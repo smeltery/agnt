@@ -205,19 +205,16 @@ function writeCanonicalFileStateString(serialized) {
 
 function resolveStoreDir() {
   return normalizeNonEmptyString(process.env.AGNT_DEVICE_STATE_DIR)
-    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_DIR)
     || DEFAULT_STORE_DIR;
 }
 
 function resolveStoreFile() {
   return normalizeNonEmptyString(process.env.AGNT_DEVICE_STATE_FILE)
-    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_FILE)
     || path.join(resolveStoreDir(), "device-state.json");
 }
 
 function resolveKeychainMirrorFile() {
-  return normalizeNonEmptyString(process.env.AGNT_DEVICE_STATE_KEYCHAIN_MOCK_FILE)
-    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE);
+  return normalizeNonEmptyString(process.env.AGNT_DEVICE_STATE_KEYCHAIN_MOCK_FILE);
 }
 
 function readKeychainStateString() {

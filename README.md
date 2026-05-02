@@ -25,7 +25,7 @@ The Remodex bridge is well-built but assumes one agent: Codex. agnt:
 - Defines a provider plugin contract (`agnt-bridge/src/providers/types.js`) with optional `translate` hooks for protocol shimming.
 - Routes the bridge's transport, desktop refresher, rollout watcher, and bootstrap through the active provider.
 - Selects the active provider via `--provider <id>`, `AGNT_PROVIDER` env, persisted daemon-state, `isInstalled()` auto-detect, then first registered.
-- Keeps `AGNT_*` env names primary; `REMODEX_*` / `PHODEX_*` aliases stay as fallbacks.
+- Uses `AGNT_*` for every env name. No alias prefixes.
 
 ## Architecture
 
@@ -109,7 +109,7 @@ node ./bin/agnt.js up --provider claude    # stub — transport throws until imp
 
 ## Configuration
 
-Primary env names are `AGNT_*`. `REMODEX_*` / `PHODEX_*` remain as fallbacks for users carrying state from the upstream Remodex fork.
+All env names use the `AGNT_*` prefix.
 
 | Env | Purpose |
 |---|---|

@@ -297,7 +297,7 @@ test("sanitizeThreadHistoryImagesForRelay annotates image end history with local
 });
 
 test("sanitizeThreadHistoryImagesForRelay uses CODEX_HOME for generated image fallbacks", (t) => {
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-codex-home-"));
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
   process.env.CODEX_HOME = codexHome;
   t.after(() => {

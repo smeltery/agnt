@@ -29,7 +29,7 @@ function useProcessPlatform(t, platform) {
 }
 
 test("workspace/readImage returns base64 image data for a file inside cwd", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "preview.png");
   const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -49,7 +49,7 @@ test("workspace/readImage returns base64 image data for a file inside cwd", asyn
 });
 
 test("workspace/readImage can return metadata without image bytes", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "preview.png");
   const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -68,7 +68,7 @@ test("workspace/readImage can return metadata without image bytes", async () => 
 });
 
 test("workspace/readImage skips bytes when cached metadata still matches", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "preview.png");
   const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -91,7 +91,7 @@ test("workspace/readImage skips bytes when cached metadata still matches", async
 });
 
 test("workspace/readImage accepts bounded preview reads", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "preview.png");
   const bytes = validOnePixelPNG;
@@ -112,7 +112,7 @@ test("workspace/readImage accepts bounded preview reads", async () => {
 
 test("workspace/readImage ignores client platform fields for non-mac preview decisions", async (t) => {
   useProcessPlatform(t, "win32");
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "preview.png");
   fs.writeFileSync(imagePath, validOnePixelPNG);
@@ -132,8 +132,8 @@ test("workspace/readImage ignores client platform fields for non-mac preview dec
 
 test("workspace/readImage retries smaller previews when the first preview is still too large", async (t) => {
   useProcessPlatform(t, "darwin");
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
-  const fakeBinDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-fake-sips-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
+  const fakeBinDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-fake-sips-"));
   const fakeSipsLog = path.join(tempDir, "sips.log");
   const previousPath = process.env.PATH;
   process.env.PATH = `${fakeBinDir}${path.delimiter}${previousPath || ""}`;
@@ -179,8 +179,8 @@ fs.writeFileSync(outputPath, dimension > 512 ? Buffer.alloc(2 * 1024 * 1024 + 1)
 
 test("workspace/readImage stops preview retries when sips times out", async (t) => {
   useProcessPlatform(t, "darwin");
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
-  const fakeBinDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-fake-sips-timeout-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
+  const fakeBinDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-fake-sips-timeout-"));
   const fakeSipsLog = path.join(tempDir, "sips-timeout.log");
   const previousPath = process.env.PATH;
   process.env.PATH = `${fakeBinDir}${path.delimiter}${previousPath || ""}`;
@@ -224,7 +224,7 @@ setTimeout(() => {}, 30_000);
 });
 
 test("workspace/readImage revalidates cached preview dimensions", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "preview.png");
   fs.writeFileSync(imagePath, validOnePixelPNG);
@@ -259,7 +259,7 @@ test("workspace/readImage revalidates cached preview dimensions", async () => {
 
 test("workspace/readImage does not fall back to original bytes when preview conversion fails", async (t) => {
   useProcessPlatform(t, "darwin");
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "corrupt.png");
   fs.writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
@@ -275,7 +275,7 @@ test("workspace/readImage does not fall back to original bytes when preview conv
 });
 
 test("workspace/readImage does not round cached mtime checks", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const imagePath = path.join(tempDir, "preview.png");
   const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -297,7 +297,7 @@ test("workspace/readImage does not round cached mtime checks", async () => {
 });
 
 test("workspace/readImage rejects non-image paths", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
   const textPath = path.join(tempDir, "notes.txt");
   fs.writeFileSync(textPath, "not an image");
@@ -312,7 +312,7 @@ test("workspace/readImage rejects non-image paths", async () => {
 });
 
 test("workspace/readImage rejects workspace images when cwd is missing", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.homedir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.homedir(), "agnt-image-"));
   const imagePath = path.join(tempDir, "preview.png");
   fs.writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
@@ -329,7 +329,7 @@ test("workspace/readImage rejects workspace images when cwd is missing", async (
 });
 
 test("workspace/readImage allows images inside non-git workspace cwd", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.homedir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.homedir(), "agnt-image-"));
   const imagePath = path.join(tempDir, "preview.png");
   const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
   fs.writeFileSync(imagePath, bytes);
@@ -348,7 +348,7 @@ test("workspace/readImage allows images inside non-git workspace cwd", async () 
 });
 
 test("workspace/readImage allows generated images under CODEX_HOME", async (t) => {
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-codex-home-"));
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
   process.env.CODEX_HOME = codexHome;
   t.after(() => {
@@ -375,7 +375,7 @@ test("workspace/readImage allows generated images under CODEX_HOME", async (t) =
 });
 
 test("workspace/readImage allows temporary screenshot images", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   const imagePath = path.join(tempDir, "emanuele-mobile.png");
   const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
   fs.writeFileSync(imagePath, bytes);
@@ -389,7 +389,7 @@ test("workspace/readImage allows temporary screenshot images", async () => {
 });
 
 test("workspace/readImage allows macOS shared /tmp screenshot images", { skip: process.platform !== "darwin" }, async () => {
-  const tempDir = fs.mkdtempSync(path.join("/tmp", "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join("/tmp", "agnt-image-"));
   const imagePath = path.join(tempDir, "emanuele-mobile.png");
   const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
   fs.writeFileSync(imagePath, bytes);
@@ -407,7 +407,7 @@ test("workspace/readImage allows macOS shared /tmp screenshot images", { skip: p
 });
 
 test("workspace/readImage rejects cwd widening outside a repository", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.homedir(), "remodex-image-"));
+  const tempDir = fs.mkdtempSync(path.join(os.homedir(), "agnt-image-"));
   const imagePath = path.join(tempDir, "preview.png");
   fs.writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 

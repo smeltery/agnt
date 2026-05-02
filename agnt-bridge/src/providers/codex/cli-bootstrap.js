@@ -7,7 +7,7 @@
 const { execFileSync } = require("child_process");
 
 const CODEX_PACKAGE_SPEC = "@openai/codex@latest";
-const SKIP_BOOTSTRAP_ENV_NAMES = ["AGNT_SKIP_CODEX_BOOTSTRAP", "REMODEX_SKIP_CODEX_BOOTSTRAP"];
+const SKIP_BOOTSTRAP_ENV_NAMES = ["AGNT_SKIP_CODEX_BOOTSTRAP"];
 
 // Keeps the Codex bootstrap flow explicit and reusable across postinstall and runtime startup paths.
 function ensureCodexCLI({

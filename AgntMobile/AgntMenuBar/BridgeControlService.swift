@@ -390,9 +390,9 @@ final class BridgeControlService {
             .map { $0.appendingPathComponent("bin", isDirectory: true).appendingPathComponent(name).path }
     }
 
-    // Mirrors the bridge daemon-state lookup order so old CLI output still hydrates the companion correctly.
+    // Mirrors the bridge daemon-state lookup order so CLI output hydrates the companion correctly.
     private func resolveStateDirectory(statusLines: [String: String]) -> URL {
-        if let explicitStateDirectory = normalizeNonEmptyString(ProcessInfo.processInfo.environment["REMODEX_DEVICE_STATE_DIR"]) {
+        if let explicitStateDirectory = normalizeNonEmptyString(ProcessInfo.processInfo.environment["AGNT_DEVICE_STATE_DIR"]) {
             return URL(fileURLWithPath: explicitStateDirectory, isDirectory: true)
         }
 
@@ -411,7 +411,7 @@ final class BridgeControlService {
         guard let data = try? Data(contentsOf: launchAgentPlistURL),
               let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
               let environment = plist["EnvironmentVariables"] as? [String: Any],
-              let stateDirectory = normalizeNonEmptyString(environment["REMODEX_DEVICE_STATE_DIR"] as? String) else {
+              let stateDirectory = normalizeNonEmptyString(environment["AGNT_DEVICE_STATE_DIR"] as? String) else {
             return nil
         }
 
@@ -512,7 +512,7 @@ final class BridgeControlService {
         }
 
         return [
-            "REMODEX_RELAY": relayOverride.trimmingCharacters(in: .whitespacesAndNewlines),
+            "AGNT_RELAY": relayOverride.trimmingCharacters(in: .whitespacesAndNewlines),
         ]
     }
 }

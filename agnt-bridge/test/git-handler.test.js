@@ -31,10 +31,10 @@ function makeTempRepo() {
   git(repoDir, "config", "user.name", "agnt Tests");
   git(repoDir, "config", "user.email", "tests@example.com");
   fs.writeFileSync(path.join(repoDir, "README.md"), "# Test\n");
-  fs.mkdirSync(path.join(repoDir, "phodex-bridge", "src"), { recursive: true });
-  fs.writeFileSync(path.join(repoDir, "phodex-bridge", "src", "index.js"), "export const ready = true;\n");
+  fs.mkdirSync(path.join(repoDir, "agnt-bridge", "src"), { recursive: true });
+  fs.writeFileSync(path.join(repoDir, "agnt-bridge", "src", "index.js"), "export const ready = true;\n");
   git(repoDir, "add", "README.md");
-  git(repoDir, "add", "phodex-bridge/src/index.js");
+  git(repoDir, "add", "agnt-bridge/src/index.js");
   git(repoDir, "commit", "-m", "Initial commit");
   git(repoDir, "branch", "feature/clean-switch");
   return repoDir;
@@ -146,7 +146,7 @@ test("gitBranches marks branches that are checked out in another worktree", asyn
 
 test("gitBranches scopes worktree paths to the current project subdirectory", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const siblingWorktree = path.join(path.dirname(repoDir), `${path.basename(repoDir)}-wt-feature`);
 
   try {
@@ -156,7 +156,7 @@ test("gitBranches scopes worktree paths to the current project subdirectory", as
 
     assert.equal(
       result.worktreePathByBranch["feature/clean-switch"],
-      canonicalPath(path.join(siblingWorktree, "phodex-bridge"))
+      canonicalPath(path.join(siblingWorktree, "agnt-bridge"))
     );
   } finally {
     fs.rmSync(repoDir, { recursive: true, force: true });
@@ -182,9 +182,9 @@ test("gitBranches exposes the true local checkout path even when called from a w
 
 test("gitBranches scopes local checkout path for subdirectory worktrees", async () => {
   const repoDir = makeTempRepo();
-  const localProjectDir = path.join(repoDir, "phodex-bridge");
+  const localProjectDir = path.join(repoDir, "agnt-bridge");
   const siblingWorktree = path.join(path.dirname(repoDir), `${path.basename(repoDir)}-wt-feature`);
-  const siblingProjectDir = path.join(siblingWorktree, "phodex-bridge");
+  const siblingProjectDir = path.join(siblingWorktree, "agnt-bridge");
 
   try {
     git(repoDir, "worktree", "add", siblingWorktree, "feature/clean-switch");
@@ -1075,7 +1075,7 @@ test("handleGitRequest owns thread rename and emits the rename hook", async () =
 
 test("gitCreateWorktree creates a managed worktree under CODEX_HOME/worktrees", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1091,7 +1091,7 @@ test("gitCreateWorktree creates a managed worktree under CODEX_HOME/worktrees", 
     assert.equal(result.branch, "agnt/new-worktree");
     assert.equal(result.alreadyExisted, false);
     assert.ok(result.worktreePath.startsWith(managedWorktreesRoot));
-    assert.equal(path.basename(result.worktreePath), "phodex-bridge");
+    assert.equal(path.basename(result.worktreePath), "agnt-bridge");
     assert.equal(git(result.worktreePath, "rev-parse", "--abbrev-ref", "HEAD"), "agnt/new-worktree");
 
     git(repoDir, "worktree", "remove", "--force", path.dirname(result.worktreePath));
@@ -1108,7 +1108,7 @@ test("gitCreateWorktree creates a managed worktree under CODEX_HOME/worktrees", 
 
 test("gitCreateManagedWorktree creates a detached managed worktree under CODEX_HOME/worktrees", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1124,7 +1124,7 @@ test("gitCreateManagedWorktree creates a detached managed worktree under CODEX_H
     assert.equal(result.baseBranch, "main");
     assert.equal(result.headMode, "detached");
     assert.ok(result.worktreePath.startsWith(managedWorktreesRoot));
-    assert.equal(path.basename(result.worktreePath), "phodex-bridge");
+    assert.equal(path.basename(result.worktreePath), "agnt-bridge");
     assert.equal(git(result.worktreePath, "rev-parse", "--abbrev-ref", "HEAD"), "HEAD");
   } finally {
     if (previousCodexHome === undefined) {
@@ -1139,7 +1139,7 @@ test("gitCreateManagedWorktree creates a detached managed worktree under CODEX_H
 
 test("gitCreateWorktree reuses an existing worktree for the same agnt branch", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
   const siblingWorktree = path.join(path.dirname(repoDir), `${path.basename(repoDir)}-wt-agnt-existing`);
@@ -1157,7 +1157,7 @@ test("gitCreateWorktree reuses an existing worktree for the same agnt branch", a
 
     assert.equal(result.branch, "agnt/existing");
     assert.equal(result.alreadyExisted, true);
-    assert.equal(result.worktreePath, canonicalPath(path.join(siblingWorktree, "phodex-bridge")));
+    assert.equal(result.worktreePath, canonicalPath(path.join(siblingWorktree, "agnt-bridge")));
   } finally {
     if (previousCodexHome === undefined) {
       delete process.env.CODEX_HOME;
@@ -1192,7 +1192,7 @@ test("gitCreateWorktree rejects a reused local branch name before ignoring the c
 
 test("gitCreateWorktree rejects invalid Git branch names before creating a worktree", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
 
   try {
     await assert.rejects(
@@ -1234,7 +1234,7 @@ test("gitCreateWorktree rejects remote-only base branches because worktrees star
 
 test("gitCreateWorktree carries tracked and untracked changes into the new worktree and cleans local", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1242,7 +1242,7 @@ test("gitCreateWorktree carries tracked and untracked changes into the new workt
 
   try {
     fs.writeFileSync(path.join(projectDir, "src", "index.js"), "export const ready = false;\n");
-    fs.writeFileSync(path.join(repoDir, "phodex-bridge", "scratch.txt"), "carry me\n");
+    fs.writeFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "carry me\n");
 
     const result = await __test.gitCreateWorktree(projectDir, {
       name: "dirty-worktree",
@@ -1258,7 +1258,7 @@ test("gitCreateWorktree carries tracked and untracked changes into the new workt
       "carry me\n"
     );
     assert.equal(git(repoDir, "status", "--short"), "");
-    assert.equal(fs.existsSync(path.join(repoDir, "phodex-bridge", "scratch.txt")), false);
+    assert.equal(fs.existsSync(path.join(repoDir, "agnt-bridge", "scratch.txt")), false);
 
     git(repoDir, "worktree", "remove", "--force", path.dirname(result.worktreePath));
   } finally {
@@ -1274,7 +1274,7 @@ test("gitCreateWorktree carries tracked and untracked changes into the new workt
 
 test("gitCreateWorktree can copy tracked and untracked changes into the new worktree without cleaning local", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1282,7 +1282,7 @@ test("gitCreateWorktree can copy tracked and untracked changes into the new work
 
   try {
     fs.writeFileSync(path.join(projectDir, "src", "index.js"), "export const ready = 'copied';\n");
-    fs.writeFileSync(path.join(repoDir, "phodex-bridge", "scratch.txt"), "keep me too\n");
+    fs.writeFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "keep me too\n");
 
     const result = await __test.gitCreateWorktree(projectDir, {
       name: "copied-worktree",
@@ -1298,9 +1298,9 @@ test("gitCreateWorktree can copy tracked and untracked changes into the new work
       fs.readFileSync(path.join(result.worktreePath, "scratch.txt"), "utf8"),
       "keep me too\n"
     );
-    assert.match(git(repoDir, "status", "--short"), /phodex-bridge\/src\/index\.js/);
+    assert.match(git(repoDir, "status", "--short"), /agnt-bridge\/src\/index\.js/);
     assert.equal(
-      fs.readFileSync(path.join(repoDir, "phodex-bridge", "scratch.txt"), "utf8"),
+      fs.readFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "utf8"),
       "keep me too\n"
     );
 
@@ -1318,7 +1318,7 @@ test("gitCreateWorktree can copy tracked and untracked changes into the new work
 
 test("gitCreateWorktree ignores dirty changes outside the current project scope", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1356,7 +1356,7 @@ test("gitCreateWorktree ignores dirty changes outside the current project scope"
 
 test("gitCreateWorktree leaves ignored files in the local checkout during handoff", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1391,7 +1391,7 @@ test("gitCreateWorktree leaves ignored files in the local checkout during handof
 
 test("gitCreateWorktree leaves ignored files only in Local when copying changes for a fork", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1428,7 +1428,7 @@ test("gitCreateWorktree leaves ignored files only in Local when copying changes 
 
 test("gitCreateManagedWorktree moves tracked changes into the detached worktree and cleans Local", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1436,7 +1436,7 @@ test("gitCreateManagedWorktree moves tracked changes into the detached worktree 
 
   try {
     fs.writeFileSync(path.join(projectDir, "src", "index.js"), "export const ready = false;\n");
-    fs.writeFileSync(path.join(repoDir, "phodex-bridge", "scratch.txt"), "carry me\n");
+    fs.writeFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "carry me\n");
 
     const result = await __test.gitCreateManagedWorktree(projectDir, {
       baseBranch: "main",
@@ -1452,7 +1452,7 @@ test("gitCreateManagedWorktree moves tracked changes into the detached worktree 
       "carry me\n"
     );
     assert.equal(git(repoDir, "status", "--short"), "");
-    assert.equal(fs.existsSync(path.join(repoDir, "phodex-bridge", "scratch.txt")), false);
+    assert.equal(fs.existsSync(path.join(repoDir, "agnt-bridge", "scratch.txt")), false);
   } finally {
     if (previousCodexHome === undefined) {
       delete process.env.CODEX_HOME;
@@ -1466,7 +1466,7 @@ test("gitCreateManagedWorktree moves tracked changes into the detached worktree 
 
 test("gitCreateManagedWorktree copies tracked changes into the detached worktree and keeps Local dirty", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1474,7 +1474,7 @@ test("gitCreateManagedWorktree copies tracked changes into the detached worktree
 
   try {
     fs.writeFileSync(path.join(projectDir, "src", "index.js"), "export const ready = 'copied';\n");
-    fs.writeFileSync(path.join(repoDir, "phodex-bridge", "scratch.txt"), "keep me too\n");
+    fs.writeFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "keep me too\n");
 
     const result = await __test.gitCreateManagedWorktree(projectDir, {
       baseBranch: "main",
@@ -1489,9 +1489,9 @@ test("gitCreateManagedWorktree copies tracked changes into the detached worktree
       fs.readFileSync(path.join(result.worktreePath, "scratch.txt"), "utf8"),
       "keep me too\n"
     );
-    assert.match(git(repoDir, "status", "--short"), /phodex-bridge\/src\/index\.js/);
+    assert.match(git(repoDir, "status", "--short"), /agnt-bridge\/src\/index\.js/);
     assert.equal(
-      fs.readFileSync(path.join(repoDir, "phodex-bridge", "scratch.txt"), "utf8"),
+      fs.readFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "utf8"),
       "keep me too\n"
     );
   } finally {
@@ -1507,7 +1507,7 @@ test("gitCreateManagedWorktree copies tracked changes into the detached worktree
 
 test("gitCreateManagedWorktree leaves ignored files only in Local", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1540,7 +1540,7 @@ test("gitCreateManagedWorktree leaves ignored files only in Local", async () => 
 
 test("gitTransferManagedHandoff moves tracked changes from Local into an existing managed worktree", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1582,7 +1582,7 @@ test("gitTransferManagedHandoff moves tracked changes from Local into an existin
 
 test("gitTransferManagedHandoff moves only the current project scope into the managed worktree", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1624,7 +1624,7 @@ test("gitTransferManagedHandoff moves only the current project scope into the ma
 
 test("gitTransferManagedHandoff moves tracked changes from a managed worktree back to Local", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 
@@ -1666,7 +1666,7 @@ test("gitTransferManagedHandoff moves tracked changes from a managed worktree ba
 
 test("gitRemoveWorktree removes a managed worktree and its freshly created branch", async () => {
   const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "phodex-bridge");
+  const projectDir = path.join(repoDir, "agnt-bridge");
   const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
 

@@ -27,7 +27,7 @@ const {
   writePairingSession,
 } = require("../src/daemon-state");
 
-test("daemon-state stores config, pairing payloads, and status under the remodex state dir", () => {
+test("daemon-state stores config, pairing payloads, and status under the agnt state dir", () => {
   withTempDaemonEnv(({ rootDir }) => {
     writeDaemonConfig({ relayUrl: "ws://127.0.0.1:9000/relay" });
     writePairingSession({ sessionId: "session-1" }, {
@@ -73,17 +73,17 @@ test("daemon-state creates the logs directory and derived log paths inside the s
 });
 
 function withTempDaemonEnv(run) {
-  const previousDir = process.env.REMODEX_DEVICE_STATE_DIR;
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-daemon-state-"));
-  process.env.REMODEX_DEVICE_STATE_DIR = rootDir;
+  const previousDir = process.env.AGNT_DEVICE_STATE_DIR;
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-daemon-state-"));
+  process.env.AGNT_DEVICE_STATE_DIR = rootDir;
 
   try {
     return run({ rootDir });
   } finally {
     if (previousDir === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_DIR;
+      delete process.env.AGNT_DEVICE_STATE_DIR;
     } else {
-      process.env.REMODEX_DEVICE_STATE_DIR = previousDir;
+      process.env.AGNT_DEVICE_STATE_DIR = previousDir;
     }
     fs.rmSync(rootDir, { recursive: true, force: true });
   }

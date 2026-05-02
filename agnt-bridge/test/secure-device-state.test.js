@@ -209,28 +209,28 @@ function makeDeviceState(overrides = {}) {
 }
 
 function withTempDeviceStateEnv(run) {
-  const previousDir = process.env.REMODEX_DEVICE_STATE_DIR;
-  const previousMirror = process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-device-state-"));
+  const previousDir = process.env.AGNT_DEVICE_STATE_DIR;
+  const previousMirror = process.env.AGNT_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-device-state-"));
   const canonicalStateFile = path.join(tempRoot, "device-state.json");
   const keychainMirrorFile = path.join(tempRoot, "keychain-device-state.json");
 
-  process.env.REMODEX_DEVICE_STATE_DIR = tempRoot;
-  process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE = keychainMirrorFile;
+  process.env.AGNT_DEVICE_STATE_DIR = tempRoot;
+  process.env.AGNT_DEVICE_STATE_KEYCHAIN_MOCK_FILE = keychainMirrorFile;
 
   try {
     return run({ canonicalStateFile, keychainMirrorFile });
   } finally {
     if (previousDir === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_DIR;
+      delete process.env.AGNT_DEVICE_STATE_DIR;
     } else {
-      process.env.REMODEX_DEVICE_STATE_DIR = previousDir;
+      process.env.AGNT_DEVICE_STATE_DIR = previousDir;
     }
 
     if (previousMirror === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
+      delete process.env.AGNT_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
     } else {
-      process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE = previousMirror;
+      process.env.AGNT_DEVICE_STATE_KEYCHAIN_MOCK_FILE = previousMirror;
     }
 
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -238,7 +238,7 @@ function withTempDeviceStateEnv(run) {
 }
 
 function readCanonicalStateFromDisk() {
-  const canonicalStateFile = path.join(process.env.REMODEX_DEVICE_STATE_DIR, "device-state.json");
+  const canonicalStateFile = path.join(process.env.AGNT_DEVICE_STATE_DIR, "device-state.json");
   return JSON.parse(fs.readFileSync(canonicalStateFile, "utf8"));
 }
 

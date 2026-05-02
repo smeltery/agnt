@@ -33,7 +33,7 @@ function openLastActiveThread({ bundleId = DEFAULT_BUNDLE_ID } = {}) {
   const state = readState();
   const threadId = state?.threadId;
   if (!threadId) {
-    throw new Error("No remembered Remodex thread found yet.");
+    throw new Error("No remembered agnt thread found yet.");
   }
 
   const targetUrl = `codex://threads/${threadId}`;

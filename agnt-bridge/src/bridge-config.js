@@ -30,12 +30,12 @@ function readBridgeConfig({
     ? ""
     : privateDefaults.relayUrl;
   const explicitRelayUrl = readFirstDefinedEnv(
-    ["AGNT_RELAY", "REMODEX_RELAY", "PHODEX_RELAY"],
+    ["AGNT_RELAY"],
     "",
     env
   );
   const relayUrl = readFirstDefinedEnv(
-    ["AGNT_RELAY", "REMODEX_RELAY", "PHODEX_RELAY"],
+    ["AGNT_RELAY"],
     defaultRelayUrl,
     env
   );
@@ -43,17 +43,17 @@ function readBridgeConfig({
     ? ""
     : privateDefaults.pushServiceUrl;
   const codexEndpoint = readFirstDefinedEnv(
-    ["AGNT_AGENT_ENDPOINT", "AGNT_CODEX_ENDPOINT", "REMODEX_CODEX_ENDPOINT", "PHODEX_CODEX_ENDPOINT"],
+    ["AGNT_AGENT_ENDPOINT", "AGNT_CODEX_ENDPOINT"],
     "",
     env
   );
   const refreshCommand = readFirstDefinedEnv(
-    ["AGNT_REFRESH_COMMAND", "REMODEX_REFRESH_COMMAND", "PHODEX_ON_PHONE_MESSAGE"],
+    ["AGNT_REFRESH_COMMAND"],
     "",
     env
   );
-  const explicitRefreshEnabled = readOptionalBooleanEnv(["AGNT_REFRESH_ENABLED", "REMODEX_REFRESH_ENABLED"], env);
-  const explicitKeepMacAwakeEnabled = readOptionalBooleanEnv(["AGNT_KEEP_MAC_AWAKE", "REMODEX_KEEP_MAC_AWAKE"], env);
+  const explicitRefreshEnabled = readOptionalBooleanEnv(["AGNT_REFRESH_ENABLED"], env);
+  const explicitKeepMacAwakeEnabled = readOptionalBooleanEnv(["AGNT_KEEP_MAC_AWAKE"], env);
   const persistedKeepMacAwakeEnabled = typeof daemonConfig.keepMacAwakeEnabled === "boolean"
     ? daemonConfig.keepMacAwakeEnabled
     : null;
@@ -62,28 +62,28 @@ function readBridgeConfig({
   return {
     relayUrl,
     pushServiceUrl: readFirstDefinedEnv(
-      ["AGNT_PUSH_SERVICE_URL", "REMODEX_PUSH_SERVICE_URL"],
+      ["AGNT_PUSH_SERVICE_URL"],
       defaultPushServiceUrl,
       env
     ),
     pushPreviewMaxChars: parseIntegerEnv(
-      readFirstDefinedEnv(["AGNT_PUSH_PREVIEW_MAX_CHARS", "REMODEX_PUSH_PREVIEW_MAX_CHARS"], "160", env),
+      readFirstDefinedEnv(["AGNT_PUSH_PREVIEW_MAX_CHARS"], "160", env),
       160
     ),
     refreshEnabled: explicitRefreshEnabled == null
       ? defaultRefreshEnabled
       : explicitRefreshEnabled,
     refreshDebounceMs: parseIntegerEnv(
-      readFirstDefinedEnv(["AGNT_REFRESH_DEBOUNCE_MS", "REMODEX_REFRESH_DEBOUNCE_MS"], String(DEFAULT_DEBOUNCE_MS), env),
+      readFirstDefinedEnv(["AGNT_REFRESH_DEBOUNCE_MS"], String(DEFAULT_DEBOUNCE_MS), env),
       DEFAULT_DEBOUNCE_MS
     ),
     keepMacAwakeEnabled: explicitKeepMacAwakeEnabled == null
       ? (persistedKeepMacAwakeEnabled == null ? false : persistedKeepMacAwakeEnabled)
       : explicitKeepMacAwakeEnabled,
     codexEndpoint,
-    desktopIpcSocketPath: readFirstDefinedEnv(["AGNT_DESKTOP_IPC_SOCKET", "REMODEX_DESKTOP_IPC_SOCKET"], "", env),
+    desktopIpcSocketPath: readFirstDefinedEnv(["AGNT_DESKTOP_IPC_SOCKET"], "", env),
     refreshCommand,
-    codexBundleId: readFirstDefinedEnv(["AGNT_CODEX_BUNDLE_ID", "REMODEX_CODEX_BUNDLE_ID"], DEFAULT_BUNDLE_ID, env),
+    codexBundleId: readFirstDefinedEnv(["AGNT_CODEX_BUNDLE_ID"], DEFAULT_BUNDLE_ID, env),
     codexAppPath: DEFAULT_APP_PATH,
     providerId: typeof daemonConfig.providerId === "string" ? daemonConfig.providerId : "",
   };

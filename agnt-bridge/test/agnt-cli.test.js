@@ -25,7 +25,7 @@ test("agnt restart reuses the macOS service start flow", async () => {
   const messages = [];
 
   await main({
-    argv: ["node", "remodex", "restart"],
+    argv: ["node", "agnt", "restart"],
     platform: "darwin",
     consoleImpl: {
       log(message) {
@@ -45,7 +45,7 @@ test("agnt restart reuses the macOS service start flow", async () => {
       async startMacOSBridgeService(options) {
         calls.push(["start-service", options]);
         return {
-          plistPath: "/tmp/remodex.plist",
+          plistPath: "/tmp/agnt.plist",
           pairingSession: { relay: "ws://127.0.0.1:9000/relay" },
         };
       },
@@ -66,7 +66,7 @@ test("agnt up shows a startup indicator while waiting for the pairing QR", async
   const messages = [];
 
   await main({
-    argv: ["node", "remodex", "up"],
+    argv: ["node", "agnt", "up"],
     platform: "darwin",
     consoleImpl: {
       log(message) {
@@ -115,7 +115,7 @@ test("agnt status --json exposes daemon metadata for companion apps", async () =
 
   try {
     await main({
-      argv: ["node", "remodex", "status", "--json"],
+      argv: ["node", "agnt", "status", "--json"],
       platform: "darwin",
       consoleImpl: {
         log() {},

@@ -129,7 +129,7 @@ test("ensureCodexCLI stops gracefully when npm is unavailable", () => {
 });
 
 test("shouldSkipCodexBootstrap respects the opt-out env flag", () => {
-  assert.equal(shouldSkipCodexBootstrap({ REMODEX_SKIP_CODEX_BOOTSTRAP: "1" }), true);
-  assert.equal(shouldSkipCodexBootstrap({ REMODEX_SKIP_CODEX_BOOTSTRAP: "true" }), true);
-  assert.equal(shouldSkipCodexBootstrap({ REMODEX_SKIP_CODEX_BOOTSTRAP: "0" }), false);
+  assert.equal(shouldSkipCodexBootstrap({ AGNT_SKIP_CODEX_BOOTSTRAP: "1" }), true);
+  assert.equal(shouldSkipCodexBootstrap({ AGNT_SKIP_CODEX_BOOTSTRAP: "true" }), true);
+  assert.equal(shouldSkipCodexBootstrap({ AGNT_SKIP_CODEX_BOOTSTRAP: "0" }), false);
 });

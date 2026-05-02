@@ -22,7 +22,7 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   const macConfig = readBridgeConfig({
     env: {},
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/agnt-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -32,16 +32,16 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   });
   const persistedKeepAwakeConfig = readBridgeConfig({
     env: {
-      REMODEX_DEVICE_STATE_DIR: "/tmp/remodex-state",
+      AGNT_DEVICE_STATE_DIR: "/tmp/agnt-state",
     },
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/agnt-package",
     fsImpl: {
       existsSync(targetPath) {
-        return targetPath === "/tmp/remodex-state/daemon-config.json";
+        return targetPath === "/tmp/agnt-state/daemon-config.json";
       },
       readFileSync(targetPath) {
-        if (targetPath === "/tmp/remodex-state/daemon-config.json") {
+        if (targetPath === "/tmp/agnt-state/daemon-config.json") {
           return JSON.stringify({ keepMacAwakeEnabled: false });
         }
         throw new Error("unexpected read");
@@ -49,9 +49,9 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
     },
   });
   const macEndpointConfig = readBridgeConfig({
-    env: { REMODEX_CODEX_ENDPOINT: "ws://localhost:8080" },
+    env: { AGNT_CODEX_ENDPOINT: "ws://localhost:8080" },
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/agnt-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -62,7 +62,7 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   const linuxConfig = readBridgeConfig({
     env: {},
     platform: "linux",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/agnt-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -71,9 +71,9 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
     },
   });
   const linuxCommandConfig = readBridgeConfig({
-    env: { REMODEX_REFRESH_COMMAND: "echo refresh" },
+    env: { AGNT_REFRESH_COMMAND: "echo refresh" },
     platform: "linux",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/agnt-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -83,12 +83,12 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   });
   const explicitOnConfig = readBridgeConfig({
     env: {
-      REMODEX_CODEX_ENDPOINT: "ws://localhost:8080",
-      REMODEX_REFRESH_ENABLED: "true",
-      REMODEX_DESKTOP_IPC_SOCKET: "/tmp/remodex-ipc.sock",
+      AGNT_CODEX_ENDPOINT: "ws://localhost:8080",
+      AGNT_REFRESH_ENABLED: "true",
+      AGNT_DESKTOP_IPC_SOCKET: "/tmp/agnt-ipc.sock",
     },
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/agnt-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -98,12 +98,12 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   });
   const explicitOffConfig = readBridgeConfig({
     env: {
-      REMODEX_REFRESH_COMMAND: "echo refresh",
-      REMODEX_REFRESH_ENABLED: "false",
-      REMODEX_KEEP_MAC_AWAKE: "false",
+      AGNT_REFRESH_COMMAND: "echo refresh",
+      AGNT_REFRESH_ENABLED: "false",
+      AGNT_KEEP_MAC_AWAKE: "false",
     },
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/agnt-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -120,13 +120,13 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   assert.equal(linuxConfig.refreshEnabled, false);
   assert.equal(linuxCommandConfig.refreshEnabled, false);
   assert.equal(explicitOnConfig.refreshEnabled, true);
-  assert.equal(explicitOnConfig.desktopIpcSocketPath, "/tmp/remodex-ipc.sock");
+  assert.equal(explicitOnConfig.desktopIpcSocketPath, "/tmp/agnt-ipc.sock");
   assert.equal(explicitOffConfig.refreshEnabled, false);
   assert.equal(explicitOffConfig.keepMacAwakeEnabled, false);
 });
 
 test("readBridgeConfig uses only the packaged relay default outside a source checkout", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-package-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-package-"));
   const srcDir = path.join(tempRoot, "src");
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(
@@ -146,7 +146,7 @@ test("readBridgeConfig uses only the packaged relay default outside a source che
 });
 
 test("readBridgeConfig uses a packaged push default only when it is explicitly provided", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-package-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-package-"));
   const srcDir = path.join(tempRoot, "src");
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(
@@ -171,7 +171,7 @@ test("readBridgeConfig uses a packaged push default only when it is explicitly p
 test("readBridgeConfig does not use the hosted fallback inside a source checkout", () => {
   const config = readBridgeConfig({
     env: {},
-    runtimeRoot: "/workspace/phodex-bridge",
+    runtimeRoot: "/workspace/agnt-bridge",
     fsImpl: {
       existsSync(targetPath) {
         return targetPath === "/workspace/.git";
@@ -186,9 +186,9 @@ test("readBridgeConfig does not use the hosted fallback inside a source checkout
 test("readBridgeConfig preserves reverse-proxy subpaths when deriving push URLs", () => {
   const config = readBridgeConfig({
     env: {
-      REMODEX_PUSH_SERVICE_URL: "https://relay.example/remodex",
+      AGNT_PUSH_SERVICE_URL: "https://relay.example/agnt",
     },
-    runtimeRoot: "/workspace/phodex-bridge",
+    runtimeRoot: "/workspace/agnt-bridge",
     fsImpl: {
       existsSync() {
         return false;
@@ -196,11 +196,11 @@ test("readBridgeConfig preserves reverse-proxy subpaths when deriving push URLs"
     },
   });
 
-  assert.equal(config.pushServiceUrl, "https://relay.example/remodex");
+  assert.equal(config.pushServiceUrl, "https://relay.example/agnt");
 });
 
 test("readBridgeConfig disables managed push defaults when a self-hosted relay override is set", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-package-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-package-"));
   const srcDir = path.join(tempRoot, "src");
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(
@@ -211,7 +211,7 @@ test("readBridgeConfig disables managed push defaults when a self-hosted relay o
 
   const config = readBridgeConfig({
     env: {
-      REMODEX_RELAY: "wss://self-host.example/relay",
+      AGNT_RELAY: "wss://self-host.example/relay",
     },
     runtimeRoot: tempRoot,
     fsImpl: fs,

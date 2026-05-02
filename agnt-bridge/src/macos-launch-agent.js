@@ -274,8 +274,6 @@ function buildLaunchAgentPlist({
     <string>${escapeXml(pathEnv)}</string>
     <key>AGNT_DEVICE_STATE_DIR</key>
     <string>${escapeXml(stateDir)}</string>
-    <key>REMODEX_DEVICE_STATE_DIR</key>
-    <string>${escapeXml(stateDir)}</string>
   </dict>
   <key>StandardOutPath</key>
   <string>${escapeXml(stdoutLogPath)}</string>

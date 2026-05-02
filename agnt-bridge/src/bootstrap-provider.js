@@ -14,7 +14,7 @@ const { buildCachedIOSAppCompatibilityWarning } = require("./ios-app-compatibili
 const installLocation = String(process.env.npm_config_location || "").trim().toLowerCase();
 const isGlobalInstall = process.env.npm_config_global === "true" || installLocation === "global";
 
-const skip = String(process.env.AGNT_SKIP_BOOTSTRAP || process.env.REMODEX_SKIP_BOOTSTRAP || "")
+const skip = String(process.env.AGNT_SKIP_BOOTSTRAP || "")
   .trim()
   .toLowerCase();
 const shouldSkip = skip === "1" || skip === "true" || skip === "yes";

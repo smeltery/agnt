@@ -190,7 +190,7 @@ For public self-hosting:
 
 Do not turn push on unless you are also ready to configure:
 
-- a bridge-side `REMODEX_PUSH_SERVICE_URL`
+- a bridge-side `AGNT_PUSH_SERVICE_URL`
 - APNs credentials on the relay side
 - your own operational setup for notification delivery
 
@@ -202,7 +202,7 @@ If your relay sits behind Traefik, Nginx, or Caddy:
 
 - forward WebSocket upgrades correctly
 - forward the `/relay/...` path to the relay process
-- only enable `REMODEX_TRUST_PROXY=true` when the proxy is trusted and sanitizes forwarded IP headers
+- only enable `AGNT_TRUST_PROXY=true` when the proxy is trusted and sanitizes forwarded IP headers
 
 ## What Not to Commit
 

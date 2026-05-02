@@ -70,7 +70,7 @@ test("endpoint transport only sends outbound messages after the websocket opens"
 });
 
 test("spawn launch plans add the bundled Codex app binary as a fallback on macOS", () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-codex-app-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-app-"));
   const appPath = path.join(tempDir, "Codex.app");
   const bundledCodexPath = path.join(appPath, "Contents", "Resources", "codex");
   fs.mkdirSync(path.dirname(bundledCodexPath), { recursive: true });
@@ -94,7 +94,7 @@ test("spawn launch plans add the bundled Codex app binary as a fallback on macOS
 });
 
 test("spawn launch plans keep the default codex command first even when a bundled fallback exists", () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-codex-path-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-path-"));
   const appPath = path.join(tempDir, "Codex.app");
   const bundledCodexPath = path.join(appPath, "Contents", "Resources", "codex");
   fs.mkdirSync(path.dirname(bundledCodexPath), { recursive: true });
@@ -115,7 +115,7 @@ test("spawn launch plans keep the default codex command first even when a bundle
 });
 
 test("spawn transport retries with the bundled Codex binary after an ENOENT launch error", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-codex-fallback-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-fallback-"));
   const appPath = path.join(tempDir, "Codex.app");
   const bundledCodexPath = path.join(appPath, "Contents", "Resources", "codex");
   fs.mkdirSync(path.dirname(bundledCodexPath), { recursive: true });

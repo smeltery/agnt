@@ -283,7 +283,7 @@ test("seeds conversation state from thread/read responses for IPC recovery", () 
 });
 
 test("desktop IPC follower recovers a baseline before applying first patch-only action updates", async (t) => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-ipc-recovery-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-ipc-recovery-"));
   const socketPath = path.join(tempDir, "ipc.sock");
   let serverSocket = null;
 
@@ -297,7 +297,7 @@ test("desktop IPC follower recovers a baseline before applying first patch-only 
           resultType: "success",
           method: "initialize",
           handledByClientId: "desktop",
-          result: { clientId: "remodex-test" },
+          result: { clientId: "agnt-test" },
         });
       }
     });
@@ -361,7 +361,7 @@ test("desktop IPC follower recovers a baseline before applying first patch-only 
 });
 
 test("desktop IPC follower answers client discovery requests as a passive client", async (t) => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-ipc-discovery-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-ipc-discovery-"));
   const socketPath = path.join(tempDir, "ipc.sock");
   const serverFrames = [];
   let serverSocket = null;
@@ -377,7 +377,7 @@ test("desktop IPC follower answers client discovery requests as a passive client
           resultType: "success",
           method: "initialize",
           handledByClientId: "desktop",
-          result: { clientId: "remodex-test" },
+          result: { clientId: "agnt-test" },
         });
       }
     });
@@ -425,7 +425,7 @@ test("desktop IPC follower answers client discovery requests as a passive client
 });
 
 test("desktop IPC follower forwards pending actions and routes iOS replies back to the Mac", async (t) => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-ipc-follower-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-ipc-follower-"));
   const socketPath = path.join(tempDir, "ipc.sock");
   const serverFrames = [];
   let serverSocket = null;
@@ -441,7 +441,7 @@ test("desktop IPC follower forwards pending actions and routes iOS replies back 
           resultType: "success",
           method: "initialize",
           handledByClientId: "desktop",
-          result: { clientId: "remodex-test" },
+          result: { clientId: "agnt-test" },
         });
       } else if (frame.method === "thread-follower-submit-user-input") {
         writeFrame(socket, {

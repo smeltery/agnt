@@ -308,7 +308,7 @@ function createDesktopIpcClient({
       return Promise.reject(new Error("Desktop IPC is not connected."));
     }
 
-    const requestId = `remodex-${now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+    const requestId = `agnt-${now().toString(36)}-${Math.random().toString(16).slice(2)}`;
     const envelope = {
       type: "request",
       requestId,

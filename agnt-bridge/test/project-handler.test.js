@@ -19,7 +19,7 @@ const {
 } = require("../src/project-handler");
 
 function makeTempHome() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "remodex-project-handler-"));
+  return fs.mkdtempSync(path.join(os.tmpdir(), "agnt-project-handler-"));
 }
 
 test("project/quickLocations only returns existing allowed folders", async () => {
@@ -136,7 +136,7 @@ test("project/listDirectory keeps symlink display names while returning the reso
 
 test("project/validatePath rejects folders outside the allowed home root", async () => {
   const homeDir = makeTempHome();
-  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-outside-"));
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-outside-"));
 
   const result = await projectValidatePath({ path: outsideDir }, { homeDir });
 

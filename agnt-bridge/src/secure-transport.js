@@ -75,7 +75,7 @@ function createBridgeSecureTransport({
       if (parsed.method || parsed.id != null) {
         sendControlMessage(createSecureError({
           code: "update_required",
-          message: "This bridge requires the latest Remodex iPhone app for secure pairing.",
+          message: "This bridge requires the latest agnt iPhone app for secure pairing.",
         }));
         return true;
       }

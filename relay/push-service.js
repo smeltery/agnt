@@ -253,21 +253,21 @@ function createFileBackedPushStateStore({ stateFilePath } = {}) {
 
 function apnsConfigFromEnv(env) {
   return {
-    teamId: readFirstDefinedEnv(["AGNT_APNS_TEAM_ID", "REMODEX_APNS_TEAM_ID", "PHODEX_APNS_TEAM_ID"], env),
-    keyId: readFirstDefinedEnv(["AGNT_APNS_KEY_ID", "REMODEX_APNS_KEY_ID", "PHODEX_APNS_KEY_ID"], env),
-    bundleId: readFirstDefinedEnv(["AGNT_APNS_BUNDLE_ID", "REMODEX_APNS_BUNDLE_ID", "PHODEX_APNS_BUNDLE_ID"], env),
+    teamId: readFirstDefinedEnv(["AGNT_APNS_TEAM_ID"], env),
+    keyId: readFirstDefinedEnv(["AGNT_APNS_KEY_ID"], env),
+    bundleId: readFirstDefinedEnv(["AGNT_APNS_BUNDLE_ID"], env),
     privateKey: readAPNsPrivateKey(env),
   };
 }
 
 function readAPNsPrivateKey(env) {
-  const rawValue = readFirstDefinedEnv(["AGNT_APNS_PRIVATE_KEY", "REMODEX_APNS_PRIVATE_KEY", "PHODEX_APNS_PRIVATE_KEY"], env);
+  const rawValue = readFirstDefinedEnv(["AGNT_APNS_PRIVATE_KEY"], env);
   if (rawValue) {
     return rawValue;
   }
 
   const filePath = readFirstDefinedEnv(
-    ["AGNT_APNS_PRIVATE_KEY_FILE", "REMODEX_APNS_PRIVATE_KEY_FILE", "PHODEX_APNS_PRIVATE_KEY_FILE"],
+    ["AGNT_APNS_PRIVATE_KEY_FILE"],
     env
   );
   if (!filePath) {
@@ -317,7 +317,7 @@ function fallbackBodyForResult(result) {
 
 function resolvePushStateFilePath(env = process.env) {
   const explicitPath = readFirstDefinedEnv(
-    ["AGNT_PUSH_STATE_FILE", "REMODEX_PUSH_STATE_FILE", "PHODEX_PUSH_STATE_FILE"],
+    ["AGNT_PUSH_STATE_FILE"],
     env
   );
   if (explicitPath) {

@@ -48,8 +48,8 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 
 ## Env var guardrails
 
-- `AGNT_*` env names are primary; `REMODEX_*` / `PHODEX_*` aliases stay as fallbacks for users carrying state from the upstream Remodex fork. Do not break the fallbacks.
-- New env reads should go through `readFirstDefinedEnv([...names])` so the alias chain remains consistent.
+- All env names use the `AGNT_*` prefix. Do not introduce alias prefixes or fallbacks to other product names.
+- Keep env reads going through `readFirstDefinedEnv([...names])` so adding a future legitimate alias (e.g. an `AGNT_*` rename) stays a one-line edit.
 
 ## Build guardrails
 

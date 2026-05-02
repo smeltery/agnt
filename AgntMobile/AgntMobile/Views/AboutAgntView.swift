@@ -178,7 +178,7 @@ struct AboutAgntView: View {
             calloutCard(
                 icon: "point.topleft.down.to.point.bottomright.curvepath",
                 color: .orange,
-                text: "Already have a running Codex instance? Point the bridge at it with REMODEX_CODEX_ENDPOINT instead of spawning a new one."
+                text: "Already have a running Codex instance? Point the bridge at it with AGNT_CODEX_ENDPOINT instead of spawning a new one."
             )
         }
     }

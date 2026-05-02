@@ -15,7 +15,7 @@ const { setTimeout: wait } = require("node:timers/promises");
 const WebSocket = require("ws");
 
 test("bridge forwards desktop IPC actions to the phone and routes replies back to Codex Desktop", async (t) => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-bridge-ipc-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-bridge-ipc-"));
   const ipcSocketPath = path.join(tempDir, "ipc.sock");
   const relayServer = new WebSocket.Server({ port: 0 });
   const relayMessages = [];

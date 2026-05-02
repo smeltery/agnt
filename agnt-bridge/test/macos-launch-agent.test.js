@@ -115,7 +115,7 @@ test("startMacOSBridgeService kickstarts the launch agent after bootstrap", () =
     const env = {
       ...process.env,
       HOME: rootDir,
-      REMODEX_DEVICE_STATE_DIR: rootDir,
+      AGNT_DEVICE_STATE_DIR: rootDir,
       AGNT_RELAY: "ws://127.0.0.1:9000/relay",
     };
 
@@ -271,7 +271,7 @@ test("getMacOSBridgeServiceStatus reports launchd + runtime metadata together", 
 
     const status = getMacOSBridgeServiceStatus({
       platform: "darwin",
-      env: { HOME: rootDir, REMODEX_DEVICE_STATE_DIR: rootDir },
+      env: { HOME: rootDir, AGNT_DEVICE_STATE_DIR: rootDir },
       execFileSyncImpl() {
         return "pid = 55";
       },
@@ -286,19 +286,19 @@ test("getMacOSBridgeServiceStatus reports launchd + runtime metadata together", 
 });
 
 function withTempDaemonEnv(run) {
-  const previousDir = process.env.REMODEX_DEVICE_STATE_DIR;
+  const previousDir = process.env.AGNT_DEVICE_STATE_DIR;
   const previousHome = process.env.HOME;
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-launch-agent-"));
-  process.env.REMODEX_DEVICE_STATE_DIR = rootDir;
+  process.env.AGNT_DEVICE_STATE_DIR = rootDir;
   process.env.HOME = rootDir;
 
   try {
     return run({ rootDir });
   } finally {
     if (previousDir === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_DIR;
+      delete process.env.AGNT_DEVICE_STATE_DIR;
     } else {
-      process.env.REMODEX_DEVICE_STATE_DIR = previousDir;
+      process.env.AGNT_DEVICE_STATE_DIR = previousDir;
     }
     if (previousHome === undefined) {
       delete process.env.HOME;
