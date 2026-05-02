@@ -1,0 +1,40 @@
+{
+  "name": "@dotbrains/agnt",
+  "version": "0.1.0",
+  "description": "Local bridge between coding-agent CLIs (Codex, Claude Code, opencode, ...) and the Agnt mobile app. Run `agnt up` to start.",
+  "main": "src/index.js",
+  "bin": {
+    "agnt": "./bin/agnt.js"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "scripts": {
+    "start": "node ./bin/agnt.js up",
+    "test": "node --test ./test/*.test.js",
+    "postinstall": "node ./src/bootstrap-provider.js",
+    "prepack": "node ./scripts/prepare-private-defaults.js",
+    "postpack": "node ./scripts/cleanup-private-defaults.js"
+  },
+  "keywords": [
+    "agnt",
+    "agent",
+    "bridge",
+    "cli",
+    "codex",
+    "claude-code",
+    "opencode",
+    "multi-provider"
+  ],
+  "author": "dotbrains",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.19.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

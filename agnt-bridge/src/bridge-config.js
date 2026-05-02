@@ -1,0 +1,155 @@
+// FILE: bridge-config.js
+// Purpose: Provider-agnostic bridge runtime configuration. Resolves the relay
+//          URL, push service, refresher debounce, keep-awake, and provider id
+//          from env vars + persisted daemon state + private defaults.
+// Layer: CLI helper
+// Exports: readBridgeConfig
+// Depends on: fs, path, ./daemon-state
+
+const fs = require("fs");
+const path = require("path");
+const { readDaemonConfig } = require("./daemon-state");
+
+// Codex desktop defaults are still produced here so existing callers (bridge
+// core, macOS launchd helpers) keep their config shape. Provider-specific
+// runtime knobs will move into provider modules in a later refactor.
+const DEFAULT_BUNDLE_ID = "com.openai.codex";
+const DEFAULT_APP_PATH = "/Applications/Codex.app";
+const DEFAULT_DEBOUNCE_MS = 1200;
+
+function readBridgeConfig({
+  env = process.env,
+  platform = process.platform,
+  runtimeRoot = path.resolve(__dirname, ".."),
+  fsImpl = fs,
+} = {}) {
+  const daemonConfig = readDaemonConfig({ env, fsImpl }) || {};
+  const privateDefaults = readPrivatePackageDefaults({ runtimeRoot, fsImpl });
+  const sourceCheckout = isSourceCheckout(runtimeRoot, fsImpl);
+  const defaultRelayUrl = sourceCheckout
+    ? ""
+    : privateDefaults.relayUrl;
+  const explicitRelayUrl = readFirstDefinedEnv(
+    ["AGNT_RELAY", "REMODEX_RELAY", "PHODEX_RELAY"],
+    "",
+    env
+  );
+  const relayUrl = readFirstDefinedEnv(
+    ["AGNT_RELAY", "REMODEX_RELAY", "PHODEX_RELAY"],
+    defaultRelayUrl,
+    env
+  );
+  const defaultPushServiceUrl = sourceCheckout || explicitRelayUrl
+    ? ""
+    : privateDefaults.pushServiceUrl;
+  const codexEndpoint = readFirstDefinedEnv(
+    ["AGNT_AGENT_ENDPOINT", "AGNT_CODEX_ENDPOINT", "REMODEX_CODEX_ENDPOINT", "PHODEX_CODEX_ENDPOINT"],
+    "",
+    env
+  );
+  const refreshCommand = readFirstDefinedEnv(
+    ["AGNT_REFRESH_COMMAND", "REMODEX_REFRESH_COMMAND", "PHODEX_ON_PHONE_MESSAGE"],
+    "",
+    env
+  );
+  const explicitRefreshEnabled = readOptionalBooleanEnv(["AGNT_REFRESH_ENABLED", "REMODEX_REFRESH_ENABLED"], env);
+  const explicitKeepMacAwakeEnabled = readOptionalBooleanEnv(["AGNT_KEEP_MAC_AWAKE", "REMODEX_KEEP_MAC_AWAKE"], env);
+  const persistedKeepMacAwakeEnabled = typeof daemonConfig.keepMacAwakeEnabled === "boolean"
+    ? daemonConfig.keepMacAwakeEnabled
+    : null;
+  // Desktop refresh is opt-in for now because Codex.app still lacks true live updates.
+  const defaultRefreshEnabled = false;
+  return {
+    relayUrl,
+    pushServiceUrl: readFirstDefinedEnv(
+      ["AGNT_PUSH_SERVICE_URL", "REMODEX_PUSH_SERVICE_URL"],
+      defaultPushServiceUrl,
+      env
+    ),
+    pushPreviewMaxChars: parseIntegerEnv(
+      readFirstDefinedEnv(["AGNT_PUSH_PREVIEW_MAX_CHARS", "REMODEX_PUSH_PREVIEW_MAX_CHARS"], "160", env),
+      160
+    ),
+    refreshEnabled: explicitRefreshEnabled == null
+      ? defaultRefreshEnabled
+      : explicitRefreshEnabled,
+    refreshDebounceMs: parseIntegerEnv(
+      readFirstDefinedEnv(["AGNT_REFRESH_DEBOUNCE_MS", "REMODEX_REFRESH_DEBOUNCE_MS"], String(DEFAULT_DEBOUNCE_MS), env),
+      DEFAULT_DEBOUNCE_MS
+    ),
+    keepMacAwakeEnabled: explicitKeepMacAwakeEnabled == null
+      ? (persistedKeepMacAwakeEnabled == null ? false : persistedKeepMacAwakeEnabled)
+      : explicitKeepMacAwakeEnabled,
+    codexEndpoint,
+    desktopIpcSocketPath: readFirstDefinedEnv(["AGNT_DESKTOP_IPC_SOCKET", "REMODEX_DESKTOP_IPC_SOCKET"], "", env),
+    refreshCommand,
+    codexBundleId: readFirstDefinedEnv(["AGNT_CODEX_BUNDLE_ID", "REMODEX_CODEX_BUNDLE_ID"], DEFAULT_BUNDLE_ID, env),
+    codexAppPath: DEFAULT_APP_PATH,
+    providerId: typeof daemonConfig.providerId === "string" ? daemonConfig.providerId : "",
+  };
+}
+
+function readPrivatePackageDefaults({ runtimeRoot, fsImpl }) {
+  const defaultsPath = path.join(runtimeRoot, "src", "private-defaults.json");
+  if (!fsImpl.existsSync(defaultsPath)) {
+    return { relayUrl: "", pushServiceUrl: "" };
+  }
+
+  try {
+    const parsed = safeParseJSON(fsImpl.readFileSync(defaultsPath, "utf8"));
+    return {
+      relayUrl: readString(parsed?.relayUrl) || "",
+      pushServiceUrl: readString(parsed?.pushServiceUrl) || "",
+    };
+  } catch {
+    return { relayUrl: "", pushServiceUrl: "" };
+  }
+}
+
+function isSourceCheckout(runtimeRoot, fsImpl) {
+  const repoRoot = path.resolve(runtimeRoot, "..");
+  return path.basename(runtimeRoot) === "agnt-bridge"
+    && fsImpl.existsSync(path.join(repoRoot, ".git"));
+}
+
+function readFirstDefinedEnv(keys, fallback, env = process.env) {
+  for (const key of keys) {
+    const value = env[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      return value.trim();
+    }
+  }
+  return fallback;
+}
+
+function readOptionalBooleanEnv(keys, env = process.env) {
+  for (const key of keys) {
+    const value = env[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      return parseBooleanEnv(value.trim());
+    }
+  }
+  return null;
+}
+
+function parseBooleanEnv(value) {
+  const normalized = String(value).trim().toLowerCase();
+  return normalized !== "false" && normalized !== "0" && normalized !== "no";
+}
+
+function parseIntegerEnv(value, fallback) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function safeParseJSON(value) {
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+function readString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+module.exports = {
+  readBridgeConfig,
+};
