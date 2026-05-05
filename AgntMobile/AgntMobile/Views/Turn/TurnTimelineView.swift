@@ -343,6 +343,8 @@ private struct TurnTimelineRowsSection: View {
 private struct TurnTimelineFooterContainer<Composer: View>: View {
     let hidesErrorMessage: Bool
     let errorMessage: String?
+    let onReportError: (String) -> Void
+    let onDismissError: () -> Void
     let shouldShowScrollToLatestButton: Bool
     let scrollToLatestButtonLift: CGFloat
     let onScrollToLatest: (() -> Void)?
@@ -351,11 +353,13 @@ private struct TurnTimelineFooterContainer<Composer: View>: View {
     var body: some View {
         let footerContent = VStack(spacing: 0) {
             if !hidesErrorMessage, let errorMessage, !errorMessage.isEmpty {
-                Text(errorMessage)
-                    .font(AppFont.caption())
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
+                TurnErrorReportCard(
+                    message: errorMessage,
+                    onReport: { onReportError(errorMessage) },
+                    onDismiss: onDismissError
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
 
             composer()
@@ -406,6 +410,8 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     let isRetryAvailable: Bool
     let errorMessage: String?
     let hidesErrorMessage: Bool
+    let onReportError: (String) -> Void
+    let onDismissError: () -> Void
 
     @Binding var shouldAnchorToAssistantResponse: Bool
     @Binding var isScrolledToBottom: Bool
@@ -840,6 +846,8 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         TurnTimelineFooterContainer(
             hidesErrorMessage: hidesErrorMessage,
             errorMessage: errorMessage,
+            onReportError: onReportError,
+            onDismissError: onDismissError,
             shouldShowScrollToLatestButton: shouldShowScrollToLatestButton,
             scrollToLatestButtonLift: Self.scrollToLatestButtonLift,
             onScrollToLatest: scrollToBottomAction,

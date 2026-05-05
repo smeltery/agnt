@@ -22,6 +22,8 @@ struct TurnConversationContainerView: View {
     let currentWorkingDirectory: String?
     let errorMessage: String?
     let composerRecoveryAccessory: AnyView?
+    let onReportError: (String) -> Void
+    let onDismissError: () -> Void
     let shouldAnchorToAssistantResponse: Binding<Bool>
     let isScrolledToBottom: Binding<Bool>
     let isComposerFocused: Bool
@@ -101,6 +103,8 @@ struct TurnConversationContainerView: View {
                 isRetryAvailable: !isThreadRunning,
                 errorMessage: errorMessage,
                 hidesErrorMessage: composerRecoveryAccessory != nil,
+                onReportError: onReportError,
+                onDismissError: onDismissError,
                 shouldAnchorToAssistantResponse: shouldAnchorToAssistantResponse,
                 isScrolledToBottom: isScrolledToBottom,
                 isComposerFocused: isComposerFocused,

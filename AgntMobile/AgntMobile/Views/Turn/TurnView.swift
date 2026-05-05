@@ -111,6 +111,17 @@ struct TurnView: View {
                 currentWorkingDirectory: gitWorkingDirectory,
                 errorMessage: codex.lastErrorMessage,
                 composerRecoveryAccessory: composerRecoveryAccessory,
+                onReportError: { errorMessage in
+                    openURL(AppEnvironment.feedbackMailtoURL(
+                        errorMessage: errorMessage,
+                        threadId: thread.id,
+                        isConnected: codex.isConnected,
+                        cliVersion: codex.bridgeInstalledVersion
+                    ))
+                },
+                onDismissError: {
+                    codex.lastErrorMessage = nil
+                },
                 shouldAnchorToAssistantResponse: shouldAnchorToAssistantResponseBinding,
                 isScrolledToBottom: isScrolledToBottomBinding,
                 isComposerFocused: isInputFocused,
