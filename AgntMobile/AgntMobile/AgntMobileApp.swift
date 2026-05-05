@@ -12,6 +12,8 @@ struct AgntMobileApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @UIApplicationDelegateAdaptor(AgntMobileAppDelegate.self) private var appDelegate
     @State private var codexService: CodexService
+    @State private var petCompanionStore: PetCompanionStore
+    @State private var petCompanionStatusStore: PetCompanionStatusStore
     @State private var subscriptionService: SubscriptionService
 
     init() {
@@ -19,6 +21,8 @@ struct AgntMobileApp: App {
         let service = CodexService()
         service.configureNotifications()
         _codexService = State(initialValue: service)
+        _petCompanionStore = State(initialValue: PetCompanionStore())
+        _petCompanionStatusStore = State(initialValue: PetCompanionStatusStore())
         _subscriptionService = State(initialValue: SubscriptionService())
     }
 
@@ -26,6 +30,8 @@ struct AgntMobileApp: App {
         WindowGroup {
             ContentView()
                 .environment(codexService)
+                .environment(petCompanionStore)
+                .environment(petCompanionStatusStore)
                 .environment(subscriptionService)
                 .task {
                     await subscriptionService.bootstrap()
