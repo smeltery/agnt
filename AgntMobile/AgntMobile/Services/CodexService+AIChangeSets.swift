@@ -40,6 +40,12 @@ private struct AIRevertOverlapAnalysis {
     }
 }
 
+private struct AIRevertBridgeRequest {
+    let previewMethod: String
+    let applyMethod: String
+    let params: JSONValue
+}
+
 extension CodexService {
     // Returns the change set associated with a specific assistant response, falling back to turn scope while streaming.
     func aiChangeSet(forAssistantMessage message: CodexMessage) -> AIChangeSet? {
@@ -162,17 +168,10 @@ extension CodexService {
         guard let normalizedWorkingDirectory else {
             throw AIChangeSetError.missingWorkingDirectory
         }
-        guard !changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw AIChangeSetError.missingPatch
-        }
-
-        let params: JSONValue = .object([
-            "cwd": .string(normalizedWorkingDirectory),
-            "forwardPatch": .string(changeSet.forwardUnifiedPatch),
-        ])
+        let request = try revertBridgeRequest(for: changeSet, normalizedWorkingDirectory: normalizedWorkingDirectory)
 
         do {
-            let response = try await sendRequest(method: "workspace/revertPatchPreview", params: params)
+            let response = try await sendRequest(method: request.previewMethod, params: request.params)
             guard let result = response.result?.objectValue else {
                 throw AIChangeSetError.bridgeError(code: nil, message: "Invalid response from bridge.")
             }
@@ -191,19 +190,12 @@ extension CodexService {
         guard let normalizedWorkingDirectory else {
             throw AIChangeSetError.missingWorkingDirectory
         }
-        guard !changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw AIChangeSetError.missingPatch
-        }
+        let request = try revertBridgeRequest(for: changeSet, normalizedWorkingDirectory: normalizedWorkingDirectory)
 
         markRevertAttempt(changeSetId: changeSet.id)
 
-        let params: JSONValue = .object([
-            "cwd": .string(normalizedWorkingDirectory),
-            "forwardPatch": .string(changeSet.forwardUnifiedPatch),
-        ])
-
         do {
-            let response = try await sendRequest(method: "workspace/revertPatchApply", params: params)
+            let response = try await sendRequest(method: request.applyMethod, params: request.params)
             guard let result = response.result?.objectValue else {
                 throw AIChangeSetError.bridgeError(code: nil, message: "Invalid response from bridge.")
             }
@@ -235,6 +227,42 @@ extension CodexService {
             recordChangeSetError(changeSetId: changeSet.id, message: mapped.localizedDescription)
             throw mapped
         }
+    }
+
+    // Chooses the bridge method: aggregate diffs use the legacy single-patch path, fallback batches stay ordered.
+    fileprivate func revertBridgeRequest(
+        for changeSet: AIChangeSet,
+        normalizedWorkingDirectory: String
+    ) throws -> AIRevertBridgeRequest {
+        if changeSet.source == .fileChangeFallback, !changeSet.fallbackPatchBatches.isEmpty {
+            let patches = changeSet.fallbackPatchBatches.reversed().map { batch in
+                JSONValue.object([
+                    "id": .string(batch.id),
+                    "forwardPatch": .string(batch.forwardUnifiedPatch),
+                ])
+            }
+            return AIRevertBridgeRequest(
+                previewMethod: "workspace/revertPatchBatchPreview",
+                applyMethod: "workspace/revertPatchBatchApply",
+                params: .object([
+                    "cwd": .string(normalizedWorkingDirectory),
+                    "patches": .array(Array(patches)),
+                ])
+            )
+        }
+
+        guard !changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AIChangeSetError.missingPatch
+        }
+
+        return AIRevertBridgeRequest(
+            previewMethod: "workspace/revertPatchPreview",
+            applyMethod: "workspace/revertPatchApply",
+            params: .object([
+                "cwd": .string(normalizedWorkingDirectory),
+                "forwardPatch": .string(changeSet.forwardUnifiedPatch),
+            ])
+        )
     }
 }
 
@@ -401,27 +429,25 @@ private extension CodexService {
             return
         }
 
-        if source == .fileChangeFallback {
-            if changeSet.forwardUnifiedPatch == normalizedPatch {
-                changeSet.fallbackPatchCount = max(changeSet.fallbackPatchCount, 1)
-            } else {
-                changeSet.fallbackPatchCount += 1
-                if changeSet.forwardUnifiedPatch.isEmpty {
-                    changeSet.forwardUnifiedPatch = normalizedPatch
-                }
-            }
-        } else {
-            changeSet.fallbackPatchCount = max(changeSet.fallbackPatchCount, 0)
-        }
-
         changeSet.threadId = threadId
         changeSet.repoRoot = changeSet.repoRoot ?? gitWorkingDirectory(for: threadId)
         changeSet.assistantMessageId = changeSet.assistantMessageId ?? latestAssistantMessageId(for: threadId, turnId: normalizedTurnId)
         changeSet.source = source
-        changeSet.forwardUnifiedPatch = normalizedPatch
-        changeSet.patchHash = AIUnifiedPatchParser.hash(for: normalizedPatch)
-        changeSet.fileChanges = analysis.fileChanges
-        changeSet.unsupportedReasons = analysis.unsupportedReasons
+
+        if source == .fileChangeFallback {
+            appendFallbackPatchBatch(
+                patch: normalizedPatch,
+                analysis: analysis,
+                to: &changeSet
+            )
+        } else {
+            // Aggregate turn/checkpoint diffs stay authoritative; fallback batches remain only as audit breadcrumbs.
+            changeSet.forwardUnifiedPatch = normalizedPatch
+            changeSet.patchHash = AIUnifiedPatchParser.hash(for: normalizedPatch)
+            changeSet.fileChanges = analysis.fileChanges
+            changeSet.unsupportedReasons = analysis.unsupportedReasons
+        }
+
         changeSet.status = .collecting
 
         aiChangeSetsByID[changeSetId] = changeSet
@@ -435,28 +461,95 @@ private extension CodexService {
         invalidateAssistantRevertStates()
     }
 
-    // Keeps assistant-scoped runtime diffs authoritative over repo-wide checkpoint snapshots.
+    // Prefers checkpoint-derived diffs when available, while runtime diffs cover turns without checkpoints.
     func shouldReplaceChangeSetPatch(
         source: AIChangeSetSource,
         existing changeSet: AIChangeSet
     ) -> Bool {
-        if changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !hasRevertPatchPayload(changeSet) {
             return true
         }
 
         switch source {
         case .turnDiff:
-            return true
+            return changeSet.source != .workspaceCheckpoint
         case .workspaceCheckpoint:
-            switch changeSet.source {
-            case .turnDiff, .fileChangeFallback:
-                return false
-            case .workspaceCheckpoint:
-                return true
-            }
+            return true
         case .fileChangeFallback:
             return changeSet.source == .fileChangeFallback
         }
+    }
+
+    // Appends a patch_apply_end batch once; repeated lifecycle echoes share the same patch hash.
+    func appendFallbackPatchBatch(
+        patch: String,
+        analysis: AIUnifiedPatchAnalysis,
+        to changeSet: inout AIChangeSet
+    ) {
+        let patchHash = AIUnifiedPatchParser.hash(for: patch)
+        if !changeSet.fallbackPatchBatches.contains(where: { $0.patchHash == patchHash }) {
+            changeSet.fallbackPatchBatches.append(
+                AIPatchBatch(
+                    forwardUnifiedPatch: patch,
+                    patchHash: patchHash,
+                    fileChanges: analysis.fileChanges,
+                    unsupportedReasons: analysis.unsupportedReasons
+                )
+            )
+        }
+
+        changeSet.fallbackPatchCount = changeSet.fallbackPatchBatches.count
+        changeSet.forwardUnifiedPatch = fallbackPatchBatchesForwardPatch(changeSet.fallbackPatchBatches)
+        changeSet.patchHash = AIUnifiedPatchParser.hash(for: fallbackPatchBatchesRevertPatch(changeSet.fallbackPatchBatches))
+        changeSet.fileChanges = mergedFileChanges(from: changeSet.fallbackPatchBatches.flatMap(\.fileChanges))
+        changeSet.unsupportedReasons = Array(Set(changeSet.fallbackPatchBatches.flatMap(\.unsupportedReasons))).sorted()
+    }
+
+    func hasRevertPatchPayload(_ changeSet: AIChangeSet) -> Bool {
+        if changeSet.source == .fileChangeFallback, !changeSet.fallbackPatchBatches.isEmpty {
+            return true
+        }
+        return !changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    func fallbackPatchBatchesForwardPatch(_ batches: [AIPatchBatch]) -> String {
+        batches
+            .map(\.forwardUnifiedPatch)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n")
+    }
+
+    func fallbackPatchBatchesRevertPatch(_ batches: [AIPatchBatch]) -> String {
+        batches
+            .reversed()
+            .map(\.forwardUnifiedPatch)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n")
+    }
+
+    func mergedFileChanges(from fileChanges: [AIFileChange]) -> [AIFileChange] {
+        var changesByPath: [String: AIFileChange] = [:]
+
+        for change in fileChanges {
+            guard let existing = changesByPath[change.path] else {
+                changesByPath[change.path] = change
+                continue
+            }
+
+            let mergedKind: AIFileChangeKind = existing.kind == change.kind ? existing.kind : .update
+            changesByPath[change.path] = AIFileChange(
+                path: change.path,
+                kind: mergedKind,
+                additions: existing.additions + change.additions,
+                deletions: existing.deletions + change.deletions,
+                isBinary: existing.isBinary || change.isBinary,
+                isRenameOrModeOnly: existing.isRenameOrModeOnly || change.isRenameOrModeOnly,
+                beforeContentHash: existing.beforeContentHash ?? change.beforeContentHash,
+                afterContentHash: change.afterContentHash ?? existing.afterContentHash
+            )
+        }
+
+        return changesByPath.values.sorted { $0.path < $1.path }
     }
 
     func finalizeChangeSetIfPossible(changeSetId: String) {
