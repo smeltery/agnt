@@ -244,7 +244,8 @@ final class GitActionsService {
         commitMessage: String? = nil,
         model: String? = nil,
         baseBranch: String? = nil,
-        featureBranch: Bool = false
+        featureBranch: Bool = false,
+        progressId: String? = nil
     ) async throws -> GitStackedActionResult {
         var params: [String: JSONValue] = ["action": .string(action)]
         if let commitMessage, !commitMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -258,6 +259,9 @@ final class GitActionsService {
         }
         if featureBranch {
             params["featureBranch"] = .bool(true)
+        }
+        if let progressId, !progressId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            params["progressId"] = .string(progressId)
         }
         let json = try await request(method: "git/runStackedAction", params: params)
         let result = GitStackedActionResult(from: json)

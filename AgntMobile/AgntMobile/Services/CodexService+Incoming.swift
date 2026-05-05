@@ -293,6 +293,9 @@ extension CodexService {
         case "serverRequest/resolved":
             handleServerRequestResolved(paramsObject)
 
+        case "git/stackedAction/progress":
+            handleGitStackedActionProgress(paramsObject)
+
         default:
             if method.hasPrefix("codex/event/"),
                handleLegacyCodexNamedEvent(method: method, paramsObject: paramsObject) {
@@ -3192,6 +3195,27 @@ extension CodexService {
         let threadId = normalizedResolvedRequestThreadID(paramsObject?["threadId"]?.stringValue)
         removeStructuredUserInputPrompt(requestID: requestID, threadIdHint: threadId)
         removePendingApproval(requestID: requestID)
+    }
+
+    // Routes phase notifications from `git/runStackedAction` to the per-call subscriber.
+    func handleGitStackedActionProgress(_ paramsObject: IncomingParamsObject?) {
+        guard let progressId = paramsObject?["progressId"]?.stringValue,
+              let phase = paramsObject?["phase"]?.stringValue,
+              let status = paramsObject?["status"]?.stringValue else {
+            return
+        }
+        gitStackedActionProgressHandlers[progressId]?(phase, status)
+    }
+
+    func registerGitStackedActionProgressHandler(
+        progressId: String,
+        handler: @escaping (String, String) -> Void
+    ) {
+        gitStackedActionProgressHandlers[progressId] = handler
+    }
+
+    func unregisterGitStackedActionProgressHandler(progressId: String) {
+        gitStackedActionProgressHandlers.removeValue(forKey: progressId)
     }
 }
 

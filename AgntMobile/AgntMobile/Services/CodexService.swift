@@ -437,6 +437,8 @@ final class CodexService {
     @ObservationIgnored var streamingAssistantFallbackMessageByTurnID: [String: String] = [:]
     @ObservationIgnored var streamingAssistantMessageByItemKey: [String: String] = [:]
     @ObservationIgnored var streamingSystemMessageByItemID: [String: String] = [:]
+    // Phase callbacks for in-flight `git/runStackedAction` calls keyed by progressId.
+    @ObservationIgnored var gitStackedActionProgressHandlers: [String: (String, String) -> Void] = [:]
     /// Rich metadata for command execution tool calls, keyed by itemId.
     var commandExecutionDetailsByItemID: [String: CommandExecutionDetails] = [:]
     // Debounces disk writes while streaming to keep UI responsive.

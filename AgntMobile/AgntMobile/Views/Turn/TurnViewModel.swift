@@ -2384,6 +2384,7 @@ final class TurnViewModel {
             defer {
                 self.runningGitAction = nil
                 self.gitActionLoadingTitle = nil
+                self.inlineCommitAndPushPhase = nil
             }
 
             let gitService = GitActionsService(codex: codex, workingDirectory: workingDirectory)
@@ -2423,7 +2424,8 @@ final class TurnViewModel {
                     let result = try await runStackedGitAction(
                         .commit,
                         gitService: gitService,
-                        model: gitWriterModel
+                        model: gitWriterModel,
+                        codex: codex
                     )
                     if let status = result.status { applyGitRepoSync(status) }
 
@@ -2431,7 +2433,8 @@ final class TurnViewModel {
                     let result = try await runStackedGitAction(
                         .push,
                         gitService: gitService,
-                        model: gitWriterModel
+                        model: gitWriterModel,
+                        codex: codex
                     )
                     handleSuccessfulStackedGitAction(
                         result,
@@ -2450,7 +2453,8 @@ final class TurnViewModel {
                     let result = try await runStackedGitAction(
                         .commitAndPush,
                         gitService: gitService,
-                        model: gitWriterModel
+                        model: gitWriterModel,
+                        codex: codex
                     )
                     handleSuccessfulStackedGitAction(result, codex: codex, workingDirectory: workingDirectory, threadID: threadID)
 
@@ -2458,7 +2462,8 @@ final class TurnViewModel {
                     let result = try await runStackedGitAction(
                         .commitPushCreatePR,
                         gitService: gitService,
-                        model: gitWriterModel
+                        model: gitWriterModel,
+                        codex: codex
                     )
                     handleSuccessfulStackedGitAction(result, codex: codex, workingDirectory: workingDirectory, threadID: threadID)
                     if let urlString = result.pullRequest.url, let url = URL(string: urlString) {
@@ -2472,7 +2477,8 @@ final class TurnViewModel {
                     let result = try await runStackedGitAction(
                         .createPR,
                         gitService: gitService,
-                        model: gitWriterModel
+                        model: gitWriterModel,
+                        codex: codex
                     )
                     handleSuccessfulStackedGitAction(result, codex: codex, workingDirectory: workingDirectory, threadID: threadID)
                     if let urlString = result.pullRequest.url, let url = URL(string: urlString) {
@@ -2573,7 +2579,8 @@ final class TurnViewModel {
     private func runStackedGitAction(
         _ action: TurnGitActionKind,
         gitService: GitActionsService,
-        model: String?
+        model: String?,
+        codex: CodexService
     ) async throws -> GitStackedActionResult {
         guard let actionIdentifier = action.stackedActionIdentifier else {
             throw GitActionsError.bridgeError(code: "invalid_git_action", message: "Unsupported Git action.")
@@ -2591,12 +2598,36 @@ final class TurnViewModel {
         }
         gitActionLoadingTitle = action.loadingTitle(repoSync: gitRepoSync)
 
+        // Subscribe to bridge progress so the inline composer pill can mirror commit/push phases.
+        let progressId = UUID().uuidString
+        codex.registerGitStackedActionProgressHandler(progressId: progressId) { [weak self] phase, status in
+            guard let self else { return }
+            guard status == "started" else {
+                if status == "completed", phase == "push" {
+                    self.inlineCommitAndPushPhase = nil
+                }
+                return
+            }
+            switch phase {
+            case "commit":
+                self.inlineCommitAndPushPhase = .committing
+            case "push":
+                self.inlineCommitAndPushPhase = .pushing
+            default:
+                break
+            }
+        }
+        defer {
+            codex.unregisterGitStackedActionProgressHandler(progressId: progressId)
+        }
+
         return try await gitService.runStackedAction(
             action: actionIdentifier,
             commitMessage: commitMessage,
             model: model,
             baseBranch: baseBranch,
-            featureBranch: shouldCreateFeatureBranch
+            featureBranch: shouldCreateFeatureBranch,
+            progressId: progressId
         )
     }
 
