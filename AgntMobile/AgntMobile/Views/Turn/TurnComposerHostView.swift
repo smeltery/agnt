@@ -123,7 +123,7 @@ struct TurnComposerHostView: View {
             isEmptyThread: isEmptyThread,
             isWorktreeProject: isWorktreeProject,
             orderedModelOptions: orderedModelOptions,
-            selectedModelID: isRuntimeSelectionLoading ? nil : codex.selectedModelOption()?.id,
+            selectedModelID: isRuntimeSelectionLoading ? nil : (codex.selectedModelOption()?.id ?? codex.selectedModelId),
             selectedModelTitle: selectedModelTitle,
             isLoadingModels: codex.isLoadingModels,
             isRuntimeSelectionLoading: isRuntimeSelectionLoading,

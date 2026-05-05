@@ -1197,7 +1197,7 @@ struct TurnView: View {
 
     private var selectedModelTitle: String {
         guard let selectedModel = codex.selectedModelOption() else {
-            return "Select model"
+            return "GPT-5.5"
         }
 
         return TurnComposerMetaMapper.modelTitle(for: selectedModel)

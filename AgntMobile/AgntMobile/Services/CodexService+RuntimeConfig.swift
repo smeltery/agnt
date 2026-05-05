@@ -13,6 +13,19 @@ private let runtimeDebugTimestampFormatter: DateFormatter = {
     return formatter
 }()
 
+private enum RuntimeSelectionDefaults {
+    static let modelId = "gpt-5.5"
+    static let reasoningEffort = "medium"
+
+    static func reasoningEffort(for unresolvedModelId: String?) -> String? {
+        guard let unresolvedModelId,
+              unresolvedModelId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == modelId else {
+            return nil
+        }
+        return reasoningEffort
+    }
+}
+
 extension CodexService {
     // Resolves the effective per-chat override record after normalizing the thread id.
     func threadRuntimeOverride(for threadId: String?) -> CodexThreadRuntimeOverride? {
@@ -89,7 +102,12 @@ extension CodexService {
 
     func setSelectedModelId(_ modelId: String?) {
         let normalized = modelId?.trimmingCharacters(in: .whitespacesAndNewlines)
-        selectedModelId = (normalized?.isEmpty == false) ? normalized : nil
+        if normalized?.isEmpty == false {
+            selectedModelId = normalized
+        } else {
+            selectedModelId = RuntimeSelectionDefaults.modelId
+            selectedReasoningEffort = RuntimeSelectionDefaults.reasoningEffort
+        }
         normalizeRuntimeSelectionsAfterModelsUpdate()
     }
 

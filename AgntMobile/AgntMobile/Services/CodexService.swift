@@ -669,7 +669,8 @@ final class CodexService {
 
         let savedModelId = defaults.string(forKey: Self.selectedModelIdDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        self.selectedModelId = (savedModelId?.isEmpty == false) ? savedModelId : nil
+        let hasSavedModelId = savedModelId?.isEmpty == false
+        self.selectedModelId = hasSavedModelId ? savedModelId : "gpt-5.5"
 
         let savedGitWriterModelId = defaults.string(forKey: Self.selectedGitWriterModelIdDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -677,7 +678,9 @@ final class CodexService {
 
         let savedReasoning = defaults.string(forKey: Self.selectedReasoningEffortDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        self.selectedReasoningEffort = (savedReasoning?.isEmpty == false) ? savedReasoning : nil
+        self.selectedReasoningEffort = (hasSavedModelId && savedReasoning?.isEmpty == false)
+            ? savedReasoning
+            : "medium"
 
         if defaults.object(forKey: Self.keepMacAwakeWhileBridgeRunsDefaultsKey) != nil {
             self.keepMacAwakeWhileBridgeRuns = defaults.bool(forKey: Self.keepMacAwakeWhileBridgeRunsDefaultsKey)
