@@ -854,39 +854,48 @@ extension CodexService {
                 }
             }
 
-            // First try with includeTurns to get full history.
-            // Falls back without includeTurns if the thread has no messages yet
-            // (server returns -32600 "not materialized yet").
-            let paramsWithTurns: JSONValue = .object([
-                "threadId": .string(threadId),
-                "includeTurns": .bool(true),
-            ])
-
-            let response: RPCMessage
+            // First try paginated thread/turns/list for a tiny recent window — the bridge's
+            // adaptive pager handles compaction & relay sanitization. Long chats no longer
+            // wait on a full thread/read snapshot before opening.
+            // Falls back to thread/read for older runtimes without turn pagination support.
+            let threadObject: RPCObject
             do {
-                response = try await sendRequest(method: "thread/read", params: paramsWithTurns)
+                let page = try await fetchInitialThreadTurnsHistoryPage(threadId: threadId)
+                threadObject = threadObjectFromPaginatedHistoryPage(threadId: threadId, page: page)
             } catch let error as CodexServiceError {
-                if case .rpcError(let rpcError) = error, rpcError.code == -32600 {
-                    // Sidebar/timeline metadata fetches should keep retrying while the child thread
-                    // is still materializing, but full history hydration can stop here.
-                    let shouldMarkHydrated = markHydratedWhenNotMaterialized
-                        && !deferHydratedMarkForNotMaterializedThreadIDs.contains(threadId)
-                    if shouldMarkHydrated {
-                        hydratedThreadIDs.insert(threadId)
+                if case .rpcError(let rpcError) = error,
+                   rpcError.code == -32601 || rpcError.code == -32600 {
+                    // Method not found or thread not materialized — try the legacy whole-thread read.
+                    let paramsWithTurns: JSONValue = .object([
+                        "threadId": .string(threadId),
+                        "includeTurns": .bool(true),
+                    ])
+                    do {
+                        let response = try await sendRequest(method: "thread/read", params: paramsWithTurns)
+                        guard let resultObject = response.result?.objectValue,
+                              let legacyThread = resultObject["thread"]?.objectValue else {
+                            throw CodexServiceError.invalidResponse("thread/read response missing thread payload")
+                        }
+                        threadObject = legacyThread
+                    } catch let fallbackError as CodexServiceError {
+                        if case .rpcError(let fallbackRpcError) = fallbackError, fallbackRpcError.code == -32600 {
+                            let shouldMarkHydrated = markHydratedWhenNotMaterialized
+                                && !deferHydratedMarkForNotMaterializedThreadIDs.contains(threadId)
+                            if shouldMarkHydrated {
+                                hydratedThreadIDs.insert(threadId)
+                            }
+                            return .notMaterialized
+                        }
+                        throw fallbackError
                     }
-                    return .notMaterialized
+                } else {
+                    throw error
                 }
-                throw error
             }
 
             guard !Task.isCancelled,
                   isPerThreadRefreshCurrent(for: threadId, generation: refreshGeneration) else {
                 throw CancellationError()
-            }
-
-            guard let resultObject = response.result?.objectValue,
-                  let threadObject = resultObject["thread"]?.objectValue else {
-                throw CodexServiceError.invalidResponse("thread/read response missing thread payload")
             }
 
             extractContextWindowUsageIfAvailable(threadId: threadId, threadObject: threadObject)
