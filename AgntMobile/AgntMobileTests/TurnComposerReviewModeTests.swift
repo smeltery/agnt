@@ -135,7 +135,7 @@ final class TurnComposerReviewModeTests: XCTestCase {
                     allowsForkCommand: true
                 )
             ).map(\.commandToken),
-            ["/review", "/feedback", "/fork", "/status", "/subagents"]
+            ["/review", "/compact", "/feedback", "/fork", "/status", "/subagents"]
         )
     }
 
@@ -145,7 +145,7 @@ final class TurnComposerReviewModeTests: XCTestCase {
                 supportsThreadFork: true,
                 allowsForkCommand: false
             ).map(\.commandToken),
-            ["/review", "/feedback", "/status", "/subagents"]
+            ["/review", "/compact", "/feedback", "/status", "/subagents"]
         )
     }
 

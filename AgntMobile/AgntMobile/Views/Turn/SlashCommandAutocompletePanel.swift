@@ -311,6 +311,8 @@ struct SlashCommandAutocompletePanel: View {
             return true
         case .subagents:
             return true
+        case .compact:
+            return !isThreadRunning
         }
     }
 

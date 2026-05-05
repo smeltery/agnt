@@ -31,6 +31,7 @@ struct TurnComposerHostView: View {
     let onOpenWorktreeHandoff: () -> Void
     let onOpenFeedbackMail: () -> Void
     let onShowStatus: () -> Void
+    let onCompactThread: () -> Void
     let voiceButtonPresentation: TurnComposerVoiceButtonPresentation
     let isVoiceRecording: Bool
     let voiceAudioLevels: [CGFloat]
@@ -213,6 +214,9 @@ struct TurnComposerHostView: View {
                     onShowStatus()
                 case .subagents:
                     viewModel.onSelectSlashCommand(command)
+                case .compact:
+                    viewModel.onSelectSlashCommand(command)
+                    onCompactThread()
                 }
             },
             onSelectCodeReviewTarget: { target in

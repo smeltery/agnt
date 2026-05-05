@@ -960,6 +960,9 @@ final class TurnViewModel {
             resetSlashCommandState(clearPendingSelection: true)
         case .subagents:
             armSubagentsSelection()
+        case .compact:
+            removeTrailingSlashCommandTokenFromInputIfNeeded()
+            resetSlashCommandState(clearPendingSelection: true)
         }
     }
 

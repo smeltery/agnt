@@ -1353,9 +1353,17 @@ struct TurnView: View {
                     handleWorktreeHandoffTap(currentThread: currentThread)
                 },
                 onOpenFeedbackMail: {
-                    openURL(AppEnvironment.feedbackMailtoURL)
+                    openURL(AppEnvironment.feedbackMailtoURL(
+                        errorMessage: codex.lastErrorMessage,
+                        threadId: thread.id,
+                        isConnected: codex.isConnected,
+                        cliVersion: codex.bridgeInstalledVersion
+                    ))
                 },
                 onShowStatus: presentStatusSheet,
+                onCompactThread: {
+                    Task { try? await codex.compactThread(currentThread.id) }
+                },
                 voiceButtonPresentation: voiceButtonPresentation,
                 isVoiceRecording: isVoiceRecording,
                 voiceAudioLevels: voiceTranscriptionManager.audioLevels,
