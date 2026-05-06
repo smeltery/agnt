@@ -7,7 +7,7 @@
 import Foundation
 import UIKit
 
-private enum TurnTimelineProjectionPolicy {
+private enum TimelineProjectionLimits {
     // Long chats can contain thousands of persisted rows. Keep initial/open-chat projection
     // bounded to the recent tail so selecting one thread does not freeze the whole screen.
     static let rawMessageLimit = 400
@@ -748,7 +748,7 @@ extension CodexService {
 
     // Centralizes the "large chat" threshold so deferred hydration only applies to heavy transcripts.
     func hasLargePersistedTranscript(threadId: String) -> Bool {
-        messages(for: threadId).count > TurnTimelineProjectionPolicy.eagerHydrationMessageLimit
+        messages(for: threadId).count > TimelineProjectionLimits.eagerHydrationMessageLimit
     }
 
     // Only trust a "thread is closed" decision when the turn-state refresh actually succeeded.
@@ -4163,11 +4163,11 @@ extension CodexService {
     // Bounds expensive render-only projection work to the recent transcript tail.
     // The service still keeps the full raw history for sync, diff summaries, and persistence.
     func snapshotProjectionSourceMessages(from messages: [CodexMessage]) -> [CodexMessage] {
-        guard messages.count > TurnTimelineProjectionPolicy.rawMessageLimit else {
+        guard messages.count > TimelineProjectionLimits.rawMessageLimit else {
             return messages
         }
 
-        return Array(messages.suffix(TurnTimelineProjectionPolicy.rawMessageLimit))
+        return Array(messages.suffix(TimelineProjectionLimits.rawMessageLimit))
     }
 
     // Refreshes every known timeline state when repo-busy status changes across threads.
