@@ -52,6 +52,13 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
   let activeAssistantMessageId = "";
   /** Latest token usage snapshot from message.updated events. */
   let lastTokenSnapshot = null;
+  /**
+   * Map: bridge-generated approval JSON-RPC request id → opencode permissionID.
+   * The shim emits an item/commandExecution/requestApproval request to iOS
+   * with that id; when iOS replies, we look up the permissionID and POST to
+   * /session/{id}/permissions/{permissionID}.
+   */
+  const approvalIdToPermission = new Map();
   /** Map opencode message-part id → bridge item id so deltas route to the same row. */
   const partItemIds = new Map();
   /** Map opencode tool-part id → { toolName, command, cwd } so completion routes correctly. */
@@ -78,6 +85,7 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
         });
       }
       resetTurnState();
+      approvalIdToPermission.clear();
     },
   };
 
@@ -87,6 +95,13 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     if (!parsed || typeof parsed !== "object") return null;
     const method = readString(parsed.method);
     const id = parsed.id;
+
+    // iOS approval reply (no method, has id + result/error). Route to opencode
+    // /session/{id}/permissions/{permissionID} based on the tracked mapping.
+    if (!method && id != null && (parsed.result !== undefined || parsed.error !== undefined)) {
+      handleApprovalReply(parsed);
+      return null;
+    }
 
     if (method === "initialize" || method === "client/initialize") {
       if (id != null) {
@@ -201,6 +216,14 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       handleSessionError(props);
       return null;
     }
+    if (type === "permission.asked") {
+      handlePermissionAsked(parsed);
+      return null;
+    }
+    if (type === "permission.replied") {
+      // Mirror reply (the REST POST already handled it). Nothing to surface.
+      return null;
+    }
     return null;
   }
 
@@ -222,6 +245,21 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
         threadId: sessionId,
         thread_id: sessionId,
         thread: threadPayload,
+      });
+      emitNotification("thread/initialized", {
+        threadId: sessionId,
+        thread_id: sessionId,
+        provider: "opencode",
+        cwd: readString(res.json?.directory) || "",
+        // opencode agents/tools are per-message, not exposed on session create.
+        // Surface what we know; the iOS app can fall back to defaults.
+        tools: [
+          "bash", "read", "write", "edit", "glob", "grep",
+          "task", "todowrite", "webfetch", "websearch",
+        ],
+        slashCommands: [],
+        skills: [],
+        agents: [],
       });
     } catch (err) {
       respondError(request?.id, -32603, `opencode POST /session failed: ${err?.message || err}`);
@@ -824,6 +862,77 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       });
       didEmitTurnCompletedForActive = true;
       resetTurnState();
+    }
+  }
+
+  // ── approval flow ──────────────────────────────────────────────────────
+  function handlePermissionAsked(envelope) {
+    // opencode top-level shape (from the SDK code): the event payload is the
+    // permission object directly under `properties` (not wrapped). Defensive
+    // about both layouts.
+    const props = envelope?.properties || {};
+    const perm = props?.info && typeof props.info === "object" ? props.info : props;
+    const permissionID = readString(perm?.id) || readString(perm?.permissionID);
+    if (!permissionID) return;
+    const sessionID = readString(perm?.sessionID) || activeThreadId;
+    if (sessionID !== activeThreadId) return;
+
+    const kind = readString(perm?.permission) || "command";
+    const metadata = perm?.metadata && typeof perm.metadata === "object" ? perm.metadata : {};
+    const requestId = `approval_${permissionID}`;
+    approvalIdToPermission.set(String(requestId), { permissionID, sessionID });
+
+    const isFileChange = kind === "edit" || kind === "write" || kind === "patch";
+    const requestMethod = isFileChange
+      ? "item/fileChange/requestApproval"
+      : "item/commandExecution/requestApproval";
+
+    injectInbound(JSON.stringify({
+      id: requestId,
+      method: requestMethod,
+      params: {
+        threadId: activeThreadId,
+        turnId: activeTurnId,
+        kind,
+        command: readString(metadata.command) || readString(perm?.tool) || "",
+        cwd: readString(metadata.cwd) || readString(perm?.directory) || "",
+        file_path: readString(metadata.filepath) || readString(metadata.file_path) || "",
+        diff: readString(metadata.diff) || "",
+        reason: readString(perm?.title) || readString(perm?.description) || "",
+        permissionID,
+      },
+    }));
+  }
+
+  async function handleApprovalReply(reply) {
+    const requestId = String(reply.id);
+    const tracked = approvalIdToPermission.get(requestId);
+    if (!tracked) return; // not an approval reply we issued
+    approvalIdToPermission.delete(requestId);
+
+    const decision = readString(reply?.result?.decision)
+      || readString(reply?.result?.response)
+      || (reply?.error ? "reject" : "");
+    // iOS uses Codex's "accept"/"decline"/"reject"; opencode wants
+    // "once"|"always"|"reject" (and optionally other optionIds).
+    let response;
+    if (decision === "accept" || decision === "approve" || decision === "once") {
+      response = "once";
+    } else if (decision === "always") {
+      response = "always";
+    } else {
+      response = "reject";
+    }
+
+    try {
+      await transport.httpRequest(
+        "POST",
+        `/session/${encodeURIComponent(tracked.sessionID)}/permissions/${encodeURIComponent(tracked.permissionID)}`,
+        { sessionID: tracked.sessionID, permissionID: tracked.permissionID, response },
+      );
+    } catch {
+      // Best-effort; the assistant will surface a tool failure if the POST
+      // didn't land.
     }
   }
 

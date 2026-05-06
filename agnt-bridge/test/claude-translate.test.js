@@ -415,7 +415,49 @@ test("Codex effort `minimal` maps to Claude `low` (the smallest valid level)", (
     },
   }));
   const call = transportCalls.find((c) => c[0] === "turnArgs");
-  assert.deepEqual(call[1], ["--effort", "low"]);
+  // Effort flag plus the auto-applied default permission-mode for --print mode.
+  assert.deepEqual(call[1], ["--effort", "low", "--permission-mode", "acceptEdits"]);
+});
+
+test("turn/start without explicit permissionMode defaults to --permission-mode acceptEdits", () => {
+  const { translator, transportCalls } = setupTranslator();
+  transportCalls.length = 0;
+  translator.outbound(JSON.stringify({
+    id: "tu-pm", method: "turn/start",
+    params: { threadId: "thr_pm", input: [{ type: "text", text: "x" }] },
+  }));
+  const call = transportCalls.find((c) => c[0] === "turnArgs");
+  assert.deepEqual(call[1], ["--permission-mode", "acceptEdits"]);
+});
+
+test("system.init emits thread/initialized with slash_commands/skills/agents", () => {
+  const { translator, injected } = setupTranslator();
+  // Clear any prior thread/start so the next system.init is the first.
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "system",
+    subtype: "init",
+    session_id: "sess-init",
+    cwd: "/tmp/work",
+    model: "claude-opus-4-7",
+    permissionMode: "acceptEdits",
+    tools: ["Bash", "Read", "Write"],
+    slash_commands: ["compact", "clear"],
+    skills: [{ id: "tdd", name: "TDD" }],
+    agents: ["explore"],
+    output_style: "default",
+    claude_code_version: "2.1.119",
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  const initialized = events.find((e) => e.method === "thread/initialized");
+  assert.ok(initialized);
+  assert.equal(initialized.params.provider, "claude");
+  assert.equal(initialized.params.model, "claude-opus-4-7");
+  assert.deepEqual(initialized.params.tools, ["Bash", "Read", "Write"]);
+  assert.deepEqual(initialized.params.slashCommands, ["compact", "clear"]);
+  assert.equal(initialized.params.cwd, "/tmp/work");
 });
 
 test("Read tool emits item/started + item/completed with file_path", () => {

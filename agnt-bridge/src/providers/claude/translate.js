@@ -455,6 +455,20 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
           cwd: sessionCwd,
         },
       });
+      emitNotification("thread/initialized", {
+        threadId,
+        thread_id: threadId,
+        provider: "claude",
+        model: readString(message.model),
+        permissionMode: readString(message.permissionMode),
+        cwd: sessionCwd,
+        tools: Array.isArray(message.tools) ? message.tools.slice(0, 200) : [],
+        slashCommands: Array.isArray(message.slash_commands) ? message.slash_commands.slice(0, 200) : [],
+        skills: Array.isArray(message.skills) ? message.skills.slice(0, 200) : [],
+        agents: Array.isArray(message.agents) ? message.agents.slice(0, 100) : [],
+        outputStyle: readString(message.output_style),
+        version: readString(message.claude_code_version),
+      });
     }
 
     if (activeTurnId && !didEmitTurnStarted) {
@@ -1101,7 +1115,11 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
       const explicitMode = readString(params?.permissionMode);
       const permissionMode = ["acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"]
         .includes(explicitMode) ? explicitMode : "";
-      if (permissionMode) args.push("--permission-mode", permissionMode);
+      // In --print mode there is no TTY for Claude to prompt on. The
+      // `default` mode would block forever waiting for an approval that
+      // never comes. Fall back to `acceptEdits` so file-edit tool calls
+      // proceed; iOS clients can override per-turn via `permissionMode`.
+      args.push("--permission-mode", permissionMode || "acceptEdits");
     }
 
     try { transport?.setTurnArgs?.(args); } catch { /* best-effort */ }

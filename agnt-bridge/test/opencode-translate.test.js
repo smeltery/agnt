@@ -36,6 +36,114 @@ function parseInjected(injected) {
   return injected.map((line) => JSON.parse(line));
 }
 
+test("permission.asked emits item/commandExecution/requestApproval and reply POSTs to /permissions", async () => {
+  const httpCalls = [];
+  const injected = [];
+  const transport = {
+    describe: () => "fake",
+    send() {},
+    httpRequest(method, pathName, body) {
+      httpCalls.push({ method, pathName, body });
+      return Promise.resolve({ status: 200, json: { ok: true }, raw: "" });
+    },
+  };
+  const translator = createOpencodeTranslator({
+    injectInbound: (line) => injected.push(line),
+    transport,
+    env: process.env,
+  });
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_perm", input: [{ type: "text", text: "do it" }] },
+  }));
+  injected.length = 0;
+  httpCalls.length = 0;
+
+  // opencode SSE: permission.asked
+  translator.inbound(JSON.stringify({
+    type: "permission.asked",
+    properties: {
+      sessionID: "ses_perm",
+      info: {
+        id: "perm_abc",
+        sessionID: "ses_perm",
+        permission: "edit",
+        metadata: { filepath: "/tmp/y.txt", diff: "+ b" },
+        title: "Approve edit?",
+      },
+    },
+  }));
+
+  const requestEnvelope = parseInjected(injected).find((e) => e.method?.endsWith("requestApproval"));
+  assert.ok(requestEnvelope, "expected an approval request to be injected");
+  assert.equal(requestEnvelope.method, "item/fileChange/requestApproval");
+  assert.equal(requestEnvelope.params.permissionID, "perm_abc");
+  assert.equal(requestEnvelope.params.file_path, "/tmp/y.txt");
+  const approvalRequestId = requestEnvelope.id;
+
+  // iOS replies via the bridge: outbound JSON-RPC response with decision:"accept"
+  translator.outbound(JSON.stringify({
+    id: approvalRequestId,
+    result: { decision: "accept" },
+  }));
+  await new Promise((r) => setImmediate(r));
+
+  assert.equal(httpCalls.length, 1);
+  assert.equal(httpCalls[0].method, "POST");
+  assert.equal(httpCalls[0].pathName, "/session/ses_perm/permissions/perm_abc");
+  assert.equal(httpCalls[0].body.response, "once");
+});
+
+test("permission decline maps decision:'decline' to opencode response:'reject'", async () => {
+  const httpCalls = [];
+  const injected = [];
+  const transport = {
+    describe: () => "fake",
+    send() {},
+    httpRequest(method, pathName, body) {
+      httpCalls.push({ method, pathName, body });
+      return Promise.resolve({ status: 200, json: { ok: true } });
+    },
+  };
+  const translator = createOpencodeTranslator({
+    injectInbound: (line) => injected.push(line),
+    transport,
+    env: process.env,
+  });
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_decline", input: [{ type: "text", text: "go" }] },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "permission.asked",
+    properties: { sessionID: "ses_decline", info: { id: "perm_x", sessionID: "ses_decline", permission: "command" } },
+  }));
+  const env = parseInjected(injected).find((e) => e.method?.endsWith("requestApproval"));
+  translator.outbound(JSON.stringify({ id: env.id, result: { decision: "decline" } }));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(httpCalls[httpCalls.length - 1].body.response, "reject");
+});
+
+test("thread/start emits thread/initialized with the opencode tool list", async () => {
+  const { translator, injected } = setupTranslator({
+    httpHandler(method, pathName) {
+      if (method === "POST" && pathName === "/session") {
+        return { status: 200, json: { id: "ses_init", directory: "/tmp/p" } };
+      }
+      return { status: 404, json: null };
+    },
+  });
+  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
+  await new Promise((r) => setImmediate(r));
+  const events = parseInjected(injected).filter((e) => e.method);
+  const initialized = events.find((e) => e.method === "thread/initialized");
+  assert.ok(initialized);
+  assert.equal(initialized.params.provider, "opencode");
+  assert.ok(initialized.params.tools.includes("bash"));
+  assert.ok(initialized.params.tools.includes("read"));
+  assert.ok(initialized.params.tools.includes("edit"));
+});
+
 test("thread/start posts to /session and synthesizes a thread response", async () => {
   const { translator, injected, httpCalls } = setupTranslator({
     httpHandler(method, pathName) {
