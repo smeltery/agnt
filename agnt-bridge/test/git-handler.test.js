@@ -1713,3 +1713,39 @@ test("gitCreateWorktree rejects dirty handoff when the chosen base branch is not
     fs.rmSync(repoDir, { recursive: true, force: true });
   }
 });
+
+test("handleGitRequest skips thread/generateTitle when codexTitleGeneration is false", () => {
+  const responses = [];
+  const handled = handleGitRequest(
+    JSON.stringify({ id: "title-1", method: "thread/generateTitle", params: { message: "hi" } }),
+    (line) => responses.push(line),
+    { codexTitleGeneration: false }
+  );
+  assert.equal(handled, false, "handler must defer to provider translator when Codex title generation is gated off");
+  assert.equal(responses.length, 0, "must not synthesize a response when not handling");
+});
+
+test("handleGitRequest still handles thread/generateTitle for Codex by default", () => {
+  __test.setRunStructuredCodexJsonImplementation(async ({ prompt }) => {
+    assert.match(prompt, /title/i);
+    return { title: "Mocked title" };
+  });
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const handled = handleGitRequest(
+      JSON.stringify({ id: "title-2", method: "thread/generateTitle", params: { message: "hello world" } }),
+      (line) => {
+        if (settled) return;
+        settled = true;
+        try {
+          const parsed = JSON.parse(line);
+          assert.equal(parsed.id, "title-2");
+          assert.equal(parsed.result.title, "Mocked title");
+          resolve();
+        } catch (err) { reject(err); }
+      },
+      {} // no codexTitleGeneration override → defaults to handling locally
+    );
+    assert.equal(handled, true);
+  });
+});

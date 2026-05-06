@@ -47,6 +47,12 @@ function handleGitRequest(rawMessage, sendResponse, options = {}) {
   if (!method.startsWith("git/") && !["thread/generateTitle", "thread/name/set"].includes(method)) {
     return false;
   }
+  // thread/generateTitle drafts the title via the Codex CLI's structured-JSON
+  // output mode. For other providers we skip the interception so the request
+  // routes to the active provider's translator (which has its own heuristic).
+  if (method === "thread/generateTitle" && options.codexTitleGeneration === false) {
+    return false;
+  }
 
   const id = parsed.id;
   const params = parsed.params || {};
