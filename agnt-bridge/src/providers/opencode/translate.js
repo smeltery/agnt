@@ -400,13 +400,22 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     try {
       const res = await transport.httpRequest("GET", "/session");
       const sessions = Array.isArray(res?.json) ? res.json : [];
-      const summaries = sessions.map((session) => mapSessionToSummary(session));
+      const params = request?.params || {};
+      const requestedLimit = numberOr(params.limit, 0);
+      // Cap unbounded lists so a phone with many sessions does not blow up
+      // the relay payload. Mirrors the Claude shim's listThreadSummaries cap.
+      const limit = Math.max(1, Math.min(requestedLimit > 0 ? requestedLimit : 200, 200));
+      const sorted = sessions
+        .slice()
+        .sort((a, b) => numberOr(b?.time?.updated, 0) - numberOr(a?.time?.updated, 0))
+        .slice(0, limit)
+        .map((session) => mapSessionToSummary(session));
       if (request?.id != null) {
         injectResponse(request.id, {
-          data: summaries,
-          threads: summaries,
+          data: sorted,
+          threads: sorted,
           nextCursor: null,
-          hasMore: false,
+          hasMore: sessions.length > limit,
         });
       }
     } catch (err) {
@@ -431,6 +440,25 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     }
     if (kind === "retry" || kind === "error") {
       const message = readString(status?.message) || `session ${kind}`;
+      // The retry status carries `next` (epoch ms) when opencode is rate-
+      // limited — surface that as thread/status/changed so the iOS app can
+      // render a banner while the request waits to resume.
+      const next = numberOr(status?.next, 0);
+      if (next > 0 && activeThreadId) {
+        emitNotification("thread/status/changed", {
+          threadId: activeThreadId,
+          thread_id: activeThreadId,
+          status: {
+            type: "rateLimited",
+            rateLimit: {
+              status: kind,
+              resetsAt: next,
+              attempt: numberOr(status?.attempt, 0),
+              message,
+            },
+          },
+        });
+      }
       if (activeTurnId && activeThreadId) {
         emitNotification("turn/failed", {
           threadId: activeThreadId,

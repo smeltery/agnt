@@ -401,6 +401,72 @@ test("thread/contextWindow/read GETs messages and surfaces token snapshot", asyn
   assert.equal(ack.result.contextWindow.outputTokens, 3);
 });
 
+test("session.status retry with next-resets-at emits thread/status/changed rateLimited", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_rl", input: [{ type: "text", text: "x" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "session.status",
+    properties: {
+      sessionID: "ses_rl",
+      status: { type: "retry", attempt: 1, next: 1778105124680, message: "Quota exceeded" },
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method === "thread/status/changed");
+  assert.equal(events.length, 1);
+  assert.equal(events[0].params.status.type, "rateLimited");
+  assert.equal(events[0].params.status.rateLimit.resetsAt, 1778105124680);
+  assert.equal(events[0].params.status.rateLimit.attempt, 1);
+});
+
+test("thread/list applies a 200-row pagination cap and reports hasMore", async () => {
+  const sessions = Array.from({ length: 350 }, (_, i) => ({
+    id: `ses_${i.toString().padStart(3, "0")}`,
+    title: `s${i}`,
+    directory: "/tmp",
+    time: { created: 0, updated: i },
+  }));
+  const { translator, injected } = setupTranslator({
+    httpHandler(method, pathName) {
+      if (method === "GET" && pathName === "/session") {
+        return { status: 200, json: sessions };
+      }
+      return { status: 404, json: null };
+    },
+  });
+
+  translator.outbound(JSON.stringify({ id: "list-cap", method: "thread/list", params: {} }));
+  await new Promise((r) => setImmediate(r));
+
+  const events = parseInjected(injected);
+  const ack = events.find((e) => e.id === "list-cap");
+  assert.equal(ack.result.data.length, 200);
+  assert.equal(ack.result.hasMore, true);
+  // Sorted descending by updated, so first is sessions[349].
+  assert.equal(ack.result.data[0].id, "ses_349");
+});
+
+test("thread/list honors a smaller requested limit", async () => {
+  const sessions = Array.from({ length: 50 }, (_, i) => ({
+    id: `ses_${i}`, time: { updated: i },
+  }));
+  const { translator, injected } = setupTranslator({
+    httpHandler() { return { status: 200, json: sessions }; },
+  });
+  translator.outbound(JSON.stringify({
+    id: "list-limit", method: "thread/list", params: { limit: 10 },
+  }));
+  await new Promise((r) => setImmediate(r));
+
+  const ack = parseInjected(injected).find((e) => e.id === "list-limit");
+  assert.equal(ack.result.data.length, 10);
+});
+
 test("inbound events for a different sessionID are ignored once a turn is active", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({

@@ -28,7 +28,11 @@ module.exports = defineProvider({
     queueFollowup: false,
     reasoningDeltas: true,
     desktopRefresher: false,
-    rolloutMirror: true,
+    // Codex's rollout-live-mirror only knows how to parse Codex's rollout
+    // schema. Until a normalized cross-provider parseRolloutLine consumer
+    // lands, claude declares this off rather than triggering the mirror
+    // watcher against `~/.claude/projects/**.jsonl` files it can't read.
+    rolloutMirror: false,
   },
   homeDir: resolveClaudeHome,
   sessionsDir() {
