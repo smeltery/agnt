@@ -8,8 +8,6 @@ Control coding-agent CLIs from your iPhone — **Codex**, **Claude Code**, **ope
 
 > agnt is a fork of [Remodex](https://github.com/Emanuele-web04/remodex) (Apache-2.0). The original tool brokers iOS ↔ Codex; agnt generalises the transport behind a provider plugin contract so other agents can be added without touching bridge core. New agnt contributions are released under PolyForm Shield 1.0.0 (see [LICENSE](LICENSE)); upstream Remodex code retains its original Apache-2.0 grant.
 
-> **Status: early.**
-
 ## Provider matrix
 
 | Provider | Detect | Transport | Protocol shim | Ready for paired phone? |
