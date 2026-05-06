@@ -13,7 +13,14 @@ const { promisify } = require("util");
 const { readBridgeConfig } = require("./bridge-config");
 const { resolveActiveProvider } = require("./providers");
 const { withTranslator } = require("./providers/types");
-const { createThreadRolloutActivityWatcher } = require("./rollout-watch");
+const {
+  createThreadRolloutActivityWatcher,
+  findRecentRolloutFileForContextRead,
+  resolveSessionsRoot,
+} = require("./rollout-watch");
+const {
+  readThreadTurnsListPageFromSessionJsonl,
+} = require("./providers/codex/session-jsonl-history");
 const { printQR } = require("./qr");
 const { rememberActiveThread } = require("./session-state");
 const { handleDesktopRequest } = require("./desktop-handler");
@@ -616,11 +623,12 @@ function startBridge({
         const response = await fetchAdaptiveThreadTurnsListForRelay(request, {
           fetchPage: (params) => sendCodexRequest("thread/turns/list", params),
         });
+        const fallbackResponse = maybeBuildJsonlThreadTurnsListFallback(request, response);
         relaySanitizedResponseMethodsById.set(String(request.id), {
           method: "thread/turns/list",
           createdAt: Date.now(),
         });
-        sendApplicationResponse(JSON.stringify(response));
+        sendApplicationResponse(JSON.stringify(fallbackResponse ?? response));
       } catch (error) {
         sendApplicationResponse(createJsonRpcErrorResponse(
           request.id,
@@ -631,6 +639,57 @@ function startBridge({
     })();
 
     return true;
+  }
+
+  // When the live thread/turns/list returns no turns (e.g. transient bridge
+  // error or stale upstream cache), reconstruct a small page from the local
+  // Codex rollout file so the iPhone has something to render. Codex-only —
+  // the other providers' translators already build their own thread/turns/list
+  // responses from their session files.
+  function maybeBuildJsonlThreadTurnsListFallback(request, response) {
+    if (activeProvider.id !== "codex") {
+      return null;
+    }
+    if (!isEmptyTurnsListResponse(response)) {
+      return null;
+    }
+
+    const params = request?.params || {};
+    const threadId = normalizeNonEmptyString(params.threadId)
+      || normalizeNonEmptyString(params.thread_id);
+    if (!threadId || hasRelayCursor(params.cursor)) {
+      return null;
+    }
+
+    try {
+      const rolloutPath = findRecentRolloutFileForContextRead(resolveSessionsRoot(), { threadId });
+      if (!rolloutPath) {
+        return null;
+      }
+      const result = readThreadTurnsListPageFromSessionJsonl(rolloutPath, {
+        threadId,
+        limit: params.limit,
+        maxLimit: 1,
+        cursor: params.cursor,
+      });
+      const turnsKey = findTurnsListResultKey(result);
+      if (!turnsKey || result[turnsKey].length === 0) {
+        return null;
+      }
+
+      return {
+        id: request.id,
+        result,
+      };
+    } catch (error) {
+      console.warn(`[agnt] thread/turns/list jsonl fallback failed: ${error.message}`);
+      return null;
+    }
+  }
+
+  function isEmptyTurnsListResponse(response) {
+    const turnsKey = findTurnsListResultKey(response?.result);
+    return Boolean(turnsKey) && response.result[turnsKey].length === 0;
   }
 
   // Encrypts bridge-generated responses instead of letting the relay see plaintext.
