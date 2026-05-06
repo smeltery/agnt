@@ -3,18 +3,14 @@
 //          plugin contract.
 // Layer: provider plugin
 // Exports: opencode provider
-// Depends on: ../types, ./transport, ./detect, os, path
-//
-// Status: transport spawns `opencode serve`, discovers the local port, and
-// streams SSE events from /event. **Outbound send() is not yet mapped** —
-// opencode's REST API differs from the bridge's Codex JSON-RPC. A protocol
-// shim is required before this provider can serve a paired phone.
+// Depends on: ../types, ./transport, ./detect, ./translate, os, path
 
 const path = require("path");
 const os = require("os");
 const { defineProvider } = require("../types");
 const { createOpencodeTransport } = require("./transport");
 const { detectOpencodeBinary, isOpencodeInstalled } = require("./detect");
+const { createOpencodeTranslator } = require("./translate");
 
 function resolveOpencodeHome() {
   return (
@@ -47,6 +43,9 @@ module.exports = defineProvider({
   },
   createTransport(opts = {}) {
     return createOpencodeTransport(opts);
+  },
+  createTranslator(ctx) {
+    return createOpencodeTranslator(ctx);
   },
   async bootstrap({ env = process.env, logger = console } = {}) {
     if (detectOpencodeBinary({ env })) {

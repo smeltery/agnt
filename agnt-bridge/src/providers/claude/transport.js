@@ -5,15 +5,14 @@
 // Exports: createClaudeTransport
 // Depends on: child_process, ./detect
 //
-// LIMITATIONS — read before extending this:
-//   The bridge speaks Codex JSON-RPC over its transport (`turn/start`,
-//   `thread/read`, `applicationRequest`, ...). Claude Code's stream-json
-//   protocol is different: stdin lines are `{type:"user",message:{...}}` and
-//   stdout lines are `{type:"system"|"assistant"|"user"|"result", ...}`.
-//   This transport plumbs raw lines in both directions and does NOT translate
-//   between schemas. Until a Codex<->stream-json shim is added (separate
-//   followup), the iOS app will not understand Claude's events. Use this
-//   transport for development of that shim.
+// Wire format:
+//   stdin  (claude --input-format stream-json)  : `{type:"user", message:{...}}` lines
+//   stdout (claude --output-format stream-json) : `{type:"system"|"assistant"|"user"|"result", ...}` lines
+//
+// The bridge core speaks Codex JSON-RPC; the Claude<->Codex protocol shim
+// lives in providers/claude/translate.js and is wired via createTranslator
+// in providers/claude/index.js. This transport stays mechanical: it spawns
+// the CLI, pipes lines, and reports lifecycle events.
 
 const { spawn } = require("child_process");
 const { detectClaudeBinary } = require("./detect");

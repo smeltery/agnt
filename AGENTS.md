@@ -21,7 +21,8 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 ## Provider plugin guardrails
 
 - agnt brokers between an iOS app and any supported coding-agent CLI (Codex, Claude Code, opencode, ...). New providers go under `agnt-bridge/src/providers/<id>/index.js` and are registered in `agnt-bridge/src/providers/index.js`.
-- Provider modules must conform to the contract in `agnt-bridge/src/providers/types.js` (`defineProvider`). Required: `id`, `displayName`, `createTransport`, `homeDir`, `sessionsDir`, `capabilities`. Optional: `bootstrap`, `createDesktopRefresher`, `parseRolloutLine`, `isInstalled`.
+- Provider modules must conform to the contract in `agnt-bridge/src/providers/types.js` (`defineProvider`). Required: `id`, `displayName`, `createTransport`, `homeDir`, `sessionsDir`, `capabilities`. Optional: `bootstrap`, `createDesktopRefresher`, `parseRolloutLine`, `isInstalled`, `createTranslator`.
+- If the agent CLI does not speak Codex JSON-RPC natively (Claude stream-json, opencode REST/SSE, …), the protocol shim lives in `providers/<id>/translate.js` and is wired via `createTranslator(ctx)`. The shim can `ctx.injectInbound(line)` to synthesize JSON-RPC responses without round-tripping the CLI — use this for `thread/start`, `thread/read`, `thread/turns/list`, and any other Codex-only methods the upstream CLI does not implement.
 - Bridge core must stay agent-agnostic. Do not reintroduce direct imports of `codex-transport`, `CodexDesktopRefresher`, or other provider-specific modules from `bridge.js` — go through `resolveActiveProvider()`.
 - When a capability is absent (e.g. `desktopRefresher`, `rolloutMirror`), gate the codepath on `provider.capabilities.<flag>` and degrade gracefully (no-op refresher, skip mirror watcher) instead of crashing.
 - Provider selection precedence: `--provider <id>` CLI flag, then `AGNT_PROVIDER` env, then persisted daemon-state, then `isInstalled()` auto-detect, then first registered.

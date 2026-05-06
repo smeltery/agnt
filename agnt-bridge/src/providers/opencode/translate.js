@@ -1,0 +1,855 @@
+// FILE: providers/opencode/translate.js
+// Purpose: Codex JSON-RPC <-> opencode REST/SSE protocol shim. Lets the iOS
+//          app drive a local `opencode serve` instance through the same
+//          turn lifecycle it uses for Codex.
+// Layer: provider plugin (opencode)
+// Exports: createOpencodeTranslator
+// Depends on: crypto
+//
+// Wire mapping (high level):
+//   bridge JSON-RPC outbound       opencode action
+//   ─────────────────────────────  ──────────────────────────────────────
+//   thread/start                   POST /session                  -> threadId = session.id
+//   thread/read                    GET  /session/{id}/message
+//   thread/turns/list              GET  /session/{id}/message
+//   thread/list                    GET  /session
+//   turn/start                     POST /session/{id}/message     -> fire-and-forget
+//   turn/interrupt                 POST /session/{id}/abort
+//
+//   opencode SSE inbound           bridge JSON-RPC notifications
+//   ─────────────────────────────  ──────────────────────────────────────
+//   server.connected               (ignored)
+//   message.updated (assistant)    item/started + item id mapping
+//   message.part.updated (text)    item/agentMessage/delta
+//   message.part.updated (reason)  item/reasoning/textDelta
+//   message.part.updated (tool)    codex/event/exec_command_* family
+//   session.status busy            turn/started
+//   session.status idle            turn/completed (and item/completed)
+//   session.status retry/error     turn/failed (then turn/completed)
+//   session.diff                   turn/diff/updated
+//   server.heartbeat               (ignored)
+//
+// Threading model:
+//   opencode has no native "turn" concept — a session simply alternates user
+//   and assistant messages and reports busy/idle. We synthesize a turnId per
+//   user-initiated `turn/start` and fire `turn/completed` on the next idle
+//   transition.
+
+const crypto = require("crypto");
+
+const PROTO_VERSION = "1.0.0-opencode-shim";
+
+function createOpencodeTranslator({ injectInbound, transport, env: _env = process.env } = {}) {
+  // ── per-connection state ───────────────────────────────────────────────
+  /** Map of threadId → opencode session id. The bridge uses sessionId == threadId. */
+  let activeThreadId = "";
+  /** Outstanding turnId synthesized by us (one in flight at a time per session). */
+  let activeTurnId = "";
+  /** Provider/model snapshot supplied by the iOS turn/start params. */
+  let lastProviderId = "";
+  let lastModelId = "";
+  /** Track the assistant message id we are currently streaming. */
+  let activeAssistantMessageId = "";
+  /** Map opencode message-part id → bridge item id so deltas route to the same row. */
+  const partItemIds = new Map();
+  /** Map opencode tool-part id → { toolName, command, cwd } so completion routes correctly. */
+  const toolCallById = new Map();
+  /** Once the active turn is finalized, suppress further turn/completed emissions. */
+  let didEmitTurnCompletedForActive = false;
+
+  return {
+    outbound,
+    inbound,
+    handleStarted() {},
+    handleClose() {
+      if (activeTurnId && activeThreadId && !didEmitTurnCompletedForActive) {
+        emitNotification("turn/failed", {
+          threadId: activeThreadId,
+          turnId: activeTurnId,
+          id: activeTurnId,
+          error: { message: "opencode transport closed before turn completed" },
+        });
+        emitNotification("turn/completed", {
+          threadId: activeThreadId,
+          turnId: activeTurnId,
+          id: activeTurnId,
+        });
+      }
+      resetTurnState();
+    },
+  };
+
+  // ── outbound (bridge → opencode REST) ──────────────────────────────────
+  function outbound(line) {
+    const parsed = safeParseJson(line);
+    if (!parsed || typeof parsed !== "object") return null;
+    const method = readString(parsed.method);
+    const id = parsed.id;
+
+    if (method === "initialize" || method === "client/initialize") {
+      if (id != null) {
+        injectResponse(id, {
+          protocolVersion: PROTO_VERSION,
+          serverInfo: { name: "opencode-shim", version: PROTO_VERSION },
+          capabilities: {},
+        });
+      }
+      return null;
+    }
+
+    if (method === "thread/start") {
+      handleThreadStart(parsed);
+      return null;
+    }
+
+    if (method === "turn/start") {
+      handleTurnStart(parsed);
+      return null;
+    }
+
+    if (method === "turn/interrupt") {
+      handleTurnInterrupt(parsed);
+      return null;
+    }
+
+    if (method === "turn/steer") {
+      respondError(id, -32601, "opencode provider does not support turn/steer");
+      return null;
+    }
+
+    if (method === "thread/read" || method === "thread/resume") {
+      handleThreadRead(parsed);
+      return null;
+    }
+
+    if (method === "thread/turns/list") {
+      handleThreadTurnsList(parsed);
+      return null;
+    }
+
+    if (method === "thread/list") {
+      handleThreadList(parsed);
+      return null;
+    }
+
+    if (method === "thread/contextWindow/read") {
+      if (id != null) injectResponse(id, { threadId: activeThreadId, contextWindow: null });
+      return null;
+    }
+
+    if (method === "thread/generateTitle" || method === "thread/name/set" || method === "thread/compact/start") {
+      if (id != null) injectResponse(id, { ok: true });
+      return null;
+    }
+
+    if (id != null) {
+      respondError(id, -32601, `opencode provider does not support method: ${method}`);
+    }
+    return null;
+  }
+
+  // ── inbound (opencode SSE data line → bridge JSON-RPC) ─────────────────
+  function inbound(line) {
+    const parsed = safeParseJson(line);
+    if (!parsed || typeof parsed !== "object") return null;
+    const type = readString(parsed.type);
+    if (!type) return null;
+    const props = parsed.properties && typeof parsed.properties === "object"
+      ? parsed.properties
+      : {};
+    const sessionId = readString(props.sessionID) || readString(props.session_id);
+
+    if (sessionId && activeThreadId && sessionId !== activeThreadId) {
+      // Event is for a session we did not start through this bridge connection.
+      // Ignore so we do not crosstalk between iOS app sessions.
+      return null;
+    }
+
+    if (type === "session.status") {
+      handleSessionStatus(props);
+      return null;
+    }
+    if (type === "message.updated") {
+      handleMessageUpdated(props);
+      return null;
+    }
+    if (type === "message.part.updated") {
+      handleMessagePartUpdated(props);
+      return null;
+    }
+    if (type === "session.updated") {
+      handleSessionUpdated(props);
+      return null;
+    }
+    if (type === "session.diff") {
+      handleSessionDiff(props);
+      return null;
+    }
+    if (type === "session.error") {
+      handleSessionError(props);
+      return null;
+    }
+    return null;
+  }
+
+  // ── outbound handlers ──────────────────────────────────────────────────
+  async function handleThreadStart(request) {
+    try {
+      const res = await transport.httpRequest("POST", "/session", {});
+      const sessionId = readString(res?.json?.id);
+      if (!sessionId) {
+        respondError(request?.id, -32603, `opencode POST /session returned no id (status ${res?.status})`);
+        return;
+      }
+      activeThreadId = sessionId;
+      const threadPayload = mapSessionToThread(res.json);
+      if (request?.id != null) {
+        injectResponse(request.id, { thread: threadPayload });
+      }
+      emitNotification("thread/started", {
+        threadId: sessionId,
+        thread_id: sessionId,
+        thread: threadPayload,
+      });
+    } catch (err) {
+      respondError(request?.id, -32603, `opencode POST /session failed: ${err?.message || err}`);
+    }
+  }
+
+  function handleTurnStart(request) {
+    const params = request?.params || {};
+    const incomingThreadId = readString(params.threadId) || readString(params.thread_id);
+    if (incomingThreadId) activeThreadId = incomingThreadId;
+    if (!activeThreadId) {
+      respondError(request?.id, -32602, "opencode turn/start requires a thread; call thread/start first");
+      return;
+    }
+
+    const turnId = generateTurnId();
+    activeTurnId = turnId;
+    activeAssistantMessageId = "";
+    partItemIds.clear();
+    toolCallById.clear();
+    didEmitTurnCompletedForActive = false;
+
+    if (request?.id != null) {
+      injectResponse(request.id, {
+        turnId,
+        turn_id: turnId,
+        id: turnId,
+        threadId: activeThreadId,
+        thread_id: activeThreadId,
+      });
+    }
+
+    emitNotification("turn/started", {
+      threadId: activeThreadId,
+      turnId,
+      id: turnId,
+      turn_id: turnId,
+    });
+
+    const body = buildOpencodeMessageBody(params);
+    if (!body) {
+      emitNotification("turn/failed", {
+        threadId: activeThreadId,
+        turnId,
+        id: turnId,
+        error: { message: "turn/start had no usable text or attachments" },
+      });
+      emitNotification("turn/completed", {
+        threadId: activeThreadId,
+        turnId,
+        id: turnId,
+      });
+      return;
+    }
+
+    // Fire-and-forget: opencode streams the assistant content via SSE on /event.
+    // The HTTP response carries the final message snapshot but we do not wait
+    // on it — the iOS app's UI is driven entirely off the SSE notifications.
+    transport.httpRequest("POST", `/session/${encodeURIComponent(activeThreadId)}/message`, body)
+      .catch((err) => {
+        emitNotification("turn/failed", {
+          threadId: activeThreadId,
+          turnId,
+          id: turnId,
+          error: { message: `opencode POST /session/{id}/message failed: ${err?.message || err}` },
+        });
+        emitNotification("turn/completed", {
+          threadId: activeThreadId,
+          turnId,
+          id: turnId,
+        });
+      });
+  }
+
+  function handleTurnInterrupt(request) {
+    if (request?.id != null) injectResponse(request.id, { ok: true });
+    if (!activeThreadId || !activeTurnId) return;
+    transport.httpRequest("POST", `/session/${encodeURIComponent(activeThreadId)}/abort`, {})
+      .catch(() => { /* best-effort */ });
+    emitNotification("turn/failed", {
+      threadId: activeThreadId,
+      turnId: activeTurnId,
+      id: activeTurnId,
+      error: { message: "interrupted by user" },
+    });
+    emitNotification("turn/completed", {
+      threadId: activeThreadId,
+      turnId: activeTurnId,
+      id: activeTurnId,
+    });
+    didEmitTurnCompletedForActive = true;
+    resetTurnState();
+  }
+
+  async function handleThreadRead(request) {
+    const params = request?.params || {};
+    const targetThreadId = readString(params.threadId)
+      || readString(params.thread_id)
+      || activeThreadId;
+    if (!targetThreadId) {
+      respondError(request?.id, -32602, "thread/read requires a threadId");
+      return;
+    }
+    activeThreadId = targetThreadId;
+    try {
+      const [sessionRes, messagesRes] = await Promise.all([
+        transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}`),
+        transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}/message`),
+      ]);
+      const session = sessionRes?.json || null;
+      const messages = Array.isArray(messagesRes?.json) ? messagesRes.json : [];
+      const thread = mapSessionToThread(session, { id: targetThreadId });
+      thread.turns = mapMessagesToTurns(messages);
+      if (request?.id != null) {
+        injectResponse(request.id, { thread });
+      }
+    } catch (err) {
+      respondError(request?.id, -32603, `opencode thread/read failed: ${err?.message || err}`);
+    }
+  }
+
+  async function handleThreadTurnsList(request) {
+    const params = request?.params || {};
+    const targetThreadId = readString(params.threadId)
+      || readString(params.thread_id)
+      || activeThreadId;
+    try {
+      const messagesRes = await transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}/message`);
+      const messages = Array.isArray(messagesRes?.json) ? messagesRes.json : [];
+      const turns = mapMessagesToTurns(messages);
+      if (request?.id != null) {
+        injectResponse(request.id, {
+          threadId: targetThreadId,
+          thread_id: targetThreadId,
+          turns,
+          nextCursor: null,
+          hasMore: false,
+          page: { turns, nextCursor: null, hasMore: false },
+        });
+      }
+    } catch (err) {
+      respondError(request?.id, -32603, `opencode thread/turns/list failed: ${err?.message || err}`);
+    }
+  }
+
+  async function handleThreadList(request) {
+    try {
+      const res = await transport.httpRequest("GET", "/session");
+      const sessions = Array.isArray(res?.json) ? res.json : [];
+      const summaries = sessions.map((session) => mapSessionToSummary(session));
+      if (request?.id != null) {
+        injectResponse(request.id, {
+          data: summaries,
+          threads: summaries,
+          nextCursor: null,
+          hasMore: false,
+        });
+      }
+    } catch (err) {
+      respondError(request?.id, -32603, `opencode thread/list failed: ${err?.message || err}`);
+    }
+  }
+
+  // ── inbound handlers ───────────────────────────────────────────────────
+  function handleSessionStatus(props) {
+    const status = props?.status;
+    const kind = readString(status?.type);
+    if (!kind) return;
+
+    if (kind === "busy") {
+      // A `busy` status mid-turn just confirms work is in progress; we already
+      // emitted turn/started up-front, so nothing to do here.
+      return;
+    }
+    if (kind === "idle") {
+      finalizeActiveTurn();
+      return;
+    }
+    if (kind === "retry" || kind === "error") {
+      const message = readString(status?.message) || `session ${kind}`;
+      if (activeTurnId && activeThreadId) {
+        emitNotification("turn/failed", {
+          threadId: activeThreadId,
+          turnId: activeTurnId,
+          id: activeTurnId,
+          error: { message },
+        });
+        // Don't fire turn/completed here — opencode may auto-recover; an
+        // explicit `idle` status will follow once the retry resolves.
+      }
+    }
+  }
+
+  function handleMessageUpdated(props) {
+    const info = props?.info;
+    if (!info || typeof info !== "object") return;
+    const role = readString(info.role);
+    const messageId = readString(info.id);
+    if (role !== "assistant" || !messageId || !activeTurnId || !activeThreadId) return;
+
+    if (activeAssistantMessageId === messageId) return;
+    activeAssistantMessageId = messageId;
+    emitNotification("item/started", {
+      threadId: activeThreadId,
+      turnId: activeTurnId,
+      itemId: messageId,
+      item: {
+        id: messageId,
+        itemId: messageId,
+        type: "assistant_message",
+        role: "assistant",
+      },
+    });
+  }
+
+  function handleMessagePartUpdated(props) {
+    if (!activeTurnId || !activeThreadId) return;
+    const part = props?.part;
+    if (!part || typeof part !== "object") return;
+    const partId = readString(part.id);
+    const partType = readString(part.type);
+    const messageId = readString(part.messageID) || activeAssistantMessageId;
+
+    if (partType === "text") {
+      const text = readString(part.text);
+      if (!text) return;
+      const itemId = messageId || mapPartItemId(partId, "assistant");
+      const previous = partItemIds.get(partId);
+      const delta = previous === undefined
+        ? text
+        : text.length > previous.length && text.startsWith(previous)
+          ? text.slice(previous.length)
+          : text;
+      partItemIds.set(partId, text);
+      emitNotification("item/agentMessage/delta", {
+        threadId: activeThreadId,
+        turnId: activeTurnId,
+        itemId,
+        delta,
+      });
+      return;
+    }
+
+    if (partType === "reasoning") {
+      const reasoning = readString(part.text) || readString(part.reasoning);
+      if (!reasoning) return;
+      const itemId = mapPartItemId(partId, "thinking");
+      const previous = partItemIds.get(partId);
+      const delta = typeof previous === "string" && reasoning.length > previous.length && reasoning.startsWith(previous)
+        ? reasoning.slice(previous.length)
+        : reasoning;
+      partItemIds.set(partId, reasoning);
+      emitNotification("item/reasoning/textDelta", {
+        threadId: activeThreadId,
+        turnId: activeTurnId,
+        itemId,
+        delta,
+      });
+      return;
+    }
+
+    if (partType === "tool") {
+      handleToolPartUpdate(part, partId);
+      return;
+    }
+  }
+
+  function handleToolPartUpdate(part, partId) {
+    const toolName = readString(part.tool) || readString(part.name) || "tool";
+    const state = part.state && typeof part.state === "object" ? part.state : null;
+    const status = readString(state?.status);
+    const previous = toolCallById.get(partId);
+
+    if (!previous) {
+      const input = state?.input && typeof state.input === "object" ? state.input : {};
+      const command = readString(input.command);
+      const cwd = readString(input.cwd);
+      const itemId = partId || generateItemId("tool");
+      toolCallById.set(partId, {
+        toolName,
+        command,
+        cwd,
+        itemId,
+        wroteBegin: false,
+      });
+    }
+    const record = toolCallById.get(partId);
+
+    if (toolName === "bash" || toolName === "Bash") {
+      if (!record.wroteBegin) {
+        record.wroteBegin = true;
+        emitNotification("codex/event/exec_command_begin", {
+          threadId: activeThreadId,
+          turnId: activeTurnId,
+          call_id: record.itemId,
+          command: record.command,
+          cwd: record.cwd,
+          status: "running",
+        });
+      }
+      if (status === "completed" || status === "error") {
+        const output = readString(state?.output) || readString(state?.stdout);
+        if (output) {
+          emitNotification("codex/event/exec_command_output_delta", {
+            threadId: activeThreadId,
+            turnId: activeTurnId,
+            call_id: record.itemId,
+            command: record.command,
+            cwd: record.cwd,
+            chunk: output,
+          });
+        }
+        emitNotification("codex/event/exec_command_end", {
+          threadId: activeThreadId,
+          turnId: activeTurnId,
+          call_id: record.itemId,
+          command: record.command,
+          cwd: record.cwd,
+          status: status === "error" ? "error" : "completed",
+          output: output || "",
+        });
+        toolCallById.delete(partId);
+      }
+      return;
+    }
+
+    if (!record.wroteBegin) {
+      record.wroteBegin = true;
+      emitNotification("codex/event/background_event", {
+        threadId: activeThreadId,
+        turnId: activeTurnId,
+        call_id: record.itemId,
+        message: `Running ${toolName}`,
+      });
+    }
+    if (status === "completed" || status === "error") {
+      toolCallById.delete(partId);
+    }
+  }
+
+  function handleSessionUpdated(props) {
+    const info = props?.info;
+    if (!info || typeof info !== "object") return;
+    const sessionId = readString(info.id);
+    const title = readString(info.title);
+    if (sessionId && title) {
+      emitNotification("thread/name/updated", {
+        threadId: sessionId,
+        thread_id: sessionId,
+        name: title,
+        title,
+      });
+    }
+  }
+
+  function handleSessionDiff(props) {
+    if (!activeThreadId) return;
+    emitNotification("turn/diff/updated", {
+      threadId: activeThreadId,
+      turnId: activeTurnId || "",
+      diff: props?.diff || [],
+    });
+  }
+
+  function handleSessionError(props) {
+    const message = readString(props?.error?.message)
+      || readString(props?.message)
+      || "opencode session reported an error";
+    if (activeTurnId && activeThreadId) {
+      emitNotification("turn/failed", {
+        threadId: activeThreadId,
+        turnId: activeTurnId,
+        id: activeTurnId,
+        error: { message },
+      });
+      emitNotification("turn/completed", {
+        threadId: activeThreadId,
+        turnId: activeTurnId,
+        id: activeTurnId,
+      });
+      didEmitTurnCompletedForActive = true;
+      resetTurnState();
+    }
+  }
+
+  function finalizeActiveTurn() {
+    if (!activeTurnId || !activeThreadId || didEmitTurnCompletedForActive) return;
+    if (activeAssistantMessageId) {
+      const accumulator = collectAssistantText();
+      if (accumulator) {
+        emitNotification("codex/event/agent_message", {
+          threadId: activeThreadId,
+          turnId: activeTurnId,
+          itemId: activeAssistantMessageId,
+          message: accumulator,
+        });
+      }
+      emitNotification("item/completed", {
+        threadId: activeThreadId,
+        turnId: activeTurnId,
+        itemId: activeAssistantMessageId,
+        item: {
+          id: activeAssistantMessageId,
+          itemId: activeAssistantMessageId,
+          type: "assistant_message",
+          role: "assistant",
+          text: accumulator,
+          content: accumulator ? [{ type: "text", text: accumulator }] : [],
+        },
+      });
+    }
+    emitNotification("turn/completed", {
+      threadId: activeThreadId,
+      turnId: activeTurnId,
+      id: activeTurnId,
+      turn_id: activeTurnId,
+    });
+    didEmitTurnCompletedForActive = true;
+    resetTurnState();
+  }
+
+  function collectAssistantText() {
+    let combined = "";
+    for (const [, snapshot] of partItemIds) {
+      if (typeof snapshot === "string") combined += snapshot;
+    }
+    return combined;
+  }
+
+  function resetTurnState() {
+    activeTurnId = "";
+    activeAssistantMessageId = "";
+    partItemIds.clear();
+    toolCallById.clear();
+    didEmitTurnCompletedForActive = false;
+  }
+
+  // ── helpers ────────────────────────────────────────────────────────────
+  function buildOpencodeMessageBody(params) {
+    const items = Array.isArray(params?.input) ? params.input : [];
+    const parts = [];
+    let combinedText = "";
+    for (const item of items) {
+      if (!item || typeof item !== "object") continue;
+      const type = readString(item.type);
+      if (type === "text") {
+        const text = readString(item.text);
+        if (text) combinedText += combinedText ? `\n${text}` : text;
+      } else if (type === "image") {
+        const url = readString(item.image_url) || readString(item.url);
+        if (!url) continue;
+        parts.push({ type: "image", url });
+      } else if (type === "skill") {
+        const name = readString(item.name) || readString(item.id);
+        if (name) combinedText += `\n[skill: ${name}]`;
+      } else if (type === "mention") {
+        const name = readString(item.name);
+        const p = readString(item.path);
+        if (name && p) combinedText += `\n@${name} (${p})`;
+      }
+    }
+    if (combinedText) parts.unshift({ type: "text", text: combinedText });
+    if (parts.length === 0) return null;
+
+    const providerId = readString(params.providerID)
+      || readString(params.provider)
+      || lastProviderId
+      || "anthropic";
+    const modelId = readString(params.modelID)
+      || readString(params.model)
+      || lastModelId
+      || "claude-haiku-4-5";
+    lastProviderId = providerId;
+    lastModelId = modelId;
+
+    return {
+      providerID: providerId,
+      modelID: modelId,
+      parts,
+    };
+  }
+
+  function mapSessionToThread(session, fallback = {}) {
+    const id = readString(session?.id) || readString(fallback.id);
+    return {
+      id,
+      threadId: id,
+      thread_id: id,
+      cwd: readString(session?.directory) || readString(fallback.cwd) || "",
+      title: readString(session?.title) || "",
+      status: "idle",
+      turns: [],
+      createdAt: numberOr(session?.time?.created, 0),
+      updatedAt: numberOr(session?.time?.updated, 0),
+    };
+  }
+
+  function mapSessionToSummary(session) {
+    const id = readString(session?.id);
+    return {
+      id,
+      threadId: id,
+      thread_id: id,
+      title: readString(session?.title) || "",
+      status: "idle",
+      cwd: readString(session?.directory) || "",
+      createdAt: numberOr(session?.time?.created, 0),
+      updatedAt: numberOr(session?.time?.updated, 0),
+    };
+  }
+
+  function mapMessagesToTurns(messages) {
+    const turns = [];
+    let currentTurn = null;
+    for (const message of messages) {
+      if (!message || typeof message !== "object") continue;
+      const info = message.info && typeof message.info === "object" ? message.info : message;
+      const role = readString(info.role);
+      const messageId = readString(info.id);
+      const parts = Array.isArray(message.parts) ? message.parts : [];
+      if (role === "user") {
+        currentTurn = {
+          id: messageId || generateTurnId(),
+          turnId: messageId || generateTurnId(),
+          status: "completed",
+          input: parts.map(mapPartToInput).filter(Boolean),
+          items: [],
+        };
+        turns.push(currentTurn);
+        continue;
+      }
+      if (role === "assistant") {
+        if (!currentTurn) {
+          currentTurn = {
+            id: messageId || generateTurnId(),
+            turnId: messageId || generateTurnId(),
+            status: "completed",
+            input: [],
+            items: [],
+          };
+          turns.push(currentTurn);
+        }
+        for (const part of parts) {
+          const item = mapPartToItem(part, messageId);
+          if (item) currentTurn.items.push(item);
+        }
+      }
+    }
+    return turns;
+  }
+
+  function mapPartToInput(part) {
+    if (!part || typeof part !== "object") return null;
+    const type = readString(part.type);
+    if (type === "text") return { type: "text", text: readString(part.text) };
+    if (type === "image") return { type: "image", image_url: readString(part.url) };
+    return null;
+  }
+
+  function mapPartToItem(part, messageId) {
+    if (!part || typeof part !== "object") return null;
+    const type = readString(part.type);
+    const itemId = readString(part.id) || messageId || generateItemId("assistant");
+    if (type === "text") {
+      return {
+        id: itemId,
+        itemId,
+        type: "assistant_message",
+        role: "assistant",
+        text: readString(part.text),
+        content: [{ type: "text", text: readString(part.text) }],
+      };
+    }
+    if (type === "reasoning") {
+      return {
+        id: itemId,
+        itemId,
+        type: "reasoning",
+        text: readString(part.text),
+      };
+    }
+    if (type === "tool") {
+      return {
+        id: itemId,
+        itemId,
+        type: "tool_call",
+        name: readString(part.tool),
+      };
+    }
+    return null;
+  }
+
+  function mapPartItemId(partId, kind) {
+    if (!partId) return generateItemId(kind);
+    const cached = partItemIds.get(`${partId}:itemId`);
+    if (cached) return cached;
+    const id = generateItemId(kind);
+    partItemIds.set(`${partId}:itemId`, id);
+    return id;
+  }
+
+  function generateTurnId() {
+    return `turn_${crypto.randomBytes(12).toString("hex")}`;
+  }
+
+  function generateItemId(kind) {
+    return `${kind}_${crypto.randomBytes(10).toString("hex")}`;
+  }
+
+  function emitNotification(method, params) {
+    injectInbound(JSON.stringify({ method, params }));
+  }
+
+  function injectResponse(id, result) {
+    injectInbound(JSON.stringify({ id, result }));
+  }
+
+  function respondError(id, code, message) {
+    if (id == null) return;
+    injectInbound(JSON.stringify({ id, error: { code, message } }));
+  }
+}
+
+function safeParseJson(line) {
+  if (typeof line !== "string") return null;
+  try {
+    return JSON.parse(line);
+  } catch {
+    return null;
+  }
+}
+
+function readString(value) {
+  return typeof value === "string" && value ? value : "";
+}
+
+function numberOr(value, fallback) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+module.exports = {
+  createOpencodeTranslator,
+};

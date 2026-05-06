@@ -29,7 +29,7 @@ const PROVIDER_CAPABILITY_KEYS = Object.freeze([
  */
 
 /**
- * @typedef {Object} ProviderTranslate
+ * @typedef {Object} ProviderTranslator
  * @property {(line: string) => string|string[]|null} [outbound]
  *   — translate a bridge-side line (Codex JSON-RPC) into provider-native frames
  *     before send(). Return `null` to drop, a string to forward as one frame,
@@ -38,6 +38,23 @@ const PROVIDER_CAPABILITY_KEYS = Object.freeze([
  *   — translate a provider-native line (e.g. Claude stream-json, opencode SSE)
  *     into bridge-side lines (Codex JSON-RPC) before bridge handling. Same
  *     return semantics as outbound.
+ * @property {(info: object) => void} [handleStarted]
+ *   — called when the underlying transport reports onStarted (e.g. once the
+ *     opencode HTTP server is up and the host/port is known). Use to wire up
+ *     deferred state in the translator instance.
+ * @property {() => void} [handleClose]
+ *   — called when the underlying transport closes; lets the translator clean
+ *     up timers, in-flight work, etc.
+ */
+
+/**
+ * @typedef {Object} TranslatorContext
+ * @property {(line: string) => void} injectInbound
+ *   — push a synthetic JSON-RPC line into the bridge as if it had arrived from
+ *     the provider. Used to answer requests the provider does not handle natively
+ *     (e.g. synthesizing a `thread/start` response with a placeholder threadId).
+ * @property {ProviderTransport} transport — the raw transport instance.
+ * @property {NodeJS.ProcessEnv} env
  */
 
 /**
@@ -51,33 +68,91 @@ const PROVIDER_CAPABILITY_KEYS = Object.freeze([
  * @property {(line: string) => object|null} [parseRolloutLine]  — provider-specific JSONL parsing
  * @property {() => Promise<void>} [bootstrap] — postinstall hook
  * @property {(opts: object) => object} [createDesktopRefresher]
- * @property {ProviderTranslate} [translate] — optional protocol shim (identity if absent)
+ * @property {ProviderTranslator} [translate]
+ *   — static translator (no per-connection state). Use createTranslator instead
+ *     when state is needed.
+ * @property {(ctx: TranslatorContext) => ProviderTranslator} [createTranslator]
+ *   — factory invoked once per connection. Lets the shim hold per-connection
+ *     state (threadId↔sessionId maps, in-flight turn tracking, ...) and inject
+ *     synthetic inbound responses via ctx.injectInbound.
  * @property {Partial<Record<typeof PROVIDER_CAPABILITY_KEYS[number], boolean>>} capabilities
  */
 
 /**
- * Wraps a raw provider transport with the provider's optional translate hooks.
- * If neither hook is set, returns the original transport unchanged.
+ * Wraps a raw provider transport with the provider's optional translator hooks.
+ * If the provider exposes neither `translate` nor `createTranslator`, returns
+ * the original transport unchanged.
+ *
+ * Translation directions:
+ *   - outbound: bridge → provider. The translator may emit zero, one, or many
+ *     frames per outbound JSON-RPC line, or use `ctx.injectInbound` to answer
+ *     locally without ever touching the transport.
+ *   - inbound: provider → bridge. The translator turns provider-native frames
+ *     (Claude stream-json, opencode SSE, ...) into the Codex JSON-RPC envelopes
+ *     the bridge already understands.
+ *
  * @param {ProviderTransport} transport
  * @param {ProviderModule} provider
+ * @param {{ env?: NodeJS.ProcessEnv }} [opts]
  * @returns {ProviderTransport}
  */
-function withTranslator(transport, provider) {
-  const outbound = provider?.translate?.outbound;
-  const inbound = provider?.translate?.inbound;
-  if (typeof outbound !== "function" && typeof inbound !== "function") {
+function withTranslator(transport, provider, { env = process.env } = {}) {
+  const factory = typeof provider?.createTranslator === "function"
+    ? provider.createTranslator
+    : null;
+  const staticTranslator = !factory && provider?.translate ? provider.translate : null;
+
+  if (!factory && !staticTranslator) {
     return transport;
   }
+
+  let inboundHandler = null;
+
+  const injectInbound = (line) => {
+    if (typeof line !== "string" || line.length === 0) return;
+    if (typeof inboundHandler === "function") {
+      try {
+        inboundHandler(line);
+      } catch (err) {
+        console.error(`[agnt][${provider?.id || "?"}] injected inbound handler threw:`, err);
+      }
+    }
+  };
+
+  let translator = staticTranslator;
+  if (factory) {
+    try {
+      translator = factory({ injectInbound, transport, env });
+    } catch (err) {
+      console.error(`[agnt][${provider?.id || "?"}] createTranslator threw:`, err);
+      return transport;
+    }
+  }
+
+  const outbound = typeof translator?.outbound === "function" ? translator.outbound : null;
+  const inbound = typeof translator?.inbound === "function" ? translator.inbound : null;
+  const handleStarted = typeof translator?.handleStarted === "function"
+    ? translator.handleStarted
+    : null;
+  const handleClose = typeof translator?.handleClose === "function"
+    ? translator.handleClose
+    : null;
 
   return {
     mode: transport.mode,
     describe: () => transport.describe(),
     send(message) {
-      if (typeof outbound !== "function") {
+      if (!outbound) {
         transport.send(message);
         return;
       }
-      const translated = outbound(message);
+      let translated;
+      try {
+        translated = outbound(message);
+      } catch (err) {
+        console.error(`[agnt][${provider.id}] translator.outbound threw:`, err);
+        return;
+      }
       if (translated == null) return;
       const frames = Array.isArray(translated) ? translated : [translated];
       for (const frame of frames) {
@@ -87,12 +162,19 @@ function withTranslator(transport, provider) {
       }
     },
     onMessage(handler) {
-      if (typeof inbound !== "function") {
+      inboundHandler = handler;
+      if (!inbound) {
         transport.onMessage(handler);
         return;
       }
       transport.onMessage((line) => {
-        const translated = inbound(line);
+        let translated;
+        try {
+          translated = inbound(line);
+        } catch (err) {
+          console.error(`[agnt][${provider.id}] translator.inbound threw:`, err);
+          return;
+        }
         if (translated == null) return;
         const frames = Array.isArray(translated) ? translated : [translated];
         for (const frame of frames) {
@@ -102,9 +184,27 @@ function withTranslator(transport, provider) {
         }
       });
     },
-    onClose(handler) { transport.onClose(handler); },
+    onClose(handler) {
+      transport.onClose((info) => {
+        if (handleClose) {
+          try { handleClose(info); } catch (err) {
+            console.error(`[agnt][${provider.id}] translator.handleClose threw:`, err);
+          }
+        }
+        handler?.(info);
+      });
+    },
     onError(handler) { transport.onError(handler); },
-    onStarted(handler) { transport.onStarted(handler); },
+    onStarted(handler) {
+      transport.onStarted((info) => {
+        if (handleStarted) {
+          try { handleStarted(info); } catch (err) {
+            console.error(`[agnt][${provider.id}] translator.handleStarted threw:`, err);
+          }
+        }
+        handler?.(info);
+      });
+    },
     shutdown() { transport.shutdown(); },
   };
 }

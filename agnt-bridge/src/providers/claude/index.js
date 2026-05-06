@@ -3,19 +3,14 @@
 //          plugin contract.
 // Layer: provider plugin
 // Exports: claude provider
-// Depends on: ../types, ./transport, ./detect, os, path
-//
-// Status: transport plumbs stdio between bridge and `claude --output-format
-// stream-json --input-format stream-json --verbose`. **Bridge<->Claude
-// schema translation is NOT implemented yet** — the bridge speaks Codex
-// JSON-RPC, Claude speaks stream-json. iOS clients won't get usable events
-// until a translation shim is added. See providers/claude/transport.js.
+// Depends on: ../types, ./transport, ./detect, ./translate, os, path
 
 const path = require("path");
 const os = require("os");
 const { defineProvider } = require("../types");
 const { createClaudeTransport } = require("./transport");
 const { detectClaudeBinary, isClaudeInstalled } = require("./detect");
+const { createClaudeTranslator } = require("./translate");
 
 function resolveClaudeHome() {
   return process.env.CLAUDE_HOME || path.join(os.homedir(), ".claude");
@@ -45,6 +40,9 @@ module.exports = defineProvider({
   createTransport(opts = {}) {
     return createClaudeTransport(opts);
   },
+  createTranslator(ctx) {
+    return createClaudeTranslator(ctx);
+  },
   async bootstrap({ env = process.env, logger = console } = {}) {
     if (detectClaudeBinary({ env })) {
       return { status: "found" };
@@ -55,5 +53,4 @@ module.exports = defineProvider({
     );
     return { status: "missing" };
   },
-  // TODO: parseRolloutLine for ~/.claude/projects/.../*.jsonl event normalization.
 });
