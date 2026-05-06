@@ -30,6 +30,18 @@ Read this whole file first.
 
 Opening a PR does not create an obligation on my side. I may close it. I may ignore it. I may take the idea and implement it differently. That's how early-stage projects work.
 
+### License of contributions
+
+agnt is **source-available** under [PolyForm Shield 1.0.0](LICENSE), not open source. By submitting a pull request, you agree that:
+
+- Your contribution will be released under PolyForm Shield 1.0.0, the same license as the rest of the project.
+- The PolyForm Shield non-compete applies to your contribution: it cannot be used to provide a product or service that competes with agnt or with anything dotbrains offers that includes agnt.
+- You have the right to license the code you're submitting under those terms — i.e. you wrote it yourself, or you have permission from your employer / co-authors.
+
+If you're unsure whether your employer's IP policy allows you to contribute, please clear it on your side before opening a PR. There is no separate CLA to sign; the act of submitting the PR is the agreement.
+
+Code that originated in [Remodex](https://github.com/Emanuele-web04/remodex) (the Apache-2.0 upstream agnt was forked from) retains its Apache-2.0 grant for anyone who pulled it. New contributions to agnt are PolyForm Shield 1.0.0.
+
 ---
 
 ## Local Development Setup
@@ -41,6 +53,7 @@ Opening a PR does not create an obligation on my side. I may close it. I may ign
   - **[Codex CLI](https://github.com/openai/codex)** — native, full feature parity
   - **[Claude Code](https://docs.claude.com/en/docs/claude-code)** — full chat, tools, interrupts, approvals
   - **[opencode](https://opencode.ai)** — full chat, tools, runtime approvals, compact, fork
+  - **[Cursor](https://cursor.com/docs/cli/installation)** — full chat, tools, interrupts, model selection (approvals auto-accepted via `--force`)
 - **[Codex desktop app](https://openai.com/index/codex/)** (optional — only needed for the Codex desktop-companion mirror feature)
 - **macOS** (required for the macOS launchd daemon and the Codex desktop refresh; core bridge works on any OS)
 - **Xcode 16+** (only for building the iOS app)
@@ -104,7 +117,7 @@ The app uses SwiftUI and the current project target is iOS 18.6. No CocoaPods or
 
 ### Environment variables
 
-For OSS/local development, prefer the launcher above. If you want to point the bridge at your own relay manually, export `AGNT_RELAY` in your shell:
+For local development, prefer the launcher above. If you want to point the bridge at your own relay manually, export `AGNT_RELAY` in your shell:
 
 ```sh
 # Connect to an existing Codex instance instead of spawning one
@@ -134,7 +147,9 @@ agnt/
 │       │   ├── claude/transport.js         # spawn `claude --print` w/ soft interrupt + respawn
 │       │   ├── claude/translate.js         # stream-json ↔ Codex JSON-RPC shim
 │       │   ├── opencode/transport.js       # spawn `opencode serve` + http client + SSE pump
-│       │   └── opencode/translate.js       # REST/SSE ↔ Codex JSON-RPC shim
+│       │   ├── opencode/translate.js       # REST/SSE ↔ Codex JSON-RPC shim
+│       │   ├── cursor/transport.js         # spawn-per-turn `cursor-agent -p` w/ --resume
+│       │   └── cursor/translate.js         # stream-json ↔ Codex JSON-RPC shim
 │       ├── git-handler.js                  # Git command execution from phone
 │       ├── workspace-handler.js            # Workspace/cwd management
 │       ├── session-state.js                # Thread persistence (~/.agnt/)
