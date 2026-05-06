@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
 
           output_dir="$GITHUB_WORKSPACE/build/unsigned-ipa"
-          archive_path="$output_dir/CodexMobile.xcarchive"
+          archive_path="$output_dir/AgntMobile.xcarchive"
           ipa_path="$output_dir/agnt-unsigned-release.ipa"
           build_log_path="$output_dir/xcodebuild.log"
 
@@ -43,8 +43,8 @@ jobs:
           mkdir -p "$output_dir"
 
           xcodebuild \
-            -project "$GITHUB_WORKSPACE/CodexMobile/CodexMobile.xcodeproj" \
-            -scheme CodexMobile \
+            -project "$GITHUB_WORKSPACE/AgntMobile/AgntMobile.xcodeproj" \
+            -scheme AgntMobile \
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath "$archive_path" \
