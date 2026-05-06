@@ -2,7 +2,7 @@
 
 **Last updated:** May 2, 2026
 
-agnt is open-source software ([Apache-2.0](../LICENSE)). This notice describes how the reference implementation handles data when you run it yourself on your own infrastructure. There is no agnt-operated cloud service; you are the operator of any deployment you create.
+agnt is source-available software ([PolyForm Shield 1.0.0](../LICENSE)). This notice describes how the reference implementation handles data when you run it yourself on your own infrastructure. There is no agnt-operated cloud service; you are the operator of any deployment you create.
 
 If you redistribute agnt or run it as a service for other users, you are responsible for publishing your own privacy notice that reflects your specific operational choices.
 

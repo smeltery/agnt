@@ -393,7 +393,7 @@ struct AboutAgntView: View {
 
     @ViewBuilder private var footer: some View {
         VStack(spacing: 10) {
-            OpenSourceBadge(style: .dark)
+            SourceBadge(style: .dark)
 
             Text("ISC License")
                 .font(AppFont.caption())

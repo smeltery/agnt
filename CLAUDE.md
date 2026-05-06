@@ -12,10 +12,10 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 - Do not reintroduce filtering by selected repo in sidebar/content.
 - Keep cross-repo open/create flow with automatic local context switch.
 - Preserve single responsibility: shared logic belongs in services/coordinators, not duplicated in views.
-- Treat this repo as open source: avoid junk code, placeholder hacks, noisy one-off workarounds, and low-signal docs.
+- Treat this repo as source-available: avoid junk code, placeholder hacks, noisy one-off workarounds, and low-signal docs.
 - If you touch docs, keep them local-only and remove stale hosted-service notes instead of adding compatibility layers.
 - Do not create one-off report markdown files in the repo root unless the user explicitly asks for a file. Keep ad-hoc analysis in the chat.
-- For open-source/self-hosted safety, do not log live relay `sessionId` values or other bearer-like pairing identifiers in server logs; redact or hash them instead.
+- For source-available/self-hosted safety, do not log live relay `sessionId` values or other bearer-like pairing identifiers in server logs; redact or hash them instead.
 - Keep user-facing answers compact by default unless the user explicitly asks for more detail.
 
 ## Provider plugin guardrails

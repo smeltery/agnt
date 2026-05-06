@@ -21,7 +21,7 @@ private let subscriptionGateFeatures: [SubscriptionGateFeature] = [
     .init(id: 4, icon: "point.3.connected.trianglepath.dotted", title: "Subagents", subtitle: "Delegate complex tasks to specialized sub-agents"),
     .init(id: 5, icon: "at", title: "$skills /cmds @files", subtitle: "Invoke skills, run slash commands, and mention files inline"),
     .init(id: 6, icon: "server.rack", title: "Hosted relay", subtitle: "You are paying for the product and the hosted path"),
-    .init(id: 7, icon: "heart", title: "Support development", subtitle: "Help keep agnt independent and open source"),
+    .init(id: 7, icon: "heart", title: "Support development", subtitle: "Help keep agnt independent and source available"),
 ]
 
 struct SubscriptionGatePreviewPlan: Identifiable {
@@ -335,7 +335,7 @@ struct SubscriptionGateView: View {
                     .multilineTextAlignment(.center)
             }
 
-            OpenSourceBadge(style: colorScheme == .dark ? .light : .dark)
+            SourceBadge(style: colorScheme == .dark ? .light : .dark)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 12)
@@ -524,7 +524,7 @@ struct SubscriptionBootstrapFailureView: View {
                     .font(AppFont.caption(weight: .medium))
                     .foregroundStyle(secondaryTextColor)
 
-                    OpenSourceBadge(style: colorScheme == .dark ? .light : .dark)
+                    SourceBadge(style: colorScheme == .dark ? .light : .dark)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 20)

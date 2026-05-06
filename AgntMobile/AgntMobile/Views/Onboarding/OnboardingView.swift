@@ -92,7 +92,7 @@ struct OnboardingView: View {
                 action: handleContinue
             )
 
-            OpenSourceBadge(style: .light)
+            SourceBadge(style: .light)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 12)

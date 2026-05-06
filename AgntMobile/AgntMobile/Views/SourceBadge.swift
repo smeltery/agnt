@@ -1,11 +1,11 @@
-// FILE: OpenSourceBadge.swift
-// Purpose: Tappable open-source GitHub badge used across onboarding and about screens.
+// FILE: SourceBadge.swift
+// Purpose: Tappable source-available GitHub badge used across onboarding and about screens.
 // Layer: View Component
-// Exports: OpenSourceBadge
+// Exports: SourceBadge
 
 import SwiftUI
 
-struct OpenSourceBadge: View {
+struct SourceBadge: View {
     var style: BadgeStyle = .light
 
     enum BadgeStyle {
@@ -23,7 +23,7 @@ struct OpenSourceBadge: View {
                     .scaledToFit()
                     .frame(width: 14, height: 14)
 
-                Text("Open source")
+                Text("Source available")
                     .font(AppFont.caption(weight: .medium))
             }
             .foregroundStyle(foregroundColor)
@@ -39,7 +39,7 @@ struct OpenSourceBadge: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open source on GitHub")
+        .accessibilityLabel("Source available on GitHub")
     }
 
     private var foregroundColor: Color {
@@ -67,12 +67,12 @@ struct OpenSourceBadge: View {
 #Preview("Light (dark bg)") {
     ZStack {
         Color.black.ignoresSafeArea()
-        OpenSourceBadge(style: .light)
+        SourceBadge(style: .light)
     }
     .preferredColorScheme(.dark)
 }
 
 #Preview("Dark (light bg)") {
-    OpenSourceBadge(style: .dark)
+    SourceBadge(style: .dark)
         .padding()
 }

@@ -1,10 +1,10 @@
 # agnt
 
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE)
 
-Control coding-agent CLIs from your iPhone — **Codex**, **Claude Code**, **opencode**, **Cursor**, and any other agent you plug in. **agnt** is a local-first, open-source bridge + iOS app that keeps the agent runtime on your Mac and lets your phone connect through a paired secure session.
+Control coding-agent CLIs from your iPhone — **Codex**, **Claude Code**, **opencode**, **Cursor**, and any other agent you plug in. **agnt** is a local-first, source-available bridge + iOS app that keeps the agent runtime on your Mac and lets your phone connect through a paired secure session.
 
-> agnt is a fork of [Remodex](https://github.com/Emanuele-web04/remodex) (Apache-2.0). The original tool brokers iOS ↔ Codex; agnt generalises the transport behind a provider plugin contract so other agents can be added without touching bridge core.
+> agnt is a fork of [Remodex](https://github.com/Emanuele-web04/remodex) (Apache-2.0). The original tool brokers iOS ↔ Codex; agnt generalises the transport behind a provider plugin contract so other agents can be added without touching bridge core. New agnt contributions are released under PolyForm Shield 1.0.0 (see [LICENSE](LICENSE)); upstream Remodex code retains its original Apache-2.0 grant.
 
 > **Status: early.**
 
@@ -160,4 +160,4 @@ See [docs/self-hosting-model.md](docs/self-hosting-model.md) for the principles 
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE). Upstream attribution: [Emanuele-web04/remodex](https://github.com/Emanuele-web04/remodex).
+[PolyForm Shield 1.0.0](LICENSE). Source-available with a non-compete clause: you may use, copy, modify, and distribute the software, but not to provide a product or service that competes with agnt. Upstream attribution: [Emanuele-web04/remodex](https://github.com/Emanuele-web04/remodex) (Apache-2.0).
