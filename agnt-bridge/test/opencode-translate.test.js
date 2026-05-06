@@ -637,6 +637,59 @@ test("opencode edit tool emits file_change with output delta", () => {
   assert.equal(completed.params.item.status, "completed");
 });
 
+test("tui.toast.show emits system/notice with severity + title", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_t", input: [{ type: "text", text: "x" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "tui.toast.show",
+    properties: {
+      title: "MCP Authentication Required",
+      message: "Server linear requires auth",
+      variant: "warning",
+      duration: 8000,
+    },
+  }));
+
+  const ev = parseInjected(injected).find((e) => e.method === "system/notice");
+  assert.ok(ev);
+  assert.equal(ev.params.severity, "warning");
+  assert.equal(ev.params.title, "MCP Authentication Required");
+});
+
+test("patch part emits turn/diff/updated and file_change item", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_p", input: [{ type: "text", text: "patch" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_p",
+      part: {
+        type: "patch", id: "prt_p", messageID: "msg_p",
+        file_path: "/tmp/z.txt",
+        diff: "@@ -1 +1 @@\n-old\n+new",
+      },
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  const diff = events.find((e) => e.method === "turn/diff/updated");
+  const started = events.find((e) => e.method === "item/started");
+  const out = events.find((e) => e.method === "item/fileChange/outputDelta");
+  assert.equal(diff.params.diff[0].file, "/tmp/z.txt");
+  assert.equal(started.params.item.type, "file_change");
+  assert.match(out.params.delta, /\+new/);
+});
+
 test("opencode webfetch tool emits a background_event with descriptive message", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({

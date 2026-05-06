@@ -224,7 +224,27 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       // Mirror reply (the REST POST already handled it). Nothing to surface.
       return null;
     }
+    if (type === "tui.toast.show") {
+      handleToastShow(parsed);
+      return null;
+    }
     return null;
+  }
+
+  function handleToastShow(envelope) {
+    const props = envelope?.properties || {};
+    const title = readString(props.title);
+    const message = readString(props.message);
+    const variant = readString(props.variant) || "info";
+    if (!title && !message) return;
+    emitNotification("system/notice", {
+      threadId: activeThreadId,
+      provider: "opencode",
+      severity: variant,
+      title,
+      message,
+      durationMs: numberOr(props.duration, 0),
+    });
   }
 
   // ── outbound handlers ──────────────────────────────────────────────────
@@ -656,6 +676,46 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     if (partType === "tool") {
       handleToolPartUpdate(part, partId);
       return;
+    }
+
+    if (partType === "patch") {
+      handlePatchPartUpdate(part, partId);
+      return;
+    }
+
+    // step-start / step-finish / snapshot / agent / file are intentional
+    // no-ops here: step markers are turn-internal phase signals, snapshot is
+    // workspace bookkeeping, file/agent appear inside other parts. Add
+    // explicit handling here when iOS gains UI affordances for them.
+  }
+
+  function handlePatchPartUpdate(part, partId) {
+    if (!activeTurnId || !activeThreadId) return;
+    const filePath = readString(part?.file_path) || readString(part?.path) || readString(part?.filepath);
+    const diff = readString(part?.diff) || readString(part?.text) || "";
+    if (!filePath && !diff) return;
+    const itemId = partId || generateItemId("patch");
+    emitNotification("turn/diff/updated", {
+      threadId: activeThreadId,
+      turnId: activeTurnId,
+      diff: [{ file: filePath, patch: diff }],
+    });
+    if (!toolCallById.has(partId)) {
+      toolCallById.set(partId, { kind: "file_change", toolName: "patch", filePath, itemId, wroteBegin: true });
+      emitNotification("item/started", {
+        threadId: activeThreadId, turnId: activeTurnId, itemId,
+        item: {
+          id: itemId, itemId,
+          type: "file_change", tool: "patch", name: "patch",
+          file_path: filePath, path: filePath,
+        },
+      });
+    }
+    if (diff) {
+      emitNotification("item/fileChange/outputDelta", {
+        threadId: activeThreadId, turnId: activeTurnId, itemId,
+        delta: diff,
+      });
     }
   }
 
