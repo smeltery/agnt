@@ -1,6 +1,8 @@
 # agnt
 
 [![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE)
+[![Bridge Check](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml)
+[![Build Unsigned IPA](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml)
 
 Control coding-agent CLIs from your iPhone — **Codex**, **Claude Code**, **opencode**, **Cursor**, and any other agent you plug in. **agnt** is a local-first, source-available bridge + iOS app that keeps the agent runtime on your Mac and lets your phone connect through a paired secure session.
 
