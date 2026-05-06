@@ -4,7 +4,8 @@
   "description": "Local bridge between coding-agent CLIs (Codex, Claude Code, opencode, Cursor, ...) and the Agnt mobile app. Run `agnt up` to start.",
   "main": "src/index.js",
   "bin": {
-    "agnt": "./bin/agnt.js"
+    "agnt": "./bin/agnt.js",
+    "agnt-jsonl-diagnose": "./bin/agnt-jsonl-diagnose.js"
   },
   "files": [
     "bin/",
