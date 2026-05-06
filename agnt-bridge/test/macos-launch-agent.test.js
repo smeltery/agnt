@@ -285,6 +285,163 @@ test("getMacOSBridgeServiceStatus reports launchd + runtime metadata together", 
   });
 });
 
+test("stopMacOSBridgeService SIGTERMs an orphan agnt run-service recorded in bridge-status.json", () => {
+  withTempDaemonEnv(() => {
+    writeBridgeStatus({ state: "running", connectionStatus: "connected", pid: 9999 });
+
+    const killed = [];
+    stopMacOSBridgeService({
+      platform: "darwin",
+      execFileSyncImpl(command, args) {
+        if (command === "ps") {
+          assert.deepEqual(args, ["-p", "9999", "-o", "command="]);
+          return "node /usr/local/bin/agnt run-service";
+        }
+        // launchctl bootout
+        return "";
+      },
+      processImpl: {
+        pid: process.pid,
+        kill(pid, signal) {
+          killed.push([pid, signal]);
+        },
+      },
+    });
+
+    assert.deepEqual(killed, [[9999, "SIGTERM"]]);
+    // Status file is still cleared regardless.
+    assert.equal(readBridgeStatus(), null);
+  });
+});
+
+test("stopMacOSBridgeService does NOT kill a PID whose command line is unrelated to agnt", () => {
+  withTempDaemonEnv(() => {
+    writeBridgeStatus({ state: "running", pid: 12345 });
+
+    const killed = [];
+    stopMacOSBridgeService({
+      platform: "darwin",
+      execFileSyncImpl(command) {
+        if (command === "ps") {
+          // PID got reused by an unrelated process — never kill it.
+          return "/usr/local/bin/postgres -D /var/lib/postgres";
+        }
+        return "";
+      },
+      processImpl: {
+        pid: process.pid,
+        kill(pid, signal) { killed.push([pid, signal]); },
+      },
+    });
+
+    assert.deepEqual(killed, []);
+  });
+});
+
+test("stopMacOSBridgeService does NOT kill its own pid even if recorded as the run-service", () => {
+  withTempDaemonEnv(() => {
+    // Record the current process pid in the status file. Even with a matching
+    // ps result, the orphan cleaner must refuse to SIGTERM itself.
+    writeBridgeStatus({ state: "running", pid: process.pid });
+
+    const killed = [];
+    stopMacOSBridgeService({
+      platform: "darwin",
+      execFileSyncImpl(command) {
+        if (command === "ps") {
+          return "node /usr/local/bin/agnt run-service";
+        }
+        return "";
+      },
+      processImpl: {
+        pid: process.pid,
+        kill(pid, signal) { killed.push([pid, signal]); },
+      },
+    });
+
+    assert.deepEqual(killed, []);
+  });
+});
+
+test("stopMacOSBridgeService skips orphan cleanup when ps lookup fails", () => {
+  withTempDaemonEnv(() => {
+    writeBridgeStatus({ state: "running", pid: 9999 });
+
+    const killed = [];
+    stopMacOSBridgeService({
+      platform: "darwin",
+      execFileSyncImpl(command) {
+        if (command === "ps") {
+          throw new Error("No such process");
+        }
+        return "";
+      },
+      processImpl: {
+        pid: process.pid,
+        kill(pid, signal) { killed.push([pid, signal]); },
+      },
+    });
+
+    assert.deepEqual(killed, []);
+  });
+});
+
+test("stopMacOSBridgeService skips orphan cleanup when no pid is recorded", () => {
+  withTempDaemonEnv(() => {
+    writeBridgeStatus({ state: "running", connectionStatus: "connected" });
+
+    const psCalls = [];
+    const killed = [];
+    stopMacOSBridgeService({
+      platform: "darwin",
+      execFileSyncImpl(command) {
+        if (command === "ps") {
+          psCalls.push("ps invoked");
+          return "";
+        }
+        return "";
+      },
+      processImpl: {
+        pid: process.pid,
+        kill(pid, signal) { killed.push([pid, signal]); },
+      },
+    });
+
+    // ps is never invoked when there's nothing to verify.
+    assert.equal(psCalls.length, 0);
+    assert.deepEqual(killed, []);
+  });
+});
+
+test("stopMacOSBridgeService swallows SIGTERM errors so cleanup still completes", () => {
+  withTempDaemonEnv(() => {
+    writeBridgeStatus({ state: "running", pid: 9999 });
+
+    let killAttempted = false;
+    // Should not throw out of stopMacOSBridgeService even though the kill fails.
+    stopMacOSBridgeService({
+      platform: "darwin",
+      execFileSyncImpl(command) {
+        if (command === "ps") {
+          return "node /usr/local/bin/agnt run-service";
+        }
+        return "";
+      },
+      processImpl: {
+        pid: process.pid,
+        kill() {
+          killAttempted = true;
+          throw new Error("ESRCH: no such process");
+        },
+      },
+    });
+
+    assert.equal(killAttempted, true);
+    // Still cleared the status file even though the kill threw.
+    assert.equal(readBridgeStatus(), null);
+  });
+});
+
 function withTempDaemonEnv(run) {
   const previousDir = process.env.AGNT_DEVICE_STATE_DIR;
   const previousHome = process.env.HOME;
