@@ -19,6 +19,7 @@ RELAY_HOSTNAME="${RELAY_HOSTNAME:-}"
 RELAY_BRIDGE_HOST=""
 RELAY_PID=""
 BRIDGE_PID=""
+PROVIDER_ID="${AGNT_PROVIDER:-}"
 
 log() {
   echo "[run-local-agnt] $*"
@@ -37,12 +38,15 @@ Options:
   --hostname HOSTNAME   Hostname or IP the iPhone should use to reach the relay
   --bind-host HOST      Interface/address the local relay should listen on
   --port PORT           Relay port to listen on
+  --provider ID         Force a specific provider (codex, claude, opencode, ...)
+                        Equivalent to setting AGNT_PROVIDER in the environment.
   --help                Show this help text
 
 Defaults:
   --bind-host           0.0.0.0
   --port                9000
   --hostname            macOS LocalHostName.local, then hostname, then localhost
+  --provider            (auto-detect by isInstalled, falls back to first registered)
 EOF
 }
 
@@ -68,6 +72,11 @@ parse_args() {
       --port)
         require_value "--port" "$#"
         RELAY_PORT="$2"
+        shift 2
+        ;;
+      --provider)
+        require_value "--provider" "$#"
+        PROVIDER_ID="$2"
         shift 2
         ;;
       --help)
@@ -290,6 +299,7 @@ print_summary() {
   Relay hostname  : ${RELAY_HOSTNAME}
   Bridge host     : ${RELAY_BRIDGE_HOST}
   Relay URL       : ws://${RELAY_HOSTNAME}:${RELAY_PORT}/relay
+  Provider        : ${PROVIDER_ID:-(auto-detect)}
 EOF
 }
 
@@ -299,7 +309,12 @@ start_bridge() {
   # This local helper should print the QR in the current terminal immediately.
   # Use the foreground bridge path instead of the macOS launchd wrapper so QR
   # rendering does not depend on daemon state being written back first.
-  AGNT_RELAY="ws://${RELAY_HOSTNAME}:${RELAY_PORT}/relay" node ./bin/agnt.js run &
+  local bridge_args=()
+  if [[ -n "${PROVIDER_ID}" ]]; then
+    bridge_args+=("--provider" "${PROVIDER_ID}")
+  fi
+  AGNT_RELAY="ws://${RELAY_HOSTNAME}:${RELAY_PORT}/relay" \
+    node ./bin/agnt.js run "${bridge_args[@]}" &
   BRIDGE_PID=$!
 }
 

@@ -37,9 +37,12 @@ Opening a PR does not create an obligation on my side. I may close it. I may ign
 ### Prerequisites
 
 - **Node.js** v18+
-- **[Codex CLI](https://github.com/openai/codex)** installed and working
-- **[Codex desktop app](https://openai.com/index/codex/)** (optional — for viewing threads on Mac)
-- **macOS** (required for desktop refresh; core bridge works on any OS)
+- At least one supported agent CLI:
+  - **[Codex CLI](https://github.com/openai/codex)** — native, full feature parity
+  - **[Claude Code](https://docs.claude.com/en/docs/claude-code)** — full chat, tools, interrupts, approvals
+  - **[opencode](https://opencode.ai)** — full chat, tools, runtime approvals, compact, fork
+- **[Codex desktop app](https://openai.com/index/codex/)** (optional — only needed for the Codex desktop-companion mirror feature)
+- **macOS** (required for the macOS launchd daemon and the Codex desktop refresh; core bridge works on any OS)
 - **Xcode 16+** (only for building the iOS app)
 - **iPhone** with the agnt app (or built from source)
 
@@ -55,7 +58,7 @@ cd agnt
 ```
 
 This launcher:
-1. Spawns a Codex `app-server` process
+1. Spawns the active provider's runtime (Codex by default; force one with `--provider <id>`)
 2. Starts a local relay on `/relay/{sessionId}`
 3. Points the bridge at that relay
 4. Prints a QR code in your terminal for the initial trust bootstrap
@@ -69,10 +72,11 @@ AGNT_RELAY="ws://localhost:9000/relay" npm start
 ```
 
 That runs `agnt up`, which:
-1. Spawns a Codex `app-server` process
-2. Connects to the configured relay
-3. On macOS, starts the built-in background bridge service
-4. Prints a QR code in your terminal when first-time pairing or recovery is needed
+1. Resolves the active provider (`--provider <id>`, then `AGNT_PROVIDER`, then persisted daemon-state, then auto-detect by `isInstalled()`, then first registered)
+2. Spawns the agent CLI through that provider's transport
+3. Connects to the configured relay
+4. On macOS, starts the built-in background bridge service
+5. Prints a QR code in your terminal when first-time pairing or recovery is needed
 
 Scan the QR code with the agnt iOS app to trust that Mac.
 
@@ -91,10 +95,10 @@ The app uses SwiftUI and the current project target is iOS 18.6. No CocoaPods or
 
 ### Testing a full local session
 
-1. Start the local launcher: `./run-local-agnt.sh`
+1. Start the local launcher: `./run-local-agnt.sh` (or `./run-local-agnt.sh --provider claude` / `--provider opencode`)
 2. Open the iOS app and scan the QR code
 3. Create a new thread from the app
-4. Send a message — you should see Codex respond in real-time
+4. Send a message — you should see the agent respond in real-time with streaming text + reasoning + tool surfacing
 5. Try git operations from the phone (commit, push, branch switching)
 6. Reopen the app and verify that the trusted reconnect path is used instead of forcing a fresh QR immediately
 
@@ -120,14 +124,23 @@ agnt/
 ├── agnt-bridge/          # Node.js CLI bridge (npm package)
 │   ├── bin/agnt.js      # CLI entrypoint
 │   └── src/
-│       ├── bridge.js               # Core relay + message forwarding
-│       ├── codex-transport.js      # Spawn vs WebSocket abstraction
-│       ├── codex-desktop-refresher.js  # Debounced Codex.app refresh
-│       ├── git-handler.js          # Git command execution from phone
-│       ├── workspace-handler.js    # Workspace/cwd management
-│       ├── session-state.js        # Thread persistence (~/.agnt/)
-│       ├── rollout-watch.js        # Thread event log tailing
-│       └── qr.js                   # QR code generation
+│       ├── bridge.js                       # Provider-agnostic core relay + message forwarding
+│       ├── secure-transport.js             # E2E-encrypted relay framing
+│       ├── providers/                      # Provider plugin contract + per-provider modules
+│       │   ├── types.js                    # defineProvider, withTranslator, capability flags
+│       │   ├── index.js                    # Registry + resolveActiveProvider()
+│       │   ├── codex/transport.js          # Codex spawn / WebSocket transport
+│       │   ├── codex/desktop-refresher.js  # Debounced Codex.app refresh (companion mirror)
+│       │   ├── claude/transport.js         # spawn `claude --print` w/ soft interrupt + respawn
+│       │   ├── claude/translate.js         # stream-json ↔ Codex JSON-RPC shim
+│       │   ├── opencode/transport.js       # spawn `opencode serve` + http client + SSE pump
+│       │   └── opencode/translate.js       # REST/SSE ↔ Codex JSON-RPC shim
+│       ├── git-handler.js                  # Git command execution from phone
+│       ├── workspace-handler.js            # Workspace/cwd management
+│       ├── session-state.js                # Thread persistence (~/.agnt/)
+│       ├── rollout-watch.js                # Codex thread event log tailing
+│       ├── rollout-live-mirror.js          # Codex desktop-companion live mirror
+│       └── qr.js                           # QR code generation
 │
 ├── AgntMobile/            # Xcode project root
 │   ├── AgntMobile/        # App source target

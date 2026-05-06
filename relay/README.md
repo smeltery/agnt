@@ -16,12 +16,12 @@ The point of keeping this code in the repo is transparency: anyone forking agnt 
 
 ## What It Does Not Do
 
-- it does not run Codex
+- it does not run the agent CLI (Codex / Claude Code / opencode)
 - it does not execute git commands
 - it does not contain the user's repository checkout
 - it does not decrypt agnt application payloads after the secure session is established
 
-Codex, git, and local file operations still run on the user's Mac.
+The agent CLI, git, and local file operations all run on the user's Mac.
 
 ## Security Model
 
@@ -55,12 +55,12 @@ flowchart TD
     L --> M[Both sides derive AES-256-GCM session keys]
 
     M --> N[iPhone sends encrypted app messages]
-    M --> O[Mac sends encrypted Codex and bridge responses]
+    M --> O[Mac sends encrypted agent CLI and bridge responses]
     N --> P[Relay forwards ciphertext to Mac]
     O --> Q[Relay forwards ciphertext to iPhone]
 
     P --> R[Bridge decrypts and routes locally]
-    R --> S[Codex app-server / git / workspace handlers]
+    R --> S[Active provider transport / git / workspace handlers]
     S --> O
 
     Q --> T[iPhone decrypts and renders timeline]

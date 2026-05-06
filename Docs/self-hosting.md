@@ -37,7 +37,7 @@ This is the easiest way to try the public repo, but on iPhone it should be treat
 
 ### What you need
 
-- a Mac with Codex CLI installed
+- a Mac with at least one supported agent CLI installed (Codex, Claude Code, or opencode)
 - an iPhone with an agnt build installed
 - both devices on the same local network
 
@@ -103,7 +103,7 @@ On your VPS:
 On your Mac:
 
 - the agnt bridge
-- Codex CLI / `codex app-server`
+- the agent CLI you want to drive (Codex `app-server`, Claude Code, opencode, etc.)
 
 On your iPhone:
 

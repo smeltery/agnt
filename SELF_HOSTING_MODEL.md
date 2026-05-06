@@ -38,7 +38,7 @@ If you use the public repo, you should expect one of these flows:
 
 That means:
 
-- Codex still runs on your Mac
+- the agent CLI (Codex, Claude Code, opencode, ...) still runs on your Mac
 - git commands still run on your Mac
 - the iPhone is still a paired remote client
 - the relay is only the transport layer
@@ -48,9 +48,10 @@ That means:
 For most GitHub users, the easiest first step is:
 
 ```sh
-git clone https://github.com/Emanuele-web04/agnt.git
+git clone https://github.com/dotbrains/agnt.git
 cd agnt
-./run-local-agnt.sh
+./run-local-agnt.sh                       # auto-detects an installed agent CLI
+./run-local-agnt.sh --provider claude     # or force a specific one
 ```
 
 For the full public setup guide, read [Docs/self-hosting.md](Docs/self-hosting.md).
