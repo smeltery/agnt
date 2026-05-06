@@ -44,5 +44,8 @@ $TMP_PLACEHOLDER
 # Claude project config (local only)
 .claude/
 
+# Swarm (local agent state)
+.swarm/
+
 # VS Code
 .vscode/
