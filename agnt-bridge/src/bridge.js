@@ -71,6 +71,12 @@ const RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS = 24_000;
 const RELAY_HISTORY_RECENT_TURN_TARGET = 40;
 const RELAY_TURNS_LIST_TARGET_BUDGET_MS = 5_500;
 const RELAY_TURNS_LIST_BUDGET_RESERVE_MS = 1_000;
+// Cap how many turns we even ask the upstream for in one go so a misbehaving
+// page (e.g. one with huge tool outputs) cannot single-handedly blow the relay
+// payload budget. The safe-retry limit governs the recovery path that fires
+// when the normal pager hits the byte-soft-limit anyway.
+const RELAY_TURNS_LIST_MAX_INITIAL_LIMIT = 5;
+const RELAY_TURNS_LIST_SAFE_RETRY_LIMIT = 5;
 const RELAY_TURNS_LIST_RESULT_KEYS = ["data", "items", "turns"];
 const RELAY_TURNS_LIST_PAGINATION_RESULT_KEYS = [
   "nextCursor",
@@ -2368,7 +2374,7 @@ async function fetchAdaptiveThreadTurnsListForRelay(request, {
 
   const params = request?.params;
   const requestedLimit = Number.isInteger(params?.limit) && params.limit > 0
-    ? params.limit
+    ? Math.min(params.limit, RELAY_TURNS_LIST_MAX_INITIAL_LIMIT)
     : 1;
   const startedAt = now();
   let nextCursor = params?.cursor;
@@ -2390,17 +2396,24 @@ async function fetchAdaptiveThreadTurnsListForRelay(request, {
       if (response) {
         return response;
       }
-      throw error;
+      return await fetchSafeThreadTurnsListFallback(request, {
+        fetchPage,
+        now,
+        sanitizeForRelay,
+        payloadSoftLimitBytes,
+      });
     }
 
-    const pageResult = page.result;
+    const pageResult = unwrapAppServerPayloadResult(page.result);
     const pageTurnsKey = findTurnsListResultKey(pageResult);
     if (!pageTurnsKey) {
       if (!response) {
-        return {
-          id: request.id,
-          result: pageResult ?? null,
-        };
+        return await fetchSafeThreadTurnsListFallback(request, {
+          fetchPage,
+          now,
+          sanitizeForRelay,
+          payloadSoftLimitBytes,
+        });
       }
       return response;
     }
@@ -2415,10 +2428,21 @@ async function fetchAdaptiveThreadTurnsListForRelay(request, {
 
     const pageTurns = pageResult[pageTurnsKey];
     combinedTurns = combinedTurns.concat(pageTurns);
-    response = {
-      id: request.id,
-      result: buildAdaptiveTurnsListResult(firstResult, lastResult, turnsKey, combinedTurns),
-    };
+    response = buildSafeTurnsListResponse(request.id, firstResult, lastResult, turnsKey, combinedTurns);
+
+    if (measureSanitizedTurnsListResponseBytes(response, sanitizeForRelay) >= payloadSoftLimitBytes) {
+      response = buildLargestSafeTurnsListResponse({
+        requestId: request.id,
+        firstResult,
+        lastResult,
+        turnsKey,
+        turns: combinedTurns,
+        maxTurns: RELAY_TURNS_LIST_SAFE_RETRY_LIMIT,
+        sanitizeForRelay,
+        payloadSoftLimitBytes,
+      }) ?? buildEmptyTurnsListResponse(request);
+      break;
+    }
 
     nextCursor = readTurnsListNextCursor(pageResult);
     if (combinedTurns.length >= requestedLimit || !hasRelayCursor(nextCursor) || pageTurns.length === 0) {
@@ -2439,12 +2463,168 @@ async function fetchAdaptiveThreadTurnsListForRelay(request, {
     }
   }
 
-  return response ?? {
+  return response ?? buildEmptyTurnsListResponse(request);
+}
+
+function buildEmptyTurnsListResponse(request) {
+  return {
     id: request.id,
     result: {
       data: [],
+      nextCursor: null,
     },
   };
+}
+
+async function fetchSafeThreadTurnsListFallback(request, {
+  fetchPage,
+  now,
+  sanitizeForRelay,
+  payloadSoftLimitBytes,
+}) {
+  const params = request?.params;
+  const requestedLimit = Number.isInteger(params?.limit) && params.limit > 0
+    ? params.limit
+    : RELAY_TURNS_LIST_SAFE_RETRY_LIMIT;
+  const safeLimit = Math.min(requestedLimit, RELAY_TURNS_LIST_SAFE_RETRY_LIMIT);
+  const safeParams = buildAdaptiveTurnsListPageParams(params, safeLimit, params?.cursor);
+
+  try {
+    const page = await fetchMeasuredAdaptiveTurnsListPage(fetchPage, safeParams, now);
+    const pageResult = unwrapAppServerPayloadResult(page.result);
+    const turnsKey = findTurnsListResultKey(pageResult);
+    if (!turnsKey) {
+      return buildEmptyTurnsListResponse(request);
+    }
+
+    // If the normal pagination path returns a bad first page, retry once with a small page.
+    // The retry response is intentionally minimal so the iOS client does not decode stale
+    // server metadata.
+    const response = buildLargestSafeTurnsListResponse({
+      requestId: request.id,
+      firstResult: pageResult,
+      lastResult: pageResult,
+      turnsKey,
+      turns: pageResult[turnsKey],
+      maxTurns: safeLimit,
+      sanitizeForRelay,
+      payloadSoftLimitBytes,
+    });
+    if (response) {
+      return response;
+    }
+  } catch {
+    // Fall through to a valid empty page: the phone can keep the thread open instead of crashing.
+  }
+
+  return buildEmptyTurnsListResponse(request);
+}
+
+function buildSafeTurnsListResponse(requestId, firstResult, lastResult, turnsKey, turns) {
+  return {
+    id: requestId,
+    result: buildAdaptiveTurnsListResult(firstResult, lastResult, turnsKey, turns),
+  };
+}
+
+// Trims oversized history pages progressively: normal page -> 5 turns -> ... -> 1 turn.
+function buildLargestSafeTurnsListResponse({
+  requestId,
+  firstResult,
+  lastResult,
+  turnsKey,
+  turns,
+  maxTurns,
+  sanitizeForRelay,
+  payloadSoftLimitBytes,
+}) {
+  const sliceLimit = Math.min(turns.length, maxTurns);
+  for (let count = sliceLimit; count > 0; count -= 1) {
+    const response = buildSafeTurnsListResponse(
+      requestId,
+      firstResult,
+      lastResult,
+      turnsKey,
+      turns.slice(0, count)
+    );
+    if (measureSanitizedTurnsListResponseBytes(response, sanitizeForRelay) < payloadSoftLimitBytes) {
+      return response;
+    }
+  }
+  return buildEmergencySingleTurnResponse({
+    requestId,
+    lastResult,
+    turnsKey,
+    turn: turns[0],
+    sanitizeForRelay,
+    payloadSoftLimitBytes,
+  });
+}
+
+function buildEmergencySingleTurnResponse({
+  requestId,
+  lastResult,
+  turnsKey,
+  turn,
+  sanitizeForRelay,
+  payloadSoftLimitBytes,
+}) {
+  if (!turn || typeof turn !== "object" || Array.isArray(turn)) {
+    return null;
+  }
+
+  for (const maxItems of [16, 4, 1]) {
+    for (const maxChars of [
+      RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS,
+      Math.floor(RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS / 4),
+      1_000,
+      0,
+    ]) {
+      const response = {
+        id: requestId,
+        result: {
+          ...buildAdaptiveTurnsListResult({}, lastResult, turnsKey, [
+            compactEmergencySingleTurnForRelay(turn, maxChars, maxItems),
+          ]),
+          agntEmergencySingleTurnForRelay: true,
+        },
+      };
+      if (measureSanitizedTurnsListResponseBytes(response, sanitizeForRelay) < payloadSoftLimitBytes) {
+        return response;
+      }
+    }
+  }
+
+  return null;
+}
+
+function compactEmergencySingleTurnForRelay(turn, maxChars, maxItems) {
+  const safeTurn = {};
+  for (const key of [
+    "id",
+    "turnId",
+    "turn_id",
+    "threadId",
+    "thread_id",
+    "createdAt",
+    "created_at",
+    "completedAt",
+    "completed_at",
+    "status",
+    "role",
+    "kind",
+  ]) {
+    const value = turn[key];
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      safeTurn[key] = value;
+    }
+  }
+
+  const items = Array.isArray(turn.items) ? turn.items : [];
+  safeTurn.items = items.slice(-maxItems).map((item) => compactHistoryItemForRelay(item, maxChars));
+  safeTurn.agntEmergencySingleTurnForRelay = true;
+  safeTurn.agntPageCompactedForRelay = true;
+  return safeTurn;
 }
 
 async function fetchMeasuredAdaptiveTurnsListPage(fetchPage, params, now) {
