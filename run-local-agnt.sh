@@ -38,7 +38,7 @@ Options:
   --hostname HOSTNAME   Hostname or IP the iPhone should use to reach the relay
   --bind-host HOST      Interface/address the local relay should listen on
   --port PORT           Relay port to listen on
-  --provider ID         Force a specific provider (codex, claude, opencode, ...)
+  --provider ID         Force a specific provider (codex, claude, opencode, cursor, ...)
                         Equivalent to setting AGNT_PROVIDER in the environment.
   --help                Show this help text
 

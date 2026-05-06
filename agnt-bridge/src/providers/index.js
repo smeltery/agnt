@@ -2,15 +2,16 @@
 // Purpose: Provider registry. Adds new agent CLIs by importing their module here.
 // Layer: provider plugin registry
 // Exports: getProvider, listProviders, resolveActiveProvider
-// Depends on: ./codex, ./claude, ./opencode, ./types
+// Depends on: ./codex, ./claude, ./opencode, ./cursor, ./types
 
 const codex = require("./codex");
 const claude = require("./claude");
 const opencode = require("./opencode");
+const cursor = require("./cursor");
 const { validateProviderModule } = require("./types");
 
 // Order matters: first entry wins as default fallback when none configured.
-const PROVIDERS = [codex, claude, opencode].map(validateProviderModule);
+const PROVIDERS = [codex, claude, opencode, cursor].map(validateProviderModule);
 const PROVIDERS_BY_ID = new Map(PROVIDERS.map((p) => [p.id, p]));
 
 function listProviders() {

@@ -1,6 +1,6 @@
 // FILE: provider-translator.test.js
 // Purpose: Verify withTranslator wires the factory + injectInbound contract that the
-//          claude/opencode shims rely on.
+//          claude/opencode/cursor shims rely on.
 // Layer: Unit test
 // Exports: node:test suite
 // Depends on: node:test, node:assert/strict, ../src/providers/types

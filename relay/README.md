@@ -16,7 +16,7 @@ The point of keeping this code in the repo is transparency: anyone forking agnt 
 
 ## What It Does Not Do
 
-- it does not run the agent CLI (Codex / Claude Code / opencode)
+- it does not run the agent CLI (Codex / Claude Code / opencode / Cursor)
 - it does not execute git commands
 - it does not contain the user's repository checkout
 - it does not decrypt agnt application payloads after the secure session is established

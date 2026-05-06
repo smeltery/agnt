@@ -38,7 +38,7 @@ If you use the public repo, you should expect one of these flows:
 
 That means:
 
-- the agent CLI (Codex, Claude Code, opencode, ...) still runs on your Mac
+- the agent CLI (Codex, Claude Code, opencode, Cursor, ...) still runs on your Mac
 - git commands still run on your Mac
 - the iPhone is still a paired remote client
 - the relay is only the transport layer

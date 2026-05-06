@@ -1,7 +1,7 @@
 {
   "name": "@dotbrains/agnt",
   "version": "0.1.0",
-  "description": "Local bridge between coding-agent CLIs (Codex, Claude Code, opencode, ...) and the Agnt mobile app. Run `agnt up` to start.",
+  "description": "Local bridge between coding-agent CLIs (Codex, Claude Code, opencode, Cursor, ...) and the Agnt mobile app. Run `agnt up` to start.",
   "main": "src/index.js",
   "bin": {
     "agnt": "./bin/agnt.js"
@@ -25,6 +25,7 @@
     "codex",
     "claude-code",
     "opencode",
+    "cursor",
     "multi-provider"
   ],
   "author": "dotbrains",

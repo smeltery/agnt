@@ -13,7 +13,7 @@ If you redistribute agnt or run it as a service for other users, you are respons
 agnt is designed so the work happens on hardware you control:
 
 - The bridge runs on your Mac.
-- The agent CLI (Codex, Claude Code, opencode, ...) runs on your Mac.
+- The agent CLI (Codex, Claude Code, opencode, Cursor, ...) runs on your Mac.
 - Conversation contents, repository actions, and workspace data live on your Mac and your iPhone.
 - The reference relay can be run locally (`run-local-agnt.sh`) or on a server you control.
 - The codebase contains no analytics, telemetry, advertising SDK, or behavioral tracking pipeline. Nothing in this repository sends usage data to a maintainer-operated endpoint.
