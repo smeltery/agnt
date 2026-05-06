@@ -551,75 +551,163 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
   }
 
   function handleToolPartUpdate(part, partId) {
-    const toolName = readString(part.tool) || readString(part.name) || "tool";
+    const toolName = (readString(part.tool) || readString(part.name) || "tool").toLowerCase();
     const state = part.state && typeof part.state === "object" ? part.state : null;
     const status = readString(state?.status);
-    const previous = toolCallById.get(partId);
+    const input = state?.input && typeof state.input === "object" ? state.input : {};
+    const errored = status === "error";
+    const isTerminal = status === "completed" || status === "error";
 
-    if (!previous) {
-      const input = state?.input && typeof state.input === "object" ? state.input : {};
+    if (!toolCallById.has(partId)) {
+      const itemId = partId || generateItemId("tool");
+      const kind = classifyOpencodeTool(toolName);
       const command = readString(input.command);
       const cwd = readString(input.cwd);
-      const itemId = partId || generateItemId("tool");
+      const filePath = readString(input.file_path) || readString(input.filePath) || readString(input.path);
+      const pattern = readString(input.pattern) || readString(input.query);
       toolCallById.set(partId, {
-        toolName,
-        command,
-        cwd,
-        itemId,
-        wroteBegin: false,
+        kind, toolName, itemId, command, cwd, filePath, pattern, wroteBegin: false,
       });
     }
     const record = toolCallById.get(partId);
+    const output = readString(state?.output) || readString(state?.stdout) || "";
 
-    if (toolName === "bash" || toolName === "Bash") {
+    if (record.kind === "bash") {
       if (!record.wroteBegin) {
         record.wroteBegin = true;
         emitNotification("codex/event/exec_command_begin", {
-          threadId: activeThreadId,
-          turnId: activeTurnId,
-          call_id: record.itemId,
-          command: record.command,
-          cwd: record.cwd,
+          threadId: activeThreadId, turnId: activeTurnId,
+          call_id: record.itemId, command: record.command, cwd: record.cwd,
           status: "running",
         });
       }
-      if (status === "completed" || status === "error") {
-        const output = readString(state?.output) || readString(state?.stdout);
+      if (isTerminal) {
         if (output) {
           emitNotification("codex/event/exec_command_output_delta", {
-            threadId: activeThreadId,
-            turnId: activeTurnId,
-            call_id: record.itemId,
-            command: record.command,
-            cwd: record.cwd,
+            threadId: activeThreadId, turnId: activeTurnId,
+            call_id: record.itemId, command: record.command, cwd: record.cwd,
             chunk: output,
           });
         }
         emitNotification("codex/event/exec_command_end", {
-          threadId: activeThreadId,
-          turnId: activeTurnId,
-          call_id: record.itemId,
-          command: record.command,
-          cwd: record.cwd,
-          status: status === "error" ? "error" : "completed",
-          output: output || "",
+          threadId: activeThreadId, turnId: activeTurnId,
+          call_id: record.itemId, command: record.command, cwd: record.cwd,
+          status: errored ? "error" : "completed", output,
         });
         toolCallById.delete(partId);
       }
       return;
     }
 
+    if (record.kind === "file_read") {
+      if (!record.wroteBegin) {
+        record.wroteBegin = true;
+        emitNotification("item/started", {
+          threadId: activeThreadId, turnId: activeTurnId, itemId: record.itemId,
+          item: {
+            id: record.itemId, itemId: record.itemId,
+            type: record.toolName === "read" ? "file_read" : "tool_call",
+            tool: record.toolName, name: record.toolName,
+            file_path: record.filePath, path: record.filePath,
+            query: record.pattern,
+          },
+        });
+      }
+      if (output) {
+        emitNotification("item/toolCall/outputDelta", {
+          threadId: activeThreadId, turnId: activeTurnId, itemId: record.itemId,
+          delta: output,
+        });
+      }
+      if (isTerminal) {
+        emitNotification("item/completed", {
+          threadId: activeThreadId, turnId: activeTurnId, itemId: record.itemId,
+          item: {
+            id: record.itemId, itemId: record.itemId,
+            type: record.toolName === "read" ? "file_read" : "tool_call",
+            tool: record.toolName, name: record.toolName,
+            file_path: record.filePath, path: record.filePath,
+            query: record.pattern,
+            status: errored ? "error" : "completed",
+            output,
+          },
+        });
+        toolCallById.delete(partId);
+      }
+      return;
+    }
+
+    if (record.kind === "file_change") {
+      if (!record.wroteBegin) {
+        record.wroteBegin = true;
+        emitNotification("item/started", {
+          threadId: activeThreadId, turnId: activeTurnId, itemId: record.itemId,
+          item: {
+            id: record.itemId, itemId: record.itemId,
+            type: "file_change",
+            tool: record.toolName, name: record.toolName,
+            file_path: record.filePath, path: record.filePath,
+          },
+        });
+      }
+      if (output) {
+        emitNotification("item/fileChange/outputDelta", {
+          threadId: activeThreadId, turnId: activeTurnId, itemId: record.itemId,
+          delta: output,
+        });
+      }
+      if (isTerminal) {
+        emitNotification("item/completed", {
+          threadId: activeThreadId, turnId: activeTurnId, itemId: record.itemId,
+          item: {
+            id: record.itemId, itemId: record.itemId,
+            type: "file_change",
+            tool: record.toolName, name: record.toolName,
+            file_path: record.filePath, path: record.filePath,
+            status: errored ? "error" : "completed",
+          },
+        });
+        toolCallById.delete(partId);
+      }
+      return;
+    }
+
+    // background tool (task, todowrite, webfetch, websearch, ...)
     if (!record.wroteBegin) {
       record.wroteBegin = true;
       emitNotification("codex/event/background_event", {
-        threadId: activeThreadId,
-        turnId: activeTurnId,
+        threadId: activeThreadId, turnId: activeTurnId,
         call_id: record.itemId,
-        message: `Running ${toolName}`,
+        message: describeOpencodeTool(record.toolName, input),
       });
     }
-    if (status === "completed" || status === "error") {
+    if (isTerminal) {
       toolCallById.delete(partId);
+    }
+  }
+
+  function classifyOpencodeTool(toolName) {
+    switch (toolName) {
+      case "bash": return "bash";
+      case "read":
+      case "glob":
+      case "grep": return "file_read";
+      case "write":
+      case "edit":
+      case "patch":
+      case "notebookedit":
+      case "notebook_edit": return "file_change";
+      default: return "background";
+    }
+  }
+
+  function describeOpencodeTool(toolName, input) {
+    switch (toolName) {
+      case "task": return `Running task: ${readString(input?.description) || "subagent"}`;
+      case "todowrite": return "Updating todo list";
+      case "webfetch": return `Fetching ${readString(input?.url) || "URL"}`;
+      case "websearch": return "Searching the web";
+      default: return `Running ${toolName}`;
     }
   }
 
@@ -746,7 +834,11 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       } else if (type === "image") {
         const url = readString(item.image_url) || readString(item.url);
         if (!url) continue;
-        parts.push({ type: "image", url });
+        // opencode receives images as `{type:"file", mediaType, url}` parts.
+        // The internal model adapter rewrites that to image_url for upstream
+        // providers (verified in opencode 1.14.30 binary).
+        const mediaType = inferImageMediaType(url);
+        parts.push({ type: "file", mediaType, url });
       } else if (type === "skill") {
         const name = readString(item.name) || readString(item.id);
         if (name) combinedText += `\n[skill: ${name}]`;
@@ -894,6 +986,17 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     const id = generateItemId(kind);
     partItemIds.set(`${partId}:itemId`, id);
     return id;
+  }
+
+  function inferImageMediaType(url) {
+    if (typeof url !== "string") return "image/png";
+    const dataMatch = /^data:([^;]+);/i.exec(url);
+    if (dataMatch) return dataMatch[1];
+    const lower = url.toLowerCase();
+    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+    if (lower.endsWith(".gif")) return "image/gif";
+    if (lower.endsWith(".webp")) return "image/webp";
+    return "image/png";
   }
 
   function generateTurnId() {

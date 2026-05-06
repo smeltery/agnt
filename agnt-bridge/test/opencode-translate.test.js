@@ -401,6 +401,120 @@ test("thread/contextWindow/read GETs messages and surfaces token snapshot", asyn
   assert.equal(ack.result.contextWindow.outputTokens, 3);
 });
 
+test("opencode read tool emits item/started + item/completed with file_path", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_read", input: [{ type: "text", text: "read it" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_read",
+      part: {
+        type: "tool", tool: "read", id: "prt_r", messageID: "msg_r",
+        state: { input: { file_path: "/tmp/x.txt" }, status: "running" },
+      },
+    },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_read",
+      part: {
+        type: "tool", tool: "read", id: "prt_r", messageID: "msg_r",
+        state: { input: { file_path: "/tmp/x.txt" }, status: "completed", output: "hello" },
+      },
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  const started = events.find((e) => e.method === "item/started");
+  const delta = events.find((e) => e.method === "item/toolCall/outputDelta");
+  const completed = events.find((e) => e.method === "item/completed");
+  assert.equal(started.params.item.type, "file_read");
+  assert.equal(started.params.item.file_path, "/tmp/x.txt");
+  assert.equal(delta.params.delta, "hello");
+  assert.equal(completed.params.item.status, "completed");
+});
+
+test("opencode edit tool emits file_change with output delta", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_edit", input: [{ type: "text", text: "edit it" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_edit",
+      part: {
+        type: "tool", tool: "edit", id: "prt_e", messageID: "msg_e",
+        state: {
+          input: { file_path: "/tmp/y.txt", old_string: "a", new_string: "b" },
+          status: "completed", output: "updated y.txt",
+        },
+      },
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  const started = events.find((e) => e.method === "item/started");
+  const fileDelta = events.find((e) => e.method === "item/fileChange/outputDelta");
+  const completed = events.find((e) => e.method === "item/completed");
+  assert.equal(started.params.item.type, "file_change");
+  assert.equal(started.params.item.tool, "edit");
+  assert.equal(fileDelta.params.delta, "updated y.txt");
+  assert.equal(completed.params.item.status, "completed");
+});
+
+test("opencode webfetch tool emits a background_event with descriptive message", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_wf", input: [{ type: "text", text: "fetch" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_wf",
+      part: {
+        type: "tool", tool: "webfetch", id: "prt_wf", messageID: "msg_wf",
+        state: { input: { url: "https://example.com" }, status: "running" },
+      },
+    },
+  }));
+
+  const ev = parseInjected(injected).find((e) => e.method === "codex/event/background_event");
+  assert.equal(ev.params.message, "Fetching https://example.com");
+});
+
+test("turn/start image attachment uses opencode {type:'file', mediaType, url} schema", () => {
+  const { translator, httpCalls } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu-img", method: "turn/start",
+    params: {
+      threadId: "ses_img",
+      input: [
+        { type: "image", image_url: "data:image/jpeg;base64,/9j/" },
+        { type: "text", text: "describe" },
+      ],
+    },
+  }));
+
+  const body = httpCalls[0].body;
+  const filePart = body.parts.find((p) => p.type === "file");
+  assert.ok(filePart);
+  assert.equal(filePart.mediaType, "image/jpeg");
+  assert.equal(filePart.url, "data:image/jpeg;base64,/9j/");
+});
+
 test("session.status retry with next-resets-at emits thread/status/changed rateLimited", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({

@@ -95,6 +95,28 @@ test("setTurnArgs layers extra flags onto the next spawn", () => {
   assert.ok(respawnArgs.includes("plan"));
 });
 
+test("setCwd respawns with the new working directory", () => {
+  const spawnCalls = [];
+  function spawnImpl(_bin, args, opts) {
+    spawnCalls.push({ args, cwd: opts.cwd });
+    const child = makeFakeChild();
+    setImmediate(() => child.emit("spawn"));
+    return child;
+  }
+
+  const transport = createClaudeTransport({
+    binPath: "/usr/local/bin/claude",
+    spawnImpl,
+    cwd: "/tmp/initial",
+  });
+  assert.equal(spawnCalls[0].cwd, "/tmp/initial");
+
+  transport.setCwd("/tmp/elsewhere");
+  transport.send('{"type":"user","message":{"role":"user","content":"x"}}');
+  assert.equal(spawnCalls.length, 2);
+  assert.equal(spawnCalls[1].cwd, "/tmp/elsewhere");
+});
+
 test("post-interrupt close events do not surface to the bridge", () => {
   const closes = [];
   let activeChild = null;

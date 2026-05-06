@@ -138,12 +138,18 @@ function createClaudeTransport({
         child = null;
       }
     },
-    /** Translator publishes the working directory derived from thread/start params. */
+    /**
+     * Translator publishes the working directory derived from thread/start
+     * params. Mirrors setTurnArgs: a change while the child is running
+     * SIGTERMs it so the next send() respawns with the new cwd. Conversation
+     * continuity is preserved by --resume <sessionId>.
+     */
     setCwd(nextCwd) {
-      if (typeof nextCwd === "string" && nextCwd && nextCwd !== activeCwd) {
-        activeCwd = nextCwd;
-        // Apply on next respawn; current child keeps its spawn cwd until the
-        // user interrupts or starts a fresh thread (which respawns).
+      if (typeof nextCwd !== "string" || !nextCwd || nextCwd === activeCwd) return;
+      activeCwd = nextCwd;
+      if (child && child.exitCode === null) {
+        try { child.kill("SIGTERM"); } catch { /* best-effort */ }
+        child = null;
       }
     },
   };

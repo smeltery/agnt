@@ -403,6 +403,21 @@ test("turn/start params translate to per-turn CLI args (model + effort + plan)",
   assert.deepEqual(args, ["--model", "sonnet", "--effort", "high", "--permission-mode", "plan"]);
 });
 
+test("Codex effort `minimal` maps to Claude `low` (the smallest valid level)", () => {
+  const { translator, transportCalls } = setupTranslator();
+  transportCalls.length = 0;
+  translator.outbound(JSON.stringify({
+    id: "tu-eff", method: "turn/start",
+    params: {
+      threadId: "thr_eff",
+      input: [{ type: "text", text: "x" }],
+      effort: "minimal",
+    },
+  }));
+  const call = transportCalls.find((c) => c[0] === "turnArgs");
+  assert.deepEqual(call[1], ["--effort", "low"]);
+});
+
 test("Read tool emits item/started + item/completed with file_path", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));

@@ -1074,10 +1074,8 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     const effort = readString(params?.effort)
       || readString(params?.reasoning_effort);
     if (effort) {
-      const normalized = effort.toLowerCase();
-      if (["low", "medium", "high", "xhigh", "max"].includes(normalized)) {
-        args.push("--effort", normalized);
-      }
+      const mapped = mapCodexEffortToClaude(effort.toLowerCase());
+      if (mapped) args.push("--effort", mapped);
     }
 
     const collaborationMode = readString(params?.collaborationMode?.mode);
@@ -1111,6 +1109,31 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
       title,
       name: title,
     });
+  }
+
+  // Codex's reasoning_effort levels (`minimal|low|medium|high`) overlap but
+  // do not match Claude's `--effort` levels (`low|medium|high|xhigh|max`).
+  // Map cleanly so iOS picker selections drive Claude's actual flag instead
+  // of being silently dropped.
+  function mapCodexEffortToClaude(level) {
+    switch (level) {
+      case "minimal":
+      case "low":
+        return "low";
+      case "medium":
+        return "medium";
+      case "high":
+        return "high";
+      case "xhigh":
+      case "very_high":
+      case "very-high":
+        return "xhigh";
+      case "max":
+      case "maximum":
+        return "max";
+      default:
+        return "";
+    }
   }
 
   function deriveTitleFromSeed(seed) {
