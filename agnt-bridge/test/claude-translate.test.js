@@ -28,6 +28,7 @@ function setupTranslator() {
     describe: () => "fake",
     setResumeSessionId(id) { transportCalls.push(["resume", id]); },
     setCwd(cwd) { transportCalls.push(["cwd", cwd]); },
+    setTurnArgs(args) { transportCalls.push(["turnArgs", args.slice()]); },
     interruptTurn() { transportCalls.push(["interrupt"]); },
   };
   const translator = createClaudeTranslator({
@@ -378,6 +379,111 @@ test("turn/interrupt calls transport.interruptTurn() AND emits synthetic events"
   assert.ok(completed);
   // Critical: the transport must actually be told to kill the active child.
   assert.deepEqual(transportCalls[0], ["interrupt"]);
+});
+
+test("turn/start params translate to per-turn CLI args (model + effort + plan)", () => {
+  const { translator, transportCalls } = setupTranslator();
+  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
+  transportCalls.length = 0;
+
+  translator.outbound(JSON.stringify({
+    id: "tu-args", method: "turn/start",
+    params: {
+      threadId: "thr_args",
+      input: [{ type: "text", text: "x" }],
+      model: "sonnet",
+      effort: "high",
+      collaborationMode: { mode: "plan" },
+    },
+  }));
+
+  const call = transportCalls.find((c) => c[0] === "turnArgs");
+  assert.ok(call, "expected setTurnArgs to be called");
+  const args = call[1];
+  assert.deepEqual(args, ["--model", "sonnet", "--effort", "high", "--permission-mode", "plan"]);
+});
+
+test("Read tool emits item/started + item/completed with file_path", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "thr_r", input: [{ type: "text", text: "read it" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "assistant",
+    message: {
+      id: "msg-r", content: [{
+        type: "tool_use", id: "toolu-r", name: "Read",
+        input: { file_path: "/tmp/x.txt" },
+      }],
+    },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "user",
+    message: {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "toolu-r", content: "hello world" }],
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  const started = events.find((e) => e.method === "item/started");
+  const completed = events.find((e) => e.method === "item/completed");
+  assert.equal(started.params.item.type, "file_read");
+  assert.equal(started.params.item.file_path, "/tmp/x.txt");
+  assert.equal(completed.params.item.output, "hello world");
+});
+
+test("Edit tool emits file_change item with output delta", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "thr_e", input: [{ type: "text", text: "edit it" }] },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "assistant",
+    message: {
+      id: "msg-e", content: [{
+        type: "tool_use", id: "toolu-e", name: "Edit",
+        input: { file_path: "/tmp/y.txt", old_string: "a", new_string: "b" },
+      }],
+    },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "user",
+    message: {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "toolu-e", content: "updated y.txt" }],
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  const started = events.find((e) => e.method === "item/started");
+  const fileDelta = events.find((e) => e.method === "item/fileChange/outputDelta");
+  const completed = events.find((e) => e.method === "item/completed");
+  assert.equal(started.params.item.type, "file_change");
+  assert.equal(started.params.item.file_path, "/tmp/y.txt");
+  assert.equal(fileDelta.params.delta, "updated y.txt");
+  assert.equal(completed.params.item.status, "completed");
+});
+
+test("thread/generateTitle returns a deterministic seed-derived title", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "title-1",
+    method: "thread/generateTitle",
+    params: { threadId: "thr_t", seed: "Refactor the bridge transport for opencode REST" },
+  }));
+  const events = parseInjected(injected);
+  assert.equal(events[0].id, "title-1");
+  assert.equal(events[0].result.title, "Refactor the bridge transport for opencode REST");
+  assert.equal(events[0].result.threadId, "thr_t");
 });
 
 test("unsupported methods get a JSON-RPC error response", () => {

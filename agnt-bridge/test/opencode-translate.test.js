@@ -329,6 +329,78 @@ test("turn/start without thread fails fast", () => {
   assert.equal(events[0].error.code, -32602);
 });
 
+test("session.status idle emits thread/tokenUsage/updated from latest message tokens", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_tok", input: [{ type: "text", text: "hi" }] },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "message.updated",
+    properties: {
+      sessionID: "ses_tok",
+      info: {
+        id: "msg_tok", role: "assistant",
+        tokens: { input: 100, output: 20, reasoning: 5, cache: { read: 80, write: 10 } },
+      },
+    },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_tok",
+      part: { type: "text", text: "ok", id: "prt_tok", messageID: "msg_tok" },
+    },
+  }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "session.status",
+    properties: { sessionID: "ses_tok", status: { type: "idle" } },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method === "thread/tokenUsage/updated");
+  assert.equal(events.length, 1);
+  assert.equal(events[0].params.tokenUsage.inputTokens, 100);
+  assert.equal(events[0].params.tokenUsage.outputTokens, 20);
+  assert.equal(events[0].params.tokenUsage.cachedInputTokens, 80);
+});
+
+test("thread/contextWindow/read GETs messages and surfaces token snapshot", async () => {
+  const { translator, injected } = setupTranslator({
+    httpHandler(method, pathName) {
+      if (method === "GET" && pathName === "/session/ses_ctx/message") {
+        return {
+          status: 200,
+          json: [
+            { info: { id: "msg_u", role: "user" }, parts: [] },
+            {
+              info: {
+                id: "msg_a", role: "assistant",
+                tokens: { input: 7, output: 3, reasoning: 0, cache: { read: 0, write: 0 } },
+              },
+              parts: [],
+            },
+          ],
+        };
+      }
+      return { status: 404, json: null };
+    },
+  });
+
+  translator.outbound(JSON.stringify({
+    id: "ctx-1",
+    method: "thread/contextWindow/read",
+    params: { threadId: "ses_ctx" },
+  }));
+  await new Promise((r) => setImmediate(r));
+
+  const events = parseInjected(injected);
+  const ack = events.find((e) => e.id === "ctx-1");
+  assert.equal(ack.result.contextWindow.inputTokens, 7);
+  assert.equal(ack.result.contextWindow.outputTokens, 3);
+});
+
 test("inbound events for a different sessionID are ignored once a turn is active", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({

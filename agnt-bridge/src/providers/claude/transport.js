@@ -120,9 +120,23 @@ function createClaudeTransport({
     setResumeSessionId(id) {
       if (typeof id === "string" && id) resumeSessionId = id;
     },
-    /** Translator publishes per-turn args (e.g. ["--model","sonnet","--permission-mode","plan"]). */
+    /**
+     * Translator publishes per-turn args (e.g. ["--model","sonnet",
+     * "--permission-mode","plan"]). If the arg list changes while a child is
+     * running, we kill it so the next send() respawns with the new flags.
+     * Mid-conversation continuity is preserved by --resume <sessionId>.
+     */
     setTurnArgs(args) {
-      turnArgs = Array.isArray(args) ? args.filter((a) => typeof a === "string" && a.length > 0) : [];
+      const next = Array.isArray(args)
+        ? args.filter((a) => typeof a === "string" && a.length > 0)
+        : [];
+      const changed = next.length !== turnArgs.length
+        || next.some((a, i) => a !== turnArgs[i]);
+      turnArgs = next;
+      if (changed && child && child.exitCode === null) {
+        try { child.kill("SIGTERM"); } catch { /* best-effort */ }
+        child = null;
+      }
     },
     /** Translator publishes the working directory derived from thread/start params. */
     setCwd(nextCwd) {

@@ -162,12 +162,13 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
       return null;
     }
 
-    if (method === "thread/generateTitle" || method === "thread/name/set") {
-      // Local-only behavior; the iOS bridge already routes most of these
-      // through git-handler. Acknowledge so the request does not hang.
-      if (id != null) {
-        injectResponse(id, { ok: true });
-      }
+    if (method === "thread/generateTitle") {
+      handleGenerateTitle(parsed);
+      return null;
+    }
+
+    if (method === "thread/name/set") {
+      if (id != null) injectResponse(id, { ok: true });
       return null;
     }
 
@@ -274,6 +275,12 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     if (!threadId) {
       threadId = generateThreadId();
     }
+
+    // Translate per-turn JSON-RPC params into Claude CLI flags. Applying via
+    // setTurnArgs respawns the CLI when flags change (with --resume so the
+    // conversation continues). Most users only set these once at thread start.
+    publishTurnArgsForParams(params);
+
     const turnId = generateTurnId();
     activeTurnId = turnId;
     activeAssistantItemId = "";
@@ -767,38 +774,56 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     const toolName = readString(part.name);
     const input = part.input && typeof part.input === "object" ? part.input : {};
     if (!threadId || !activeTurnId) return;
+    if (pendingToolCalls.has(toolUseId)) return; // de-dup if assistant frame appears twice
 
     if (toolName === "Bash") {
       const command = readString(input.command);
       const cwd = readString(input.cwd) || sessionCwd || "";
-      pendingToolCalls.set(toolUseId, {
-        kind: "bash",
-        toolName,
-        command,
-        cwd,
-      });
+      pendingToolCalls.set(toolUseId, { kind: "bash", toolName, command, cwd });
       emitNotification("codex/event/exec_command_begin", {
-        threadId,
-        turnId: activeTurnId,
-        call_id: toolUseId,
-        command,
-        cwd,
-        status: "running",
+        threadId, turnId: activeTurnId,
+        call_id: toolUseId, command, cwd, status: "running",
+      });
+      return;
+    }
+
+    if (toolName === "Read" || toolName === "Glob" || toolName === "Grep") {
+      const filePath = readString(input.file_path) || readString(input.path) || "";
+      pendingToolCalls.set(toolUseId, { kind: "file_read", toolName, filePath });
+      emitNotification("item/started", {
+        threadId, turnId: activeTurnId, itemId: toolUseId,
+        item: {
+          id: toolUseId, itemId: toolUseId,
+          type: toolName === "Read" ? "file_read" : "tool_call",
+          tool: toolName, name: toolName,
+          file_path: filePath, path: filePath,
+          query: readString(input.pattern) || readString(input.query) || "",
+        },
+      });
+      return;
+    }
+
+    if (toolName === "Write" || toolName === "Edit" || toolName === "NotebookEdit") {
+      const filePath = readString(input.file_path) || readString(input.path) || "";
+      pendingToolCalls.set(toolUseId, { kind: "file_change", toolName, filePath });
+      emitNotification("item/started", {
+        threadId, turnId: activeTurnId, itemId: toolUseId,
+        item: {
+          id: toolUseId, itemId: toolUseId,
+          type: "file_change",
+          tool: toolName, name: toolName,
+          file_path: filePath, path: filePath,
+        },
       });
       return;
     }
 
     pendingToolCalls.set(toolUseId, {
-      kind: "background",
-      toolName,
-      command: toolName,
-      cwd: sessionCwd || "",
+      kind: "background", toolName, command: toolName, cwd: sessionCwd || "",
     });
     emitNotification("codex/event/background_event", {
-      threadId,
-      turnId: activeTurnId,
-      call_id: toolUseId,
-      message: describeToolForUi(toolName, input),
+      threadId, turnId: activeTurnId,
+      call_id: toolUseId, message: describeToolForUi(toolName, input),
     });
   }
 
@@ -809,26 +834,56 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     if (!call) return;
 
     const output = readToolResultText(part.content);
+    const errored = part.is_error === true;
 
     if (call.kind === "bash") {
       if (output) {
         emitNotification("codex/event/exec_command_output_delta", {
-          threadId,
-          turnId: activeTurnId,
-          call_id: toolUseId,
-          command: call.command,
-          cwd: call.cwd,
+          threadId, turnId: activeTurnId,
+          call_id: toolUseId, command: call.command, cwd: call.cwd,
           chunk: output,
         });
       }
       emitNotification("codex/event/exec_command_end", {
-        threadId,
-        turnId: activeTurnId,
-        call_id: toolUseId,
-        command: call.command,
-        cwd: call.cwd,
-        status: part.is_error === true ? "error" : "completed",
+        threadId, turnId: activeTurnId,
+        call_id: toolUseId, command: call.command, cwd: call.cwd,
+        status: errored ? "error" : "completed",
         output: output || "",
+      });
+    } else if (call.kind === "file_read") {
+      if (output) {
+        emitNotification("item/toolCall/outputDelta", {
+          threadId, turnId: activeTurnId, itemId: toolUseId,
+          delta: output,
+        });
+      }
+      emitNotification("item/completed", {
+        threadId, turnId: activeTurnId, itemId: toolUseId,
+        item: {
+          id: toolUseId, itemId: toolUseId,
+          type: call.toolName === "Read" ? "file_read" : "tool_call",
+          tool: call.toolName, name: call.toolName,
+          file_path: call.filePath, path: call.filePath,
+          status: errored ? "error" : "completed",
+          output: output || "",
+        },
+      });
+    } else if (call.kind === "file_change") {
+      if (output) {
+        emitNotification("item/fileChange/outputDelta", {
+          threadId, turnId: activeTurnId, itemId: toolUseId,
+          delta: output,
+        });
+      }
+      emitNotification("item/completed", {
+        threadId, turnId: activeTurnId, itemId: toolUseId,
+        item: {
+          id: toolUseId, itemId: toolUseId,
+          type: "file_change",
+          tool: call.toolName, name: call.toolName,
+          file_path: call.filePath, path: call.filePath,
+          status: errored ? "error" : "completed",
+        },
       });
     }
 
@@ -1006,6 +1061,63 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
 
   function claudeHome() {
     return env.CLAUDE_HOME || path.join(os.homedir(), ".claude");
+  }
+
+  // ── per-turn CLI flag publishing ───────────────────────────────────────
+  function publishTurnArgsForParams(params) {
+    const args = [];
+    const model = readString(params?.model)
+      || readString(params?.modelId)
+      || readString(params?.modelID);
+    if (model) args.push("--model", model);
+
+    const effort = readString(params?.effort)
+      || readString(params?.reasoning_effort);
+    if (effort) {
+      const normalized = effort.toLowerCase();
+      if (["low", "medium", "high", "xhigh", "max"].includes(normalized)) {
+        args.push("--effort", normalized);
+      }
+    }
+
+    const collaborationMode = readString(params?.collaborationMode?.mode);
+    if (collaborationMode === "plan") {
+      args.push("--permission-mode", "plan");
+    } else {
+      const explicitMode = readString(params?.permissionMode);
+      const permissionMode = ["acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"]
+        .includes(explicitMode) ? explicitMode : "";
+      if (permissionMode) args.push("--permission-mode", permissionMode);
+    }
+
+    try { transport?.setTurnArgs?.(args); } catch { /* best-effort */ }
+  }
+
+  // ── thread/generateTitle (heuristic from first user message) ───────────
+  // Spawning a fresh `claude --print` for title-only generation would be
+  // expensive and depends on auth state. The iOS app already does its own
+  // automatic title pass; here we just produce a deterministic seed so the
+  // request does not hang.
+  function handleGenerateTitle(request) {
+    if (request?.id == null) return;
+    const params = request?.params || {};
+    const seed = readString(params.seed)
+      || readString(params.firstMessage)
+      || readString(params.message)
+      || "";
+    const title = deriveTitleFromSeed(seed);
+    injectResponse(request.id, {
+      threadId: readString(params.threadId) || threadId,
+      title,
+      name: title,
+    });
+  }
+
+  function deriveTitleFromSeed(seed) {
+    const trimmed = seed.replace(/\s+/g, " ").trim();
+    if (!trimmed) return "New conversation";
+    const truncated = trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
+    return truncated;
   }
 
   // ── helpers ────────────────────────────────────────────────────────────

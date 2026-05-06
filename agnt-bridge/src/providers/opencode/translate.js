@@ -50,6 +50,8 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
   let lastModelId = "";
   /** Track the assistant message id we are currently streaming. */
   let activeAssistantMessageId = "";
+  /** Latest token usage snapshot from message.updated events. */
+  let lastTokenSnapshot = null;
   /** Map opencode message-part id → bridge item id so deltas route to the same row. */
   const partItemIds = new Map();
   /** Map opencode tool-part id → { toolName, command, cwd } so completion routes correctly. */
@@ -133,7 +135,7 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     }
 
     if (method === "thread/contextWindow/read") {
-      if (id != null) injectResponse(id, { threadId: activeThreadId, contextWindow: null });
+      handleContextWindowRead(parsed);
       return null;
     }
 
@@ -355,6 +357,45 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     }
   }
 
+  async function handleContextWindowRead(request) {
+    if (request?.id == null) return;
+    const params = request?.params || {};
+    const targetThreadId = readString(params.threadId)
+      || readString(params.thread_id)
+      || activeThreadId;
+    if (!targetThreadId) {
+      injectResponse(request.id, { threadId: activeThreadId, contextWindow: null });
+      return;
+    }
+    try {
+      const messagesRes = await transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}/message`);
+      const messages = Array.isArray(messagesRes?.json) ? messagesRes.json : [];
+      // The most recent assistant message carries the latest token snapshot.
+      let tokens = null;
+      for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const info = messages[i]?.info && typeof messages[i].info === "object" ? messages[i].info : null;
+        if (info && info.role === "assistant" && info.tokens && typeof info.tokens === "object") {
+          tokens = info.tokens;
+          break;
+        }
+      }
+      injectResponse(request.id, {
+        threadId: targetThreadId,
+        contextWindow: tokens
+          ? {
+            inputTokens: numberOr(tokens.input, 0),
+            outputTokens: numberOr(tokens.output, 0),
+            reasoningTokens: numberOr(tokens.reasoning, 0),
+            cacheReadTokens: numberOr(tokens.cache?.read, 0),
+            cacheCreateTokens: numberOr(tokens.cache?.write, 0),
+          }
+          : null,
+      });
+    } catch (err) {
+      respondError(request.id, -32603, `opencode thread/contextWindow/read failed: ${err?.message || err}`);
+    }
+  }
+
   async function handleThreadList(request) {
     try {
       const res = await transport.httpRequest("GET", "/session");
@@ -409,6 +450,10 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     const role = readString(info.role);
     const messageId = readString(info.id);
     if (role !== "assistant" || !messageId || !activeTurnId || !activeThreadId) return;
+
+    if (info.tokens && typeof info.tokens === "object") {
+      lastTokenSnapshot = info.tokens;
+    }
 
     if (activeAssistantMessageId === messageId) return;
     activeAssistantMessageId = messageId;
@@ -618,6 +663,18 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
           role: "assistant",
           text: accumulator,
           content: accumulator ? [{ type: "text", text: accumulator }] : [],
+        },
+      });
+    }
+    if (lastTokenSnapshot) {
+      emitNotification("thread/tokenUsage/updated", {
+        threadId: activeThreadId,
+        tokenUsage: {
+          inputTokens: numberOr(lastTokenSnapshot.input, 0),
+          outputTokens: numberOr(lastTokenSnapshot.output, 0),
+          reasoningTokens: numberOr(lastTokenSnapshot.reasoning, 0),
+          cachedInputTokens: numberOr(lastTokenSnapshot.cache?.read, 0),
+          cachedCreationInputTokens: numberOr(lastTokenSnapshot.cache?.write, 0),
         },
       });
     }
