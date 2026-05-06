@@ -115,7 +115,7 @@ function startBridge({
   const relayBaseUrl = config.relayUrl.replace(/\/+$/, "");
   if (!relayBaseUrl) {
     console.error("[agnt] No relay URL configured.");
-    console.error("[agnt] In a source checkout, run ./run-local-agnt.sh or set AGNT_RELAY.");
+    console.error("[agnt] In a source checkout, run ./scripts/run-local-agnt.sh or set AGNT_RELAY.");
     process.exit(1);
   }
 

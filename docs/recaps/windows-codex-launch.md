@@ -15,7 +15,7 @@ This task fixed a Windows startup bug in the local bridge. The bridge used to sp
 |---|---|---|
 | `agnt-bridge/src/codex-transport.js` | ✏️ Modified | Added platform-aware spawn planning and safe Windows shutdown |
 | `agnt-bridge/src/bridge.js` | ✏️ Modified | Improved startup error logging to show the actual launch command |
-| `Docs/RECAP-windows-codex-launch.md` | ✅ Created | Recap for the Windows launcher fix |
+| `docs/recaps/windows-codex-launch.md` | ✅ Created | Recap for the Windows launcher fix |
 
 ---
 

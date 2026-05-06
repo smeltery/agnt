@@ -33,7 +33,7 @@ The public repo now also includes the trusted-Mac reconnect flow, but the built-
 
 If you use the public repo, you should expect one of these flows:
 
-1. Local LAN pairing on your own machine with `./run-local-agnt.sh`
+1. Local LAN pairing on your own machine with `./scripts/run-local-agnt.sh`
 2. A self-hosted relay on your own VPS, passed in through `AGNT_RELAY`
 
 That means:
@@ -50,11 +50,11 @@ For most GitHub users, the easiest first step is:
 ```sh
 git clone https://github.com/dotbrains/agnt.git
 cd agnt
-./run-local-agnt.sh                       # auto-detects an installed agent CLI
-./run-local-agnt.sh --provider claude     # or force a specific one
+./scripts/run-local-agnt.sh                       # auto-detects an installed agent CLI
+./scripts/run-local-agnt.sh --provider claude     # or force a specific one
 ```
 
-For the full public setup guide, read [Docs/self-hosting.md](Docs/self-hosting.md).
+For the full public setup guide, read [self-hosting.md](self-hosting.md).
 
 If you want the smoothest self-hosted iPhone path, prefer a relay reachable through Tailscale or another stable private network instead of plain LAN-only routing.
 
@@ -97,7 +97,7 @@ Those belong in your own environment, private config, or release pipeline.
 If you cloned agnt from GitHub:
 
 - do not expect a private hosted relay to be built in
-- use `./run-local-agnt.sh` for local testing
+- use `./scripts/run-local-agnt.sh` for local testing
 - use `AGNT_RELAY` for your own VPS or hosted relay
 - use QR once to trust the Mac, then let reconnect reuse that trust
 - remember that the built-in daemon/background service path is currently macOS-only

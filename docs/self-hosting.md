@@ -12,7 +12,7 @@ This document intentionally avoids any private hosted-service details. If you ar
 The public source tree is local-first and self-host friendly:
 
 - there is no public production relay baked into the GitHub source
-- local pairing should work out of the box with `./run-local-agnt.sh`
+- local pairing should work out of the box with `./scripts/run-local-agnt.sh`
 - internet-facing setups should pass their own relay URL explicitly with `AGNT_RELAY`
 - the first QR scan bootstraps trust, then later reconnects can reuse the same trusted Mac through that relay
 - the built-in background daemon for trusted reconnect is currently macOS-only
@@ -48,7 +48,7 @@ From the repo root:
 ```sh
 git clone https://github.com/dotbrains/agnt.git
 cd agnt
-./run-local-agnt.sh
+./scripts/run-local-agnt.sh
 ```
 
 What this does:
@@ -69,7 +69,7 @@ Then:
 Pass a hostname or IP address that the phone can actually reach:
 
 ```sh
-./run-local-agnt.sh --hostname 192.168.1.10
+./scripts/run-local-agnt.sh --hostname 192.168.1.10
 ```
 
 ### Health check
@@ -231,7 +231,7 @@ Check:
 Try a concrete LAN IP:
 
 ```sh
-./run-local-agnt.sh --hostname 192.168.1.10
+./scripts/run-local-agnt.sh --hostname 192.168.1.10
 ```
 
 If local LAN pairing still fails on iPhone even though the relay health check works, prefer a Tailscale-reachable relay instead of continuing to rely on plain `ws://` over the same Wi-Fi.

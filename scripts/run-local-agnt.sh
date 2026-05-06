@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# FILE: run-local-agnt.sh
+# FILE: scripts/run-local-agnt.sh
 # Purpose: Starts a local relay plus the public bridge for OSS and self-host workflows.
 # Layer: developer utility
 # Exports: none
@@ -8,7 +8,9 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve the repo root one level above this script's directory.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BRIDGE_DIR="${ROOT_DIR}/agnt-bridge"
 RELAY_DIR="${ROOT_DIR}/relay"
 RELAY_SERVER_MODULE="${RELAY_DIR}/server.js"
@@ -32,7 +34,7 @@ die() {
 
 usage() {
   cat <<'EOF'
-Usage: ./run-local-agnt.sh [options]
+Usage: ./scripts/run-local-agnt.sh [options]
 
 Options:
   --hostname HOSTNAME   Hostname or IP the iPhone should use to reach the relay

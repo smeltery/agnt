@@ -8,7 +8,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/AgntMobile.xcodeproj"
 SCHEME="${SCHEME:-AgntMobile}"
 DESTINATION="${DESTINATION:-platform=iOS Simulator,name=iPhone 17}"
-BASELINE_PATH="${BASELINE_PATH:-$ROOT_DIR/Docs/Sidebar-RunBadge-Performance-Baseline.json}"
+BASELINE_PATH="${BASELINE_PATH:-$ROOT_DIR/docs/Sidebar-RunBadge-Performance-Baseline.json}"
 MAX_REGRESSION_PERCENT="${MAX_REGRESSION_PERCENT:-}"
 
 if [[ ! -f "$BASELINE_PATH" ]]; then

@@ -401,7 +401,7 @@ function assertRelayConfigured(config) {
   if (typeof config?.relayUrl === "string" && config.relayUrl.trim()) {
     return;
   }
-  throw new Error("No relay URL configured. Run ./run-local-agnt.sh or set AGNT_RELAY before enabling the macOS bridge service.");
+  throw new Error("No relay URL configured. Run ./scripts/run-local-agnt.sh or set AGNT_RELAY before enabling the macOS bridge service.");
 }
 
 function launchAgentDomain(env) {

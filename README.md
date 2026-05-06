@@ -86,7 +86,10 @@ The Remodex bridge is well-built but assumes one agent: Codex. agnt:
 │       └── ...
 ├── AgntMobile/                   # Xcode project root (iOS app)
 ├── relay/                        # Optional local relay server
-└── run-local-agnt.sh             # Spin up local relay + foreground bridge
+├── docs/                         # User-facing docs (self-hosting guides, recaps)
+├── legal/                        # Privacy policy + terms of use
+└── scripts/
+    └── run-local-agnt.sh         # Spin up local relay + foreground bridge
 ```
 
 ## Prerequisites
@@ -106,10 +109,10 @@ The Remodex bridge is well-built but assumes one agent: Codex. agnt:
 ```bash
 git clone https://github.com/dotbrains/agnt.git
 cd agnt
-./run-local-agnt.sh                          # auto-detects an installed agent CLI
-./run-local-agnt.sh --provider claude        # force Claude Code
-./run-local-agnt.sh --provider opencode      # force opencode
-./run-local-agnt.sh --provider cursor        # force Cursor
+./scripts/run-local-agnt.sh                          # auto-detects an installed agent CLI
+./scripts/run-local-agnt.sh --provider claude        # force Claude Code
+./scripts/run-local-agnt.sh --provider opencode      # force opencode
+./scripts/run-local-agnt.sh --provider cursor        # force Cursor
 ```
 
 Or run the bridge directly without the local-relay launcher:
@@ -153,7 +156,7 @@ All env names use the `AGNT_*` prefix.
 
 ## Self-hosting
 
-See [SELF_HOSTING_MODEL.md](SELF_HOSTING_MODEL.md). The transport layer is inspectable; nothing in the iOS app source embeds a hosted endpoint.
+See [docs/self-hosting-model.md](docs/self-hosting-model.md) for the principles and [docs/self-hosting.md](docs/self-hosting.md) for the setup guide. The transport layer is inspectable; nothing in the iOS app source embeds a hosted endpoint.
 
 ## License
 

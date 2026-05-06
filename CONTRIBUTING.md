@@ -54,7 +54,7 @@ git clone https://github.com/dotbrains/agnt.git
 cd agnt
 
 # Start a local relay + bridge together
-./run-local-agnt.sh
+./scripts/run-local-agnt.sh
 ```
 
 This launcher:
@@ -95,7 +95,7 @@ The app uses SwiftUI and the current project target is iOS 18.6. No CocoaPods or
 
 ### Testing a full local session
 
-1. Start the local launcher: `./run-local-agnt.sh` (or `./run-local-agnt.sh --provider claude` / `--provider opencode` / `--provider cursor`)
+1. Start the local launcher: `./scripts/run-local-agnt.sh` (or `./scripts/run-local-agnt.sh --provider claude` / `--provider opencode` / `--provider cursor`)
 2. Open the iOS app and scan the QR code
 3. Create a new thread from the app
 4. Send a message — you should see the agent respond in real-time with streaming text + reasoning + tool surfacing
