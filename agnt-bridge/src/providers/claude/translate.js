@@ -8,15 +8,24 @@
 //
 // Design notes:
 //   - The bridge speaks Codex JSON-RPC. The Claude CLI speaks stream-json:
-//     stdin lines are `{type:"user", message:{...}}`, stdout lines are
-//     `{type:"system"|"assistant"|"user"|"result", ...}`. This translator runs
-//     in both directions and synthesizes JSON-RPC responses for Codex-only
-//     methods that Claude does not handle (`thread/start`, `thread/read`,
-//     `thread/turns/list`, `thread/contextWindow/read`, ...).
+//     stdin lines are `{type:"user", message:{...}}`. Stdout has multiple
+//     frame types per turn:
+//        system.init           — emitted at the start of each turn
+//        system.status         — periodic phase signal ("requesting")
+//        stream_event          — Anthropic SDK SSE-style events; this is the
+//                                authoritative delta source when the CLI is
+//                                run with --include-partial-messages
+//        assistant             — consolidated message snapshot (used for
+//                                tool_use blocks and as a fallback delta)
+//        user                  — echoed user input + tool_result frames
+//        result                — turn complete (cost, usage, final text)
+//        rate_limit_event      — surfaced as a thread/status/changed event
 //   - One translator instance per bridge connection. State lives in closure:
 //       threadId  : the synthetic Codex-style id we hand to the iOS app
-//       sessionId : Claude's actual session_id (assigned at first system.init)
-//       activeTurnId / pendingTurnRequestId / activeAssistantItemId / ...
+//       sessionId : Claude's actual session_id (assigned at first system.init).
+//                   Published to transport.setResumeSessionId() so a respawn
+//                   after turn/interrupt continues the same conversation.
+//       activeTurnId / activeAssistantItemId / blocksByIndex / ...
 //   - Claude does not pre-create sessions; the very first turn implicitly
 //     creates one. We synthesize a `thread/start` response with a placeholder
 //     threadId, then map that threadId to whatever session_id Claude reports
@@ -29,7 +38,7 @@ const os = require("os");
 
 const PROTO_VERSION = "1.0.0-claude-shim";
 
-function createClaudeTranslator({ injectInbound, transport: _transport, env = process.env } = {}) {
+function createClaudeTranslator({ injectInbound, transport, env = process.env } = {}) {
   // ── per-connection state ───────────────────────────────────────────────
   /** Synthetic threadId surfaced to the iOS app. */
   let threadId = "";
@@ -51,6 +60,14 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
   let lastAssistantMessageId = "";
   /** Map of Claude tool_use_id → { name, command, cwd, kind } so we can close the loop on tool_result. */
   const pendingToolCalls = new Map();
+  /**
+   * Index of the in-progress streamed content block. Claude emits
+   * content_block_start with `index` followed by content_block_delta /
+   * content_block_stop sharing that index. We keep per-index state
+   * (kind=text|thinking|tool_use, accumulated text, item id, tool input
+   * fragments) so deltas route to the right bridge item.
+   */
+  const blocksByIndex = new Map();
   /** Once we see system.init, we emit thread/started. Track so we don't repeat per resume. */
   let didEmitThreadStarted = false;
   /** Track whether we have already emitted turn/started for the active turn. */
@@ -183,6 +200,9 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
     if (type === "system") {
       return handleSystem(parsed);
     }
+    if (type === "stream_event") {
+      return handleStreamEvent(parsed);
+    }
     if (type === "assistant") {
       return handleAssistant(parsed);
     }
@@ -193,7 +213,7 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
       return handleResult(parsed);
     }
     if (type === "rate_limit_event") {
-      return null;
+      return handleRateLimitEvent(parsed);
     }
     return null;
   }
@@ -202,7 +222,10 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
   function handleThreadStart(request) {
     const params = request?.params || {};
     const requestedCwd = readString(params.cwd) || readString(params.workingDirectory) || "";
-    if (requestedCwd) sessionCwd = requestedCwd;
+    if (requestedCwd) {
+      sessionCwd = requestedCwd;
+      try { transport?.setCwd?.(requestedCwd); } catch { /* best-effort */ }
+    }
 
     if (!threadId) {
       threadId = generateThreadId();
@@ -287,6 +310,10 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
     if (request?.id != null) {
       injectResponse(request.id, { ok: true });
     }
+    // Soft-kill the running turn at the transport level. The transport drops
+    // its child reference; the next send() respawns with --resume so the
+    // conversation continues.
+    try { transport?.interruptTurn?.(); } catch { /* best-effort */ }
     if (!activeTurnId || !threadId) return;
     emitErrorNotification(activeTurnId, "interrupted by user");
     emitTurnCompleted(activeTurnId);
@@ -372,11 +399,19 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
   // ── inbound handlers ───────────────────────────────────────────────────
   function handleSystem(message) {
     const subtype = readString(message.subtype);
+    if (subtype === "status") {
+      // `status: "requesting"` is a hint that work has begun; we already
+      // emitted turn/started up-front so no need to mirror it.
+      return null;
+    }
     if (subtype !== "init") return null;
 
     const newSessionId = readString(message.session_id);
-    if (newSessionId && !sessionId) {
+    if (newSessionId) {
       sessionId = newSessionId;
+      // Tell the transport so the next respawn (after an interrupt) picks up
+      // history with `--resume <sessionId>`.
+      try { transport?.setResumeSessionId?.(newSessionId); } catch { /* best-effort */ }
     }
     const initCwd = readString(message.cwd);
     if (initCwd) sessionCwd = initCwd;
@@ -405,6 +440,112 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
     return null;
   }
 
+  // ── stream_event handler (the real delta source when --include-partial-messages is on) ──
+  function handleStreamEvent(envelope) {
+    const event = envelope?.event;
+    if (!event || typeof event !== "object") return null;
+    const evType = readString(event.type);
+
+    if (evType === "message_start") {
+      const inner = event.message;
+      if (inner && typeof inner === "object") {
+        const messageId = readString(inner.id);
+        if (messageId && messageId !== lastAssistantMessageId) {
+          // New assistant message: reset per-message bookkeeping.
+          lastAssistantMessageId = messageId;
+          activeAssistantItemId = "";
+          assistantTextAccumulator = "";
+          reasoningItemId = "";
+          reasoningAccumulator = "";
+          blocksByIndex.clear();
+        }
+      }
+      return null;
+    }
+
+    if (evType === "content_block_start") {
+      const index = numberOr(event.index, -1);
+      if (index < 0) return null;
+      const block = event.content_block || {};
+      const blockType = readString(block.type);
+      if (blockType === "text") {
+        const itemId = ensureAssistantItemId();
+        blocksByIndex.set(index, { kind: "text", itemId });
+      } else if (blockType === "thinking") {
+        const itemId = ensureReasoningItemId();
+        blocksByIndex.set(index, { kind: "thinking", itemId });
+      } else if (blockType === "tool_use") {
+        // Tool use deltas come via input_json_delta; we wait for the
+        // consolidated `assistant` frame (which has the parsed input) before
+        // emitting exec_command_begin to avoid acting on partial JSON.
+        blocksByIndex.set(index, {
+          kind: "tool_use",
+          toolUseId: readString(block.id),
+          toolName: readString(block.name),
+        });
+      }
+      return null;
+    }
+
+    if (evType === "content_block_delta") {
+      const index = numberOr(event.index, -1);
+      const block = blocksByIndex.get(index);
+      if (!block) return null;
+      const delta = event.delta || {};
+      const deltaType = readString(delta.type);
+
+      if (deltaType === "text_delta" && block.kind === "text") {
+        const text = readString(delta.text);
+        if (!text) return null;
+        emitNotification("item/agentMessage/delta", {
+          threadId,
+          turnId: activeTurnId,
+          itemId: block.itemId,
+          delta: text,
+        });
+        assistantTextAccumulator += text;
+      } else if (deltaType === "thinking_delta" && block.kind === "thinking") {
+        const text = readString(delta.thinking) || readString(delta.text);
+        if (!text) return null;
+        emitNotification("item/reasoning/textDelta", {
+          threadId,
+          turnId: activeTurnId,
+          itemId: block.itemId,
+          delta: text,
+        });
+        reasoningAccumulator += text;
+      }
+      // input_json_delta and signature_delta are intentionally dropped — we
+      // re-emit tool calls from the consolidated assistant frame instead.
+      return null;
+    }
+
+    if (evType === "content_block_stop") {
+      // No-op: the per-block state lives until the next message_start clears it.
+      return null;
+    }
+
+    if (evType === "message_delta") {
+      const usage = event.usage && typeof event.usage === "object" ? event.usage : null;
+      if (usage) {
+        lastUsage = mergeUsage(lastUsage, usage);
+      }
+      return null;
+    }
+
+    if (evType === "message_stop") {
+      return null;
+    }
+
+    return null;
+  }
+
+  // The consolidated `assistant` frame appears once per message after the
+  // stream_event sequence. We use it to:
+  //   - emit tool_use exec_command_begin events with the FULL parsed input
+  //     (stream_event input_json_delta is fragmentary)
+  //   - act as a fallback delta source for clients running without
+  //     --include-partial-messages
   function handleAssistant(message) {
     const inner = message.message;
     if (!inner || typeof inner !== "object") return null;
@@ -412,14 +553,12 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
     const messageId = readString(inner.id);
     if (messageId) lastAssistantMessageId = messageId;
     const usage = inner.usage && typeof inner.usage === "object" ? inner.usage : null;
-    if (usage) lastUsage = usage;
+    if (usage) lastUsage = mergeUsage(lastUsage, usage);
 
     const content = Array.isArray(inner.content) ? inner.content : [];
     if (content.length === 0) return null;
 
     if (!activeTurnId) {
-      // Defensive: a stray assistant frame with no active turn shouldn't crash
-      // the bridge. Synthesize a turn so deltas still surface.
       activeTurnId = generateTurnId();
     }
     if (!didEmitTurnStarted) {
@@ -431,55 +570,39 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
       const partType = readString(part.type);
 
       if (partType === "text") {
+        // Fallback path: if no stream_event delta delivered any text yet for
+        // this message, treat the consolidated text as a single delta. This
+        // keeps the shim working without --include-partial-messages.
         const text = readString(part.text);
-        if (!text) continue;
-        if (!activeAssistantItemId) {
-          activeAssistantItemId = generateItemId("assistant");
-          emitNotification("item/started", {
-            threadId,
-            turnId: activeTurnId,
-            itemId: activeAssistantItemId,
-            item: {
-              id: activeAssistantItemId,
-              itemId: activeAssistantItemId,
-              type: "assistant_message",
-              role: "assistant",
-            },
-          });
-        }
+        if (!text || assistantTextAccumulator.length >= text.length) continue;
+        const newText = text.startsWith(assistantTextAccumulator)
+          ? text.slice(assistantTextAccumulator.length)
+          : text;
+        const itemId = ensureAssistantItemId();
         emitNotification("item/agentMessage/delta", {
           threadId,
           turnId: activeTurnId,
-          itemId: activeAssistantItemId,
-          delta: text,
+          itemId,
+          delta: newText,
         });
-        assistantTextAccumulator += text;
+        assistantTextAccumulator = text;
         continue;
       }
 
       if (partType === "thinking") {
         const reasoning = readString(part.thinking) || readString(part.text);
-        if (!reasoning) continue;
-        if (!reasoningItemId) {
-          reasoningItemId = generateItemId("thinking");
-          emitNotification("item/started", {
-            threadId,
-            turnId: activeTurnId,
-            itemId: reasoningItemId,
-            item: {
-              id: reasoningItemId,
-              itemId: reasoningItemId,
-              type: "reasoning",
-            },
-          });
-        }
+        if (!reasoning || reasoningAccumulator.length >= reasoning.length) continue;
+        const newReasoning = reasoning.startsWith(reasoningAccumulator)
+          ? reasoning.slice(reasoningAccumulator.length)
+          : reasoning;
+        const itemId = ensureReasoningItemId();
         emitNotification("item/reasoning/textDelta", {
           threadId,
           turnId: activeTurnId,
-          itemId: reasoningItemId,
-          delta: reasoning,
+          itemId,
+          delta: newReasoning,
         });
-        reasoningAccumulator += reasoning;
+        reasoningAccumulator = reasoning;
         continue;
       }
 
@@ -489,6 +612,61 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
       }
     }
 
+    return null;
+  }
+
+  function ensureAssistantItemId() {
+    if (activeAssistantItemId) return activeAssistantItemId;
+    activeAssistantItemId = generateItemId("assistant");
+    emitNotification("item/started", {
+      threadId,
+      turnId: activeTurnId,
+      itemId: activeAssistantItemId,
+      item: {
+        id: activeAssistantItemId,
+        itemId: activeAssistantItemId,
+        type: "assistant_message",
+        role: "assistant",
+      },
+    });
+    return activeAssistantItemId;
+  }
+
+  function ensureReasoningItemId() {
+    if (reasoningItemId) return reasoningItemId;
+    reasoningItemId = generateItemId("thinking");
+    emitNotification("item/started", {
+      threadId,
+      turnId: activeTurnId,
+      itemId: reasoningItemId,
+      item: {
+        id: reasoningItemId,
+        itemId: reasoningItemId,
+        type: "reasoning",
+      },
+    });
+    return reasoningItemId;
+  }
+
+  function handleRateLimitEvent(envelope) {
+    const info = envelope?.rate_limit_info && typeof envelope.rate_limit_info === "object"
+      ? envelope.rate_limit_info
+      : null;
+    if (!info) return null;
+    if (!threadId) return null;
+    emitNotification("thread/status/changed", {
+      threadId,
+      thread_id: threadId,
+      status: {
+        type: "rateLimited",
+        rateLimit: {
+          type: readString(info.rateLimitType),
+          status: readString(info.status),
+          resetsAt: numberOr(info.resetsAt, 0),
+          isUsingOverage: info.isUsingOverage === true,
+        },
+      },
+    });
     return null;
   }
 
@@ -925,6 +1103,7 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
     reasoningAccumulator = "";
     didEmitTurnStarted = false;
     pendingToolCalls.clear();
+    blocksByIndex.clear();
   }
 
   function generateThreadId() {
@@ -951,6 +1130,18 @@ function createClaudeTranslator({ injectInbound, transport: _transport, env = pr
     if (id == null) return;
     injectInbound(JSON.stringify({ id, error: { code, message } }));
   }
+}
+
+function mergeUsage(prev, next) {
+  if (!prev) return next;
+  return {
+    ...prev,
+    ...next,
+    input_tokens: numberOr(next.input_tokens, prev.input_tokens),
+    output_tokens: numberOr(next.output_tokens, prev.output_tokens),
+    cache_read_input_tokens: numberOr(next.cache_read_input_tokens, prev.cache_read_input_tokens),
+    cache_creation_input_tokens: numberOr(next.cache_creation_input_tokens, prev.cache_creation_input_tokens),
+  };
 }
 
 function safeParseJson(line) {

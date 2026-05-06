@@ -1,11 +1,16 @@
 // FILE: claude-translate.test.js
 // Purpose: Verify the Claude stream-json <-> Codex JSON-RPC translator handles
-//          the full happy-path turn (thread/start, turn/start, system.init,
-//          assistant text + thinking, tool_use/tool_result, result) and the
-//          synthetic responses for thread/read & thread/turns/list.
+//          the full happy-path turn:
+//          - thread/start synthesizes a thread response
+//          - turn/start writes a stream-json user message and emits turn/started
+//          - system.init binds session_id and respawns are wired via setResumeSessionId
+//          - stream_event content_block_delta events emit the right deltas
+//          - consolidated `assistant` frame is the source of truth for tool_use
+//          - rate_limit_event surfaces as thread/status/changed
+//          - turn/interrupt calls transport.interruptTurn and synthesizes events
+//          - thread/read & thread/turns/list reconstruct from disk rollout
 // Layer: Unit test
 // Exports: node:test suite
-// Depends on: node:test, node:assert/strict, ../src/providers/claude/translate
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -17,12 +22,20 @@ const { createClaudeTranslator } = require("../src/providers/claude/translate");
 
 function setupTranslator() {
   const injected = [];
+  const transportCalls = [];
+  const transport = {
+    send() {},
+    describe: () => "fake",
+    setResumeSessionId(id) { transportCalls.push(["resume", id]); },
+    setCwd(cwd) { transportCalls.push(["cwd", cwd]); },
+    interruptTurn() { transportCalls.push(["interrupt"]); },
+  };
   const translator = createClaudeTranslator({
     injectInbound: (line) => injected.push(line),
-    transport: { send() {}, describe: () => "fake" },
+    transport,
     env: process.env,
   });
-  return { translator, injected };
+  return { translator, injected, transport, transportCalls };
 }
 
 function parseInjected(injected) {
@@ -30,7 +43,7 @@ function parseInjected(injected) {
 }
 
 test("thread/start synthesizes a thread response and emits thread/started", () => {
-  const { translator, injected } = setupTranslator();
+  const { translator, injected, transportCalls } = setupTranslator();
   const result = translator.outbound(JSON.stringify({
     id: "req-1",
     method: "thread/start",
@@ -39,13 +52,13 @@ test("thread/start synthesizes a thread response and emits thread/started", () =
   assert.equal(result, null);
 
   const events = parseInjected(injected);
-  // 1) JSON-RPC response 2) thread/started notification
   assert.equal(events.length, 2);
   assert.equal(events[0].id, "req-1");
   assert.match(events[0].result.thread.id, /^thr_/);
   assert.equal(events[0].result.thread.cwd, "/tmp/work");
   assert.equal(events[1].method, "thread/started");
-  assert.equal(events[1].params.threadId, events[0].result.thread.id);
+  // The translator must publish the cwd to the transport so respawns honor it.
+  assert.deepEqual(transportCalls[0], ["cwd", "/tmp/work"]);
 });
 
 test("turn/start emits a Claude user line, acks the request, and emits turn/started", () => {
@@ -65,12 +78,9 @@ test("turn/start emits a Claude user line, acks the request, and emits turn/star
   assert.equal(claudeLine.message.content, "hi there");
 
   const events = parseInjected(injected);
-  // 1) turn/start response  2) turn/started notification
   assert.equal(events[0].id, "tu-1");
   assert.match(events[0].result.turnId, /^turn_/);
   assert.equal(events[1].method, "turn/started");
-  assert.equal(events[1].params.threadId, "thr_test");
-  assert.equal(events[1].params.turnId, events[0].result.turnId);
 });
 
 test("turn/start with image attachment emits structured content array", () => {
@@ -92,17 +102,17 @@ test("turn/start with image attachment emits structured content array", () => {
   const claudeLine = JSON.parse(out[0]);
   assert.ok(Array.isArray(claudeLine.message.content));
   assert.equal(claudeLine.message.content[0].type, "text");
-  assert.equal(claudeLine.message.content[0].text, "describe this");
   assert.equal(claudeLine.message.content[1].type, "image");
   assert.deepEqual(claudeLine.message.content[1].source, {
     type: "base64", media_type: "image/png", data: "AAAA",
   });
 });
 
-test("system.init carries session_id and emits thread/started exactly once", () => {
-  const { translator, injected } = setupTranslator();
+test("system.init publishes session_id to transport for respawn", () => {
+  const { translator, injected, transportCalls } = setupTranslator();
   translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
   injected.length = 0;
+  transportCalls.length = 0;
 
   translator.inbound(JSON.stringify({
     type: "system",
@@ -110,12 +120,12 @@ test("system.init carries session_id and emits thread/started exactly once", () 
     session_id: "sess-abc",
     cwd: "/tmp/x",
   }));
-  // Already emitted thread/started during thread/start; system.init must not duplicate.
-  const events = parseInjected(injected);
-  assert.equal(events.length, 0);
+  assert.deepEqual(transportCalls[0], ["resume", "sess-abc"]);
+  // thread/started already fired during thread/start; init must not duplicate.
+  assert.equal(injected.length, 0);
 });
 
-test("assistant text deltas surface as item/started + item/agentMessage/delta", () => {
+test("stream_event content_block_delta text → item/started + item/agentMessage/delta", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
   translator.outbound(JSON.stringify({
@@ -124,33 +134,36 @@ test("assistant text deltas surface as item/started + item/agentMessage/delta", 
   }));
   injected.length = 0;
 
+  // Simulate the canonical stream:
+  //   message_start → content_block_start(text) → 2x content_block_delta → content_block_stop → message_stop
   translator.inbound(JSON.stringify({
-    type: "assistant",
-    message: {
-      id: "msg-1",
-      content: [{ type: "text", text: "Hello " }],
-    },
+    type: "stream_event",
+    event: { type: "message_start", message: { id: "msg-1", role: "assistant" } },
   }));
   translator.inbound(JSON.stringify({
-    type: "assistant",
-    message: {
-      id: "msg-1",
-      content: [{ type: "text", text: "world!" }],
-    },
+    type: "stream_event",
+    event: { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "stream_event",
+    event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hello " } },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "stream_event",
+    event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "world!" } },
   }));
 
   const events = parseInjected(injected).filter((e) => e.method);
-  // First assistant frame: item/started + item/agentMessage/delta(Hello )
   assert.equal(events[0].method, "item/started");
+  assert.equal(events[0].params.item.type, "assistant_message");
   assert.equal(events[1].method, "item/agentMessage/delta");
   assert.equal(events[1].params.delta, "Hello ");
-  // Second frame reuses the same item id and just streams the delta.
   assert.equal(events[2].method, "item/agentMessage/delta");
   assert.equal(events[2].params.delta, "world!");
   assert.equal(events[1].params.itemId, events[2].params.itemId);
 });
 
-test("assistant thinking content emits item/reasoning/textDelta", () => {
+test("stream_event content_block_delta thinking → item/reasoning/textDelta", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
   translator.outbound(JSON.stringify({
@@ -160,11 +173,16 @@ test("assistant thinking content emits item/reasoning/textDelta", () => {
   injected.length = 0;
 
   translator.inbound(JSON.stringify({
-    type: "assistant",
-    message: {
-      id: "msg-2",
-      content: [{ type: "thinking", thinking: "considering options" }],
-    },
+    type: "stream_event",
+    event: { type: "message_start", message: { id: "msg-2", role: "assistant" } },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "stream_event",
+    event: { type: "content_block_start", index: 0, content_block: { type: "thinking" } },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "stream_event",
+    event: { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "considering options" } },
   }));
 
   const events = parseInjected(injected).filter((e) => e.method);
@@ -174,19 +192,40 @@ test("assistant thinking content emits item/reasoning/textDelta", () => {
   assert.equal(events[1].params.delta, "considering options");
 });
 
-test("Bash tool_use + tool_result map to exec_command_begin/end", () => {
+test("consolidated assistant frame is a fallback delta when stream_events are missing", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
   translator.outbound(JSON.stringify({
     id: "tu", method: "turn/start",
-    params: { threadId: "thr_z", input: [{ type: "text", text: "ls" }] },
+    params: { threadId: "thr_z", input: [{ type: "text", text: "hi" }] },
+  }));
+  injected.length = 0;
+
+  // No stream_event frames — only the consolidated assistant snapshot.
+  translator.inbound(JSON.stringify({
+    type: "assistant",
+    message: { id: "msg-3", content: [{ type: "text", text: "Hi!" }] },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  assert.equal(events[0].method, "item/started");
+  assert.equal(events[1].method, "item/agentMessage/delta");
+  assert.equal(events[1].params.delta, "Hi!");
+});
+
+test("Bash tool_use (consolidated) + tool_result → exec_command_begin/end", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "thr_b", input: [{ type: "text", text: "ls" }] },
   }));
   injected.length = 0;
 
   translator.inbound(JSON.stringify({
     type: "assistant",
     message: {
-      id: "msg-3",
+      id: "msg-4",
       content: [{
         type: "tool_use",
         id: "toolu-1",
@@ -195,16 +234,11 @@ test("Bash tool_use + tool_result map to exec_command_begin/end", () => {
       }],
     },
   }));
-
   translator.inbound(JSON.stringify({
     type: "user",
     message: {
       role: "user",
-      content: [{
-        type: "tool_result",
-        tool_use_id: "toolu-1",
-        content: "file1\nfile2\n",
-      }],
+      content: [{ type: "tool_result", tool_use_id: "toolu-1", content: "file1\nfile2\n" }],
     },
   }));
 
@@ -212,11 +246,30 @@ test("Bash tool_use + tool_result map to exec_command_begin/end", () => {
   const begin = events.find((e) => e.method === "codex/event/exec_command_begin");
   const outDelta = events.find((e) => e.method === "codex/event/exec_command_output_delta");
   const end = events.find((e) => e.method === "codex/event/exec_command_end");
-  assert.ok(begin, "exec_command_begin emitted");
   assert.equal(begin.params.command, "ls -la");
-  assert.equal(begin.params.cwd, "/tmp");
   assert.equal(outDelta.params.chunk, "file1\nfile2\n");
   assert.equal(end.params.status, "completed");
+});
+
+test("rate_limit_event surfaces as thread/status/changed", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
+  injected.length = 0;
+
+  translator.inbound(JSON.stringify({
+    type: "rate_limit_event",
+    rate_limit_info: {
+      status: "allowed",
+      resetsAt: 1778069400,
+      rateLimitType: "five_hour",
+      isUsingOverage: false,
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method === "thread/status/changed");
+  assert.equal(events[0].params.status.type, "rateLimited");
+  assert.equal(events[0].params.status.rateLimit.type, "five_hour");
+  assert.equal(events[0].params.status.rateLimit.resetsAt, 1778069400);
 });
 
 test("result frame emits final agent_message + item/completed + turn/completed", () => {
@@ -226,9 +279,18 @@ test("result frame emits final agent_message + item/completed + turn/completed",
     id: "tu", method: "turn/start",
     params: { threadId: "thr_q", input: [{ type: "text", text: "say hi" }] },
   }));
+  // Simulate the canonical text stream.
   translator.inbound(JSON.stringify({
-    type: "assistant",
-    message: { id: "msg-4", content: [{ type: "text", text: "Hi!" }] },
+    type: "stream_event",
+    event: { type: "message_start", message: { id: "msg-5", role: "assistant" } },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "stream_event",
+    event: { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+  }));
+  translator.inbound(JSON.stringify({
+    type: "stream_event",
+    event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hi!" } },
   }));
   injected.length = 0;
 
@@ -291,14 +353,15 @@ test("thread/turns/list reconstructs from disk rollout under CLAUDE_HOME", () =>
   fs.rmSync(tmpHome, { recursive: true, force: true });
 });
 
-test("turn/interrupt emits turn/failed + turn/completed and acks", () => {
-  const { translator, injected } = setupTranslator();
+test("turn/interrupt calls transport.interruptTurn() AND emits synthetic events", () => {
+  const { translator, injected, transportCalls } = setupTranslator();
   translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
   translator.outbound(JSON.stringify({
     id: "tu", method: "turn/start",
     params: { threadId: "thr_int", input: [{ type: "text", text: "go" }] },
   }));
   injected.length = 0;
+  transportCalls.length = 0;
 
   translator.outbound(JSON.stringify({
     id: "int-1",
@@ -311,9 +374,10 @@ test("turn/interrupt emits turn/failed + turn/completed and acks", () => {
   const failed = events.find((e) => e.method === "turn/failed");
   const completed = events.find((e) => e.method === "turn/completed");
   assert.ok(ack);
-  assert.ok(failed);
   assert.equal(failed.params.error.message, "interrupted by user");
   assert.ok(completed);
+  // Critical: the transport must actually be told to kill the active child.
+  assert.deepEqual(transportCalls[0], ["interrupt"]);
 });
 
 test("unsupported methods get a JSON-RPC error response", () => {

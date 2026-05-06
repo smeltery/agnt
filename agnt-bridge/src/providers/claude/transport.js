@@ -1,29 +1,51 @@
 // FILE: providers/claude/transport.js
 // Purpose: Spawn-based transport for the Claude Code CLI. Plumbs stdin/stdout
-//          between the bridge and `claude` running in stream-json mode.
+//          between the bridge and `claude` running in stream-json mode, with
+//          soft-interrupt support that kills the active turn and silently
+//          respawns the CLI for the next user message (preserving the same
+//          conversation via `--resume <session_id>`).
 // Layer: provider plugin (claude)
 // Exports: createClaudeTransport
 // Depends on: child_process, ./detect
 //
 // Wire format:
-//   stdin  (claude --input-format stream-json)  : `{type:"user", message:{...}}` lines
-//   stdout (claude --output-format stream-json) : `{type:"system"|"assistant"|"user"|"result", ...}` lines
+//   stdin  (`claude --print --input-format=stream-json`)
+//          : `{type:"user", message:{...}}` lines
+//   stdout (`claude --print --output-format=stream-json --include-partial-messages`)
+//          : `{type:"system"|"assistant"|"user"|"result"|"stream_event", ...}` lines
 //
-// The bridge core speaks Codex JSON-RPC; the Claude<->Codex protocol shim
-// lives in providers/claude/translate.js and is wired via createTranslator
-// in providers/claude/index.js. This transport stays mechanical: it spawns
-// the CLI, pipes lines, and reports lifecycle events.
+// Lifecycle notes:
+//   - The CLI accepts multiple `{type:"user"}` lines on stdin and emits one
+//     `result` per turn while staying alive. EOF on stdin causes a clean exit.
+//   - Aborting a turn means killing the child with SIGINT. Respawning is
+//     transparent: the next `send()` after a kill spawns a fresh CLI with
+//     `--resume <sessionId>` so conversation history is preserved.
+//   - Bridge-level shutdown (transport.shutdown()) is the only way to surface
+//     a `close` event to the bridge core; auto-respawns are silent.
 
 const { spawn } = require("child_process");
 const { detectClaudeBinary } = require("./detect");
 
-const DEFAULT_ARGS = ["--output-format", "stream-json", "--input-format", "stream-json", "--verbose"];
+// `--print` enables non-interactive mode (the only mode where stream-json IO
+//   is actually honored — the help text says so explicitly).
+// `--include-partial-messages` emits the per-token `stream_event` frames the
+//   shim relies on for incremental UI updates; without it the assistant's text
+//   only lands as one consolidated `assistant` snapshot.
+// `--verbose` keeps the `system.init` and `result` frames flowing.
+const DEFAULT_ARGS = [
+  "--print",
+  "--input-format", "stream-json",
+  "--output-format", "stream-json",
+  "--include-partial-messages",
+  "--verbose",
+];
 
 function createClaudeTransport({
   env = process.env,
   spawnImpl = spawn,
   binPath = "",
   extraArgs = [],
+  cwd = process.cwd(),
 } = {}) {
   const resolvedBin = binPath || detectClaudeBinary({ env });
   if (!resolvedBin) {
@@ -33,14 +55,21 @@ function createClaudeTransport({
     );
   }
 
-  const args = [...DEFAULT_ARGS, ...extraArgs];
-  const description = `\`claude ${args.join(" ")}\``;
+  const baseArgs = [...DEFAULT_ARGS, ...extraArgs];
+  const description = `\`claude ${baseArgs.join(" ")}\``;
 
   let child = null;
   let stdoutBuffer = "";
   let stderrBuffer = "";
   let didRequestShutdown = false;
   let didReportError = false;
+  let didEmitInitialStarted = false;
+  /** Last `session_id` learned via translator → setResumeSessionId so respawns continue the same conversation. */
+  let resumeSessionId = "";
+  /** Turn-level args layered on top of baseArgs (e.g. --model, --permission-mode). */
+  let turnArgs = [];
+  /** Spawn cwd; updated when the translator reports a new working directory. */
+  let activeCwd = cwd;
   const listeners = createListenerBag();
 
   spawnChild();
@@ -50,7 +79,9 @@ function createClaudeTransport({
     describe() {
       return description;
     },
+    /** Write a `{type:"user",...}` line; auto-respawns the CLI if it died after an interrupt. */
     send(message) {
+      ensureChild();
       if (!child?.stdin?.writable || child.stdin.destroyed || child.stdin.writableEnded) {
         return;
       }
@@ -72,18 +103,69 @@ function createClaudeTransport({
       didRequestShutdown = true;
       shutdownChild(child);
     },
+    /**
+     * Soft-interrupt: kill the in-flight turn so the next `send()` respawns a
+     * fresh CLI with `--resume <session_id>`. Caller (the translator) has
+     * already emitted the synthetic turn/failed + turn/completed.
+     */
+    interruptTurn() {
+      if (!child || child.exitCode !== null) return;
+      try { child.kill("SIGINT"); } catch { /* best-effort */ }
+      // Drop the reference so the next ensureChild() respawns. The 'close'
+      // event fires asynchronously; the auto-respawn flag suppresses the
+      // bridge-facing close notification.
+      child = null;
+    },
+    /** Translator publishes the latest Claude session_id so respawns continue history. */
+    setResumeSessionId(id) {
+      if (typeof id === "string" && id) resumeSessionId = id;
+    },
+    /** Translator publishes per-turn args (e.g. ["--model","sonnet","--permission-mode","plan"]). */
+    setTurnArgs(args) {
+      turnArgs = Array.isArray(args) ? args.filter((a) => typeof a === "string" && a.length > 0) : [];
+    },
+    /** Translator publishes the working directory derived from thread/start params. */
+    setCwd(nextCwd) {
+      if (typeof nextCwd === "string" && nextCwd && nextCwd !== activeCwd) {
+        activeCwd = nextCwd;
+        // Apply on next respawn; current child keeps its spawn cwd until the
+        // user interrupts or starts a fresh thread (which respawns).
+      }
+    },
   };
+
+  function ensureChild() {
+    if (child && child.exitCode === null) return;
+    spawnChild();
+  }
+
+  function buildSpawnArgs() {
+    const args = [...baseArgs, ...turnArgs];
+    if (resumeSessionId) {
+      args.push("--resume", resumeSessionId);
+    }
+    return args;
+  }
 
   function spawnChild() {
     stdoutBuffer = "";
     stderrBuffer = "";
+    const args = buildSpawnArgs();
+    const isInitialSpawn = !didEmitInitialStarted;
     child = spawnImpl(resolvedBin, args, {
       env,
       stdio: ["pipe", "pipe", "pipe"],
+      cwd: activeCwd,
     });
 
     child.on("spawn", () => {
-      listeners.emitStarted({ mode: "spawn", launchDescription: description });
+      // Only the very first spawn surfaces a 'started' event to the bridge.
+      // Auto-respawns after an interrupt are invisible — the bridge already
+      // considers the transport "started".
+      if (!didEmitInitialStarted) {
+        didEmitInitialStarted = true;
+        listeners.emitStarted({ mode: "spawn", launchDescription: description });
+      }
     });
 
     child.on("error", (error) => {
@@ -93,13 +175,19 @@ function createClaudeTransport({
     });
 
     child.on("close", (code, signal) => {
+      // After an interrupt, child was reset to null and the next send()
+      // respawns. Suppress the close so the bridge doesn't tear down.
+      if (signal === "SIGINT" || signal === "SIGTERM") {
+        if (!didRequestShutdown) return;
+      }
+      // After a normal turn-completion EOF, the CLI may also exit. Don't
+      // bubble the close unless shutdown was requested.
+      if (!didRequestShutdown && code === 0) return;
+
       if (!didRequestShutdown && !didReportError && code !== 0) {
         didReportError = true;
         listeners.emitError(createClaudeCloseError({
-          code,
-          signal,
-          stderrBuffer,
-          description,
+          code, signal, stderrBuffer, description,
         }));
         return;
       }
@@ -128,28 +216,23 @@ function createClaudeTransport({
     child.stderr.on("data", (chunk) => {
       const text = chunk.toString("utf8");
       stderrBuffer = (stderrBuffer + text).slice(-4096);
-      // Surface stderr line-by-line so launch failures and warnings are visible.
       for (const line of text.split(/\r?\n/)) {
         if (line.length > 0) {
           console.error(`[agnt][claude] ${line}`);
         }
       }
     });
+
+    // Mark for the IDE — initial spawn was a fresh boot. The flag is also
+    // used to silence subsequent 'started' emissions.
+    void isInitialSpawn;
   }
 }
 
 function shutdownChild(child) {
   if (!child || child.exitCode !== null) return;
-  try {
-    child.stdin?.end();
-  } catch {
-    // Best-effort.
-  }
-  try {
-    child.kill("SIGTERM");
-  } catch {
-    // Best-effort.
-  }
+  try { child.stdin?.end(); } catch { /* best-effort */ }
+  try { child.kill("SIGTERM"); } catch { /* best-effort */ }
 }
 
 function createClaudeCloseError({ code, signal, stderrBuffer, description }) {
@@ -190,4 +273,5 @@ function createListenerBag() {
 
 module.exports = {
   createClaudeTransport,
+  DEFAULT_ARGS,
 };
