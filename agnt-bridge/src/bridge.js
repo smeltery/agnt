@@ -905,19 +905,26 @@ function startBridge({
   // Replaces huge inline desktop-history images with lightweight references before relay encryption.
   function sanitizeRelayBoundCodexMessage(rawMessage) {
     pruneExpiredForwardedRequestMethods();
-    const parsed = safeParseJSON(rawMessage);
+    const normalizedMessage = normalizeRelayBoundJsonRpcMessage(rawMessage, {
+      pendingRequestMethodsById: relaySanitizedResponseMethodsById,
+    });
+    if (!normalizedMessage) {
+      return null;
+    }
+
+    const parsed = safeParseJSON(normalizedMessage);
     const responseId = parsed?.id;
     if (responseId == null) {
-      return sanitizeLiveGeneratedImageMessageForRelay(rawMessage);
+      return sanitizeLiveGeneratedImageMessageForRelay(normalizedMessage);
     }
 
     const trackedRequest = relaySanitizedResponseMethodsById.get(String(responseId));
     if (!trackedRequest) {
-      return rawMessage;
+      return normalizedMessage;
     }
     relaySanitizedResponseMethodsById.delete(String(responseId));
 
-    return sanitizeThreadHistoryImagesForRelay(rawMessage, trackedRequest.method);
+    return sanitizeThreadHistoryImagesForRelay(normalizedMessage, trackedRequest.method);
   }
 
   function updatePendingAuthLoginFromCodexMessage(rawMessage) {
@@ -1260,8 +1267,21 @@ function startBridge({
       return true;
     }
 
-    waiter.resolve(parsed.result ?? null);
+    waiter.resolve(readBridgeManagedSuccessPayload(parsed));
     return true;
+  }
+
+  // Normalizes private app-server responses before the bridge re-wraps them for iOS.
+  // Codex's app-server occasionally hands back `{payload}` instead of `{result}`;
+  // non-Codex providers always return `{result}`, so this is a no-op for them.
+  function readBridgeManagedSuccessPayload(parsed) {
+    if (Object.prototype.hasOwnProperty.call(parsed, "result")) {
+      return parsed.result ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(parsed, "payload")) {
+      return parsed.payload ?? null;
+    }
+    return null;
   }
 
   function failBridgeManagedCodexRequests(error) {
@@ -1978,6 +1998,114 @@ function parseBridgeJSON(value) {
   } catch {
     return null;
   }
+}
+
+// Keeps app-server responses in the JSON-RPC shape that the iOS client decodes.
+// Some agent CLIs (notably Codex's app-server) return responses wrapped in
+// `{payload}` instead of `{result}`; iOS only knows how to read `{result}`. This
+// helper rewrites those responses into the canonical shape, leaves
+// already-canonical messages untouched, and drops anything that should not be
+// forwarded to the relay (e.g. server-initiated requests for which we have no
+// matching tracked request).
+function normalizeRelayBoundJsonRpcMessage(rawMessage, {
+  pendingRequestMethodsById = null,
+} = {}) {
+  const parsed = parseBridgeJSON(rawMessage);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const hasMethod = typeof parsed.method === "string" && parsed.method.length > 0;
+  const hasResponseId = parsed.id !== undefined && parsed.id !== null;
+  const hasResult = Object.prototype.hasOwnProperty.call(parsed, "result");
+  const hasError = Object.prototype.hasOwnProperty.call(parsed, "error");
+  const hasPayload = Object.prototype.hasOwnProperty.call(parsed, "payload");
+  if (hasResponseId && !hasMethod && !hasResult && !hasError && hasPayload) {
+    const { payload, ...rest } = parsed;
+    return JSON.stringify({
+      ...rest,
+      result: payload ?? null,
+    });
+  }
+
+  if (hasResponseId && !hasMethod && hasResult && !hasError) {
+    const unwrappedResult = unwrapAppServerPayloadResult(parsed.result);
+    if (unwrappedResult !== parsed.result) {
+      return JSON.stringify({
+        ...parsed,
+        result: unwrappedResult,
+      });
+    }
+  }
+
+  if (hasMethod && hasResponseId && !isRelayBoundServerRequestMethod(parsed.method)) {
+    const trackedRequest = pendingRequestMethodsById?.get(String(parsed.id));
+    const isTrackedResponse = trackedRequest?.method === parsed.method
+      && (hasResult || hasError || hasPayload);
+    if (isTrackedResponse) {
+      const { method, payload, ...rest } = parsed;
+      if (!hasResult && !hasError && hasPayload) {
+        return JSON.stringify({
+          ...rest,
+          result: payload ?? null,
+        });
+      }
+      if (hasResult && !hasError) {
+        return JSON.stringify({
+          ...rest,
+          result: unwrapAppServerPayloadResult(rest.result),
+        });
+      }
+      return JSON.stringify(rest);
+    }
+
+    return null;
+  }
+
+  if (!hasMethod && !hasResponseId) {
+    return null;
+  }
+
+  return rawMessage;
+}
+
+function unwrapAppServerPayloadResult(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+  if (!Object.prototype.hasOwnProperty.call(value, "payload")) {
+    return value;
+  }
+
+  const payload = value.payload;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return value;
+  }
+
+  const directPayloadKeys = [
+    "data",
+    "items",
+    "threads",
+    "turns",
+    "thread",
+  ];
+  const hasDirectResultPayload = directPayloadKeys.some((key) => (
+    Object.prototype.hasOwnProperty.call(payload, key)
+  ));
+  if (!hasDirectResultPayload) {
+    return value;
+  }
+
+  return {
+    ...value,
+    ...payload,
+  };
+}
+
+function isRelayBoundServerRequestMethod(method) {
+  return method === "item/tool/requestUserInput"
+    || method === "tool/requestUserInput"
+    || method.endsWith("requestApproval");
 }
 
 function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
