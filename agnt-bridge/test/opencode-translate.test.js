@@ -401,6 +401,63 @@ test("thread/contextWindow/read GETs messages and surfaces token snapshot", asyn
   assert.equal(ack.result.contextWindow.outputTokens, 3);
 });
 
+test("second turn/start while one is active is rejected", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu-1", method: "turn/start",
+    params: { threadId: "ses_x", input: [{ type: "text", text: "first" }] },
+  }));
+  injected.length = 0;
+
+  translator.outbound(JSON.stringify({
+    id: "tu-2", method: "turn/start",
+    params: { threadId: "ses_x", input: [{ type: "text", text: "second" }] },
+  }));
+  const events = parseInjected(injected);
+  assert.equal(events[0].id, "tu-2");
+  assert.equal(events[0].error.code, -32003);
+});
+
+test("thread/compact POSTs to /session/{id}/summarize and returns ok:true", async () => {
+  const { translator, injected, httpCalls } = setupTranslator({
+    httpHandler(method, pathName) {
+      if (method === "POST" && pathName === "/session/ses_c/summarize") {
+        return { status: 200, json: { ok: true } };
+      }
+      return { status: 404, json: null };
+    },
+  });
+  translator.outbound(JSON.stringify({
+    id: "c-1", method: "thread/compact", params: { threadId: "ses_c" },
+  }));
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(httpCalls[0], { method: "POST", pathName: "/session/ses_c/summarize", body: {} });
+  const ack = parseInjected(injected).find((e) => e.id === "c-1");
+  assert.equal(ack.result.compacted, true);
+});
+
+test("thread/fork POSTs to /session/{id}/fork and returns the new thread", async () => {
+  const { translator, injected, httpCalls } = setupTranslator({
+    httpHandler(method, pathName) {
+      if (method === "POST" && pathName === "/session/ses_src/fork") {
+        return {
+          status: 200,
+          json: { id: "ses_forked", title: "Forked", directory: "/tmp", time: { created: 1, updated: 1 } },
+        };
+      }
+      return { status: 404, json: null };
+    },
+  });
+  translator.outbound(JSON.stringify({
+    id: "fork-1", method: "thread/fork",
+    params: { threadId: "ses_src", messageId: "msg_pivot" },
+  }));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(httpCalls[0].body.messageID, "msg_pivot");
+  const ack = parseInjected(injected).find((e) => e.id === "fork-1");
+  assert.equal(ack.result.thread.id, "ses_forked");
+});
+
 test("opencode read tool emits item/started + item/completed with file_path", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({

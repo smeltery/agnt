@@ -139,7 +139,17 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       return null;
     }
 
-    if (method === "thread/generateTitle" || method === "thread/name/set" || method === "thread/compact/start") {
+    if (method === "thread/compact/start" || method === "thread/compact") {
+      handleThreadCompact(parsed);
+      return null;
+    }
+
+    if (method === "thread/fork") {
+      handleThreadFork(parsed);
+      return null;
+    }
+
+    if (method === "thread/generateTitle" || method === "thread/name/set") {
       if (id != null) injectResponse(id, { ok: true });
       return null;
     }
@@ -220,6 +230,13 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
 
   function handleTurnStart(request) {
     const params = request?.params || {};
+
+    // Reject overlapping turns. Same backstop as the Claude shim.
+    if (activeTurnId) {
+      respondError(request?.id, -32003, "A turn is already in flight on this thread");
+      return;
+    }
+
     const incomingThreadId = readString(params.threadId) || readString(params.thread_id);
     if (incomingThreadId) activeThreadId = incomingThreadId;
     if (!activeThreadId) {
@@ -354,6 +371,60 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       }
     } catch (err) {
       respondError(request?.id, -32603, `opencode thread/turns/list failed: ${err?.message || err}`);
+    }
+  }
+
+  async function handleThreadCompact(request) {
+    const params = request?.params || {};
+    const targetThreadId = readString(params.threadId)
+      || readString(params.thread_id)
+      || activeThreadId;
+    if (!targetThreadId) {
+      respondError(request?.id, -32602, "thread/compact requires a threadId");
+      return;
+    }
+    try {
+      const res = await transport.httpRequest(
+        "POST",
+        `/session/${encodeURIComponent(targetThreadId)}/summarize`,
+        {},
+      );
+      const ok = res?.status >= 200 && res?.status < 300;
+      if (request?.id != null) {
+        injectResponse(request.id, {
+          ok,
+          compacted: ok,
+          threadId: targetThreadId,
+        });
+      }
+    } catch (err) {
+      respondError(request?.id, -32603, `opencode thread/compact failed: ${err?.message || err}`);
+    }
+  }
+
+  async function handleThreadFork(request) {
+    const params = request?.params || {};
+    const targetThreadId = readString(params.threadId)
+      || readString(params.thread_id)
+      || activeThreadId;
+    if (!targetThreadId) {
+      respondError(request?.id, -32602, "thread/fork requires a threadId");
+      return;
+    }
+    try {
+      const messageId = readString(params.messageId) || readString(params.fromMessageId);
+      const body = messageId ? { messageID: messageId } : {};
+      const res = await transport.httpRequest(
+        "POST",
+        `/session/${encodeURIComponent(targetThreadId)}/fork`,
+        body,
+      );
+      const newThread = mapSessionToThread(res?.json, { id: readString(res?.json?.id) || "" });
+      if (request?.id != null) {
+        injectResponse(request.id, { thread: newThread });
+      }
+    } catch (err) {
+      respondError(request?.id, -32603, `opencode thread/fork failed: ${err?.message || err}`);
     }
   }
 

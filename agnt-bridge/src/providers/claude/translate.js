@@ -172,10 +172,17 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
       return null;
     }
 
-    if (method === "thread/compact/start") {
-      // Claude manages context internally; report no-op completion.
+    if (method === "thread/compact/start" || method === "thread/compact") {
+      // Claude's `/compact` slash command is interactive-only — the
+      // stream-json CLI ignores it. Acknowledge with `compacted:false` so
+      // the iOS app's compact pill can render a "not supported" hint
+      // without hanging.
       if (id != null) {
-        injectResponse(id, { ok: true, compacted: false });
+        injectResponse(id, {
+          ok: true,
+          compacted: false,
+          reason: "claude_cli_compact_unsupported",
+        });
       }
       return null;
     }
@@ -268,6 +275,15 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
   // shows up before the assistant deltas arrive.
   function handleTurnStart(request) {
     const params = request?.params || {};
+
+    // Reject overlapping turns rather than letting state collide. iOS UI
+    // generally disables Send while a turn runs; this is a backstop for
+    // pathological clients (and a clean error if it ever fires).
+    if (activeTurnId) {
+      respondError(request?.id, -32003, "A turn is already in flight on this thread");
+      return null;
+    }
+
     const incomingThreadId = readString(params.threadId) || readString(params.thread_id);
     if (incomingThreadId) {
       threadId = incomingThreadId;

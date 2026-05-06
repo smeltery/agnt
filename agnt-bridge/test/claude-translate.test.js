@@ -501,6 +501,36 @@ test("thread/generateTitle returns a deterministic seed-derived title", () => {
   assert.equal(events[0].result.threadId, "thr_t");
 });
 
+test("second turn/start while one is active is rejected", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
+  translator.outbound(JSON.stringify({
+    id: "tu-1", method: "turn/start",
+    params: { threadId: "thr_x", input: [{ type: "text", text: "first" }] },
+  }));
+  injected.length = 0;
+
+  translator.outbound(JSON.stringify({
+    id: "tu-2", method: "turn/start",
+    params: { threadId: "thr_x", input: [{ type: "text", text: "second" }] },
+  }));
+  const events = parseInjected(injected);
+  assert.equal(events[0].id, "tu-2");
+  assert.equal(events[0].error.code, -32003);
+  assert.match(events[0].error.message, /already in flight/);
+});
+
+test("thread/compact acks with compacted:false (Claude CLI does not honor /compact in stream-json)", () => {
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "compact-1", method: "thread/compact", params: { threadId: "thr_c" },
+  }));
+  const events = parseInjected(injected);
+  assert.equal(events[0].id, "compact-1");
+  assert.equal(events[0].result.compacted, false);
+  assert.equal(events[0].result.reason, "claude_cli_compact_unsupported");
+});
+
 test("unsupported methods get a JSON-RPC error response", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({
