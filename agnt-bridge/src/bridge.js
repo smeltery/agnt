@@ -629,7 +629,7 @@ function startBridge({
         const response = await fetchAdaptiveThreadTurnsListForRelay(request, {
           fetchPage: (params) => sendCodexRequest("thread/turns/list", params),
         });
-        const fallbackResponse = maybeBuildJsonlThreadTurnsListFallback(request, response);
+        const fallbackResponse = maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, response);
         relaySanitizedResponseMethodsById.set(String(request.id), {
           method: "thread/turns/list",
           createdAt: Date.now(),
@@ -645,57 +645,6 @@ function startBridge({
     })();
 
     return true;
-  }
-
-  // When the live thread/turns/list returns no turns (e.g. transient bridge
-  // error or stale upstream cache), reconstruct a small page from the local
-  // Codex rollout file so the iPhone has something to render. Codex-only —
-  // the other providers' translators already build their own thread/turns/list
-  // responses from their session files.
-  function maybeBuildJsonlThreadTurnsListFallback(request, response) {
-    if (activeProvider.id !== "codex") {
-      return null;
-    }
-    if (!isEmptyTurnsListResponse(response)) {
-      return null;
-    }
-
-    const params = request?.params || {};
-    const threadId = normalizeNonEmptyString(params.threadId)
-      || normalizeNonEmptyString(params.thread_id);
-    if (!threadId || hasRelayCursor(params.cursor)) {
-      return null;
-    }
-
-    try {
-      const rolloutPath = findRecentRolloutFileForContextRead(resolveSessionsRoot(), { threadId });
-      if (!rolloutPath) {
-        return null;
-      }
-      const result = readThreadTurnsListPageFromSessionJsonl(rolloutPath, {
-        threadId,
-        limit: params.limit,
-        maxLimit: 1,
-        cursor: params.cursor,
-      });
-      const turnsKey = findTurnsListResultKey(result);
-      if (!turnsKey || result[turnsKey].length === 0) {
-        return null;
-      }
-
-      return {
-        id: request.id,
-        result,
-      };
-    } catch (error) {
-      console.warn(`[agnt] thread/turns/list jsonl fallback failed: ${error.message}`);
-      return null;
-    }
-  }
-
-  function isEmptyTurnsListResponse(response) {
-    const turnsKey = findTurnsListResultKey(response?.result);
-    return Boolean(turnsKey) && response.result[turnsKey].length === 0;
   }
 
   // Encrypts bridge-generated responses instead of letting the relay see plaintext.
@@ -2476,6 +2425,65 @@ function buildEmptyTurnsListResponse(request) {
   };
 }
 
+function isEmptyTurnsListResponse(response) {
+  const turnsKey = findTurnsListResultKey(response?.result);
+  return Boolean(turnsKey) && response.result[turnsKey].length === 0;
+}
+
+// When the live thread/turns/list returns no turns (e.g. transient bridge
+// error or stale upstream cache), reconstruct a small page from the local
+// Codex rollout file so the iPhone has something to render. Codex-only — the
+// other providers' translators already build their own thread/turns/list
+// responses from their session files.
+//
+// Dependencies are injectable so the fallback is testable without touching the
+// real ~/.codex/sessions directory.
+function maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, response, {
+  resolveSessionsRootImpl = resolveSessionsRoot,
+  findRecentRolloutFileForContextReadImpl = findRecentRolloutFileForContextRead,
+  readThreadTurnsListPageFromSessionJsonlImpl = readThreadTurnsListPageFromSessionJsonl,
+  logger = console,
+} = {}) {
+  if (activeProvider?.id !== "codex") {
+    return null;
+  }
+  if (!isEmptyTurnsListResponse(response)) {
+    return null;
+  }
+
+  const params = request?.params || {};
+  const threadId = normalizeNonEmptyString(params.threadId)
+    || normalizeNonEmptyString(params.thread_id);
+  if (!threadId || hasRelayCursor(params.cursor)) {
+    return null;
+  }
+
+  try {
+    const rolloutPath = findRecentRolloutFileForContextReadImpl(resolveSessionsRootImpl(), { threadId });
+    if (!rolloutPath) {
+      return null;
+    }
+    const result = readThreadTurnsListPageFromSessionJsonlImpl(rolloutPath, {
+      threadId,
+      limit: params.limit,
+      maxLimit: 1,
+      cursor: params.cursor,
+    });
+    const turnsKey = findTurnsListResultKey(result);
+    if (!turnsKey || result[turnsKey].length === 0) {
+      return null;
+    }
+
+    return {
+      id: request.id,
+      result,
+    };
+  } catch (error) {
+    logger.warn?.(`[agnt] thread/turns/list jsonl fallback failed: ${error.message}`);
+    return null;
+  }
+}
+
 async function fetchSafeThreadTurnsListFallback(request, {
   fetchPage,
   now,
@@ -2957,12 +2965,21 @@ function createNoopDesktopRefresher() {
 }
 
 module.exports = {
+  buildEmergencySingleTurnResponse,
+  buildEmptyTurnsListResponse,
   buildHeartbeatBridgeStatus,
+  buildLargestSafeTurnsListResponse,
+  compactEmergencySingleTurnForRelay,
   createMacOSBridgeWakeAssertion,
   fetchAdaptiveThreadTurnsListForRelay,
   hasRelayConnectionGoneStale,
+  isEmptyTurnsListResponse,
+  isRelayBoundServerRequestMethod,
+  maybeBuildJsonlThreadTurnsListFallback,
+  normalizeRelayBoundJsonRpcMessage,
   persistBridgePreferences,
   sanitizeLiveGeneratedImageMessageForRelay,
   sanitizeThreadHistoryImagesForRelay,
   startBridge,
+  unwrapAppServerPayloadResult,
 };
