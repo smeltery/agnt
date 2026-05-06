@@ -130,6 +130,20 @@ AGNT_RELAY="ws://localhost:9000/relay" npm start
 AGNT_REFRESH_ENABLED=true npm start
 ```
 
+### Debugging
+
+If `thread/turns/list` returns empty for a Codex thread and the bridge's JSONL fallback (`maybeBuildJsonlThreadTurnsListFallback`) doesn't recover history, run the standalone diagnostic CLI on the rollout file directly:
+
+```sh
+# After `npm install` in agnt-bridge/, the bin is on PATH:
+npx agnt-jsonl-diagnose ~/.codex/sessions/<session>.jsonl
+
+# Or with options:
+npx agnt-jsonl-diagnose ~/.codex/sessions/<session>.jsonl --recent-turns 10 --show-text
+```
+
+It prints structured stats — line counts, parse errors, recovered turn shapes, byte sizes, and (with `--show-text`) short item text previews. Codex-specific. Exits non-zero on parse errors so you can chain it in scripts.
+
 ### Project structure
 
 ```
