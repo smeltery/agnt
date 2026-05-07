@@ -156,7 +156,7 @@ All env names use the `AGNT_*` prefix.
 
 ## Self-hosting
 
-See [docs/self-hosting-model.md](docs/self-hosting-model.md) for the principles and [docs/self-hosting.md](docs/self-hosting.md) for the setup guide. The transport layer is inspectable; nothing in the iOS app source embeds a hosted endpoint.
+See [docs/](docs/) for the full documentation set: [`docs/operations/self-hosting-model.md`](docs/operations/self-hosting-model.md) for the principles, [`docs/operations/self-hosting.md`](docs/operations/self-hosting.md) for the setup guide, and [`docs/architecture/`](docs/architecture/) for how the bridge is built. The transport layer is inspectable; nothing in the iOS app source embeds a hosted endpoint.
 
 ## License
 
