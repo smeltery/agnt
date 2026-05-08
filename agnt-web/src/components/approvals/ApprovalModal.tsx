@@ -1,14 +1,21 @@
 // Renders the head of the approval queue as a modal. Decline / Accept resolve
 // the underlying server-request promise; "Allow for session" is offered for
-// command-execution approvals only (matches iOS behavior).
+// command-execution approvals only (matches iOS behavior). When more than
+// one approval of the same `kind` is queued (typical during agent-heavy
+// flows), a small batch row exposes Accept-all-of-this-kind /
+// Decline-all-of-this-kind so users don't have to click through 20 dialogs.
 
 import { type ApprovalRequest, useApprovalsStore } from "../../state/approvals-store";
 
 export function ApprovalModal() {
   const queue = useApprovalsStore((state) => state.queue);
   const decide = useApprovalsStore((state) => state.decide);
+  const decideAllOfKind = useApprovalsStore((state) => state.decideAllOfKind);
   const head = queue[0];
   if (!head) return null;
+
+  const sameKindCount = queue.filter((entry) => entry.kind === head.kind).length;
+  const otherKindCount = queue.length - sameKindCount;
 
   return (
     <div className="agnt-modal-backdrop" role="presentation">
@@ -39,14 +46,45 @@ export function ApprovalModal() {
             Accept
           </button>
         </footer>
-        {queue.length > 1 && (
+        {sameKindCount > 1 && (
+          <div className="agnt-modal-batch-row">
+            <span className="agnt-modal-batch-label">
+              {sameKindCount - 1} more {batchNoun(head.kind, sameKindCount - 1)} queued
+            </span>
+            <div className="agnt-modal-batch-actions">
+              <button
+                type="button"
+                className="agnt-button-ghost agnt-button-danger"
+                onClick={() => decideAllOfKind(head.kind, "decline")}
+                title="Decline every queued approval of this kind"
+              >
+                Decline all
+              </button>
+              <button
+                type="button"
+                className="agnt-button-ghost"
+                onClick={() => decideAllOfKind(head.kind, "accept")}
+                title="Accept every queued approval of this kind — review carefully"
+              >
+                Accept all
+              </button>
+            </div>
+          </div>
+        )}
+        {otherKindCount > 0 && (
           <div className="agnt-modal-queue-hint">
-            +{queue.length - 1} more pending
+            +{otherKindCount} of a different kind pending
           </div>
         )}
       </div>
     </div>
   );
+}
+
+function batchNoun(kind: ApprovalRequest["kind"], count: number): string {
+  if (kind === "command") return count === 1 ? "command" : "commands";
+  if (kind === "fileChange") return count === 1 ? "file change" : "file changes";
+  return count === 1 ? "approval" : "approvals";
 }
 
 function labelForKind(request: ApprovalRequest): string {

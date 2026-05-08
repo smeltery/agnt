@@ -1,6 +1,7 @@
 import type { CodexMessage } from "../../../models";
 import { useLightboxStore } from "../../../state/lightbox-store";
 import { BookmarkButton } from "./BookmarkButton";
+import { RowLinkButton } from "./RowLinkButton";
 
 export function UserRow({ message }: { message: CodexMessage }) {
   const showLightbox = useLightboxStore((state) => state.show);
@@ -42,6 +43,7 @@ export function UserRow({ message }: { message: CodexMessage }) {
       {message.deliveryState !== "pending" && (
         <div className="agnt-row-actions">
           <BookmarkButton threadId={message.threadId} messageId={message.id} />
+          <RowLinkButton threadId={message.threadId} messageId={message.id} />
         </div>
       )}
     </div>

@@ -12,6 +12,8 @@ const SECTIONS: Array<{
     rows: [
       { keys: ["j"], description: "Next thread in sidebar" },
       { keys: ["k"], description: "Previous thread in sidebar" },
+      { keys: ["["], description: "Jump to previous user message in this thread" },
+      { keys: ["]"], description: "Jump to next user message in this thread" },
       { keys: ["/"], description: "Focus the composer" },
       { keys: ["f"], description: "Search this thread" },
       { keys: ["⌘ / Ctrl", "F"], description: "Search this thread (also captures the browser shortcut)" },

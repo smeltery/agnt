@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 28 — Chat nav shortcuts + URL hash deep-linking + approvals batch actions ✅ DONE
+
+- ✅ `[` / `]` jump between user messages in the active thread. Anchor index is whichever user row is closest to the viewport mid-line, so successive presses make progress even after the user scrolls. Uses the existing scroll-into-view + brief highlight ring (Session 15). Bare keys, gated by `skipWhenTyping` so the shortcuts don't fire from inside a draft. HelpModal updated.
+- ✅ URL hash deep-linking + per-row "Copy link". `#thread/<id>` selects on boot; `#thread/<id>/message/<id>` additionally scrolls the message into view via a one-slot `chat-focus-store` (waits for the matching reducer state to hydrate before scrolling). Active thread changes write back via `history.replaceState` so reload restores the view without polluting back-button history. New `🔗` button on assistant + user rows copies a `${origin}${pathname}#thread/<id>/message/<id>` permalink.
+- ✅ Approvals "Accept all" / "Decline all" of the same kind. New `decideAllOfKind` in `state/approvals-store.ts` resolves every queued approval whose `kind` matches with one decision; the modal exposes Accept-all / Decline-all only when more than one approval of the head's kind is queued, scoped to that kind so a queued `git push` can't ride along with a batch `read` accept.
+
 ## Session 27 — Reply/quote + slash variables + cross-thread bookmark filter ✅ DONE
 
 - ✅ Per-row Reply / quote on assistant rows. New "⤴ Reply" button next to Bookmark/Copy/Revert pushes a `> quoted text\n\n` block into the composer's draft via a tiny new `state/composer-inbox-store.ts` (single-slot pub/sub keyed by threadId so a Reply published while a different thread was active gets applied the moment the user navigates back). Code fences in the source are stripped so the quote can't reopen a fence in the user's draft; long quotes are truncated at ~1500 chars with an ellipsis.

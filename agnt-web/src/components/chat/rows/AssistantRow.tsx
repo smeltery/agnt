@@ -7,6 +7,7 @@ import { useComposerInboxStore } from "../../../state/composer-inbox-store";
 import { useConnectionStore } from "../../../state/connection-store";
 import { useThreadsStore } from "../../../state/threads-store";
 import { BookmarkButton } from "./BookmarkButton";
+import { RowLinkButton } from "./RowLinkButton";
 import { MarkdownContent } from "../MarkdownContent";
 
 export function AssistantRow({ message }: { message: CodexMessage }) {
@@ -64,6 +65,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       {!message.isStreaming && message.text && (
         <div className="agnt-row-actions">
           <BookmarkButton threadId={message.threadId} messageId={message.id} />
+          <RowLinkButton threadId={message.threadId} messageId={message.id} />
           <button
             type="button"
             className="agnt-row-action"

@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useShortcut } from "../../lib/keyboard";
 import { useStickyScroll } from "../../lib/sticky-scroll";
+import type { CodexMessage } from "../../models";
 import { fractionUsed } from "../../models";
 import { useBookmarksStore } from "../../state/bookmarks-store";
+import { useChatFocusStore } from "../../state/chat-focus-store";
 import { useConnectionStore } from "../../state/connection-store";
 import {
   selectActiveMessages,
@@ -64,6 +66,27 @@ export function ChatView() {
     { skipWhenTyping: false }
   );
 
+  // `[` / `]` jump between user messages — Vim-style navigation through a
+  // long thread without scrolling. `]` steps forward (toward the latest),
+  // `[` steps back. The cursor is anchored on whichever user row is closest
+  // to the current viewport mid-line so successive presses make progress
+  // even if the user scrolled in between.
+  function stepBetweenUserMessages(direction: 1 | -1) {
+    const userRows = visibleMessages.filter((message) => message.role === "user");
+    if (userRows.length === 0) return;
+    const currentIndex = findClosestUserIndex(userRows, scrollRef.current);
+    let nextIndex: number;
+    if (currentIndex < 0) {
+      nextIndex = direction === 1 ? 0 : userRows.length - 1;
+    } else {
+      nextIndex = currentIndex + direction;
+      if (nextIndex < 0 || nextIndex >= userRows.length) return;
+    }
+    scrollMessageIntoView(userRows[nextIndex].id);
+  }
+  useShortcut("[", () => stepBetweenUserMessages(-1));
+  useShortcut("]", () => stepBetweenUserMessages(1));
+
   const scrollMessageIntoView = useCallback(
     (messageId: string) => {
       const node = scrollRef.current?.querySelector(`[data-message-id="${cssEscape(messageId)}"]`);
@@ -76,6 +99,21 @@ export function ChatView() {
     },
     [scrollRef]
   );
+
+  // Deep-link follow-up: when Workspace queued a `messageId` for this thread
+  // (parsed from `#thread/.../message/<id>`), wait until the matching row is
+  // actually in the DOM before scrolling — messages arrive async via
+  // selectThread + reducer hydration.
+  const pendingFocus = useChatFocusStore((state) => state.pendingMessageId);
+  useEffect(() => {
+    if (!selectedThreadId || !pendingFocus) return;
+    if (pendingFocus.threadId !== selectedThreadId) return;
+    if (!visibleMessages.some((message) => message.id === pendingFocus.messageId)) return;
+    const messageId = useChatFocusStore.getState().consume(selectedThreadId);
+    if (!messageId) return;
+    // Defer one frame so the row's layout has settled.
+    requestAnimationFrame(() => scrollMessageIntoView(messageId));
+  }, [selectedThreadId, pendingFocus, visibleMessages, scrollMessageIntoView]);
 
   const overWarn = usage ? fractionUsed(usage) >= CONTEXT_WARN_FRACTION : false;
 
@@ -164,4 +202,29 @@ export function ChatView() {
 function cssEscape(value: string): string {
   if (typeof CSS !== "undefined" && typeof CSS.escape === "function") return CSS.escape(value);
   return value.replace(/(["\\])/g, "\\$1");
+}
+
+/**
+ * Walk the user-row list and pick whichever id is closest to the viewport's
+ * mid-line. `[` and `]` step from there. Returns -1 when no row is on
+ * screen (e.g. the user scrolled past the entire thread); the caller treats
+ * that as "start from the boundary."
+ */
+function findClosestUserIndex(userRows: CodexMessage[], scrollContainer: HTMLElement | null): number {
+  if (!scrollContainer || userRows.length === 0) return -1;
+  const viewportMid = scrollContainer.getBoundingClientRect().top + scrollContainer.clientHeight / 2;
+  let bestIndex = -1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  userRows.forEach((message, index) => {
+    const node = scrollContainer.querySelector(`[data-message-id="${cssEscape(message.id)}"]`);
+    if (!(node instanceof HTMLElement)) return;
+    const rect = node.getBoundingClientRect();
+    const center = rect.top + rect.height / 2;
+    const distance = Math.abs(center - viewportMid);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
 }

@@ -2,10 +2,12 @@
 // Mirrors AgntMobile's split-view at the highest level — feature parity rolls
 // out inside each column over follow-up sessions.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDocumentTitle } from "../../lib/document-title";
+import { buildHashLocation, parseHashLocation } from "../../lib/hash-routing";
 import { useShortcut } from "../../lib/keyboard";
 import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from "../../lib/thread-export";
+import { useChatFocusStore } from "../../state/chat-focus-store";
 import { useCheckpointsStore } from "../../state/checkpoints-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useProjectStore } from "../../state/project-store";
@@ -52,6 +54,40 @@ export function Workspace() {
   useEffect(() => {
     void hydrateFromDisk();
   }, [hydrateFromDisk]);
+
+  // Deep-link boot. Parse `#thread/<id>` (optionally with `/message/<id>`)
+  // once we have hydrated state — selectThread is async and `selectedThreadId`
+  // would otherwise race with the hash on initial paint. We only run this
+  // once per session; `applyHashOnceRef` gates against the StrictMode double
+  // invoke that would otherwise re-fire selection on every mount.
+  const applyHashOnceRef = useRef(false);
+  const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
+  useEffect(() => {
+    if (applyHashOnceRef.current) return;
+    if (typeof window === "undefined") return;
+    const location = parseHashLocation(window.location.hash);
+    if (!location.threadId) {
+      applyHashOnceRef.current = true;
+      return;
+    }
+    applyHashOnceRef.current = true;
+    void useThreadsStore.getState().selectThread(location.threadId);
+    if (location.messageId) {
+      useChatFocusStore.getState().request(location.threadId, location.messageId);
+    }
+  }, []);
+
+  // Keep the URL hash in sync with the active thread so reload restores the
+  // view. `replaceState` (not pushState) avoids spawning a back-button stack
+  // entry per navigation. The hash gets cleared when no thread is selected.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const target = selectedThreadId ? buildHashLocation({ threadId: selectedThreadId }) : "";
+    if (window.location.hash === target) return;
+    if (window.location.hash === "" && target === "") return;
+    const url = window.location.pathname + window.location.search + target;
+    window.history.replaceState(null, "", url);
+  }, [selectedThreadId]);
 
   useShortcut("/", (event) => {
     event.preventDefault();

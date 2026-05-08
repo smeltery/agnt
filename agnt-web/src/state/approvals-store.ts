@@ -34,6 +34,9 @@ interface ApprovalsState {
   queue: ApprovalRequest[];
   enqueue(request: ApprovalRequest, resolve: (decision: ApprovalDecision) => void): void;
   decide(id: string, decision: ApprovalDecision): void;
+  /** Resolve every queued approval whose `kind` matches with the given decision.
+   *  Useful for "Accept all" / "Decline all" batch actions in the modal. */
+  decideAllOfKind(kind: ApprovalKind, decision: ApprovalDecision): number;
   clearAll(): void;
 }
 
@@ -52,6 +55,18 @@ export const useApprovalsStore = create<ApprovalsState>((set, get) => ({
     resolvers.delete(id);
     entry.resolve(decision);
     set({ queue: get().queue.filter((approval) => approval.id !== id) });
+  },
+  decideAllOfKind(kind, decision) {
+    const matched = get().queue.filter((approval) => approval.kind === kind);
+    if (matched.length === 0) return 0;
+    for (const approval of matched) {
+      const entry = resolvers.get(approval.id);
+      if (!entry) continue;
+      resolvers.delete(approval.id);
+      entry.resolve(decision);
+    }
+    set({ queue: get().queue.filter((approval) => approval.kind !== kind) });
+    return matched.length;
   },
   clearAll() {
     for (const [, entry] of resolvers) entry.resolve("decline");

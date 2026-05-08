@@ -538,6 +538,20 @@ button {
 .agnt-modal-reason { margin: 0; color: var(--agnt-fg-dim); }
 .agnt-modal-footer { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .agnt-modal-queue-hint { font-size: 11px; color: var(--agnt-fg-dim); text-align: right; }
+.agnt-modal-batch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--agnt-border);
+  border-radius: 6px;
+  background: var(--agnt-bg-elev);
+}
+.agnt-modal-batch-label { font-size: 12px; color: var(--agnt-fg-dim); }
+.agnt-modal-batch-actions { display: flex; gap: 6px; }
+.agnt-modal-batch-actions .agnt-button-ghost { padding: 2px 8px; font-size: 11px; }
 
 .agnt-notice-stack {
   position: fixed;
