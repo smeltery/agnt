@@ -11,6 +11,7 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { copyText } from "../../lib/clipboard";
 import { useConnectionStore } from "../../state/connection-store";
+import { useLightboxStore } from "../../state/lightbox-store";
 import { selectImageState, useWorkspaceImageCache } from "../../state/workspace-image-cache";
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
 import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
@@ -236,8 +237,13 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
               key={index}
               src={token.url}
               alt={token.label || token.title || "image"}
-              title={token.title}
-              className="agnt-md-image"
+              title={token.title ?? "Click to enlarge"}
+              className="agnt-md-image agnt-md-image-clickable"
+              onClick={() => useLightboxStore.getState().showOne({
+                src: token.url,
+                alt: token.label || token.title || "image",
+                caption: token.label || token.title,
+              })}
             />
           );
         }
@@ -292,8 +298,13 @@ function WorkspaceImage({ cwd, path, label, title }: WorkspaceImageProps) {
       <img
         src={cached.dataUrl}
         alt={label || title || path}
-        title={title ?? path}
-        className="agnt-md-image"
+        title={title ?? `${path} — click to enlarge`}
+        className="agnt-md-image agnt-md-image-clickable"
+        onClick={() => useLightboxStore.getState().showOne({
+          src: cached.dataUrl,
+          alt: label || title || path,
+          caption: label || path,
+        })}
       />
     );
   }

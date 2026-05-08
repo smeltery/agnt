@@ -42,4 +42,10 @@ export const idb = {
   async remove(key: string): Promise<void> {
     await withStore<undefined>("readwrite", (store) => store.delete(key) as IDBRequest<undefined>);
   },
+  /** All string keys in the kv store. Used by the Settings backup/restore flow
+   *  to enumerate everything without hardcoding the key list. */
+  async keys(): Promise<string[]> {
+    const raw = await withStore<IDBValidKey[]>("readonly", (store) => store.getAllKeys() as IDBRequest<IDBValidKey[]>);
+    return raw.filter((value): value is string => typeof value === "string");
+  },
 };

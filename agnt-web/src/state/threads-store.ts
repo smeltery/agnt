@@ -26,6 +26,7 @@ import { useGitStore } from "./git-store";
 import { useNoticesStore } from "./notices-store";
 import { fetchThreadTurnsPage } from "./pagination";
 import { useStreamingStatsStore } from "./streaming-stats-store";
+import { useTurnTimingStore } from "./turn-timing-store";
 import { buildStructuredInputServerRequestHandler, useStructuredInputStore } from "./structured-input-store";
 import { runPostHandshakeBootstrap, type ModelOption } from "./sync";
 import { useVoiceStore } from "./voice-store";
@@ -481,11 +482,13 @@ function registerNotificationHandlers(
   on(connection, "turn/started", (params) => withTurnEvent(params, (event) => {
     mutateReducer(event.threadId, set, get, (s) => applyTurnStarted(s, event));
     useStreamingStatsStore.getState().noteTurnStarted(event.threadId);
+    if (event.turnId) useTurnTimingStore.getState().noteTurnStarted(event.threadId, event.turnId);
   }));
   on(connection, "turn/completed", (params) =>
     withTurnEvent(params, (event) => {
       mutateReducer(event.threadId, set, get, (s) => applyTurnCompleted(s, event));
       useStreamingStatsStore.getState().noteTurnFinished(event.threadId);
+      if (event.turnId) useTurnTimingStore.getState().noteTurnEnded(event.turnId);
       bumpVisitIfActive(event.threadId, set, get);
       // Two layered "tab is hidden" signals: a desktop notification when the
       // user has granted permission and opted in, plus the title flash as a
@@ -499,6 +502,7 @@ function registerNotificationHandlers(
       const errorText = readString(params, "error", "message");
       mutateReducer(event.threadId, set, get, (s) => applyTurnFailed(s, event, errorText));
       useStreamingStatsStore.getState().noteTurnFinished(event.threadId);
+      if (event.turnId) useTurnTimingStore.getState().noteTurnEnded(event.turnId);
       bumpVisitIfActive(event.threadId, set, get);
       void notifyTurnFinished(event.threadId, get, "failed", errorText);
       flashTitle("Turn failed");

@@ -2037,3 +2037,110 @@ button {
   min-width: 50px;
 }
 .agnt-composer-findreplace .agnt-button-ghost { padding: 2px 6px; font-size: 11px; }
+
+/* Session 30 — Sidebar density + collapsible groups, per-turn timing chip,
+   GitPanel diff stats, workspace-image clickable hover, backup/restore. */
+
+.agnt-sidebar-density-toggle {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.agnt-sidebar-density-toggle:hover { background: var(--agnt-bg-elev-2); color: var(--agnt-fg); }
+
+.agnt-sidebar-group-header-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 6px 10px 4px;
+  margin: 0;
+  text-align: left;
+}
+.agnt-sidebar-group-header-button:hover { color: var(--agnt-fg); }
+.agnt-sidebar-group-chevron {
+  display: inline-block;
+  width: 8px;
+  font-size: 10px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-sidebar-group-count {
+  margin-left: auto;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--agnt-fg-dim);
+}
+.agnt-sidebar-group-collapsed .agnt-sidebar-list { display: none; }
+
+.agnt-sidebar-density-compact .agnt-sidebar-thread {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.agnt-sidebar-density-compact .agnt-sidebar-thread-cwd {
+  font-size: 10px;
+  margin-top: 0;
+}
+.agnt-sidebar-density-compact .agnt-sidebar-group-header,
+.agnt-sidebar-density-compact .agnt-sidebar-group-header-button {
+  padding-top: 3px;
+  padding-bottom: 1px;
+}
+.agnt-sidebar-density-compact .agnt-sidebar-list { gap: 0; }
+
+.agnt-row-action-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+  cursor: default;
+  user-select: none;
+}
+
+.agnt-gitpanel-totals {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+.agnt-gitpanel-stat-add { color: var(--agnt-ok); }
+.agnt-gitpanel-stat-del { color: var(--agnt-danger); }
+.agnt-gitpanel-file-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agnt-md-image-clickable {
+  cursor: zoom-in;
+  transition: filter 120ms ease;
+}
+.agnt-md-image-clickable:hover { filter: brightness(1.05); }
+
+.agnt-settings-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
