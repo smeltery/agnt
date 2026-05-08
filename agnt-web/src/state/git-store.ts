@@ -51,6 +51,12 @@ export interface GitState {
   refreshDiff(threadId: string, rpc: JsonRpcClient): Promise<void>;
   refreshBranches(threadId: string, rpc: JsonRpcClient): Promise<void>;
   checkoutBranch(threadId: string, rpc: JsonRpcClient, branch: string): Promise<void>;
+  createBranch(threadId: string, rpc: JsonRpcClient, name: string): Promise<string | null>;
+  createWorktree(
+    threadId: string,
+    rpc: JsonRpcClient,
+    params: { branch: string; baseBranch?: string }
+  ): Promise<string | null>;
   commit(threadId: string, rpc: JsonRpcClient, message: string): Promise<void>;
   push(threadId: string, rpc: JsonRpcClient): Promise<void>;
   pull(threadId: string, rpc: JsonRpcClient): Promise<void>;
@@ -115,6 +121,44 @@ export const useGitStore = create<GitState>((set, get) => ({
       await Promise.all([get().refreshStatus(threadId, rpc), get().refreshBranches(threadId, rpc)]);
     } catch (error) {
       setError(set, get, threadId, (error as Error).message);
+    } finally {
+      setLoading(set, threadId, false);
+    }
+  },
+
+  async createBranch(threadId, rpc, name) {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    setLoading(set, threadId, true);
+    try {
+      const result = await rpc.request<{ branch?: string }>("git/createBranch", { threadId, name: trimmed });
+      const created = typeof result.branch === "string" && result.branch ? result.branch : trimmed;
+      await get().refreshBranches(threadId, rpc);
+      return created;
+    } catch (error) {
+      setError(set, get, threadId, (error as Error).message);
+      return null;
+    } finally {
+      setLoading(set, threadId, false);
+    }
+  },
+
+  async createWorktree(threadId, rpc, params) {
+    const branch = params.branch.trim();
+    if (!branch) return null;
+    setLoading(set, threadId, true);
+    try {
+      const result = await rpc.request<{ worktreePath?: string }>("git/createWorktree", {
+        threadId,
+        branch,
+        baseBranch: params.baseBranch,
+      });
+      const path = typeof result.worktreePath === "string" ? result.worktreePath : null;
+      await get().refreshBranches(threadId, rpc);
+      return path;
+    } catch (error) {
+      setError(set, get, threadId, (error as Error).message);
+      return null;
     } finally {
       setLoading(set, threadId, false);
     }

@@ -86,6 +86,14 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 11 — Critical bug fix + image attachments + worktree creation ✅ DONE
+
+- 🔴 **Bug fix:** `turn/start` was sending `params.content: string`, but no bridge translator reads that — every web turn was emitting `"turn/start had no usable text or attachments"` (tests didn't catch it because vitest mocks the RPC). Now sends `params.input: [{type:"text",text}, ...]` matching `AgntMobile/Services/CodexService+ThreadsTurns.swift:makeTurnInputPayload`. `params.content` is kept alongside as a courtesy in case any future provider wants the pre-flattened string.
+- ✅ Image attachments end-to-end: composer file picker + paste + drag/drop, base64 + canvas-downscaled thumbnails, persisted on the user row, sent as `{type:"image", url:"data:..."}` items
+- ✅ Worktree creation from the git panel: `git/createBranch` + `git/createWorktree` with the current branch as the base
+
+**AI change sets deferred** — the full flow needs the reducer to track per-message forward patches captured during streaming. The bridge doesn't surface those as a clean event today (it's tied to Codex's app-server), and the per-turn `RevertSheet` from Session 10 already covers the practical "undo what this turn did" workflow. Will revisit if a clear need emerges.
+
 ## Session 10 — Workspace checkpoints (per-turn revert) ✅ DONE
 
 - ✅ `protocol/workspace-checkpoints.ts` typed wrappers for `workspace/checkpointRestorePreview` + `workspace/checkpointRestoreApply` (capture happens automatically on the bridge)
@@ -99,7 +107,7 @@ later session because the protocol and storage layers are already complete.
 - WebPush for completion notifications (gated on a self-hostable web-push gateway; meanwhile completions surface via the existing `system/notice` toasts)
 - E2E tests against a local relay + bridge in CI (would need a CI runner that can spin up the bridge with a fake provider; high lift, low parity benefit right now)
 - Full Codex OAuth flow (cross-tab redirect handoff design)
-- Worktree creation + stacked-action git operations (the read-only branch picker covers the 80% case; worktrees are an iOS power-user feature)
-- AI change sets (per-message patch revert UI on top of `workspace/revertPatchPreview` + `workspace/revertPatchApply`); the per-turn revert covers the bigger workflow
+- Stacked-action git operations + managed-worktree handoff (worktrees are landed in Session 11; only the iOS-style power-user flows around them remain)
+- AI change sets (per-message patch revert UI on top of `workspace/revertPatchPreview` + `workspace/revertPatchApply`); the per-turn revert from Session 10 covers the bigger workflow
 - `turn/steer` mid-run steering (Codex-only via native pass-through; gate on provider capability)
-- Image attachments + `workspace/readImage` (composer drag-drop + viewer)
+- `workspace/readImage` viewer for assistant-emitted image references (composer-side image attach is done in Session 11)

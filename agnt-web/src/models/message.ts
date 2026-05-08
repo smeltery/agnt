@@ -57,6 +57,18 @@ export interface PlanState {
   presentation: PlanPresentation;
 }
 
+export interface ImageAttachment {
+  id: string;
+  /** data: URL ready to ship to the bridge as `params.input.image_url`. */
+  payloadDataUrl: string;
+  /** Smaller data: URL used for in-row preview and post-send rendering. */
+  thumbnailDataUrl: string;
+  /** Optional source filename so the user remembers what they attached. */
+  fileName?: string;
+  /** Original byte length of the source file (pre-encoding). */
+  byteLength?: number;
+}
+
 export function decodePlanSteps(raw: unknown): PlanStep[] {
   if (!Array.isArray(raw)) return [];
   const steps: PlanStep[] = [];
@@ -92,6 +104,8 @@ export interface CodexMessage {
   command?: CommandExecutionDetails;
   fileChange?: FileChangeDetails;
   plan?: PlanState;
+  /** User-attached images. Persisted along with the message text. */
+  attachments?: ImageAttachment[];
   /** Stable insertion order; primary sort key. */
   orderIndex: number;
 }
@@ -111,6 +125,7 @@ export interface CreateMessageInput {
   command?: CommandExecutionDetails;
   fileChange?: FileChangeDetails;
   plan?: PlanState;
+  attachments?: ImageAttachment[];
   orderIndex?: number;
 }
 
@@ -130,6 +145,7 @@ export function createMessage(input: CreateMessageInput): CodexMessage {
     command: input.command,
     fileChange: input.fileChange,
     plan: input.plan,
+    attachments: input.attachments,
     orderIndex: input.orderIndex ?? orderCounter.next(),
   };
 }

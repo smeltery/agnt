@@ -43,6 +43,8 @@ import {
 } from "./turn-reducer";
 import { messagesStore } from "../storage/messages-store";
 import { prefsStore } from "../storage/prefs-store";
+import { buildTurnInput } from "./turn-input";
+import type { ImageAttachment } from "../models";
 
 const log = makeLogger("threads");
 const PERSIST_DEBOUNCE_MS = 250;
@@ -78,8 +80,8 @@ export interface ThreadsState {
   hydrateFromDisk(): Promise<void>;
   selectThread(threadId: string): Promise<void>;
   loadOlderTurns(threadId: string): Promise<void>;
-  sendTurn(threadId: string, content: string): Promise<void>;
-  startNewThread(input: { content: string; cwd?: string }): Promise<string | null>;
+  sendTurn(threadId: string, content: string, attachments?: ImageAttachment[]): Promise<void>;
+  startNewThread(input: { content: string; cwd?: string; attachments?: ImageAttachment[] }): Promise<string | null>;
   stopTurn(): Promise<void>;
   patchTurnFlags(patch: Partial<TurnFlags>): void;
   forkThread(sourceThreadId: string): Promise<string | null>;
@@ -185,12 +187,19 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     }
   },
 
-  async sendTurn(threadId, content) {
+  async sendTurn(threadId, content, attachments) {
     if (!activeConnection?.rpc) return;
-    mutateReducer(threadId, set, get, (state) => applyLocalUserMessage(state, threadId, content));
+    mutateReducer(threadId, set, get, (state) =>
+      applyLocalUserMessage(state, threadId, content, { attachments })
+    );
     schedulePersist(threadId, get);
+    const input = buildTurnInput(content, attachments);
+    if (input.length === 0) return;
     const flags = get().turnFlags;
-    const params: Record<string, unknown> = { threadId, content };
+    // Bridge translators read `params.input` exclusively. Keeping `content`
+    // alongside as a courtesy for any future provider that might want a
+    // pre-flattened string (no current provider does).
+    const params: Record<string, unknown> = { threadId, input, content };
     if (flags.model) params.model = flags.model;
     if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;
     if (flags.permissionMode) params.permissionMode = flags.permissionMode;
@@ -217,9 +226,11 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
 
   async startNewThread(input) {
     if (!activeConnection?.rpc) return null;
-    const { content, cwd } = input;
+    const { content, cwd, attachments } = input;
+    const turnInput = buildTurnInput(content, attachments);
+    if (turnInput.length === 0) return null;
     const flags = get().turnFlags;
-    const params: Record<string, unknown> = { content };
+    const params: Record<string, unknown> = { content, input: turnInput };
     if (cwd) params.cwd = cwd;
     if (flags.model) params.model = flags.model;
     if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;

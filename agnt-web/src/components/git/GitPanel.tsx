@@ -21,6 +21,8 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
   const refreshDiff = useGitStore((state) => state.refreshDiff);
   const refreshBranches = useGitStore((state) => state.refreshBranches);
   const checkoutBranch = useGitStore((state) => state.checkoutBranch);
+  const createBranch = useGitStore((state) => state.createBranch);
+  const createWorktree = useGitStore((state) => state.createWorktree);
   const commit = useGitStore((state) => state.commit);
   const push = useGitStore((state) => state.push);
   const pull = useGitStore((state) => state.pull);
@@ -28,6 +30,9 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
   const [commitMessage, setCommitMessage] = useState("");
   const [showDiff, setShowDiff] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createMode, setCreateMode] = useState<"branch" | "worktree">("branch");
+  const [creationFeedback, setCreationFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     if (!rpc) return;
@@ -145,6 +150,55 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
 
       {showDiff && diff && <pre className="agnt-gitpanel-diff">{diff}</pre>}
       {showDiff && !diff && <div className="agnt-gitpanel-empty">No diff yet.</div>}
+
+      {showBranches && (
+        <div className="agnt-gitpanel-create">
+          <select
+            value={createMode}
+            onChange={(event) => setCreateMode(event.target.value as "branch" | "worktree")}
+            disabled={loading}
+            aria-label="Create mode"
+          >
+            <option value="branch">Branch</option>
+            <option value="worktree">Worktree</option>
+          </select>
+          <input
+            type="text"
+            className="agnt-gitpanel-create-input"
+            placeholder={createMode === "branch" ? "new-branch-name" : "feature/short-lived-cwd"}
+            value={createName}
+            onChange={(event) => setCreateName(event.target.value)}
+            disabled={loading}
+          />
+          <button
+            type="button"
+            className="agnt-button-ghost"
+            disabled={loading || !createName.trim()}
+            onClick={async () => {
+              setCreationFeedback(null);
+              if (createMode === "branch") {
+                const created = await createBranch(threadId, rpc, createName);
+                if (created) {
+                  setCreationFeedback(`Created branch ${created}`);
+                  setCreateName("");
+                }
+              } else {
+                const path = await createWorktree(threadId, rpc, {
+                  branch: createName,
+                  baseBranch: branches?.currentBranch,
+                });
+                if (path) {
+                  setCreationFeedback(`Worktree at ${path}`);
+                  setCreateName("");
+                }
+              }
+            }}
+          >
+            Create
+          </button>
+        </div>
+      )}
+      {creationFeedback && <div className="agnt-gitpanel-feedback">{creationFeedback}</div>}
 
       {showBranches && (
         <ul className="agnt-gitpanel-branches">

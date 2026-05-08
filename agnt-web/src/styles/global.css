@@ -608,6 +608,80 @@ button {
   color: var(--agnt-fg);
   font: inherit;
 }
+.agnt-gitpanel-create {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+.agnt-gitpanel-create select,
+.agnt-gitpanel-create-input {
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--agnt-fg);
+}
+.agnt-gitpanel-create-input { flex: 1; }
+.agnt-gitpanel-feedback {
+  font-size: 11px;
+  color: var(--agnt-ok);
+  margin-top: 4px;
+}
+
+.agnt-composer-attachments {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 6px 0;
+}
+.agnt-composer-attachment {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--agnt-border);
+  background: var(--agnt-bg-elev-2);
+}
+.agnt-composer-attachment img { width: 100%; height: 100%; object-fit: cover; }
+.agnt-composer-attachment-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+.agnt-composer-attach-error {
+  font-size: 11px;
+  color: var(--agnt-danger);
+  padding: 2px 8px;
+}
+.agnt-composer-drop { box-shadow: inset 0 0 0 2px var(--agnt-accent); }
+.agnt-row-attachments {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.agnt-row-attachment-thumb {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 6px;
+  border: 1px solid var(--agnt-border);
+}
+.agnt-row-user-text { display: block; }
+
 .agnt-gitpanel-branches {
   list-style: none;
   margin: 0;

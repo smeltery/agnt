@@ -82,3 +82,58 @@ describe("decodeBranches", () => {
     expect([...snapshot.branchesCheckedOutElsewhere]).toEqual(["side"]);
   });
 });
+
+describe("git-store.createBranch + createWorktree", () => {
+  it("createBranch trims input and calls git/createBranch with the bridge's expected param shape", async () => {
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const rpc = {
+      request<R>(method: string, params: unknown): Promise<R> {
+        calls.push({ method, params });
+        if (method === "git/createBranch") return Promise.resolve({ branch: "feature/x" } as R);
+        return Promise.resolve({ branches: [], current: "main", default: "main" } as R);
+      },
+    } as unknown as import("../src/protocol/jsonrpc-client").JsonRpcClient;
+    const { useGitStore } = await import("../src/state/git-store");
+    useGitStore.getState().reset();
+    const created = await useGitStore.getState().createBranch("t1", rpc, "  feature/x  ");
+    expect(created).toBe("feature/x");
+    const createCall = calls.find((call) => call.method === "git/createBranch");
+    expect(createCall?.params).toMatchObject({ threadId: "t1", name: "feature/x" });
+  });
+
+  it("createWorktree forwards the base branch from the current snapshot", async () => {
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const rpc = {
+      request<R>(method: string, params: unknown): Promise<R> {
+        calls.push({ method, params });
+        if (method === "git/createWorktree") {
+          return Promise.resolve({ worktreePath: "/tmp/wt" } as R);
+        }
+        return Promise.resolve({ branches: [], current: "main", default: "main" } as R);
+      },
+    } as unknown as import("../src/protocol/jsonrpc-client").JsonRpcClient;
+    const { useGitStore } = await import("../src/state/git-store");
+    useGitStore.getState().reset();
+    const path = await useGitStore.getState().createWorktree("t1", rpc, {
+      branch: "feature/y",
+      baseBranch: "main",
+    });
+    expect(path).toBe("/tmp/wt");
+    const createCall = calls.find((call) => call.method === "git/createWorktree");
+    expect(createCall?.params).toMatchObject({ threadId: "t1", branch: "feature/y", baseBranch: "main" });
+  });
+
+  it("createBranch surfaces empty-name errors locally without hitting the bridge", async () => {
+    let called = 0;
+    const rpc = {
+      request<R>(): Promise<R> {
+        called += 1;
+        return Promise.resolve({} as R);
+      },
+    } as unknown as import("../src/protocol/jsonrpc-client").JsonRpcClient;
+    const { useGitStore } = await import("../src/state/git-store");
+    useGitStore.getState().reset();
+    expect(await useGitStore.getState().createBranch("t1", rpc, "   ")).toBeNull();
+    expect(called).toBe(0);
+  });
+});

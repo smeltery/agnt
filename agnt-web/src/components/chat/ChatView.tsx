@@ -50,9 +50,9 @@ export function ChatView() {
       <TurnFlagBar />
       <Composer
         running={running}
-        onSend={(text) => {
+        onSend={(text, attachments) => {
           if (!selectedThreadId) return;
-          void sendTurn(selectedThreadId, text);
+          void sendTurn(selectedThreadId, text, attachments);
         }}
         onStop={() => void stopTurn()}
       />

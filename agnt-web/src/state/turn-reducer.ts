@@ -169,7 +169,12 @@ export function applyItemOutputDelta(state: ThreadReducerState, event: ItemOutpu
 }
 
 /** Optimistic local user echo before turn/started arrives. */
-export function applyLocalUserMessage(state: ThreadReducerState, threadId: string, text: string): ThreadReducerState {
+export function applyLocalUserMessage(
+  state: ThreadReducerState,
+  threadId: string,
+  text: string,
+  options: { attachments?: import("../models").ImageAttachment[] } = {}
+): ThreadReducerState {
   return appendOrUpdate(state, (messages) => [
     ...messages,
     createMessage({
@@ -177,6 +182,7 @@ export function applyLocalUserMessage(state: ThreadReducerState, threadId: strin
       role: "user",
       kind: "chat",
       text,
+      attachments: options.attachments?.length ? options.attachments : undefined,
       deliveryState: "pending",
     }),
   ]);

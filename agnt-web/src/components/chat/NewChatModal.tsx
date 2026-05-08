@@ -25,6 +25,10 @@ export function NewChatModal({ onClose, onPickProject }: NewChatModalProps) {
     setSubmitting(false);
     if (id) onClose();
   }
+  // Attachments here are intentionally not surfaced — first-turn images can
+  // be sent via the in-thread composer once the thread exists. Folding image
+  // ingestion into this modal would double the surface and we'd still need
+  // the in-thread path. Keep New Chat focused on prompt + cwd.
 
   return (
     <div className="agnt-modal-backdrop" role="presentation" onClick={onClose}>

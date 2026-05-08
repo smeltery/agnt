@@ -77,7 +77,7 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | `CodexMessageOrderCounter` | ✅ | `models/order-counter.ts` |
 | `ContextWindowUsage` | ✅ | `models/context-window.ts` |
 | `CommandExecutionDetails` | ✅ | `models/message.ts` (with `appendCommandOutput` trimmer) |
-| `CodexImageAttachment` | ⛔ | 4 |
+| `CodexImageAttachment` | ✅ | 11 (`models/message.ts:ImageAttachment` — payload + thumbnail data URLs, optional fileName + byteLength) |
 | `CodexSkillMetadata` | ⛔ | 2 |
 | `CodexModelOption` | ⛔ | 2 |
 | `CodexCollaboration` | ⛔ | 4 |
@@ -122,6 +122,8 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Copy-to-clipboard on assistant rows | `components/chat/rows/AssistantRow.tsx` + `lib/clipboard.ts` | ✅ (Async Clipboard API + execCommand fallback for non-secure dev origins) |
 | `/` to focus composer · `Esc` closes overlays | `components/workspace/Workspace.tsx` | ✅ |
 | Per-turn revert (workspace checkpoints) | `components/checkpoints/RevertSheet.tsx` + `state/checkpoints-store.ts` + `protocol/workspace-checkpoints.ts` | ✅ (preview shows affected/staged/untracked, apply requires confirmDestructiveRestore) |
+| Image attachments (composer + user-row thumbs) | `components/chat/Composer.tsx` + `lib/image-attach.ts` + `models/message.ts:ImageAttachment` | ✅ (file picker, paste, drag-drop, canvas-downscaled thumbnails, sent as `params.input[].image`) |
+| Branch + worktree creation | `components/git/GitPanel.tsx` + `state/git-store.ts:createBranch/createWorktree` | ✅ (basic flow; managed-worktree handoff + stacked actions still deferred) |
 | Service worker (offline app shell) | `public/sw.js` | ✅ (production-only registration; cache-first hashed assets, network-first navigations, never caches relay/WS) |
 
 ## Storage
