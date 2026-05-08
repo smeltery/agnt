@@ -18,6 +18,15 @@ test.afterEach(() => {
   __test.resetRunGitHubCliImplementation();
 });
 
+// Sandboxed CI environments may force commit signing via the developer's global
+// gitconfig (gpg.format=ssh + a custom signing program). Test fixtures don't go
+// through that flow, so we isolate this entire test process from global/system
+// gitconfig — both fixture commands here AND production `git-handler.js` shells
+// (which inherit process.env) get a clean slate. Real users running `agnt` keep
+// their own signing config because production never sets these.
+process.env.GIT_CONFIG_GLOBAL = "/dev/null";
+process.env.GIT_CONFIG_SYSTEM = "/dev/null";
+
 function git(cwd, ...args) {
   return execFileSync("git", args, {
     cwd,

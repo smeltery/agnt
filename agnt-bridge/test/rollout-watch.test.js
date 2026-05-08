@@ -83,16 +83,25 @@ test("watcher prefers the newest rollout when the same thread has multiple files
     fs.rmSync(homeDir, { recursive: true, force: true });
   });
 
-  writeRolloutFile(path.join(threadDir, "rollout-2026-03-05T13-23-27-thread-a.jsonl"), {
+  // Filesystems with coarse mtime granularity (e.g. 1s on some Linux filesystems)
+  // would otherwise stamp both files with the same mtime when the test writes them
+  // back-to-back, defeating the watcher's "newest first" ordering. Pin distinct
+  // mtimes inside the watcher's recent-window so neither file is filtered out.
+  const olderPath = path.join(threadDir, "rollout-2026-03-05T13-23-27-thread-a.jsonl");
+  const newerPath = path.join(threadDir, "rollout-2026-03-05T13-25-27-thread-a.jsonl");
+  writeRolloutFile(olderPath, {
     turnId: "turn-a-old",
     tokensUsed: 111,
     tokenLimit: 1_000,
   });
-  writeRolloutFile(path.join(threadDir, "rollout-2026-03-05T13-25-27-thread-a.jsonl"), {
+  writeRolloutFile(newerPath, {
     turnId: "turn-a-new",
     tokensUsed: 333,
     tokenLimit: 1_000,
   });
+  const now = Date.now();
+  setFileMTime(olderPath, now - 60_000);
+  setFileMTime(newerPath, now - 1_000);
 
   const usages = [];
   const watcher = createThreadRolloutActivityWatcher({
@@ -194,16 +203,23 @@ test("readLatestContextWindowUsage prefers the newest same-thread rollout", (t) 
     fs.rmSync(homeDir, { recursive: true, force: true });
   });
 
-  writeRolloutFile(path.join(threadDir, "rollout-2026-03-05T13-23-27-thread-a.jsonl"), {
+  const olderPath = path.join(threadDir, "rollout-2026-03-05T13-23-27-thread-a.jsonl");
+  const newerPath = path.join(threadDir, "rollout-2026-03-05T13-25-27-thread-a.jsonl");
+  writeRolloutFile(olderPath, {
     turnId: "turn-a-old",
     tokensUsed: 222,
     tokenLimit: 1_000,
   });
-  writeRolloutFile(path.join(threadDir, "rollout-2026-03-05T13-25-27-thread-a.jsonl"), {
+  writeRolloutFile(newerPath, {
     turnId: "turn-a-new",
     tokensUsed: 444,
     tokenLimit: 1_000,
   });
+  // Pin distinct mtimes near "now" so coarse-resolution filesystems can't collapse
+  // the writes and the recent-rollout filter keeps both files in scope.
+  const now = Date.now();
+  setFileMTime(olderPath, now - 60_000);
+  setFileMTime(newerPath, now - 1_000);
 
   const result = readLatestContextWindowUsage({ threadId: "thread-a" });
   assert.deepEqual(result?.usage, {

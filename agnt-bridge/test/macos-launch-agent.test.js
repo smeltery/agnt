@@ -174,7 +174,10 @@ test("resetMacOSBridgePairing stops the daemon before revoking persisted trust",
   });
 });
 
-test("runMacOSBridgeService records a clean error state instead of throwing when daemon config is missing", () => {
+// `runMacOSBridgeService` is the launchd-only runtime path; on Linux/Windows it
+// short-circuits via assertDarwinPlatform(). The behavior under test (clean error
+// state when relay URL is missing) only exists on macOS.
+test("runMacOSBridgeService records a clean error state instead of throwing when daemon config is missing", { skip: process.platform !== "darwin" }, () => {
   withTempDaemonEnv(() => {
     writePairingSession({ sessionId: "stale-session" });
 
