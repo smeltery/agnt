@@ -16,6 +16,7 @@ const {
   startMacOSBridgeService,
   stopMacOSBridgeService,
   getLinuxBridgeServiceStatus,
+  isLinuxBridgeServiceNotInstalledError,
   printLinuxBridgePairingQr,
   printLinuxBridgeServiceStatus,
   resetLinuxBridgePairing,
@@ -124,8 +125,8 @@ async function main({
     assertServiceCommand(command, { platform, consoleImpl, exitImpl });
     deps.readBridgeConfig();
     const result = platform === "darwin"
-      ? await deps.startMacOSBridgeService({ waitForPairing: false })
-      : await deps.startLinuxBridgeService({ waitForPairing: false });
+      ? await deps.startMacOSBridgeService({ waitForPairing: false, providerId })
+      : await deps.startLinuxBridgeService({ waitForPairing: false, providerId });
     emitResult({
       payload: {
         ok: true,
@@ -147,8 +148,8 @@ async function main({
     assertServiceCommand(command, { platform, consoleImpl, exitImpl });
     deps.readBridgeConfig();
     const result = platform === "darwin"
-      ? await deps.startMacOSBridgeService({ waitForPairing: false })
-      : await deps.startLinuxBridgeService({ waitForPairing: false });
+      ? await deps.startMacOSBridgeService({ waitForPairing: false, providerId })
+      : await deps.startLinuxBridgeService({ waitForPairing: false, providerId });
     emitResult({
       payload: {
         ok: true,
@@ -233,8 +234,12 @@ async function main({
             jsonOutput,
             consoleImpl,
           });
-        } catch {
-          // No active systemd unit installed — just clear the on-disk pairing.
+        } catch (innerError) {
+          // Only fall back to a file-only reset when systemd has nothing to manage on this box.
+          // Real systemd errors (`systemctl` permission denied, dbus failure, etc.) must surface.
+          if (!isLinuxBridgeServiceNotInstalledError(innerError)) {
+            throw innerError;
+          }
           deps.resetBridgePairing();
           emitResult({
             payload: {

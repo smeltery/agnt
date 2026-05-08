@@ -20,6 +20,7 @@ const {
 } = require("./macos-launch-agent");
 const {
   getLinuxBridgeServiceStatus,
+  isLinuxBridgeServiceNotInstalledError,
   printLinuxBridgePairingQr,
   printLinuxBridgeServiceStatus,
   resetLinuxBridgePairing,
@@ -40,6 +41,7 @@ module.exports = {
   startMacOSBridgeService,
   stopMacOSBridgeService,
   getLinuxBridgeServiceStatus,
+  isLinuxBridgeServiceNotInstalledError,
   printLinuxBridgePairingQr,
   printLinuxBridgeServiceStatus,
   resetLinuxBridgePairing,

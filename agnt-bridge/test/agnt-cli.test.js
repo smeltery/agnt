@@ -54,7 +54,7 @@ test("agnt restart reuses the macOS service start flow", async () => {
 
   assert.deepEqual(calls, [
     "read-config",
-    ["start-service", { waitForPairing: false }],
+    ["start-service", { waitForPairing: false, providerId: "" }],
   ]);
   assert.deepEqual(messages, [
     "[agnt] macOS bridge service restarted.",
@@ -158,4 +158,103 @@ test("agnt status --json exposes daemon metadata for companion apps", async () =
   assert.equal(payload.daemonConfig?.relayUrl, "ws://127.0.0.1:9000/relay");
   assert.equal(payload.bridgeStatus?.connectionStatus, "connected");
   assert.equal(payload.pairingSession?.pairingPayload?.sessionId, "session-json");
+});
+
+test("agnt start --provider claude forwards the override to the service installer", async () => {
+  const calls = [];
+
+  await main({
+    argv: ["node", "agnt", "start", "--provider", "claude"],
+    platform: "darwin",
+    consoleImpl: { log() {}, error() {} },
+    exitImpl(code) { throw new Error(`unexpected exit ${code}`); },
+    deps: {
+      readBridgeConfig() {},
+      async startMacOSBridgeService(options) {
+        calls.push(["start-service", options]);
+        return { plistPath: "/tmp/agnt.plist" };
+      },
+    },
+  });
+
+  assert.deepEqual(calls, [
+    ["start-service", { waitForPairing: false, providerId: "claude" }],
+  ]);
+});
+
+test("agnt start --provider opencode forwards the override on Linux", async () => {
+  const calls = [];
+
+  await main({
+    argv: ["node", "agnt", "start", "--provider", "opencode"],
+    platform: "linux",
+    consoleImpl: { log() {}, error() {} },
+    exitImpl(code) { throw new Error(`unexpected exit ${code}`); },
+    deps: {
+      readBridgeConfig() {},
+      async startLinuxBridgeService(options) {
+        calls.push(["start-service", options]);
+        return { unitPath: "/tmp/agnt.service" };
+      },
+    },
+  });
+
+  assert.deepEqual(calls, [
+    ["start-service", { waitForPairing: false, providerId: "opencode" }],
+  ]);
+});
+
+test("agnt reset-pairing falls back to file-only reset only when the Linux unit is not installed", async () => {
+  const calls = [];
+
+  await main({
+    argv: ["node", "agnt", "reset-pairing"],
+    platform: "linux",
+    consoleImpl: { log() {}, error() {} },
+    exitImpl(code) { throw new Error(`unexpected exit ${code}`); },
+    deps: {
+      resetLinuxBridgePairing() {
+        const error = new Error("Unit com.dotbrains.agnt.bridge.service not loaded.");
+        error.stderr = Buffer.from("Unit com.dotbrains.agnt.bridge.service not loaded.");
+        throw error;
+      },
+      resetBridgePairing() {
+        calls.push("reset-file-only");
+        return { hadState: true };
+      },
+    },
+  });
+
+  assert.deepEqual(calls, ["reset-file-only"]);
+});
+
+test("agnt reset-pairing surfaces unexpected Linux service errors instead of reporting success", async () => {
+  const calls = [];
+  const errors = [];
+
+  await main({
+    argv: ["node", "agnt", "reset-pairing"],
+    platform: "linux",
+    consoleImpl: {
+      log() {},
+      error(message) { errors.push(message); },
+    },
+    exitImpl(code) { calls.push(["exit", code]); },
+    deps: {
+      resetLinuxBridgePairing() {
+        // A real systemd error that is NOT a "service not installed" marker should propagate.
+        const error = new Error("Failed to connect to bus: Permission denied");
+        throw error;
+      },
+      resetBridgePairing() {
+        calls.push("reset-file-only");
+      },
+    },
+  });
+
+  // Must not have silently fallen back to the file-only reset.
+  assert.deepEqual(calls.filter((entry) => entry === "reset-file-only"), []);
+  assert.deepEqual(calls.filter((entry) => Array.isArray(entry) && entry[0] === "exit"), [["exit", 1]]);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /Permission denied/);
 });

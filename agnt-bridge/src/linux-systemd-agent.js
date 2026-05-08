@@ -482,6 +482,18 @@ function isMissingSystemdUnitError(error) {
     || combined.includes("not found");
 }
 
+// Distinguishes "no service to manage on this box" (missing unit OR systemctl absent)
+// from real systemd errors that should surface to the caller.
+function isLinuxBridgeServiceNotInstalledError(error) {
+  if (!error) {
+    return false;
+  }
+  if (error.code === "ENOENT") {
+    return true;
+  }
+  return isMissingSystemdUnitError(error);
+}
+
 // systemd allows shell-style backslash escapes inside Environment=, ExecStart=, etc.
 // Quote and escape so values containing spaces, quotes, or backslashes round-trip safely.
 function escapeSystemdValue(value) {
@@ -515,6 +527,7 @@ function normalizeNonEmptyString(value) {
 module.exports = {
   buildSystemdUserUnit,
   getLinuxBridgeServiceStatus,
+  isLinuxBridgeServiceNotInstalledError,
   printLinuxBridgePairingQr,
   printLinuxBridgeServiceStatus,
   resetLinuxBridgePairing,
