@@ -5,6 +5,7 @@ import type { CodexMessage } from "../../../models";
 import { AssistantRow } from "./AssistantRow";
 import { CommandExecutionRow } from "./CommandExecutionRow";
 import { FileChangeRow } from "./FileChangeRow";
+import { PlanRow } from "./PlanRow";
 import { ReasoningRow } from "./ReasoningRow";
 import { ToolActivityRow } from "./ToolActivityRow";
 import { UserRow } from "./UserRow";
@@ -20,10 +21,12 @@ export function MessageRow({ message }: { message: CodexMessage }) {
       return <FileChangeRow message={message} />;
     case "toolActivity":
       return <ToolActivityRow message={message} />;
+    case "plan":
+      return <PlanRow message={message} />;
     case "chat":
     default:
-      // Treat plan/userInputPrompt/subagentAction as plain assistant rows for
-      // now — Session 3 swaps those in with dedicated renderers.
+      // userInputPrompt + subagentAction still fall through to AssistantRow until
+      // Session 4 ships dedicated renderers; their text is the most useful surface.
       return <AssistantRow message={message} />;
   }
 }

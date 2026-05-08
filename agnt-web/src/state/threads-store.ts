@@ -11,10 +11,13 @@ import {
   type CodexMessage,
   type CodexThread,
   type ContextWindowUsage,
+  decodePlanSteps,
   extractContextWindowUsage,
   orderCounter,
 } from "../models";
 import type { Connection } from "../protocol";
+import { buildApprovalServerRequestHandler, useApprovalsStore } from "./approvals-store";
+import { useNoticesStore } from "./notices-store";
 import { fetchThreadTurnsPage } from "./pagination";
 import { runPostHandshakeBootstrap, type ModelOption } from "./sync";
 import {
@@ -23,6 +26,8 @@ import {
   applyItemOutputDelta,
   applyItemStarted,
   applyLocalUserMessage,
+  applyPlanDelta,
+  applyPlanUpdated,
   applyReasoningDelta,
   applyTurnCompleted,
   applyTurnFailed,
@@ -35,6 +40,19 @@ import { messagesStore } from "../storage/messages-store";
 const log = makeLogger("threads");
 const PERSIST_DEBOUNCE_MS = 250;
 
+export type ReasoningEffort = "low" | "medium" | "high";
+export type PermissionMode = "default" | "acceptEdits" | "plan" | "bypassPermissions";
+
+export interface TurnFlags {
+  /** Selected provider model id (subset of state.models). Undefined = bridge default. */
+  model?: string;
+  reasoningEffort?: ReasoningEffort;
+  /** Claude-only: passes through as `params.permissionMode`. */
+  permissionMode?: PermissionMode;
+  /** Codex-only: requests plan-mode for this turn. */
+  planMode?: boolean;
+}
+
 export interface ThreadsState {
   threads: CodexThread[];
   archivedThreads: CodexThread[];
@@ -42,6 +60,7 @@ export interface ThreadsState {
   selectedThreadId: string | null;
   reducerStates: Record<string, ThreadReducerState>;
   contextUsageByThread: Record<string, ContextWindowUsage>;
+  turnFlags: TurnFlags;
   loading: boolean;
   error: string | null;
   hydrated: boolean;
@@ -52,6 +71,7 @@ export interface ThreadsState {
   loadOlderTurns(threadId: string): Promise<void>;
   sendTurn(threadId: string, content: string): Promise<void>;
   stopTurn(): Promise<void>;
+  patchTurnFlags(patch: Partial<TurnFlags>): void;
   reset(): void;
 }
 
@@ -66,6 +86,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   selectedThreadId: null,
   reducerStates: {},
   contextUsageByThread: {},
+  turnFlags: {},
   loading: false,
   error: null,
   hydrated: false,
@@ -79,8 +100,10 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
 
   async bindToConnection(connection) {
     while (teardownHandlers.length) teardownHandlers.pop()?.();
+    useApprovalsStore.getState().clearAll();
     activeConnection = connection;
     registerNotificationHandlers(connection, set, get);
+    registerServerRequestHandlers(connection);
     set({ loading: true, error: null });
     try {
       const snapshot = await runPostHandshakeBootstrap({
@@ -130,11 +153,21 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     if (!activeConnection?.rpc) return;
     mutateReducer(threadId, set, get, (state) => applyLocalUserMessage(state, threadId, content));
     schedulePersist(threadId, get);
+    const flags = get().turnFlags;
+    const params: Record<string, unknown> = { threadId, content };
+    if (flags.model) params.model = flags.model;
+    if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;
+    if (flags.permissionMode) params.permissionMode = flags.permissionMode;
+    if (flags.planMode) params.planMode = true;
     try {
-      await activeConnection.rpc.request("turn/start", { threadId, content });
+      await activeConnection.rpc.request("turn/start", params);
     } catch (error) {
       set({ error: (error as Error).message });
     }
+  },
+
+  patchTurnFlags(patch) {
+    set({ turnFlags: { ...get().turnFlags, ...patch } });
   },
 
   async stopTurn() {
@@ -242,6 +275,48 @@ function registerNotificationHandlers(
     if (!usage) return;
     set({ contextUsageByThread: { ...get().contextUsageByThread, [threadId]: usage } });
   });
+
+  // Plan mode.
+  on(connection, "turn/plan/updated", (params) =>
+    withTurnEvent(params, (event) => {
+      const explanation = readString(params, "explanation");
+      const steps = decodePlanSteps((params as Record<string, unknown> | undefined)?.plan);
+      mutateReducer(event.threadId, set, get, (s) => applyPlanUpdated(s, { ...event, explanation, steps }));
+    })
+  );
+  on(connection, "item/plan/delta", (params) =>
+    withTurnEvent(params, (event) => {
+      const delta = readString(params, "delta") ?? "";
+      mutateReducer(event.threadId, set, get, (s) => applyPlanDelta(s, { ...event, delta }));
+      schedulePersist(event.threadId, get);
+    })
+  );
+
+  // System notices (e.g. opencode tui.toast.show).
+  on(connection, "system/notice", (params) => {
+    if (!params || typeof params !== "object") return;
+    const obj = params as Record<string, unknown>;
+    useNoticesStore.getState().enqueue({
+      severity: typeof obj.severity === "string" ? obj.severity : undefined,
+      title: typeof obj.title === "string" ? obj.title : undefined,
+      message: typeof obj.message === "string" ? obj.message : undefined,
+      provider: typeof obj.provider === "string" ? obj.provider : undefined,
+      threadId: typeof obj.threadId === "string" ? obj.threadId : undefined,
+      durationMs: typeof obj.durationMs === "number" ? obj.durationMs : undefined,
+    });
+  });
+}
+
+function registerServerRequestHandlers(connection: Connection): void {
+  // Server-initiated approval flows. The bridge can send any of:
+  //   item/commandExecution/requestApproval, item/fileChange/requestApproval,
+  //   item/...requestApproval. We register the handler under each name we know
+  //   the providers emit; unknown shapes get a "decline" reply.
+  const handler = buildApprovalServerRequestHandler();
+  const names = ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"];
+  for (const name of names) {
+    teardownHandlers.push(connection.rpc.onServerRequest(name, (params) => handler(params, name)));
+  }
 }
 
 function on(connection: Connection, method: string, handler: (params: unknown) => void): void {

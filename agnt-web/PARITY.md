@@ -33,8 +33,8 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Messages` | ✅ | 2 (item-scoped reconciliation, late-replay deltas, block-replay dedup) |
 | `Incoming` | ✅ | 2 (item/agentMessage/delta, item/reasoning/textDelta, item/*/outputDelta, item/started, item/completed, turn lifecycle, thread/tokenUsage/updated) |
 | `IncomingAssistant` | ✅ | 2 |
-| `IncomingPlanMode` | ⛔ | 3 |
-| `IncomingSupport` | 🟡 | 2 (context-window extractor only; approvals + notice routing in 3) |
+| `IncomingPlanMode` | ✅ | 3 (turn/plan/updated, item/plan/delta, presentation transitions) |
+| `IncomingSupport` | ✅ | 3 (context-window + approvals queue + system/notice toasts) |
 | `ThreadsTurns` | ✅ | 2 (`thread/list` archived split, `thread/turns/list` cursor, `turn/start`, `turn/interrupt`) |
 | `ThreadHistoryPagination` | ✅ | 2 |
 | `ThreadFork` + `ThreadForkCompatibility` | ⛔ | 4 |
@@ -80,6 +80,7 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | `CodexModelOption` | ⛔ | 2 |
 | `CodexCollaboration` | ⛔ | 4 |
 | `CodexAccessMode` | ⛔ | 4 |
+| `CodexReasoningEffortOption` | ✅ | 3 (per-turn flag) |
 | `CodexFuzzyFileMatch` | ⛔ | 4 |
 | `CodexRateLimitStatus` | ⛔ | 5 |
 | `CodexServiceTier` | ⛔ | 5 |
@@ -100,6 +101,10 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Sidebar | `components/sidebar/Sidebar.tsx` | ✅ (live/archived tabs, cwd hint, selection) |
 | Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
 | Markdown | `components/chat/MarkdownContent.tsx` | 🟡 (fenced code, inline code, bold/italic; tables/lists/syntax highlighting in 5) |
+| Approvals modal | `components/approvals/ApprovalModal.tsx` + `state/approvals-store.ts` | ✅ (command + file change, accept / decline / acceptForSession) |
+| System-notice toasts | `components/shared/NoticeStack.tsx` + `state/notices-store.ts` | ✅ (auto-dismiss, severity-aware) |
+| Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |
+| Per-turn flag bar | `components/chat/TurnFlagBar.tsx` | ✅ (model, reasoning effort, plan mode, permission mode) |
 | Settings | ⛔ | 5 |
 | About | ⛔ | 5 |
 | Pet | ⛔ | 7 |

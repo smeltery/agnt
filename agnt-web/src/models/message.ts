@@ -49,10 +49,31 @@ export interface PlanStep {
   status: "pending" | "in_progress" | "completed" | "failed";
 }
 
+export type PlanPresentation = "progress" | "resultStreaming" | "resultReady" | "resultClosed";
+
 export interface PlanState {
   explanation?: string;
   steps: PlanStep[];
-  presentation: "progress" | "resultStreaming" | "resultReady" | "resultClosed";
+  presentation: PlanPresentation;
+}
+
+export function decodePlanSteps(raw: unknown): PlanStep[] {
+  if (!Array.isArray(raw)) return [];
+  const steps: PlanStep[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const step = typeof record.step === "string" ? record.step : typeof record.text === "string" ? record.text : "";
+    const status = typeof record.status === "string" ? record.status.toLowerCase() : "pending";
+    if (!step.trim()) continue;
+    steps.push({
+      step,
+      status: ["pending", "in_progress", "completed", "failed"].includes(status)
+        ? (status as PlanStep["status"])
+        : "pending",
+    });
+  }
+  return steps;
 }
 
 export interface CodexMessage {

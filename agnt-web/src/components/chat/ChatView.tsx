@@ -7,6 +7,7 @@ import {
 } from "../../state/threads-store";
 import { Composer } from "./Composer";
 import { MessageRow } from "./rows";
+import { TurnFlagBar } from "./TurnFlagBar";
 
 export function ChatView() {
   const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
@@ -42,6 +43,7 @@ export function ChatView() {
         )}
         {error && <div className="agnt-chat-error">{error}</div>}
       </div>
+      <TurnFlagBar />
       <Composer
         running={running}
         onSend={(text) => {

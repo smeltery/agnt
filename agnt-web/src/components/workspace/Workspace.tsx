@@ -5,8 +5,10 @@
 import { useEffect } from "react";
 import { useConnectionStore } from "../../state/connection-store";
 import { useThreadsStore } from "../../state/threads-store";
+import { ApprovalModal } from "../approvals/ApprovalModal";
 import { ChatView } from "../chat/ChatView";
 import { Sidebar } from "../sidebar/Sidebar";
+import { NoticeStack } from "../shared/NoticeStack";
 import { StatusPill } from "../shared/StatusPill";
 
 export function Workspace() {
@@ -39,6 +41,8 @@ export function Workspace() {
         <Sidebar />
         <ChatView />
       </div>
+      <NoticeStack />
+      <ApprovalModal />
     </div>
   );
 }

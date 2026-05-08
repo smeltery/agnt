@@ -23,12 +23,13 @@ later session because the protocol and storage layers are already complete.
 - ✅ `AssistantReplayDeduper` port (exact + block replay)
 - 🟡 Code-block syntax highlighting deferred to Session 5 — fenced code renders as monospace, language tag exposed via CSS class so a highlighter can drop in without touching components
 
-## Session 3 — Approvals & plan mode
+## Session 3 — Approvals & plan mode ✅ DONE
 
-- `item/commandExecution/requestApproval` and `item/fileChange/requestApproval` UI
-- Plan-mode delta rendering (`turn/plan/updated`, `IncomingPlanMode`)
-- Per-turn provider flags: model, reasoning effort, plan mode, permission mode
-- `system/notice` toast surface
+- ✅ `item/commandExecution/requestApproval` + `item/fileChange/requestApproval` modal with accept / decline / "allow for session"
+- ✅ Plan-mode rendering (`turn/plan/updated` snapshots + `item/plan/delta` streaming + presentation transitions)
+- ✅ Per-turn provider flags (model, reasoning effort, plan mode, permission mode) wired into `turn/start.params`
+- ✅ `system/notice` toast surface with severity-aware auto-dismiss
+- 🟡 `tool/requestUserInput` structured-input prompts deferred to Session 4 (plan-mode + tool-call-input UI is meatier than what this session targeted)
 
 ## Session 4 — Workspace & projects
 

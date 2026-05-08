@@ -16,6 +16,8 @@ import {
   compareMessages,
   createMessage,
   type MessageKind,
+  type PlanState,
+  type PlanStep,
 } from "../models";
 import { replayDeduper } from "./replay-deduper";
 
@@ -30,6 +32,12 @@ export interface ThreadReducerState {
   streamingReasoningByItem: Record<string, string>;
   /** Streaming structured rows (tool calls, file changes, commands) by (turnId, itemId). */
   streamingStructuredByItem: Record<string, string>;
+  /**
+   * Plan rows are unique per (turnId, itemId|"_progress"). The progress slot holds the
+   * structured plan steps emitted by `turn/plan/updated`; per-itemId slots hold the
+   * streamed plan text from `item/plan/delta`.
+   */
+  streamingPlanByKey: Record<string, string>;
   /** Set of turnIds whose terminal frame has arrived. Late deltas patch silently. */
   terminalTurns: Record<string, true>;
   /** Currently active turnId for the thread (running). */
@@ -43,6 +51,7 @@ export function emptyThreadState(): ThreadReducerState {
     streamingFallbackByTurn: {},
     streamingReasoningByItem: {},
     streamingStructuredByItem: {},
+    streamingPlanByKey: {},
     terminalTurns: {},
   };
 }
@@ -409,6 +418,82 @@ function completeReasoningRow(state: ThreadReducerState, event: ItemCompletedEve
   return { ...closed, streamingReasoningByItem: removeKey(closed.streamingReasoningByItem, itemKey) };
 }
 
+// ─── Plan mode ────────────────────────────────────────────────────────────────
+//   Mirrors handleTurnPlanUpdated + appendPlanDelta in CodexService+IncomingPlanMode.swift.
+//   `turn/plan/updated` snapshots the structured step list; `item/plan/delta` streams
+//   the plan's prose into a per-item row that lives alongside the structured snapshot.
+
+export interface PlanUpdatedEvent extends ReducerEvent {
+  explanation?: string;
+  steps: PlanStep[];
+}
+
+export function applyPlanUpdated(state: ThreadReducerState, event: PlanUpdatedEvent): ThreadReducerState {
+  if (!event.turnId) return state;
+  const key = compositeKey(event.turnId, "_progress");
+  return upsertPlanRow(state, event, key, () => ({
+    explanation: event.explanation,
+    steps: event.steps,
+    presentation: "progress",
+  }));
+}
+
+export interface PlanDeltaEvent extends ReducerEvent {
+  delta: string;
+}
+
+export function applyPlanDelta(state: ThreadReducerState, event: PlanDeltaEvent): ThreadReducerState {
+  if (!event.turnId || !event.itemId || !event.delta) return state;
+  const key = compositeKey(event.turnId, event.itemId);
+  const existingId = state.streamingPlanByKey[key];
+  if (existingId) {
+    return mutateMessage(state, existingId, (m) => ({
+      ...m,
+      text: m.text + event.delta,
+      isStreaming: true,
+      plan: { ...(m.plan ?? { steps: [] as PlanStep[], presentation: "resultStreaming" }), presentation: "resultStreaming" },
+    }));
+  }
+  return upsertPlanRow(
+    state,
+    event,
+    key,
+    (existing) => existing ?? { steps: [], presentation: "resultStreaming" as const },
+    event.delta
+  );
+}
+
+function upsertPlanRow(
+  state: ThreadReducerState,
+  event: ReducerEvent,
+  key: string,
+  buildPlan: (existing: PlanState | undefined) => PlanState,
+  appendText?: string
+): ThreadReducerState {
+  if (!event.turnId) return state;
+  const existingId = state.streamingPlanByKey[key];
+  if (existingId) {
+    return mutateMessage(state, existingId, (m) => ({
+      ...m,
+      text: appendText ? m.text + appendText : m.text,
+      isStreaming: true,
+      plan: buildPlan(m.plan),
+    }));
+  }
+  const message = createMessage({
+    threadId: event.threadId,
+    role: "system",
+    kind: "plan",
+    text: appendText ?? "",
+    turnId: event.turnId,
+    itemId: event.itemId,
+    isStreaming: true,
+    plan: buildPlan(undefined),
+  });
+  const next = appendOrUpdate(state, (messages) => [...messages, message]);
+  return { ...next, streamingPlanByKey: { ...next.streamingPlanByKey, [key]: message.id } };
+}
+
 // ─── Structured items: tool calls, file changes, command executions ────────────
 
 function beginStructuredItem(state: ThreadReducerState, event: ItemStartedEvent, kind: MessageKind): ThreadReducerState {
@@ -458,14 +543,24 @@ function completeStructuredItem(state: ThreadReducerState, event: ItemCompletedE
 
 function closeStreamingRowsForTurn(state: ThreadReducerState, turnId: string): ThreadReducerState {
   const next = appendOrUpdate(state, (messages) =>
-    messages.map((m) => (m.turnId === turnId && m.isStreaming ? { ...m, isStreaming: false } : m))
+    messages.map((m) => {
+      if (m.turnId !== turnId || !m.isStreaming) return m;
+      const closed = { ...m, isStreaming: false };
+      // Plan presentation transitions from streaming → ready when the turn closes.
+      if (closed.plan && closed.plan.presentation === "resultStreaming") {
+        closed.plan = { ...closed.plan, presentation: "resultReady" };
+      }
+      return closed;
+    })
   );
+  const turnIds = idsForTurn(next.messages, turnId);
   return {
     ...next,
-    streamingByItem: filterByValueNotIn(next.streamingByItem, idsForTurn(next.messages, turnId)),
+    streamingByItem: filterByValueNotIn(next.streamingByItem, turnIds),
     streamingFallbackByTurn: removeKey(next.streamingFallbackByTurn, turnId),
-    streamingReasoningByItem: filterByValueNotIn(next.streamingReasoningByItem, idsForTurn(next.messages, turnId)),
-    streamingStructuredByItem: filterByValueNotIn(next.streamingStructuredByItem, idsForTurn(next.messages, turnId)),
+    streamingReasoningByItem: filterByValueNotIn(next.streamingReasoningByItem, turnIds),
+    streamingStructuredByItem: filterByValueNotIn(next.streamingStructuredByItem, turnIds),
+    streamingPlanByKey: filterByValueNotIn(next.streamingPlanByKey, turnIds),
   };
 }
 
