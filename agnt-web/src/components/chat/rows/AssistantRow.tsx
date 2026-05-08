@@ -6,6 +6,7 @@ import { useCheckpointsStore } from "../../../state/checkpoints-store";
 import { useComposerInboxStore } from "../../../state/composer-inbox-store";
 import { useConnectionStore } from "../../../state/connection-store";
 import { useThreadsStore } from "../../../state/threads-store";
+import { formatTurnDuration, useTurnTimingStore } from "../../../state/turn-timing-store";
 import { BookmarkButton } from "./BookmarkButton";
 import { RowLinkButton } from "./RowLinkButton";
 import { MarkdownContent } from "../MarkdownContent";
@@ -20,6 +21,8 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
         ?? state.archivedThreads.find((t) => t.id === message.threadId);
     return undefined;
   });
+  const timing = useTurnTimingStore((state) => (message.turnId ? state.byTurn[message.turnId] : undefined));
+  const durationLabel = timing ? formatTurnDuration(timing) : null;
 
   async function handleCopy() {
     const ok = await copyText(message.text);
@@ -64,6 +67,14 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       </div>
       {!message.isStreaming && message.text && (
         <div className="agnt-row-actions">
+          {durationLabel && (
+            <span
+              className="agnt-row-action-meta"
+              title="Time from turn start to turn end (this session)"
+            >
+              ⏱ {durationLabel}
+            </span>
+          )}
           <BookmarkButton threadId={message.threadId} messageId={message.id} />
           <RowLinkButton threadId={message.threadId} messageId={message.id} />
           <button

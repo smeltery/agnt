@@ -19,9 +19,16 @@ export type ThemePreference = "auto" | "light" | "dark";
 
 export type SidebarTabPreference = "live" | "archived";
 
+export type SidebarDensity = "comfortable" | "compact";
+
 export interface SidebarPreferences {
   tab?: SidebarTabPreference;
   query?: string;
+  /** Recency-group ids the user has collapsed (Today / Yesterday / This week
+   *  / Earlier / Pinned / Archived). Persisted; absent groups render expanded. */
+  collapsedGroups?: string[];
+  /** Row density. `compact` shrinks padding + font for users with many threads. */
+  density?: SidebarDensity;
 }
 
 /** "auto" = follow platform permission; "on" = always notify when granted;

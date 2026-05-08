@@ -50,7 +50,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Review` | ⛔ | future (`review/start` UI; bridge supports the RPC, no clear web surface yet) |
 | `AIChangeSets` | ⛔ deferred | per-turn `RevertSheet` (Session 10) covers the practical "undo what this turn did" workflow; finer-grained per-message patch revert needs reducer to track forward patches captured during streaming |
 | `WorkspaceCheckpoints` | ✅ | 10 (preview + apply per turn; checkpointDiff + Copy not yet wired in UI but bridge-ready) |
-| `WorkspaceImages` | ✅ | 18 (workspace/readImage wrapper + cache; MarkdownContent resolves non-http image refs against thread cwd) |
+| `WorkspaceImages` | ✅ | 18 + 30 (workspace/readImage wrapper + cache; MarkdownContent resolves non-http image refs against thread cwd; click any inline image to open in the shared Lightbox) |
 | `ProjectFolders` | ✅ | 9 (project/quickLocations + listDirectory + searchDirectories + folder picker UI) |
 | `TrustedPairPresentation` | ✅ | 5 (Settings shows current Mac fingerprint + per-Mac forget; no inline sidebar badge) |
 | `Helpers` | n/a | utility — port functions on demand |

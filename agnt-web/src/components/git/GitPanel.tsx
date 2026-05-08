@@ -4,6 +4,7 @@
 // diff is fetched once on first expand and reused across files).
 
 import { useEffect, useMemo, useState } from "react";
+import { computeDiffStats, formatDiffStats, sumDiffStats } from "../../lib/git-diff-stats";
 import { splitUnifiedDiff } from "../../lib/git-diff-parser";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
 import { useGitStore } from "../../state/git-store";
@@ -45,6 +46,21 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
     for (const entry of splitUnifiedDiff(diff)) map.set(entry.path, entry.patch);
     return map;
   }, [diff]);
+  const statsByFile = useMemo(() => {
+    const map = new Map<string, { insertions: number; deletions: number }>();
+    for (const [path, patch] of diffByFile) map.set(path, computeDiffStats(patch));
+    return map;
+  }, [diffByFile]);
+  // Prefer the bridge's `diffTotals` (returned by `git/status`) — it doesn't
+  // require fetching the unified patch, so totals paint immediately. Fall back
+  // to summing per-file stats when the bridge omits them and the user has
+  // already expanded a file (which forces a diff fetch).
+  const totalStats = useMemo(() => {
+    if (status?.diffTotals) {
+      return { insertions: status.diffTotals.insertions, deletions: status.diffTotals.deletions };
+    }
+    return sumDiffStats(statsByFile.values());
+  }, [status?.diffTotals, statsByFile]);
 
   useEffect(() => {
     if (!rpc) return;
@@ -80,6 +96,12 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
           {status.aheadCount > 0 && <span title="commits ahead of remote">↑{status.aheadCount}</span>}
           {status.behindCount > 0 && <span title="commits behind remote">↓{status.behindCount}</span>}
           {status.isDirty && <span className="agnt-gitpanel-dirty">dirty</span>}
+          {(totalStats.insertions > 0 || totalStats.deletions > 0) && (
+            <span className="agnt-gitpanel-totals" title="Total insertions / deletions across the dirty working tree">
+              <span className="agnt-gitpanel-stat-add">+{totalStats.insertions}</span>
+              <span className="agnt-gitpanel-stat-del">−{totalStats.deletions}</span>
+            </span>
+          )}
         </div>
       </header>
 
@@ -112,6 +134,15 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
                     {file.status || "?"}
                   </span>
                   <code>{file.path}</code>
+                  {statsByFile.has(file.path) && (
+                    <span
+                      className="agnt-gitpanel-file-stats"
+                      title={formatDiffStats(statsByFile.get(file.path)!)}
+                    >
+                      <span className="agnt-gitpanel-stat-add">+{statsByFile.get(file.path)!.insertions}</span>
+                      <span className="agnt-gitpanel-stat-del">−{statsByFile.get(file.path)!.deletions}</span>
+                    </span>
+                  )}
                   <span className="agnt-gitpanel-file-chevron" aria-hidden>{expanded ? "▾" : "▸"}</span>
                 </button>
                 {expanded && (

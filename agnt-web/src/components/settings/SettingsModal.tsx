@@ -3,8 +3,14 @@
 // app exposes under Settings > Paired computers. Account login is read-only
 // for the same reason as iOS — full OAuth handoff happens out-of-band.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { permissionLabel, requestPermission } from "../../lib/notifications";
+import {
+  applyStateBackup,
+  buildStateBackup,
+  defaultBackupFilename,
+  downloadBackup,
+} from "../../lib/state-backup";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
@@ -173,6 +179,8 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
         <CustomSlashCommandsSection />
 
+        <BackupRestoreSection />
+
         <section className="agnt-settings-section">
           <h3>Trusted Macs ({macs.length})</h3>
           {macs.length === 0 ? (
@@ -310,6 +318,90 @@ function CustomSlashCommandsSection() {
         <button type="button" className="agnt-button-ghost" onClick={startNew}>
           + Add command
         </button>
+      )}
+    </section>
+  );
+}
+
+function BackupRestoreSection() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleExport() {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const backup = await buildStateBackup();
+      const count = Object.keys(backup.kv).length;
+      downloadBackup(backup, defaultBackupFilename());
+      setFeedback({ kind: "ok", message: `Exported ${count} key${count === 1 ? "" : "s"}.` });
+    } catch (error) {
+      setFeedback({ kind: "error", message: (error as Error)?.message ?? "Export failed." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleImport(file: File) {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const result = await applyStateBackup(parsed);
+      if (!result.ok) {
+        setFeedback({ kind: "error", message: result.reason ?? "Import failed." });
+        return;
+      }
+      // Restored prefs only take effect on the next page load — zustand stores
+      // hydrate from IndexedDB at boot. Tell the user explicitly so the UI
+      // appearing unchanged isn't surprising.
+      setFeedback({
+        kind: "ok",
+        message: `Imported ${result.appliedCount} key${result.appliedCount === 1 ? "" : "s"}. Reload the page to see the restored state.`,
+      });
+    } catch (error) {
+      setFeedback({ kind: "error", message: (error as Error)?.message ?? "Import failed." });
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <section className="agnt-settings-section">
+      <h3>Backup &amp; restore</h3>
+      <p className="agnt-settings-hint">
+        Export preferences (theme, sidebar layout, pinned threads, bookmarks, custom slash commands, thread colors) and the
+        local thread message cache as a JSON file. Identity keys and pairing state are intentionally <strong>not</strong> included —
+        re-pair the bridge in a fresh browser instead. Importing overwrites matching keys; reload the page to see the restored UI.
+      </p>
+      <div className="agnt-settings-backup-actions">
+        <button type="button" className="agnt-button-ghost" onClick={() => void handleExport()} disabled={busy}>
+          Export backup
+        </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy}
+        >
+          Import backup…
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void handleImport(file);
+          }}
+        />
+      </div>
+      {feedback && (
+        <p className={feedback.kind === "ok" ? "agnt-settings-hint" : "agnt-settings-error"}>{feedback.message}</p>
       )}
     </section>
   );

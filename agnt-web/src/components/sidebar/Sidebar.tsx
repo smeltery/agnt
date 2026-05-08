@@ -9,7 +9,11 @@ import {
 import { filterThreads } from "../../state/thread-filter";
 import { groupThreadsByRecency, type ThreadGroup } from "../../state/thread-grouping";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
-import { prefsStore, type SidebarTabPreference } from "../../storage/prefs-store";
+import {
+  prefsStore,
+  type SidebarDensity,
+  type SidebarTabPreference,
+} from "../../storage/prefs-store";
 import { ThreadContextMenu } from "./ThreadContextMenu";
 
 interface SidebarProps {
@@ -36,6 +40,8 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   const reducerStates = useThreadsStore((state) => state.reducerStates);
   const [tab, setTab] = useState<SidebarTab>("live");
   const [query, setQuery] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  const [density, setDensity] = useState<SidebarDensity>("comfortable");
   // Multi-select mode: when on, row clicks toggle selection instead of
   // navigating. The action bar at the top performs Archive / Unarchive /
   // Export across the chosen set.
@@ -51,6 +57,8 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
     void prefsStore.loadSidebar().then((prefs) => {
       if (prefs.tab === "archived" || prefs.tab === "live") setTab(prefs.tab);
       if (typeof prefs.query === "string") setQuery(prefs.query);
+      if (Array.isArray(prefs.collapsedGroups)) setCollapsedGroups(new Set(prefs.collapsedGroups));
+      if (prefs.density === "compact" || prefs.density === "comfortable") setDensity(prefs.density);
       hydratedRef.current = true;
     });
   }, []);
@@ -58,8 +66,22 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   useEffect(() => {
     if (!hydratedRef.current) return;
     // Tiny payloads, no debounce — every tab toggle and every keystroke writes.
-    void prefsStore.saveSidebar({ tab, query });
-  }, [tab, query]);
+    void prefsStore.saveSidebar({
+      tab,
+      query,
+      collapsedGroups: [...collapsedGroups],
+      density,
+    });
+  }, [tab, query, collapsedGroups, density]);
+
+  function toggleGroupCollapse(groupId: string) {
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
 
   // Switching tabs while in select mode would surface a confusing "selected
   // count" that includes IDs no longer visible. Reset selection on tab change.
@@ -73,12 +95,16 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   const { visible, groups } = useMemo(() => {
     const filtered = filterThreads(tab === "live" ? liveThreads : archivedThreads, query);
     if (tab !== "live") {
-      return { visible: filtered, groups: [{ id: "earlier" as const, label: "Archived", threads: filtered }] };
+      const archivedGroup = { id: "earlier" as const, label: "Archived", threads: filtered };
+      const visibleArchived = collapsedGroups.has(archivedGroup.id) ? [] : filtered;
+      return { visible: visibleArchived, groups: [archivedGroup] };
     }
     const sectioned = groupThreadsByRecency(filtered, { pinnedIds: pinnedThreadIds });
-    const flat = sectioned.flatMap((group) => group.threads);
+    // Threads in collapsed groups stay rendered as a header-only row but are
+    // skipped by j/k navigation since they're not visible to the user.
+    const flat = sectioned.flatMap((group) => (collapsedGroups.has(group.id) ? [] : group.threads));
     return { visible: flat, groups: sectioned };
-  }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds]);
+  }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds, collapsedGroups]);
 
   // j/k navigate the visible list, like Gmail/Linear. Wraps at the boundaries
   // so muscle memory works either direction. Disabled in multi-select mode so
@@ -147,10 +173,21 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   }
 
   return (
-    <aside className="agnt-sidebar">
+    <aside className={"agnt-sidebar agnt-sidebar-density-" + density}>
       <div className="agnt-sidebar-header">
         <span className="agnt-sidebar-title">Threads</span>
         {loading && <span className="agnt-sidebar-loading">syncing…</span>}
+        {!selectMode && (
+          <button
+            type="button"
+            className="agnt-sidebar-density-toggle"
+            onClick={() => setDensity(density === "compact" ? "comfortable" : "compact")}
+            title={density === "compact" ? "Switch to comfortable density" : "Switch to compact density"}
+            aria-label={density === "compact" ? "Comfortable density" : "Compact density"}
+          >
+            {density === "compact" ? "≡" : "☰"}
+          </button>
+        )}
         {!selectMode && (
           <button
             type="button"
@@ -227,26 +264,34 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
         </div>
       ) : (
         <div className="agnt-sidebar-groups">
-          {groups.map((group) => (
-            <SidebarGroup
-              key={group.id}
-              group={group}
-              showHeader={tab === "live" && groups.length > 1}
-              selectedThreadId={selectedThreadId}
-              runningThreadIds={runningThreadIds}
-              pinnedThreadIds={pinnedThreadIds}
-              lastVisitedByThread={lastVisitedByThread}
-              colorByThread={colorByThread}
-              selectMode={selectMode}
-              selectedIds={selectedIds}
-              onSelect={handleRowSelect}
-              onReorderPinned={
-                group.id === "pinned" && !selectMode
-                  ? (orderedIds) => void reorderPinnedThreads(orderedIds)
-                  : undefined
-              }
-            />
-          ))}
+          {groups.map((group) => {
+            const collapsed = collapsedGroups.has(group.id);
+            // Show the collapsible header for archived (single group) too, so the
+            // collapse-everything affordance is consistent across tabs.
+            const showHeader = tab === "live" ? groups.length > 1 : true;
+            return (
+              <SidebarGroup
+                key={group.id}
+                group={group}
+                showHeader={showHeader}
+                collapsed={collapsed}
+                onToggleCollapse={showHeader ? () => toggleGroupCollapse(group.id) : undefined}
+                selectedThreadId={selectedThreadId}
+                runningThreadIds={runningThreadIds}
+                pinnedThreadIds={pinnedThreadIds}
+                lastVisitedByThread={lastVisitedByThread}
+                colorByThread={colorByThread}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onSelect={handleRowSelect}
+                onReorderPinned={
+                  group.id === "pinned" && !selectMode
+                    ? (orderedIds) => void reorderPinnedThreads(orderedIds)
+                    : undefined
+                }
+              />
+            );
+          })}
         </div>
       )}
     </aside>
@@ -297,6 +342,8 @@ function SidebarTabButton({
 function SidebarGroup({
   group,
   showHeader,
+  collapsed,
+  onToggleCollapse,
   selectedThreadId,
   runningThreadIds,
   pinnedThreadIds,
@@ -309,6 +356,8 @@ function SidebarGroup({
 }: {
   group: ThreadGroup;
   showHeader: boolean;
+  collapsed: boolean;
+  onToggleCollapse?(): void;
   selectedThreadId: string | null;
   runningThreadIds: Set<string>;
   pinnedThreadIds: Set<string>;
@@ -336,9 +385,26 @@ function SidebarGroup({
   }
 
   return (
-    <section className="agnt-sidebar-group">
-      {showHeader && <h3 className="agnt-sidebar-group-header">{group.label}</h3>}
-      <ul className="agnt-sidebar-list">
+    <section className={"agnt-sidebar-group" + (collapsed ? " agnt-sidebar-group-collapsed" : "")}>
+      {showHeader && (
+        onToggleCollapse ? (
+          <button
+            type="button"
+            className="agnt-sidebar-group-header agnt-sidebar-group-header-button"
+            onClick={onToggleCollapse}
+            aria-expanded={!collapsed}
+            aria-controls={`agnt-sidebar-group-${group.id}`}
+          >
+            <span className="agnt-sidebar-group-chevron" aria-hidden>{collapsed ? "▸" : "▾"}</span>
+            <span>{group.label}</span>
+            <span className="agnt-sidebar-group-count">{group.threads.length}</span>
+          </button>
+        ) : (
+          <h3 className="agnt-sidebar-group-header">{group.label}</h3>
+        )
+      )}
+      {collapsed ? null : (
+      <ul className="agnt-sidebar-list" id={`agnt-sidebar-group-${group.id}`}>
         {group.threads.map((thread) => (
           <SidebarRow
             key={thread.id}
@@ -370,6 +436,7 @@ function SidebarGroup({
           />
         ))}
       </ul>
+      )}
     </section>
   );
 }
