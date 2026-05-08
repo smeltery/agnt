@@ -28,6 +28,7 @@ export interface ConnectionInputs {
   onStatus: (status: ConnectionStatus) => void;
   onApplicationPayload?: (payloadText: string) => void;
   onBridgeOutboundSeq?: (seq: number) => void;
+  onLatencySample?: (method: string, milliseconds: number) => void;
 }
 
 export class Connection {
@@ -53,9 +54,10 @@ export class Connection {
       onChannelClosed: (reason) => this.transitionStatus({ kind: "closed", reason }),
     });
 
-    this.rpc = new JsonRpcClient({
-      send: (payloadText) => this.secure.sendApplicationPayload(payloadText),
-    });
+    this.rpc = new JsonRpcClient(
+      { send: (payloadText) => this.secure.sendApplicationPayload(payloadText) },
+      { onLatencySample: inputs.onLatencySample }
+    );
 
     this.socket = new RelaySocket(buildRelayUrl(inputs.relayUrl, inputs.sessionId), {
       onOpen: () => this.handleSocketOpen(),

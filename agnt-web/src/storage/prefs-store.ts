@@ -36,6 +36,13 @@ const NOTIFICATIONS_KEY = "prefs.notifications";
 const LAST_VISITED_KEY = "prefs.lastVisitedByThread";
 const CUSTOM_SLASH_KEY = "prefs.customSlashCommands";
 const BOOKMARKS_KEY = "prefs.bookmarksByThread";
+const THREAD_COLORS_KEY = "prefs.threadColors";
+
+/** Fixed palette — keeping it small so the picker stays compact and the
+ *  color set survives the light/dark theme swap (the colors were chosen
+ *  to render distinctly against both backgrounds). */
+export const THREAD_COLOR_VALUES = ["red", "orange", "yellow", "green", "blue", "purple"] as const;
+export type ThreadColor = typeof THREAD_COLOR_VALUES[number];
 
 export interface CustomSlashCommand {
   /** Unique slug — what the user types after `/`. Must match the slug regex. */
@@ -118,6 +125,19 @@ export const prefsStore = {
   },
   async saveBookmarks(map: Record<string, string[]>): Promise<void> {
     await idb.set(BOOKMARKS_KEY, map);
+  },
+  async loadThreadColors(): Promise<Record<string, ThreadColor>> {
+    const raw = await idb.get<Record<string, string>>(THREAD_COLORS_KEY);
+    if (!raw || typeof raw !== "object") return {};
+    const valid = new Set<string>(THREAD_COLOR_VALUES);
+    const out: Record<string, ThreadColor> = {};
+    for (const [threadId, color] of Object.entries(raw)) {
+      if (typeof color === "string" && valid.has(color)) out[threadId] = color as ThreadColor;
+    }
+    return out;
+  },
+  async saveThreadColors(map: Record<string, ThreadColor>): Promise<void> {
+    await idb.set(THREAD_COLORS_KEY, map);
   },
 };
 

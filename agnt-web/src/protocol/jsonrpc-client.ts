@@ -11,6 +11,10 @@ import type { JsonRpcError, JsonRpcMessage, JsonRpcSuccess } from "./types";
 const log = makeLogger("jsonrpc");
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
+function nowMs(): number {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
 export type NotificationHandler = (params: unknown, method: string) => void;
 
 export type ServerRequestHandler = (params: unknown) => Promise<unknown>;
@@ -19,18 +23,28 @@ export interface JsonRpcTransport {
   send(payloadText: string): void;
 }
 
+export interface JsonRpcOptions {
+  /** Optional latency observer — called on every successful response with the
+   *  measured round-trip time. UI layers wire this to a small store; tests
+   *  can plug in a spy to assert timing without touching protocol internals. */
+  onLatencySample?: (method: string, milliseconds: number) => void;
+}
+
 export class JsonRpcClient {
   private nextId = 1;
-  private readonly pending = new Map<number | string, Deferred<unknown>>();
+  private readonly pending = new Map<number | string, { deferred: Deferred<unknown>; method: string; startedAt: number }>();
   private readonly notificationHandlers = new Map<string, Set<NotificationHandler>>();
   private readonly serverRequestHandlers = new Map<string, ServerRequestHandler>();
+  private readonly options: JsonRpcOptions;
 
-  constructor(private readonly transport: JsonRpcTransport) {}
+  constructor(private readonly transport: JsonRpcTransport, options: JsonRpcOptions = {}) {
+    this.options = options;
+  }
 
   request<R = unknown, P = unknown>(method: string, params?: P, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<R> {
     const id = this.nextId++;
     const deferred = createDeferred<unknown>();
-    this.pending.set(id, deferred);
+    this.pending.set(id, { deferred, method, startedAt: nowMs() });
     this.transport.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
     return withTimeout(deferred.promise, timeoutMs, `${method} timed out after ${timeoutMs}ms`).then(
       (value) => value as R,
@@ -84,21 +98,31 @@ export class JsonRpcClient {
   }
 
   rejectAllPending(reason: Error): void {
-    for (const [, deferred] of this.pending) deferred.reject(reason);
+    for (const [, entry] of this.pending) entry.deferred.reject(reason);
     this.pending.clear();
   }
 
   private resolvePending(message: JsonRpcSuccess | JsonRpcError): void {
-    const deferred = this.pending.get(message.id as number | string);
-    if (!deferred) {
+    const entry = this.pending.get(message.id as number | string);
+    if (!entry) {
       log.warn("response for unknown id", message.id);
       return;
     }
     this.pending.delete(message.id as number | string);
     if ("error" in message) {
-      deferred.reject(new JsonRpcRemoteError(message.error.message, message.error.code, message.error.data));
+      entry.deferred.reject(new JsonRpcRemoteError(message.error.message, message.error.code, message.error.data));
     } else {
-      deferred.resolve(message.result);
+      entry.deferred.resolve(message.result);
+    }
+    // Latency observation runs after settling so a sample reflects the same
+    // event the caller saw. We only sample successful responses — errors
+    // can be quick (`-32601 method not found`) and would skew the median.
+    if (!("error" in message)) {
+      try {
+        this.options.onLatencySample?.(entry.method, nowMs() - entry.startedAt);
+      } catch (error) {
+        log.warn("latency observer threw", error);
+      }
     }
   }
 

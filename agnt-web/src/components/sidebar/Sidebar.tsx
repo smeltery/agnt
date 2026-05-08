@@ -28,6 +28,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   const runningThreadIds = useThreadsStore((state) => state.runningThreadIds);
   const pinnedThreadIds = useThreadsStore((state) => state.pinnedThreadIds);
   const lastVisitedByThread = useThreadsStore((state) => state.lastVisitedByThread);
+  const colorByThread = useThreadsStore((state) => state.colorByThread);
   const selectThread = useThreadsStore((state) => state.selectThread);
   const archiveThread = useThreadsStore((state) => state.archiveThread);
   const unarchiveThread = useThreadsStore((state) => state.unarchiveThread);
@@ -235,6 +236,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
               runningThreadIds={runningThreadIds}
               pinnedThreadIds={pinnedThreadIds}
               lastVisitedByThread={lastVisitedByThread}
+              colorByThread={colorByThread}
               selectMode={selectMode}
               selectedIds={selectedIds}
               onSelect={handleRowSelect}
@@ -299,6 +301,7 @@ function SidebarGroup({
   runningThreadIds,
   pinnedThreadIds,
   lastVisitedByThread,
+  colorByThread,
   selectMode,
   selectedIds,
   onSelect,
@@ -310,6 +313,7 @@ function SidebarGroup({
   runningThreadIds: Set<string>;
   pinnedThreadIds: Set<string>;
   lastVisitedByThread: Record<string, number>;
+  colorByThread: Record<string, string>;
   selectMode: boolean;
   selectedIds: Set<string>;
   onSelect: (thread: CodexThread) => void;
@@ -343,6 +347,7 @@ function SidebarGroup({
             running={runningThreadIds.has(thread.id)}
             pinned={pinnedThreadIds.has(thread.id)}
             unread={isThreadUnread(thread, lastVisitedByThread) && thread.id !== selectedThreadId}
+            color={colorByThread[thread.id]}
             selectMode={selectMode}
             checked={selectedIds.has(thread.id)}
             onSelect={() => onSelect(thread)}
@@ -375,6 +380,7 @@ function SidebarRow({
   running,
   pinned,
   unread,
+  color,
   selectMode,
   checked,
   onSelect,
@@ -391,6 +397,7 @@ function SidebarRow({
   running: boolean;
   pinned: boolean;
   unread: boolean;
+  color?: string;
   selectMode: boolean;
   checked: boolean;
   onSelect: () => void;
@@ -410,6 +417,7 @@ function SidebarRow({
         + (selected ? " agnt-sidebar-row-selected" : "")
         + (selectMode && checked ? " agnt-sidebar-row-checked" : "")
         + (unread ? " agnt-sidebar-row-unread" : "")
+        + (color ? ` agnt-sidebar-row-color agnt-thread-color-${color}` : "")
         + (isDragSource ? " agnt-sidebar-row-dragging" : "")
         + (isDropTarget ? " agnt-sidebar-row-drop-target" : "")
       }

@@ -45,7 +45,7 @@ import {
   type ThreadReducerState,
 } from "./turn-reducer";
 import { messagesStore } from "../storage/messages-store";
-import { prefsStore } from "../storage/prefs-store";
+import { prefsStore, type ThreadColor } from "../storage/prefs-store";
 import { buildTurnInput } from "./turn-input";
 import type { ImageAttachment } from "../models";
 
@@ -80,6 +80,8 @@ export interface ThreadsState {
   /** Per-thread last-visit timestamp. A thread shows an unread dot when its
    *  `updatedAt` exceeds this. Persisted via `prefsStore.saveLastVisited`. */
   lastVisitedByThread: Record<string, number>;
+  /** Per-thread color tag (one of `THREAD_COLOR_VALUES`). Persisted. */
+  colorByThread: Record<string, ThreadColor>;
   loading: boolean;
   error: string | null;
   hydrated: boolean;
@@ -104,6 +106,8 @@ export interface ThreadsState {
   reorderPinnedThreads(orderedIds: string[]): Promise<void>;
   /** Force the unread dot back on by clearing the recorded last-visit time. */
   markThreadUnread(threadId: string): Promise<void>;
+  /** Set the thread color tag, or pass `null` to clear it. */
+  setThreadColor(threadId: string, color: ThreadColor | null): Promise<void>;
   reset(): void;
 }
 
@@ -122,17 +126,19 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   runningThreadIds: new Set(),
   pinnedThreadIds: new Set(),
   lastVisitedByThread: {},
+  colorByThread: {},
   loading: false,
   error: null,
   hydrated: false,
 
   async hydrateFromDisk() {
     if (get().hydrated) return;
-    const [max, persistedFlags, pinnedIds, lastVisited] = await Promise.all([
+    const [max, persistedFlags, pinnedIds, lastVisited, threadColors] = await Promise.all([
       messagesStore.loadHighestOrderIndex(),
       prefsStore.loadTurnFlags(),
       prefsStore.loadPinnedThreadIds(),
       prefsStore.loadLastVisited(),
+      prefsStore.loadThreadColors(),
     ]);
     orderCounter.seedFrom(max);
     // Cast through the looser persisted shape — anything malformed (an old
@@ -147,6 +153,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       },
       pinnedThreadIds: new Set(pinnedIds),
       lastVisitedByThread: lastVisited,
+      colorByThread: threadColors,
     });
   },
 
@@ -168,6 +175,15 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     delete next[threadId];
     set({ lastVisitedByThread: next });
     void prefsStore.saveLastVisited(next);
+  },
+
+  async setThreadColor(threadId, color) {
+    if (!threadId) return;
+    const next = { ...get().colorByThread };
+    if (color === null) delete next[threadId];
+    else next[threadId] = color;
+    set({ colorByThread: next });
+    void prefsStore.saveThreadColors(next);
   },
 
   async reorderPinnedThreads(orderedIds) {

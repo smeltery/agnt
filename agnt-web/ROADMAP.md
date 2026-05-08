@@ -86,6 +86,13 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 29 — Workspace file browser + per-thread color tag + connection latency ✅ DONE
+
+- ✅ Workspace file browser side-panel. New "Files" toggle in the chat header (next to "Git") opens a tree-view rooted at the active thread's `cwd` via existing `project/listDirectory` RPC. Children are lazy-fetched + cached on first expand; clicking a file inserts an `@cwd-relative-path` mention into the composer through Session 27's inbox so it stacks with the existing mention picker. Disabled when no `cwd` is set; manual Refresh button re-fetches the active directory.
+- ✅ Per-thread color tag. New 6-color palette (red/orange/yellow/green/blue/purple) selectable from the sidebar context menu, persisted to IndexedDB via `prefs.threadColors`. Sidebar rows render a 3 px colored bar; chat header gets a small colored dot next to the title. Pure visual organization layer atop pin/recency.
+- ✅ Connection latency indicator in `StatusPill`. New `state/latency-store.ts` keeps a 16-sample rolling window; `JsonRpcClient` was extended with an `onLatencySample` observer fed by `connection-store`. Status pill shows the median ("12ms" / "210ms") with color tiers (`<100` ok, `<500` warn, `>=500` slow); hides while idle or older than 30s. Full tooltip exposes the source ("median of recent RPCs").
+- 17 new vitest cases (latency rolling window + median + classify, color palette persistence). 318 / 318 pass; tsc + vite build clean (401 KB / 127 KB gzip main bundle).
+
 ## Session 28 — Chat nav shortcuts + URL hash deep-linking + approvals batch actions ✅ DONE
 
 - ✅ `[` / `]` jump between user messages in the active thread. Anchor index is whichever user row is closest to the viewport mid-line, so successive presses make progress even after the user scrolls. Uses the existing scroll-into-view + brief highlight ring (Session 15). Bare keys, gated by `skipWhenTyping` so the shortcuts don't fire from inside a draft. HelpModal updated.
