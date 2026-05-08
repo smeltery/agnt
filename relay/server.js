@@ -97,6 +97,16 @@ async function handleHTTPRequest(req, res, {
   trustProxy,
 }) {
   const pathname = safePathname(req.url);
+
+  // Permissive CORS for the agnt web client. Echoing the requesting origin keeps
+  // browsers happy without committing to a single origin (self-hosters set whatever
+  // they want). The relay never sees plaintext anyway — auth is in the secure channel.
+  applyCorsHeaders(req, res);
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    return res.end();
+  }
+
   if (req.method === "GET" && pathname === "/health") {
     return writeJSON(
       res,
@@ -213,6 +223,15 @@ function writeJSON(res, status, body) {
   res.statusCode = status;
   res.setHeader("content-type", "application/json");
   res.end(JSON.stringify(body));
+}
+
+function applyCorsHeaders(req, res) {
+  const origin = readHeaderString(req?.headers?.origin) || "*";
+  res.setHeader("access-control-allow-origin", origin);
+  res.setHeader("vary", "origin");
+  res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-max-age", "600");
 }
 
 function writeRateLimitResponse(res) {

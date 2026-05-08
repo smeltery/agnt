@@ -4,25 +4,27 @@
 [![Bridge Check](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml)
 [![Build Unsigned IPA](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml)
 
-**Drive coding-agent CLIs from your iPhone.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac and proxies an end-to-end encrypted session to your phone. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
+**Drive coding-agent CLIs from your iPhone or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac and proxies an end-to-end encrypted session to your iOS app or to a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
 
 ## What it is
 
 ```mermaid
 flowchart LR
     iOS["iOS app"]
+    Web["web app<br/>(browser)"]
     Relay["relay<br/>(opaque transport)"]
     Bridge["bridge<br/>(your Mac)"]
     CLI["agent CLI<br/>(codex / claude /<br/>opencode / cursor)"]
 
     iOS <-->|"E2E-encrypted<br/>JSON-RPC"| Relay
+    Web <-->|"E2E-encrypted<br/>JSON-RPC"| Relay
     Relay <-->|"WebSocket"| Bridge
     Bridge -->|"native protocol<br/>(translator shim)"| CLI
 ```
 
-- **iOS app** speaks one protocol — Codex JSON-RPC over a paired secure session.
+- **iOS app** and **web app** are two clients of the same protocol — Codex JSON-RPC over a paired secure session.
 - **Bridge** runs on your Mac. It picks a provider, spawns the matching CLI, and translates between JSON-RPC and whatever native protocol the CLI uses (stream-json, REST+SSE, …).
-- **Relay** routes ciphertext bytes only. Run it locally for LAN use, or self-host it on a VPS for off-network access.
+- **Relay** routes ciphertext bytes only. Run it locally for LAN use, or self-host it on a VPS / Tailscale for off-network access.
 
 agnt is a fork of [Remodex](https://github.com/Emanuele-web04/remodex) (Apache-2.0). Remodex was Codex-only; agnt generalizes the transport behind a provider plugin contract so other agents can be added without touching the bridge core.
 
@@ -58,6 +60,7 @@ The full docset lives in [`docs/`](docs/) with deep technical references and mer
 | understand the architecture | [`docs/architecture/overview.md`](docs/architecture/overview.md) |
 | extend agnt with a new provider | [`docs/development/adding-a-provider.md`](docs/development/adding-a-provider.md) |
 | self-host on a VPS | [`docs/operations/self-hosting.md`](docs/operations/self-hosting.md) |
+| run the browser client | [`agnt-web/README.md`](agnt-web/README.md) |
 | diagnose a broken thread | [`docs/operations/debugging.md`](docs/operations/debugging.md) |
 | see all `AGNT_*` env vars | [`docs/operations/env-reference.md`](docs/operations/env-reference.md) |
 

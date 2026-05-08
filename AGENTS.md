@@ -67,6 +67,14 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 - Markdown files inside Xcode-synced groups can still produce harmless warnings.
 - For small iOS/mobile fixes, prefer inspection and targeted edits over simulator runs by default.
 
+## Web client guardrails (`agnt-web/`)
+
+- `agnt-web` is a second client for the same relay+bridge stack — it is **not** a hosted service. Treat its README and deployment notes as self-host guidance only; do not introduce a hardcoded production origin.
+- The browser secure-transport port must stay byte-for-byte aligned with `agnt-bridge/src/secure-transport.js`. Any change to transcript framing, nonce layout, or HKDF info must land in both modules in the same PR, with the parity vitest suite updated.
+- Browsers can't set custom WebSocket headers; the relay accepts `?role=iphone` as a fallback. Do not remove that fallback. Mac bridges still set `x-role: mac` via headers — do not start trusting query-string roles for the Mac side.
+- Long-running parity work tracked in `agnt-web/PARITY.md` and `agnt-web/ROADMAP.md`. Update both whenever a surface lands or its scope changes.
+- Static-only build. Do not introduce a Node runtime in `agnt-web/`; the browser is the runtime.
+
 ## Local quick runbook
 
 ```bash

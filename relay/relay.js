@@ -50,10 +50,12 @@ function setupRelay(
     const urlPath = req.url || "";
     const match = urlPath.match(/^\/relay\/([^/?]+)/);
     const sessionId = match?.[1];
-    const role = req.headers["x-role"];
+    // Browsers can't set custom headers on WebSocket upgrades, so accept ?role=iphone as
+    // a fallback. Headers still win when both are present so iOS keeps its existing path.
+    const role = req.headers["x-role"] || readRoleFromQuery(urlPath);
 
     if (!sessionId || (role !== "mac" && role !== "iphone")) {
-      ws.close(4000, "Missing sessionId or invalid x-role header");
+      ws.close(4000, "Missing sessionId or invalid role");
       return;
     }
 
@@ -610,6 +612,14 @@ function createRelayError(status, code, message) {
 function readHeaderString(value) {
   const candidate = Array.isArray(value) ? value[0] : value;
   return typeof candidate === "string" && candidate.trim() ? candidate.trim() : null;
+}
+
+function readRoleFromQuery(urlPath) {
+  const queryIndex = urlPath.indexOf("?");
+  if (queryIndex < 0) return null;
+  const params = new URLSearchParams(urlPath.slice(queryIndex + 1));
+  const candidate = params.get("role");
+  return candidate === "mac" || candidate === "iphone" ? candidate : null;
 }
 
 function safeParseJSON(value) {
