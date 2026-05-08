@@ -46,6 +46,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   return (
     <form className="agnt-composer" onSubmit={handleSubmit}>
       <textarea
+        id="agnt-composer-input"
         className="agnt-composer-input"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}

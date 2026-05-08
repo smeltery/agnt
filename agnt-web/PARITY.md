@@ -47,7 +47,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Account` | ⛔ | 5 (Codex login flow, OAuth-style redirect dance) |
 | `Voice` + `VoiceCompatibility` | ✅ | 6 (MediaRecorder + Web Audio resample → 24 kHz mono WAV → voice/transcribe; Codex-only at the bridge) |
 | `Notifications` | ⛔ | future (web-push when we tackle it) |
-| `Pets` | ⛔ | 7 (low priority, fun feature) |
+| `Pets` | ⛔ dropped | iOS-specific UX (animations / haptics / Live Activities). Use the iOS app for pets. |
 | `Review` | ⛔ | 4 |
 | `AIChangeSets` | ⛔ | 4 |
 | `WorkspaceCheckpoints` + `WorkspaceImages` | ⛔ | 4 |
@@ -58,7 +58,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `CodexMessagePersistence` | ✅ | 2 (IndexedDB-backed, debounced per thread) |
 | `AIChangeSetPersistence` | ⛔ | 4 (deferred with AI change sets) |
 | `Coordination/*` | ⛔ | 4 |
-| `Payments` (StoreKit) | ⛔ | not applicable in browser; needs a different provider story |
+| `Payments` (StoreKit) | ⛔ n/a | StoreKit is iOS-only; agnt-web is self-hosted and doesn't sell anything to the user |
 | `DesktopHandoffService` | ⛔ | not applicable |
 | `GPTVoiceTranscriptionManager` | n/a | bridge owns the auth context + ChatGPT call; web client just sends the wav bytes |
 
@@ -111,10 +111,14 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ |
 | Git panel (status / diff / commit / push / pull) | `components/git/GitPanel.tsx` | ✅ (read + basic write; worktree + advanced flows deferred) |
 | Structured user-input prompts | `components/structured-input/StructuredInputModal.tsx` | ✅ (free text, secret, single-/multi-select) |
-| Pet | ⛔ | 7 |
-| Payments | ⛔ | n/a |
+| Pet | ⛔ dropped | iOS-specific UX |
+| Payments | ⛔ n/a | StoreKit doesn't apply to self-hosted web |
 | Turn detail (`Views/Turn/*`) | ⛔ | 3 |
-| Shared (modals, badges) | `components/shared/` | 🟡 (loading, status pill) |
+| Shared (modals, badges, toasts) | `components/shared/` | ✅ (loading, status pill, notice toasts) |
+| Sidebar search + j/k navigation | `components/sidebar/Sidebar.tsx` + `state/thread-filter.ts` + `lib/keyboard.ts` | ✅ |
+| Copy-to-clipboard on assistant rows | `components/chat/rows/AssistantRow.tsx` + `lib/clipboard.ts` | ✅ (Async Clipboard API + execCommand fallback for non-secure dev origins) |
+| `/` to focus composer · `Esc` closes overlays | `components/workspace/Workspace.tsx` | ✅ |
+| Service worker (offline app shell) | `public/sw.js` | ✅ (production-only registration; cache-first hashed assets, network-first navigations, never caches relay/WS) |
 
 ## Storage
 

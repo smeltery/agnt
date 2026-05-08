@@ -3,6 +3,7 @@
 // inside each column over follow-up sessions.
 
 import { useEffect, useState } from "react";
+import { useShortcut } from "../../lib/keyboard";
 import { useConnectionStore } from "../../state/connection-store";
 import { useThreadsStore } from "../../state/threads-store";
 import { ApprovalModal } from "../approvals/ApprovalModal";
@@ -23,6 +24,22 @@ export function Workspace() {
   useEffect(() => {
     void hydrateFromDisk();
   }, [hydrateFromDisk]);
+
+  // `/` jumps focus to the composer (Linear/GitHub-style). Only fires when
+  // the user isn't already typing somewhere — useShortcut handles that.
+  useShortcut("/", (event) => {
+    event.preventDefault();
+    document.getElementById("agnt-composer-input")?.focus();
+  });
+
+  // Esc closes any open overlay so users always have a way out.
+  useShortcut(
+    "Escape",
+    () => {
+      if (overlay) setOverlay(null);
+    },
+    { skipWhenTyping: false }
+  );
 
   return (
     <div className="agnt-workspace">

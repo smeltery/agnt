@@ -63,14 +63,20 @@ later session because the protocol and storage layers are already complete.
 - ✅ Voice button in the composer with idle / recording (live timer + cancel) / transcribing / error states; final transcript appends to the draft
 - ⛔ Streaming partial transcripts intentionally not built — `voice/transcribe` is a single request/response at the protocol level. Web Speech API gives live transcripts but uses a different model + bypasses bridge auth, so we keep the bridge path
 
-## Session 7 — Pets / payments / nice-to-haves
+## Session 7 — Pets / payments / hardening ✅ DONE
 
-- Pet companion port (or explicit decision to drop it for web)
-- Web-equivalent of the StoreKit-gated screens (likely "open in iOS app" links)
+- ⛔ Pet companion **dropped from web port** — animations / haptics / Live Activities are iOS-specific UX that don't translate cleanly. iOS app keeps it.
+- ⛔ StoreKit-gated screens **n/a** — agnt-web is self-hosted and doesn't sell anything to the user.
+- ✅ Service worker for offline-tolerant reload (`public/sw.js`, production-only registration). Cache-first for hashed assets, network-first for navigations, never caches `/relay/*` or `/v1/*`.
+- ✅ Sidebar thread search with `j`/`k` keyboard navigation (Linear/Gmail-style)
+- ✅ Copy-to-clipboard on completed assistant rows
+- ✅ Workspace shortcuts: `/` focuses the composer, `Esc` closes any open overlay
 
-## Session N — Hardening
+## Session N — Future hardening (deferred — not blocking)
 
-- Service worker for offline-tolerant reconnect
-- Optional WebPush for completion notifications (when we have a self-hostable web-push gateway)
-- Wallclock-skew tolerance review
-- E2E tests against a local relay + bridge in CI
+- WebPush for completion notifications (gated on a self-hostable web-push gateway; meanwhile completions surface via the existing `system/notice` toasts)
+- E2E tests against a local relay + bridge in CI (would need a CI runner that can spin up the bridge with a fake provider; high lift, low parity benefit right now)
+- Markdown tables / lists rendering
+- Full Codex OAuth flow (cross-tab redirect handoff design)
+- Worktree + stacked-action git operations
+- AI change sets, workspace checkpoints, workspace images, project switcher UI (need design work — not blocked by infra)

@@ -752,6 +752,42 @@ button {
   margin-left: 8px;
 }
 
+.agnt-sidebar-search { padding: 8px 10px; border-bottom: 1px solid var(--agnt-border); }
+.agnt-sidebar-search-input {
+  width: 100%;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--agnt-fg);
+}
+.agnt-sidebar-search-input:focus {
+  outline: none;
+  border-color: var(--agnt-accent);
+}
+
+.agnt-row-assistant { position: relative; }
+.agnt-row-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  color: var(--agnt-fg-dim);
+  font: inherit;
+  font-size: 10px;
+  padding: 2px 6px;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+.agnt-row-assistant:hover .agnt-row-copy { opacity: 1; }
+.agnt-row-copy:hover { color: var(--agnt-fg); border-color: var(--agnt-accent); }
+.agnt-row-copy-done { color: var(--agnt-ok); border-color: var(--agnt-ok); opacity: 1; }
+
 .agnt-status-pill {
   font-size: 11px;
   font-weight: 600;
