@@ -18,8 +18,8 @@ export function computeDiffStats(patch: string): DiffStats {
   let deletions = 0;
   for (const rawLine of patch.split("\n")) {
     if (!rawLine) continue;
-    if (rawLine.startsWith("+++") || rawLine.startsWith("---")) continue;
-    if (rawLine.startsWith("@@")) continue;
+    if (rawLine.startsWith("+++ ") || rawLine.startsWith("--- ")) continue;
+    if (rawLine.startsWith("@@ ")) continue;
     if (rawLine.startsWith("diff --git")) continue;
     if (rawLine.startsWith("index ")) continue;
     if (rawLine.startsWith("+")) insertions += 1;

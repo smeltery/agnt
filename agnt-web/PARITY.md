@@ -133,8 +133,9 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Per-thread color tag | `state/threads-store.ts:setThreadColor` + `storage/prefs-store.ts:THREAD_COLOR_VALUES` + sidebar context menu + chat header | ✅ (Session 29; 6-color palette persisted; sidebar 3 px bar + chat header dot) |
 | Connection latency indicator | `state/latency-store.ts` + `protocol/jsonrpc-client.ts` (`onLatencySample`) + `components/shared/StatusPill.tsx` | ✅ (Session 29; passive RPC RTT median over a 16-sample rolling window; <100 ok, <500 warn, >=500 slow tiers; hidden when stale or idle) |
 | Document title reflects active thread | `lib/document-title.ts` + `components/workspace/Workspace.tsx` | ✅ (Session 20; `[name] · agnt`) |
-| Sidebar grouped by recency | `state/thread-grouping.ts` + `components/sidebar/Sidebar.tsx` | ✅ (Session 20; Pinned / Today / Yesterday / This week / Earlier; archived stays flat) |
+| Sidebar grouped by recency | `state/thread-grouping.ts` + `components/sidebar/Sidebar.tsx` | ✅ (Session 20 + 30; Pinned / Today / Yesterday / This week / Earlier; archived stays flat; collapsible group headers + density toggle added Session 30) |
 | Title flash on hidden-tab turn completion | `lib/document-title.ts:flashTitle` + threads-store `turn/completed`/`turn/failed` handlers | ✅ (Session 20; cycles "(Turn done) [name] · agnt" against neutral; auto-stops on visibility) |
+| Per-turn timing chip | `state/turn-timing-store.ts` + `components/chat/rows/AssistantRow.tsx` | ✅ (Session 30; ⏱ N.Ns chip on completed assistant rows, memory-only retention) |
 | Composer history | `components/chat/Composer.tsx` | ✅ (Session 16; up-arrow recalls past prompts at empty draft, down-arrow steps forward, Esc restores in-progress draft, manual edit drops out of recall) |
 | Lightbox sibling navigation | `components/shared/Lightbox.tsx` + `state/lightbox-store.ts` | ✅ (Session 16; left/right arrow keys + on-screen ‹ › buttons cycle through a row's attachments; counter `1 / N`) |
 | Approvals modal | `components/approvals/ApprovalModal.tsx` + `state/approvals-store.ts` | ✅ (command + file change, accept / decline / acceptForSession) |
@@ -143,10 +144,11 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Per-turn flag bar | `components/chat/TurnFlagBar.tsx` | ✅ (model, reasoning effort, plan mode, permission mode) |
 | Voice composer button | `components/chat/VoiceButton.tsx` + `state/voice-store.ts` + `lib/audio-encode.ts` | ✅ (record → resample → WAV → voice/transcribe; final transcript drops into composer draft) |
 | Settings | `components/settings/SettingsModal.tsx` + `state/account-store.ts` | ✅ (connection info, account status, trusted-Mac mgmt with forget) |
+| State backup / restore | `lib/state-backup.ts` + Settings section | ✅ (Session 30; Export + Import for prefs + messages via IndexedDB; excludes pairing/identity state) |
 | About | `components/settings/AboutModal.tsx` | ✅ (version, source link, license) |
 | Chat header (title + cwd + provider) | `components/chat/ChatHeader.tsx` | ✅ |
 | Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ |
-| Git panel (status / diff / branches / commit / push / pull / checkout / create-branch / create-worktree) | `components/git/GitPanel.tsx` | ✅ (Sessions 4 + 8 + 11; managed-worktree handoff + stacked actions deferred) |
+| Git panel (status / diff / branches / commit / push / pull / checkout / create-branch / create-worktree) | `components/git/GitPanel.tsx` | ✅ (Sessions 4 + 8 + 11 + 30; managed-worktree handoff + stacked actions deferred; diff stats via `lib/git-diff-stats.ts` added Session 30) |
 | Structured user-input prompts | `components/structured-input/StructuredInputModal.tsx` | ✅ (free text, secret, single-/multi-select) |
 | Pet | ⛔ dropped | iOS-specific UX |
 | Payments | ⛔ n/a | StoreKit doesn't apply to self-hosted web |

@@ -233,4 +233,3 @@ later session because the protocol and storage layers are already complete.
 - Stacked-action git operations + managed-worktree handoff (worktrees are landed in Session 11; only the iOS-style power-user flows around them remain)
 - AI change sets (per-message patch revert UI on top of `workspace/revertPatchPreview` + `workspace/revertPatchApply`); the per-turn revert from Session 10 covers the bigger workflow
 - `turn/steer` mid-run steering (Codex-only via native pass-through; gate on provider capability)
-- `workspace/readImage` viewer for assistant-emitted image references (composer-side image attach is done in Session 11)
