@@ -3,6 +3,7 @@
 // out inside each column over follow-up sessions.
 
 import { useEffect, useState } from "react";
+import { useDocumentTitle } from "../../lib/document-title";
 import { useShortcut } from "../../lib/keyboard";
 import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from "../../lib/thread-export";
 import { useCheckpointsStore } from "../../state/checkpoints-store";
@@ -31,6 +32,13 @@ export function Workspace() {
   const hydrateFromDisk = useThreadsStore((state) => state.hydrateFromDisk);
   const showProjectPicker = useProjectStore((state) => state.show);
   const projectPickerOpen = useProjectStore((state) => state.open);
+  const activeThreadTitle = useThreadsStore((state) => {
+    const id = state.selectedThreadId;
+    if (!id) return undefined;
+    const thread = state.threads.find((t) => t.id === id) ?? state.archivedThreads.find((t) => t.id === id);
+    return thread?.name ?? thread?.title;
+  });
+  useDocumentTitle(activeThreadTitle);
   const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | "help" | null>(null);
   // The picker can be invoked either from a "Change project" affordance or
   // from the "New Chat" flow. We track who asked so we can route the result.

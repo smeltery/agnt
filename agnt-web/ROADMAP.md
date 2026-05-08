@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 20 — Document title + sidebar grouping + completion flash ✅ DONE
+
+- ✅ Document title reflects the active thread: `[name] · agnt`. Helps when agnt is open in several tabs at once.
+- ✅ Sidebar grouped by recency on the live tab: Pinned / Today / Yesterday / This week / Earlier. Archived stays flat under a single section header. Pure `groupThreadsByRecency` reads `updatedAt` then `createdAt` so threads missing both fall into Earlier.
+- ✅ Title flash on `turn/completed` (and `turn/failed`) when the tab is hidden — alternates `(Turn done) [name] · agnt` against neutral every 1.5 s, auto-stops on `visibilitychange`. No-op when the tab is focused. Closes the "did my turn finish while I was elsewhere" gap without needing a WebPush gateway.
+
 ## Session 19 — Drafts autosave + pinned threads + power-user shortcuts ✅ DONE
 
 - ✅ Composer drafts auto-saved per thread to IndexedDB. 400 ms debounce while typing, immediate save on thread switch and `beforeunload`, cleared on successful send. Empty drafts are removed (not stored as `""`) so the cache stays small.

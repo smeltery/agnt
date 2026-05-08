@@ -6,6 +6,7 @@
 // to slices via zustand selectors and never see Connection/JsonRpcClient.
 
 import { create } from "zustand";
+import { flashTitle } from "../lib/document-title";
 import { makeLogger } from "../lib/log";
 import {
   type CodexMessage,
@@ -385,11 +386,23 @@ function registerNotificationHandlers(
 ): void {
   // Lifecycle.
   on(connection, "turn/started", (params) => withTurnEvent(params, (event) => mutateReducer(event.threadId, set, get, (s) => applyTurnStarted(s, event))));
-  on(connection, "turn/completed", (params) => withTurnEvent(params, (event) => mutateReducer(event.threadId, set, get, (s) => applyTurnCompleted(s, event))));
-  on(connection, "turn/failed", (params) => withTurnEvent(params, (event) => {
-    const errorText = readString(params, "error", "message");
-    mutateReducer(event.threadId, set, get, (s) => applyTurnFailed(s, event, errorText));
-  }));
+  on(connection, "turn/completed", (params) =>
+    withTurnEvent(params, (event) => {
+      mutateReducer(event.threadId, set, get, (s) => applyTurnCompleted(s, event));
+      // Flash the tab title when the user has switched away — gives them a
+      // visible signal a turn finished without needing a real WebPush gateway.
+      // The active-tab case stays quiet; the streaming row going non-streaming
+      // is already its own visible cue.
+      flashTitle("Turn done");
+    })
+  );
+  on(connection, "turn/failed", (params) =>
+    withTurnEvent(params, (event) => {
+      const errorText = readString(params, "error", "message");
+      mutateReducer(event.threadId, set, get, (s) => applyTurnFailed(s, event, errorText));
+      flashTitle("Turn failed");
+    })
+  );
 
   // Streaming deltas.
   on(connection, "item/agentMessage/delta", (params) =>

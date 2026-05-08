@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodexThread } from "../../models";
 import { useShortcuts } from "../../lib/keyboard";
 import { filterThreads } from "../../state/thread-filter";
+import { groupThreadsByRecency, type ThreadGroup } from "../../state/thread-grouping";
 import { useThreadsStore } from "../../state/threads-store";
 import { prefsStore, type SidebarTabPreference } from "../../storage/prefs-store";
 import { ThreadContextMenu } from "./ThreadContextMenu";
@@ -41,19 +42,17 @@ export function Sidebar({ onNewChat }: SidebarProps) {
     // Tiny payloads, no debounce — every tab toggle and every keystroke writes.
     void prefsStore.saveSidebar({ tab, query });
   }, [tab, query]);
-  const visible = useMemo(() => {
+  // The visible list drives j/k navigation (it has to be flat for that),
+  // while `groups` is the partitioned view we render. Both stay in sync via
+  // the same filter + grouping pass.
+  const { visible, groups } = useMemo(() => {
     const filtered = filterThreads(tab === "live" ? liveThreads : archivedThreads, query);
-    // Pinned threads sort to the top of the live tab; archived stays in its
-    // server order. Stable within each partition so users see consistent
-    // positions across re-renders.
-    if (tab !== "live" || pinnedThreadIds.size === 0) return filtered;
-    const pinned: CodexThread[] = [];
-    const rest: CodexThread[] = [];
-    for (const thread of filtered) {
-      if (pinnedThreadIds.has(thread.id)) pinned.push(thread);
-      else rest.push(thread);
+    if (tab !== "live") {
+      return { visible: filtered, groups: [{ id: "earlier" as const, label: "Archived", threads: filtered }] };
     }
-    return [...pinned, ...rest];
+    const sectioned = groupThreadsByRecency(filtered, { pinnedIds: pinnedThreadIds });
+    const flat = sectioned.flatMap((group) => group.threads);
+    return { visible: flat, groups: sectioned };
   }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds]);
 
   // j/k navigate the visible list, like Gmail/Linear. Wraps at the boundaries
@@ -96,18 +95,19 @@ export function Sidebar({ onNewChat }: SidebarProps) {
           {query ? "No threads match your search." : tab === "live" ? "No live threads yet." : "No archived threads."}
         </div>
       ) : (
-        <ul className="agnt-sidebar-list">
-          {visible.map((thread) => (
-            <SidebarRow
-              key={thread.id}
-              thread={thread}
-              selected={thread.id === selectedThreadId}
-              running={runningThreadIds.has(thread.id)}
-              pinned={pinnedThreadIds.has(thread.id)}
-              onSelect={() => void selectThread(thread.id)}
+        <div className="agnt-sidebar-groups">
+          {groups.map((group) => (
+            <SidebarGroup
+              key={group.id}
+              group={group}
+              showHeader={tab === "live" && groups.length > 1}
+              selectedThreadId={selectedThreadId}
+              runningThreadIds={runningThreadIds}
+              pinnedThreadIds={pinnedThreadIds}
+              onSelect={selectThread}
             />
           ))}
-        </ul>
+        </div>
       )}
     </aside>
   );
@@ -151,6 +151,40 @@ function SidebarTabButton({
     >
       {label}
     </button>
+  );
+}
+
+function SidebarGroup({
+  group,
+  showHeader,
+  selectedThreadId,
+  runningThreadIds,
+  pinnedThreadIds,
+  onSelect,
+}: {
+  group: ThreadGroup;
+  showHeader: boolean;
+  selectedThreadId: string | null;
+  runningThreadIds: Set<string>;
+  pinnedThreadIds: Set<string>;
+  onSelect: (threadId: string) => Promise<void> | void;
+}) {
+  return (
+    <section className="agnt-sidebar-group">
+      {showHeader && <h3 className="agnt-sidebar-group-header">{group.label}</h3>}
+      <ul className="agnt-sidebar-list">
+        {group.threads.map((thread) => (
+          <SidebarRow
+            key={thread.id}
+            thread={thread}
+            selected={thread.id === selectedThreadId}
+            running={runningThreadIds.has(thread.id)}
+            pinned={pinnedThreadIds.has(thread.id)}
+            onSelect={() => void onSelect(thread.id)}
+          />
+        ))}
+      </ul>
+    </section>
   );
 }
 

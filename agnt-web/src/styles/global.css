@@ -1072,6 +1072,23 @@ button {
   font-size: 11px;
   vertical-align: middle;
 }
+.agnt-sidebar-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.agnt-sidebar-group { display: flex; flex-direction: column; gap: 2px; }
+.agnt-sidebar-group-header {
+  margin: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--agnt-fg-dim);
+}
 @keyframes agnt-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
