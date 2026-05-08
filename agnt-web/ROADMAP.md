@@ -86,6 +86,13 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 14 — Composer + UX polish ✅ DONE
+
+- ✅ Drag-drop / paste / picker now accepts text files alongside images. Recognized files (~80 extensions: source code, markup, config, log) get inlined as fenced code blocks with the right language hint and a backtick-run-aware fence escape; binaries are refused with a friendly message.
+- ✅ Per-fence Copy button on every code block (hover-reveal, 2-second "Copied" feedback, uses the same `lib/clipboard.ts` fallback path).
+- ✅ Keyboard-shortcut help overlay — `?` opens it, lists nav + composer + sidebar shortcuts; new `?` button in the workspace topbar for discoverability.
+- ✅ Sidebar tab choice + search query persist to IndexedDB so a refresh doesn't bounce users back to "Live" with an empty query.
+
 ## Session 13 — Theme + export + lazy code-highlight ✅ DONE
 
 - ✅ Light theme via CSS-variable swap with explicit Auto/Light/Dark picker; system pref honored in Auto. Prism token colors recolored for the light palette so code blocks stay legible.

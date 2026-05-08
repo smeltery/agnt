@@ -1,15 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodexThread } from "../../models";
 import { useShortcuts } from "../../lib/keyboard";
 import { filterThreads } from "../../state/thread-filter";
 import { useThreadsStore } from "../../state/threads-store";
+import { prefsStore, type SidebarTabPreference } from "../../storage/prefs-store";
 import { ThreadContextMenu } from "./ThreadContextMenu";
 
 interface SidebarProps {
   onNewChat(): void;
 }
 
-type SidebarTab = "live" | "archived";
+type SidebarTab = SidebarTabPreference;
 
 export function Sidebar({ onNewChat }: SidebarProps) {
   const liveThreads = useThreadsStore((state) => state.threads);
@@ -20,6 +21,25 @@ export function Sidebar({ onNewChat }: SidebarProps) {
   const selectThread = useThreadsStore((state) => state.selectThread);
   const [tab, setTab] = useState<SidebarTab>("live");
   const [query, setQuery] = useState("");
+  const hydratedRef = useRef(false);
+
+  // Hydrate persisted prefs once; later changes to tab/query persist via the
+  // effect below. Reading them from IndexedDB is async so we set hydratedRef
+  // to gate the saver — otherwise the initial setTab("live") call would
+  // overwrite the just-loaded preference.
+  useEffect(() => {
+    void prefsStore.loadSidebar().then((prefs) => {
+      if (prefs.tab === "archived" || prefs.tab === "live") setTab(prefs.tab);
+      if (typeof prefs.query === "string") setQuery(prefs.query);
+      hydratedRef.current = true;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    // Tiny payloads, no debounce — every tab toggle and every keystroke writes.
+    void prefsStore.saveSidebar({ tab, query });
+  }, [tab, query]);
   const visible = useMemo(
     () => filterThreads(tab === "live" ? liveThreads : archivedThreads, query),
     [tab, liveThreads, archivedThreads, query]

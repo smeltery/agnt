@@ -9,6 +9,7 @@
 // stays predictable.
 
 import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { copyText } from "../../lib/clipboard";
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
 import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
 
@@ -69,6 +70,7 @@ function renderFence(language: string | null, body: string): ReactNode {
 function CodeBlock({ language, body }: { language: string | null; body: string }) {
   const canonical = knownLanguage(language ?? undefined);
   const [ready, setReady] = useState(canonical ? isLanguageReady(canonical) : false);
+  const [justCopied, setJustCopied] = useState(false);
 
   useEffect(() => {
     if (!canonical || ready) return;
@@ -80,6 +82,13 @@ function CodeBlock({ language, body }: { language: string | null; body: string }
       cancelled = true;
     };
   }, [canonical, ready]);
+
+  async function handleCopy() {
+    const ok = await copyText(body);
+    if (!ok) return;
+    setJustCopied(true);
+    window.setTimeout(() => setJustCopied(false), 1200);
+  }
 
   return (
     <pre className={"agnt-md-pre" + (canonical ? " agnt-md-lang-" + canonical : "")}>
@@ -94,6 +103,15 @@ function CodeBlock({ language, body }: { language: string | null; body: string }
           dangerouslySetInnerHTML={{ __html: escapeHtml(body) }}
         />
       )}
+      <button
+        type="button"
+        className={"agnt-md-pre-copy" + (justCopied ? " agnt-md-pre-copy-done" : "")}
+        onClick={handleCopy}
+        aria-label={justCopied ? "Copied" : "Copy code"}
+        title={justCopied ? "Copied" : "Copy code block"}
+      >
+        {justCopied ? "Copied" : "Copy"}
+      </button>
     </pre>
   );
 }

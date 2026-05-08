@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { attachmentFromFile, ImageAttachError } from "../../lib/image-attach";
+import { attachmentFromTextFile, looksLikeTextFile, TextAttachError } from "../../lib/text-attach";
 import type { ImageAttachment } from "../../models";
 import { useVoiceStore } from "../../state/voice-store";
 import { VoiceButton } from "./VoiceButton";
@@ -58,28 +59,53 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     const list = Array.from(files);
     if (list.length === 0) return;
     setAttachError(null);
-    const next: ImageAttachment[] = [];
+    // Two ingest paths: image files become ImageAttachments (sent as
+    // params.input image items), recognized text files get inlined into the
+    // draft as fenced code blocks (no attachment surface needed — the prompt
+    // is the carrier). Anything else is rejected with a friendly message so
+    // we don't silently lose a drag.
+    const imageAttachments: ImageAttachment[] = [];
+    const textSnippets: string[] = [];
     for (const file of list) {
-      try {
-        next.push(await attachmentFromFile(file));
-      } catch (error) {
-        setAttachError(
-          error instanceof ImageAttachError ? error.message : (error as Error).message
-        );
+      const isImage = file.type.startsWith("image/");
+      if (isImage) {
+        try {
+          imageAttachments.push(await attachmentFromFile(file));
+        } catch (error) {
+          setAttachError(error instanceof ImageAttachError ? error.message : (error as Error).message);
+        }
+        continue;
       }
+      if (looksLikeTextFile(file)) {
+        try {
+          textSnippets.push((await attachmentFromTextFile(file)).fenced);
+        } catch (error) {
+          setAttachError(error instanceof TextAttachError ? error.message : (error as Error).message);
+        }
+        continue;
+      }
+      setAttachError(`Refusing \`${file.name || "file"}\` — only images and recognized text files are accepted.`);
     }
-    if (next.length === 0) return;
-    setAttachments((current) => [...current, ...next]);
+    if (imageAttachments.length > 0) setAttachments((current) => [...current, ...imageAttachments]);
+    if (textSnippets.length > 0) {
+      setDraft((current) => {
+        const joined = textSnippets.join("\n\n");
+        return current.trim() ? `${current.trimEnd()}\n\n${joined}` : joined;
+      });
+    }
   }
 
   function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
     const items = event.clipboardData.items;
     const files: File[] = [];
     for (const item of items) {
-      if (item.kind === "file") {
-        const file = item.getAsFile();
-        if (file && file.type.startsWith("image/")) files.push(file);
-      }
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      // ingestFiles handles both image and text files; we accept anything
+      // here so a paste of a `.ts` file from Finder/Files goes through the
+      // same path drag/drop uses.
+      if (file.type.startsWith("image/") || looksLikeTextFile(file)) files.push(file);
     }
     if (files.length > 0) {
       event.preventDefault();
@@ -139,14 +165,16 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        placeholder="Send a turn… (⌘/Ctrl+Enter; paste or drop images)"
+        placeholder="Send a turn… (⌘/Ctrl+Enter; paste or drop images and text files)"
         rows={3}
         spellCheck={false}
       />
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif"
+        // Empty `accept` lets the picker show all files — looksLikeTextFile()
+        // and the image MIME check filter at ingest time, where we can also
+        // surface a friendly message for unsupported types.
         multiple
         hidden
         onChange={(event) => {

@@ -15,6 +15,7 @@ import { ProjectPicker } from "../project/ProjectPicker";
 import { AboutModal } from "../settings/AboutModal";
 import { SettingsModal } from "../settings/SettingsModal";
 import { Sidebar } from "../sidebar/Sidebar";
+import { HelpModal } from "../shared/HelpModal";
 import { NoticeStack } from "../shared/NoticeStack";
 import { ReconnectBanner } from "../shared/ReconnectBanner";
 import { StatusPill } from "../shared/StatusPill";
@@ -27,7 +28,7 @@ export function Workspace() {
   const hydrateFromDisk = useThreadsStore((state) => state.hydrateFromDisk);
   const showProjectPicker = useProjectStore((state) => state.show);
   const projectPickerOpen = useProjectStore((state) => state.open);
-  const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | null>(null);
+  const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | "help" | null>(null);
   // The picker can be invoked either from a "Change project" affordance or
   // from the "New Chat" flow. We track who asked so we can route the result.
   const [pickerCallback, setPickerCallback] = useState<((path: string) => void) | null>(null);
@@ -39,6 +40,13 @@ export function Workspace() {
   useShortcut("/", (event) => {
     event.preventDefault();
     document.getElementById("agnt-composer-input")?.focus();
+  });
+
+  useShortcut("?", () => {
+    // skipWhenTyping is on by default, so the user can still type "?" in the
+    // composer without summoning the help. If they're outside an input the
+    // overlay opens (or closes if it's already up).
+    setOverlay((current) => (current === "help" ? null : "help"));
   });
 
   useShortcut("Escape", () => {
@@ -66,6 +74,14 @@ export function Workspace() {
               Reconnect
             </button>
           )}
+          <button
+            className="agnt-button-ghost"
+            onClick={() => setOverlay("help")}
+            title="Keyboard shortcuts"
+            aria-label="Keyboard shortcuts"
+          >
+            ?
+          </button>
           <button className="agnt-button-ghost" onClick={() => setOverlay("settings")}>
             Settings
           </button>
@@ -85,6 +101,7 @@ export function Workspace() {
       <RevertSheet />
       {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
       {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
+      {overlay === "help" && <HelpModal onClose={() => setOverlay(null)} />}
       {overlay === "newChat" && (
         <NewChatModal
           onClose={() => setOverlay(null)}

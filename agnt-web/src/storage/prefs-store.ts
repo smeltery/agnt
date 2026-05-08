@@ -17,8 +17,16 @@ export interface PersistedTurnFlags {
 
 export type ThemePreference = "auto" | "light" | "dark";
 
+export type SidebarTabPreference = "live" | "archived";
+
+export interface SidebarPreferences {
+  tab?: SidebarTabPreference;
+  query?: string;
+}
+
 const TURN_FLAGS_KEY = "prefs.turnFlags";
 const THEME_KEY = "prefs.theme";
+const SIDEBAR_KEY = "prefs.sidebar";
 
 export const prefsStore = {
   async loadTurnFlags(): Promise<PersistedTurnFlags> {
@@ -36,6 +44,12 @@ export const prefsStore = {
   },
   async saveTheme(theme: ThemePreference): Promise<void> {
     await idb.set(THEME_KEY, theme);
+  },
+  async loadSidebar(): Promise<SidebarPreferences> {
+    return (await idb.get<SidebarPreferences>(SIDEBAR_KEY)) ?? {};
+  },
+  async saveSidebar(prefs: SidebarPreferences): Promise<void> {
+    await idb.set(SIDEBAR_KEY, prefs);
   },
 };
 

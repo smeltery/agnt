@@ -127,6 +127,10 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Theme picker (Auto / Light / Dark) | `state/theme-store.ts` + `storage/prefs-store.ts:applyThemeToDocument` + Settings segmented control | ✅ (Session 13; persisted to IndexedDB, respects `prefers-color-scheme` in Auto, Prism token colors recoloured for light) |
 | Export thread to Markdown | `lib/thread-export.ts` + sidebar context menu | ✅ (Session 13; renders user / assistant / reasoning / command / file change / plan / failed-turn rows) |
 | Lazy-load Prism language packs | `components/chat/syntax-highlight.ts` | ✅ (Session 13; per-language Vite chunks fetched on first use, ~5 KB gzip off the main bundle) |
+| Text-file ingest in composer | `lib/text-attach.ts` + `components/chat/Composer.tsx` | ✅ (Session 14; drag-drop / paste / picker; auto-fenced with language hint inferred from extension; backtick-run-aware fence escape) |
+| Per-fence Copy button | `components/chat/MarkdownContent.tsx:CodeBlock` | ✅ (Session 14; hover-reveal, two-second "Copied" feedback) |
+| Keyboard-shortcut help overlay | `components/shared/HelpModal.tsx` | ✅ (Session 14; `?` opens, lists nav / composer / sidebar shortcuts) |
+| Sidebar prefs persistence (tab + query) | `storage/prefs-store.ts:loadSidebar/saveSidebar` | ✅ (Session 14; survives reload via IndexedDB) |
 | Inline failed-turn rows | `components/chat/rows/index.tsx` (`role: "system"` + `deliveryState: "failed"`) | ✅ (Session 12; replaces the global error banner for turn failures) |
 | Reconnect banner | `components/shared/ReconnectBanner.tsx` | ✅ (Session 12; visible during `connecting` / `handshaking` after first successful pair) |
 | Stop button in chat header | `components/chat/ChatHeader.tsx` | ✅ (Session 12; mirrors composer Stop so it's reachable while scrolled up) |
