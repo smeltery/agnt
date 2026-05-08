@@ -44,6 +44,14 @@ const LAST_VISITED_KEY = "prefs.lastVisitedByThread";
 const CUSTOM_SLASH_KEY = "prefs.customSlashCommands";
 const BOOKMARKS_KEY = "prefs.bookmarksByThread";
 const THREAD_COLORS_KEY = "prefs.threadColors";
+const TURN_WEBHOOK_KEY = "prefs.turnWebhook";
+
+export interface TurnWebhookPreference {
+  /** Absolute https/http URL to POST to on turn end. Empty when unset. */
+  url: string;
+  /** Master switch — when off, the URL is remembered but no requests fire. */
+  enabled: boolean;
+}
 
 /** Fixed palette — keeping it small so the picker stays compact and the
  *  color set survives the light/dark theme swap (the colors were chosen
@@ -132,6 +140,17 @@ export const prefsStore = {
   },
   async saveBookmarks(map: Record<string, string[]>): Promise<void> {
     await idb.set(BOOKMARKS_KEY, map);
+  },
+  async loadTurnWebhook(): Promise<TurnWebhookPreference> {
+    const raw = await idb.get<TurnWebhookPreference>(TURN_WEBHOOK_KEY);
+    if (!raw || typeof raw !== "object") return { url: "", enabled: false };
+    return {
+      url: typeof raw.url === "string" ? raw.url : "",
+      enabled: Boolean(raw.enabled),
+    };
+  },
+  async saveTurnWebhook(pref: TurnWebhookPreference): Promise<void> {
+    await idb.set(TURN_WEBHOOK_KEY, pref);
   },
   async loadThreadColors(): Promise<Record<string, ThreadColor>> {
     const raw = await idb.get<Record<string, string>>(THREAD_COLORS_KEY);

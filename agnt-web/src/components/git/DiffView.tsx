@@ -1,11 +1,14 @@
-// Renders a unified-diff fragment with per-line coloring and per-hunk
-// collapse toggles. Each `@@ … @@` hunk owns a clickable header that hides
-// its body without affecting sibling hunks; meta lines (file headers) are
-// always rendered so the user knows which file they're looking at even when
-// every hunk is collapsed.
+// Renders a unified-diff fragment with per-line coloring, per-hunk
+// collapse, and word-level intra-line highlighting. Each `@@ … @@` hunk
+// owns a clickable header that hides its body without affecting sibling
+// hunks; meta lines (file headers) are always rendered so the user knows
+// which file they're looking at even when every hunk is collapsed. Pairs
+// of adjacent `-` / `+` lines are scanned for word-level differences so a
+// one-character rename inside a long line shows up tightly.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { groupDiffByHunks } from "../../lib/diff-hunk-grouper";
+import { diffWordTokens, type DiffWordToken } from "../../lib/diff-word-tokens";
 
 interface DiffViewProps {
   patch: string;
@@ -64,17 +67,81 @@ export function DiffView({ patch }: DiffViewProps) {
               )}
               {"\n"}
             </span>
-            {!collapsed && hunk.body.map((line, lineIndex) => (
-              <span key={`hunk-${hunk.index}-line-${lineIndex}`} className={classifyLine(line)}>
-                {line}
-                {lineIndex < hunk.body.length - 1 ? "\n" : ""}
-              </span>
-            ))}
+            {!collapsed && <HunkBody hunkIndex={hunk.index} body={hunk.body} />}
           </span>
         );
       })}
     </pre>
   );
+}
+
+function HunkBody({ hunkIndex, body }: { hunkIndex: number; body: string[] }) {
+  // Compute word-level annotations for adjacent `-` / `+` line pairs once
+  // per body — keyed by the absolute position so React keys stay stable.
+  // We only diff one-to-one runs because aligning a 3-removal-2-addition
+  // hunk would need a full Myers' or histogram diff; in practice most
+  // hunks are 1:1 swaps and we get the lion's share of the value.
+  const annotations = useMemo(() => computeWordAnnotations(body), [body]);
+  return (
+    <>
+      {body.map((line, lineIndex) => {
+        const isLast = lineIndex === body.length - 1;
+        const klass = classifyLine(line);
+        const wordTokens = annotations[lineIndex];
+        if (wordTokens) {
+          return (
+            <span key={`hunk-${hunkIndex}-line-${lineIndex}`} className={klass}>
+              {wordTokens.map((token, tokenIndex) => (
+                <span
+                  key={tokenIndex}
+                  className={token.change === "same" ? "agnt-diff-word-same" : `agnt-diff-word-${token.change}`}
+                >
+                  {token.text}
+                </span>
+              ))}
+              {isLast ? "" : "\n"}
+            </span>
+          );
+        }
+        return (
+          <span key={`hunk-${hunkIndex}-line-${lineIndex}`} className={klass}>
+            {line}
+            {isLast ? "" : "\n"}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+/** Walks the hunk body looking for one-to-one `-` then `+` pairs. Returns a
+ *  map from line index to the per-token annotation, or undefined for lines
+ *  that don't get word-level highlighting (context, file-header pairs, or
+ *  unbalanced multi-line edits). */
+function computeWordAnnotations(body: string[]): Array<DiffWordToken[] | undefined> {
+  const out: Array<DiffWordToken[] | undefined> = new Array(body.length).fill(undefined);
+  for (let i = 0; i < body.length - 1; i += 1) {
+    const left = body[i];
+    const right = body[i + 1];
+    // Skip the file-header `--- a/...` / `+++ b/...` lines that occasionally
+    // re-appear in a hunk body (rename + edit), and any unbalanced runs.
+    if (!isRemoveDataLine(left) || !isAddDataLine(right)) continue;
+    if (i + 2 < body.length && (isRemoveDataLine(body[i + 2]) || isAddDataLine(body[i + 2]))) continue;
+    const { removed, added } = diffWordTokens(left.slice(1), right.slice(1));
+    // Re-prepend the leading `-` / `+` as `same` tokens so the marker is
+    // never highlighted as a removed/added word in itself.
+    out[i] = [{ text: "-", change: "same" }, ...removed];
+    out[i + 1] = [{ text: "+", change: "same" }, ...added];
+    i += 1;
+  }
+  return out;
+}
+
+function isRemoveDataLine(line: string): boolean {
+  return line.startsWith("-") && !line.startsWith("--- ");
+}
+function isAddDataLine(line: string): boolean {
+  return line.startsWith("+") && !line.startsWith("+++ ");
 }
 
 function classifyLine(line: string): string {

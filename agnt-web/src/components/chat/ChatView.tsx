@@ -184,7 +184,15 @@ export function ChatView() {
             <div
               key={message.id}
               data-message-id={message.id}
-              className={highlightedMessageId === message.id ? "agnt-row-highlight" : undefined}
+              // `agnt-msg-cv` opts each row into CSS `content-visibility:
+              // auto`, so off-screen rows skip layout + paint entirely.
+              // Browser-native virtualization — no JS overhead, no library,
+              // no scroll-position math. The intrinsic-size hint keeps
+              // scroll height stable while rows are skipped.
+              className={
+                "agnt-msg-cv"
+                + (highlightedMessageId === message.id ? " agnt-row-highlight" : "")
+              }
             >
               <MessageRow message={message} />
             </div>

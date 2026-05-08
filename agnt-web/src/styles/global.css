@@ -2269,3 +2269,101 @@ button {
   color: var(--agnt-fg);
 }
 .agnt-settings-search::placeholder { color: var(--agnt-fg-dim); }
+
+/* Session 32 — content-visibility virtualization, undo toast, word-level
+   diff highlighting, copy-as-patch, webhook + diagnostic settings rows. */
+
+/* Browser-native virtualization for long threads: each row's layout +
+   paint is skipped while it's off-screen. The intrinsic-size hint keeps
+   scroll height stable so the bar position is accurate even before rows
+   render their actual height. */
+.agnt-msg-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+.agnt-undo-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+  animation: agnt-undo-toast-in 160ms ease-out;
+}
+@keyframes agnt-undo-toast-in {
+  from { transform: translate(-50%, 8px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+.agnt-undo-toast-label { color: var(--agnt-fg-dim); }
+.agnt-undo-toast-action {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.agnt-undo-toast-action:hover { background: var(--agnt-bg); }
+.agnt-undo-toast-dismiss {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.agnt-undo-toast-dismiss:hover { color: var(--agnt-fg); }
+
+/* Word-level diff highlighting. Tokens marked `same` inherit the line's
+   ambient color (red/green); only the differing tokens get the bold
+   highlight, so a one-character rename in a long line stands out. */
+.agnt-diff-word-same { /* inherits ambient color */ }
+.agnt-diff-word-removed {
+  background: rgba(255, 90, 100, 0.28);
+  color: #ffe0e3;
+  border-radius: 2px;
+}
+.agnt-diff-word-added {
+  background: rgba(95, 200, 122, 0.28);
+  color: #d8ffd8;
+  border-radius: 2px;
+}
+[data-theme="light"] .agnt-diff-word-removed { background: rgba(220, 50, 70, 0.22); color: #4a0a14; }
+[data-theme="light"] .agnt-diff-word-added { background: rgba(40, 140, 70, 0.20); color: #062c10; }
+
+.agnt-gitpanel-file-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.agnt-settings-row-label {
+  min-width: 80px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-settings-input {
+  flex: 1;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--agnt-fg);
+  font-family: var(--agnt-mono);
+}
+.agnt-settings-input-error { border-color: var(--agnt-danger); }

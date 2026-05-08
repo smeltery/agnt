@@ -28,6 +28,8 @@ import { fetchThreadTurnsPage } from "./pagination";
 import { armSlowResponseWatch, cancelSlowResponseWatch } from "./slow-response-watcher";
 import { useStreamingStatsStore } from "./streaming-stats-store";
 import { useTurnTimingStore } from "./turn-timing-store";
+import { useUndoStore } from "./undo-store";
+import { fireTurnWebhook } from "../lib/turn-webhook";
 import { buildStructuredInputServerRequestHandler, useStructuredInputStore } from "./structured-input-store";
 import { runPostHandshakeBootstrap, type ModelOption } from "./sync";
 import { useVoiceStore } from "./voice-store";
@@ -391,9 +393,23 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     if (!activeConnection?.rpc) return;
     const trimmed = name.trim();
     if (!trimmed) return;
+    // Capture the prior label so the undo toast can restore it. Read from
+    // both lists since rename works on archived threads too.
+    const state = get();
+    const prior =
+      state.threads.find((t) => t.id === threadId)
+      ?? state.archivedThreads.find((t) => t.id === threadId);
+    const previousName = prior?.name ?? prior?.title;
+    if (previousName === trimmed) return;
     try {
       await activeConnection.rpc.request("thread/name/set", { threadId, name: trimmed });
       patchThreadName(set, get, threadId, trimmed);
+      if (previousName) {
+        useUndoStore.getState().publish({
+          label: `Renamed to "${trimmed}"`,
+          reverse: () => get().renameThread(threadId, previousName),
+        });
+      }
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -401,9 +417,16 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
 
   async archiveThread(threadId) {
     if (!activeConnection?.rpc) return;
+    const state = get();
+    const target = state.threads.find((t) => t.id === threadId);
+    const label = target?.name ?? target?.title ?? "thread";
     try {
       await activeConnection.rpc.request("thread/archive", { threadId });
       moveThreadBetweenLists(set, get, threadId, "archive");
+      useUndoStore.getState().publish({
+        label: `Archived "${label}"`,
+        reverse: () => get().unarchiveThread(threadId),
+      });
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -411,9 +434,16 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
 
   async unarchiveThread(threadId) {
     if (!activeConnection?.rpc) return;
+    const state = get();
+    const target = state.archivedThreads.find((t) => t.id === threadId);
+    const label = target?.name ?? target?.title ?? "thread";
     try {
       await activeConnection.rpc.request("thread/unarchive", { threadId });
       moveThreadBetweenLists(set, get, threadId, "unarchive");
+      useUndoStore.getState().publish({
+        label: `Unarchived "${label}"`,
+        reverse: () => get().archiveThread(threadId),
+      });
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -502,6 +532,13 @@ function registerNotificationHandlers(
       // permission-free fallback. Both no-op when the tab is focused.
       void notifyTurnFinished(event.threadId, get, "completed");
       flashTitle("Turn done");
+      void fireTurnWebhook({
+        schemaVersion: 1,
+        outcome: "completed",
+        threadId: event.threadId,
+        turnId: event.turnId,
+        timestamp: new Date().toISOString(),
+      });
     })
   );
   on(connection, "turn/failed", (params) =>
@@ -516,6 +553,14 @@ function registerNotificationHandlers(
       bumpVisitIfActive(event.threadId, set, get);
       void notifyTurnFinished(event.threadId, get, "failed", errorText);
       flashTitle("Turn failed");
+      void fireTurnWebhook({
+        schemaVersion: 1,
+        outcome: "failed",
+        threadId: event.threadId,
+        turnId: event.turnId,
+        timestamp: new Date().toISOString(),
+        errorText,
+      });
     })
   );
 
