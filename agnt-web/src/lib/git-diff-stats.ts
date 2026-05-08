@@ -18,7 +18,14 @@ export function computeDiffStats(patch: string): DiffStats {
   let deletions = 0;
   for (const rawLine of patch.split("\n")) {
     if (!rawLine) continue;
+    // Match the actual file-header markers (`--- a/path`, `+++ b/path`, with
+    // the mandatory trailing space) instead of any leading run of `+`/`-`.
+    // Otherwise a real addition like `++++value` would be silently dropped.
     if (rawLine.startsWith("+++ ") || rawLine.startsWith("--- ")) continue;
+    // Hunk markers always emit a space after the closing `@@` (`@@ -X,Y +A,B @@`).
+    // Requiring the trailing space avoids a misclassification if a content line
+    // ever started with `@@` directly (and lets `@@@` combined-diff hunks through
+    // to be counted).
     if (rawLine.startsWith("@@ ")) continue;
     if (rawLine.startsWith("diff --git")) continue;
     if (rawLine.startsWith("index ")) continue;

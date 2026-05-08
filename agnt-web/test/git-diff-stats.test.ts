@@ -32,6 +32,21 @@ describe("computeDiffStats", () => {
     expect(computeDiffStats(headerOnly)).toEqual({ insertions: 1, deletions: 0 });
   });
 
+  it("counts hunk content whose first character happens to be + or -", () => {
+    // The header-skip predicate must require a trailing space — otherwise a
+    // real addition like `++++value` (or a deletion `----value`) would be
+    // mis-classified as a file header and dropped.
+    const tricky = `diff --git a/q b/q
+index 1..2 100644
+--- a/q
++++ b/q
+@@ -1,2 +1,2 @@
+-----old-banner
+++++new-banner
+`;
+    expect(computeDiffStats(tricky)).toEqual({ insertions: 1, deletions: 1 });
+  });
+
   it("sums multiple stats objects", () => {
     expect(
       sumDiffStats([
