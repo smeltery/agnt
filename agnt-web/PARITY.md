@@ -35,10 +35,10 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `IncomingAssistant` | ✅ | 2 |
 | `IncomingPlanMode` | ✅ | 3 (turn/plan/updated, item/plan/delta, presentation transitions) |
 | `IncomingSupport` | ✅ | 3 (context-window + approvals queue + system/notice toasts) |
-| `ThreadsTurns` | ✅ | 2 (`thread/list` archived split, `thread/turns/list` cursor, `turn/start`, `turn/interrupt`) |
+| `ThreadsTurns` | ✅ | 2 + 4 (thread/list, turns/list, turn/start/interrupt, fork, name/set, archive, unarchive) |
 | `ThreadHistoryPagination` | ✅ | 2 |
-| `ThreadFork` + `ThreadForkCompatibility` | ⛔ | 4 |
-| `ThreadProjectRouting` | ⛔ | 4 |
+| `ThreadFork` + `ThreadForkCompatibility` | ✅ | 4 (no per-target-project routing yet) |
+| `ThreadProjectRouting` | 🟡 | 4 (cwd surfaced in chat header + sidebar; no project switcher UI) |
 | `Sync` | ✅ | 2 (initialize, model/list, thread/list active+archived) |
 | `Status` | 🟡 | 1 (status pill only) |
 | `RuntimeCompatibility` + `RuntimeConfig` | 🟡 | 2 (initialize round-trip + capability gate; full version negotiation in later sessions) |
@@ -84,12 +84,10 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | `CodexFuzzyFileMatch` | ⛔ | 4 |
 | `CodexRateLimitStatus` | ⛔ | 5 |
 | `CodexServiceTier` | ⛔ | 5 |
-| `GitActionModels` | ⛔ | 4 |
-| `AIChangeSetModels` | ⛔ | 4 |
-| `ContextWindowUsage` | ⛔ | 4 |
-| `PetCompanionModels` | ⛔ | 7 |
+| `GitActionModels` | 🟡 | 4 (sync/diff/commit/push subset; full worktree + stacked-action models deferred) |
+| `AIChangeSetModels` | ⛔ | future |
+| `PetCompanionModels` | ⛔ | future |
 | `AppFont` | n/a | use system fonts |
-| `CodexReasoningEffortOption` | ⛔ | 2 |
 
 ## Views
 
@@ -105,6 +103,10 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | System-notice toasts | `components/shared/NoticeStack.tsx` + `state/notices-store.ts` | ✅ (auto-dismiss, severity-aware) |
 | Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |
 | Per-turn flag bar | `components/chat/TurnFlagBar.tsx` | ✅ (model, reasoning effort, plan mode, permission mode) |
+| Chat header (title + cwd + provider) | `components/chat/ChatHeader.tsx` | ✅ |
+| Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ |
+| Git panel (status / diff / commit / push / pull) | `components/git/GitPanel.tsx` | ✅ (read + basic write; worktree + advanced flows deferred) |
+| Structured user-input prompts | `components/structured-input/StructuredInputModal.tsx` | ✅ (free text, secret, single-/multi-select) |
 | Settings | ⛔ | 5 |
 | About | ⛔ | 5 |
 | Pet | ⛔ | 7 |

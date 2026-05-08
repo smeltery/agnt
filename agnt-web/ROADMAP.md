@@ -31,7 +31,15 @@ later session because the protocol and storage layers are already complete.
 - ✅ `system/notice` toast surface with severity-aware auto-dismiss
 - 🟡 `tool/requestUserInput` structured-input prompts deferred to Session 4 (plan-mode + tool-call-input UI is meatier than what this session targeted)
 
-## Session 4 — Workspace & projects
+## Session 4 — Workspace & projects ✅ DONE (lean slice)
+
+- ✅ Thread operations: fork, rename, archive/unarchive (sidebar context menu + chat header)
+- ✅ Structured user-input prompts (`tool/requestUserInput` + `item/tool/requestUserInput`)
+- ✅ Git actions panel: status, diff, commit, push, pull
+- ✅ cwd indicator in chat header
+- 🟡 AI change sets, workspace checkpoints, workspace images, project switcher UI deferred — these need design work and aren't blocking parity
+
+## Session 4 — Workspace & projects (deferred items)
 
 - Project folders + per-thread project routing
 - AI change sets (apply / revert / view diff)

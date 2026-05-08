@@ -13,12 +13,15 @@ import {
   type ContextWindowUsage,
   decodePlanSteps,
   extractContextWindowUsage,
+  normalizeThread,
   orderCounter,
 } from "../models";
 import type { Connection } from "../protocol";
 import { buildApprovalServerRequestHandler, useApprovalsStore } from "./approvals-store";
+import { useGitStore } from "./git-store";
 import { useNoticesStore } from "./notices-store";
 import { fetchThreadTurnsPage } from "./pagination";
+import { buildStructuredInputServerRequestHandler, useStructuredInputStore } from "./structured-input-store";
 import { runPostHandshakeBootstrap, type ModelOption } from "./sync";
 import {
   applyAgentDelta,
@@ -72,6 +75,10 @@ export interface ThreadsState {
   sendTurn(threadId: string, content: string): Promise<void>;
   stopTurn(): Promise<void>;
   patchTurnFlags(patch: Partial<TurnFlags>): void;
+  forkThread(sourceThreadId: string): Promise<string | null>;
+  renameThread(threadId: string, name: string): Promise<void>;
+  archiveThread(threadId: string): Promise<void>;
+  unarchiveThread(threadId: string): Promise<void>;
   reset(): void;
 }
 
@@ -101,6 +108,8 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   async bindToConnection(connection) {
     while (teardownHandlers.length) teardownHandlers.pop()?.();
     useApprovalsStore.getState().clearAll();
+    useStructuredInputStore.getState().clearAll();
+    useGitStore.getState().reset();
     activeConnection = connection;
     registerNotificationHandlers(connection, set, get);
     registerServerRequestHandlers(connection);
@@ -168,6 +177,57 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
 
   patchTurnFlags(patch) {
     set({ turnFlags: { ...get().turnFlags, ...patch } });
+  },
+
+  async forkThread(sourceThreadId) {
+    if (!activeConnection?.rpc) return null;
+    try {
+      const response = await activeConnection.rpc.request<{ threadId?: string; thread?: { id?: string } }>(
+        "thread/fork",
+        { threadId: sourceThreadId }
+      );
+      const newThreadId = response.threadId ?? response.thread?.id;
+      if (!newThreadId) return null;
+      // Refresh the live thread list so the new thread appears in the sidebar.
+      void refreshLiveThreads(set, get);
+      await get().selectThread(newThreadId);
+      return newThreadId;
+    } catch (error) {
+      set({ error: (error as Error).message });
+      return null;
+    }
+  },
+
+  async renameThread(threadId, name) {
+    if (!activeConnection?.rpc) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      await activeConnection.rpc.request("thread/name/set", { threadId, name: trimmed });
+      patchThreadName(set, get, threadId, trimmed);
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  async archiveThread(threadId) {
+    if (!activeConnection?.rpc) return;
+    try {
+      await activeConnection.rpc.request("thread/archive", { threadId });
+      moveThreadBetweenLists(set, get, threadId, "archive");
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  async unarchiveThread(threadId) {
+    if (!activeConnection?.rpc) return;
+    try {
+      await activeConnection.rpc.request("thread/unarchive", { threadId });
+      moveThreadBetweenLists(set, get, threadId, "unarchive");
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
   },
 
   async stopTurn() {
@@ -268,6 +328,12 @@ function registerNotificationHandlers(
     if (!threadId) return;
     set({});  // touch for selector recomputation; refreshThreads pulls full data on next sync tick
   });
+  on(connection, "thread/name/updated", (params) => {
+    const threadId = readString(params, "threadId");
+    const name = readString(params, "name");
+    if (!threadId || !name) return;
+    patchThreadName(set, get, threadId, name);
+  });
   on(connection, "thread/tokenUsage/updated", (params) => {
     const threadId = readString(params, "threadId");
     if (!threadId) return;
@@ -312,10 +378,77 @@ function registerServerRequestHandlers(connection: Connection): void {
   //   item/commandExecution/requestApproval, item/fileChange/requestApproval,
   //   item/...requestApproval. We register the handler under each name we know
   //   the providers emit; unknown shapes get a "decline" reply.
-  const handler = buildApprovalServerRequestHandler();
-  const names = ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"];
-  for (const name of names) {
-    teardownHandlers.push(connection.rpc.onServerRequest(name, (params) => handler(params, name)));
+  const approvalHandler = buildApprovalServerRequestHandler();
+  for (const name of ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"]) {
+    teardownHandlers.push(connection.rpc.onServerRequest(name, (params) => approvalHandler(params, name)));
+  }
+
+  // Structured user-input prompts. Provider can emit either short or namespaced form.
+  const inputHandler = buildStructuredInputServerRequestHandler();
+  for (const name of ["tool/requestUserInput", "item/tool/requestUserInput"]) {
+    teardownHandlers.push(connection.rpc.onServerRequest(name, inputHandler));
+  }
+}
+
+// Surgical patch of the locally-cached thread name so the sidebar updates
+// without a full thread/list round-trip; the bridge will broadcast
+// thread/name/updated which will reconcile if the optimistic edit drifted.
+function patchThreadName(
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState,
+  threadId: string,
+  name: string
+): void {
+  set({
+    threads: get().threads.map((thread) => (thread.id === threadId ? { ...thread, name } : thread)),
+    archivedThreads: get().archivedThreads.map((thread) =>
+      thread.id === threadId ? { ...thread, name } : thread
+    ),
+  });
+}
+
+function moveThreadBetweenLists(
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState,
+  threadId: string,
+  direction: "archive" | "unarchive"
+): void {
+  if (direction === "archive") {
+    const target = get().threads.find((t) => t.id === threadId);
+    if (!target) return;
+    set({
+      threads: get().threads.filter((t) => t.id !== threadId),
+      archivedThreads: [{ ...target, syncState: "archivedLocal" }, ...get().archivedThreads],
+      selectedThreadId: get().selectedThreadId === threadId ? null : get().selectedThreadId,
+    });
+    return;
+  }
+  const target = get().archivedThreads.find((t) => t.id === threadId);
+  if (!target) return;
+  set({
+    archivedThreads: get().archivedThreads.filter((t) => t.id !== threadId),
+    threads: [{ ...target, syncState: "live" }, ...get().threads],
+  });
+}
+
+async function refreshLiveThreads(
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState
+): Promise<void> {
+  if (!activeConnection?.rpc) return;
+  try {
+    const result = await activeConnection.rpc.request<{ data?: unknown[]; items?: unknown[]; threads?: unknown[] }>(
+      "thread/list",
+      { limit: 50, archived: false }
+    );
+    const raw = result.data ?? result.items ?? result.threads ?? [];
+    const threads = raw
+      .map((t) => normalizeThread(t as Record<string, unknown>, { syncState: "live" }))
+      .filter((t): t is CodexThread => t !== null);
+    set({ threads });
+  } catch (error) {
+    log.warn("refreshLiveThreads failed", error);
+    void get; // silence unused
   }
 }
 

@@ -1,0 +1,134 @@
+// Per-thread git panel. Shows branch + state + dirty file list, with a
+// commit-message field and Commit/Push/Pull buttons. Diff toggles open a
+// monospaced patch view (lazy: only fetched when user opens it).
+
+import { useEffect, useState } from "react";
+import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
+import { useGitStore } from "../../state/git-store";
+
+interface GitPanelProps {
+  threadId: string;
+  rpc: JsonRpcClient | null;
+}
+
+export function GitPanel({ threadId, rpc }: GitPanelProps) {
+  const status = useGitStore((state) => state.byThread[threadId]);
+  const diff = useGitStore((state) => state.diffByThread[threadId]);
+  const loading = useGitStore((state) => Boolean(state.loadingByThread[threadId]));
+  const error = useGitStore((state) => state.errorByThread[threadId]);
+  const refreshStatus = useGitStore((state) => state.refreshStatus);
+  const refreshDiff = useGitStore((state) => state.refreshDiff);
+  const commit = useGitStore((state) => state.commit);
+  const push = useGitStore((state) => state.push);
+  const pull = useGitStore((state) => state.pull);
+
+  const [commitMessage, setCommitMessage] = useState("");
+  const [showDiff, setShowDiff] = useState(false);
+
+  useEffect(() => {
+    if (!rpc) return;
+    void refreshStatus(threadId, rpc);
+  }, [threadId, rpc, refreshStatus]);
+
+  if (!rpc) return null;
+
+  if (!status) {
+    return (
+      <div className="agnt-gitpanel agnt-gitpanel-empty">
+        <span>Git status unavailable.</span>
+        <button type="button" onClick={() => void refreshStatus(threadId, rpc)} disabled={loading}>
+          {loading ? "loading…" : "retry"}
+        </button>
+      </div>
+    );
+  }
+
+  if (!status.isGitRepository) {
+    return <div className="agnt-gitpanel agnt-gitpanel-empty">Not a git repository.</div>;
+  }
+
+  return (
+    <section className="agnt-gitpanel" aria-label="Git">
+      <header className="agnt-gitpanel-header">
+        <div className="agnt-gitpanel-branch">
+          <span className="agnt-row-tag">branch</span>
+          <strong>{status.currentBranch ?? "(detached)"}</strong>
+          {status.trackingBranch && <span className="agnt-gitpanel-tracking">↳ {status.trackingBranch}</span>}
+        </div>
+        <div className="agnt-gitpanel-counts">
+          {status.aheadCount > 0 && <span title="commits ahead of remote">↑{status.aheadCount}</span>}
+          {status.behindCount > 0 && <span title="commits behind remote">↓{status.behindCount}</span>}
+          {status.isDirty && <span className="agnt-gitpanel-dirty">dirty</span>}
+        </div>
+      </header>
+
+      {error && <div className="agnt-gitpanel-error">{error}</div>}
+
+      {status.files.length > 0 && (
+        <ul className="agnt-gitpanel-files">
+          {status.files.map((file) => (
+            <li key={file.path}>
+              <span className={"agnt-gitpanel-file-status agnt-gitpanel-file-status-" + (file.status[0] ?? "?").toLowerCase()}>
+                {file.status || "?"}
+              </span>
+              <code>{file.path}</code>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="agnt-gitpanel-actions">
+        <input
+          type="text"
+          className="agnt-gitpanel-message"
+          placeholder="Commit message"
+          value={commitMessage}
+          onChange={(event) => setCommitMessage(event.target.value)}
+          disabled={loading}
+        />
+        <button
+          type="button"
+          className="agnt-button-primary"
+          onClick={() => {
+            void commit(threadId, rpc, commitMessage);
+            setCommitMessage("");
+          }}
+          disabled={loading || !status.isDirty || !commitMessage.trim()}
+        >
+          Commit
+        </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => void push(threadId, rpc)}
+          disabled={loading || !status.canPush}
+        >
+          Push
+        </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => void pull(threadId, rpc)}
+          disabled={loading || status.behindCount === 0}
+        >
+          Pull
+        </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => {
+            const next = !showDiff;
+            setShowDiff(next);
+            if (next) void refreshDiff(threadId, rpc);
+          }}
+          disabled={loading}
+        >
+          {showDiff ? "Hide diff" : "View diff"}
+        </button>
+      </div>
+
+      {showDiff && diff && <pre className="agnt-gitpanel-diff">{diff}</pre>}
+      {showDiff && !diff && <div className="agnt-gitpanel-empty">No diff yet.</div>}
+    </section>
+  );
+}

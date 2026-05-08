@@ -10,6 +10,7 @@ import { ChatView } from "../chat/ChatView";
 import { Sidebar } from "../sidebar/Sidebar";
 import { NoticeStack } from "../shared/NoticeStack";
 import { StatusPill } from "../shared/StatusPill";
+import { StructuredInputModal } from "../structured-input/StructuredInputModal";
 
 export function Workspace() {
   const status = useConnectionStore((state) => state.status);
@@ -43,6 +44,7 @@ export function Workspace() {
       </div>
       <NoticeStack />
       <ApprovalModal />
+      <StructuredInputModal />
     </div>
   );
 }

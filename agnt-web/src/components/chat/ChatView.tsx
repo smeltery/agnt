@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import { fractionUsed } from "../../models";
+import { useConnectionStore } from "../../state/connection-store";
 import {
   selectActiveMessages,
   selectActiveTurnRunning,
   useThreadsStore,
 } from "../../state/threads-store";
+import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
 import { MessageRow } from "./rows";
 import { TurnFlagBar } from "./TurnFlagBar";
@@ -19,6 +21,7 @@ export function ChatView() {
   const usage = useThreadsStore((state) =>
     selectedThreadId ? state.contextUsageByThread[selectedThreadId] : undefined
   );
+  const connection = useConnectionStore((state) => state.connection);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,6 +30,7 @@ export function ChatView() {
 
   return (
     <main className="agnt-chat">
+      <ChatHeader rpc={connection?.rpc ?? null} />
       {usage && (
         <div className="agnt-context-bar" title={`${usage.tokensUsed.toLocaleString()} / ${usage.tokenLimit.toLocaleString()} tokens used`}>
           <div className="agnt-context-bar-fill" style={{ width: `${(fractionUsed(usage) * 100).toFixed(0)}%` }} />

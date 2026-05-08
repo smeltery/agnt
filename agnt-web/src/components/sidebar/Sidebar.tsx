@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { CodexThread } from "../../models";
 import { useThreadsStore } from "../../state/threads-store";
+import { ThreadContextMenu } from "./ThreadContextMenu";
 
 type SidebarTab = "live" | "archived";
 
@@ -68,15 +69,12 @@ function SidebarTabButton({
 function SidebarRow({ thread, selected, onSelect }: { thread: CodexThread; selected: boolean; onSelect: () => void }) {
   const title = thread.name ?? thread.title ?? "Untitled";
   return (
-    <li>
-      <button
-        type="button"
-        className={"agnt-sidebar-thread" + (selected ? " agnt-sidebar-thread-selected" : "")}
-        onClick={onSelect}
-      >
+    <li className={"agnt-sidebar-row" + (selected ? " agnt-sidebar-row-selected" : "")}>
+      <button type="button" className="agnt-sidebar-thread" onClick={onSelect}>
         <span className="agnt-sidebar-thread-title">{title}</span>
         {thread.cwd && <span className="agnt-sidebar-thread-cwd">{thread.cwd}</span>}
       </button>
+      <ThreadContextMenu thread={thread} />
     </li>
   );
 }
