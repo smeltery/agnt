@@ -12,6 +12,7 @@ import {
 import { loadOrCreatePhoneIdentity } from "../storage/identity-store";
 import { pairingStore, SavedRelayPairing } from "../storage/pairing-store";
 import { useLatencyStore } from "./latency-store";
+import { useNoticesStore } from "./notices-store";
 import { useThreadsStore } from "./threads-store";
 
 export interface ConnectionState {
@@ -24,6 +25,10 @@ export interface ConnectionState {
   reconnect(): Promise<void>;
   forget(): Promise<void>;
 }
+
+// Track the previous status kind so transitions emit at most one disconnect
+// toast per drop. Module-scoped so it survives across `connect` calls.
+let previousStatusKind: ConnectionStatus["kind"] = "idle";
 
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
   status: { kind: "idle" },
@@ -105,6 +110,22 @@ async function connect(
     lastAppliedBridgeOutboundSeq: saved.lastAppliedBridgeOutboundSeq,
     onStatus(status) {
       set({ status });
+      // Emit a one-shot toast on `open → (closed|error)` so users know their
+      // typing isn't lost. Drafts already debounce-persist to IndexedDB
+      // (Session 19); the toast is the *visible* signal that the local
+      // backup exists. Only fires on the transition, not on every
+      // closed-state re-emit, and only when there was previously an active
+      // session worth losing.
+      const previous = previousStatusKind;
+      previousStatusKind = status.kind;
+      if (previous === "open" && (status.kind === "closed" || status.kind === "error")) {
+        useNoticesStore.getState().enqueue({
+          severity: "warn",
+          title: "Connection lost",
+          message: "Your in-progress drafts are saved locally. Reconnect to keep going.",
+          durationMs: 8_000,
+        });
+      }
       if (status.kind === "open") {
         void useThreadsStore.getState().bindToConnection(connection);
         if (handshakeMode === "qr_bootstrap") {

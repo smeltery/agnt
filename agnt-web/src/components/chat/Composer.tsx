@@ -12,6 +12,7 @@ import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-s
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
 import { ComposerFindReplace } from "./ComposerFindReplace";
+import { MarkdownContent } from "./MarkdownContent";
 import { useVoiceStore } from "../../state/voice-store";
 import { draftsStore } from "../../storage/drafts-store";
 import { VoiceButton } from "./VoiceButton";
@@ -30,6 +31,8 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   const [attachError, setAttachError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Composer history: up-arrow at an empty draft (or while the cursor is
@@ -651,20 +654,37 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
           onClose={() => setFindReplaceOpen(false)}
         />
       )}
-      <textarea
-        ref={textareaRef}
-        id="agnt-composer-input"
-        className="agnt-composer-input"
-        value={draft}
-        onChange={(event) => onDraftChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleCaretMove}
-        onClick={handleCaretMove}
-        onPaste={handlePaste}
-        placeholder="Send a turn… (⌘/Ctrl+Enter; / for commands; @ to reference a file; paste or drop images and text files)"
-        rows={3}
-        spellCheck={false}
-      />
+      <div className={"agnt-composer-editor" + (previewOpen ? " agnt-composer-editor-split" : "")}>
+        <textarea
+          ref={textareaRef}
+          id="agnt-composer-input"
+          className="agnt-composer-input"
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleCaretMove}
+          onClick={handleCaretMove}
+          onPaste={handlePaste}
+          placeholder="Send a turn… (⌘/Ctrl+Enter; / for commands; @ to reference a file; paste or drop images and text files)"
+          rows={3}
+          spellCheck={false}
+        />
+        {previewOpen && (
+          <div
+            className="agnt-composer-preview"
+            aria-label="Markdown preview"
+            // Keep the preview scroll bounded to the same height as the
+            // textarea so a long draft doesn't push the actions row off-screen.
+            style={{ maxHeight: textareaRef.current?.clientHeight ?? 220 }}
+          >
+            {draft.trim() ? (
+              <MarkdownContent text={draft} cwd={mentionCwd} />
+            ) : (
+              <span className="agnt-composer-preview-empty">Preview renders here while you type.</span>
+            )}
+          </div>
+        )}
+      </div>
       <input
         ref={fileInputRef}
         type="file"
@@ -689,6 +709,32 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
           📎
         </button>
         <VoiceButton />
+        <PromptHistoryDropdown
+          open={historyOpen}
+          history={userPromptHistory}
+          onOpenChange={setHistoryOpen}
+          onPick={(text) => {
+            setDraft(text);
+            setHistoryCursor(-1);
+            draftBeforeRecallRef.current = "";
+            setHistoryOpen(false);
+            requestAnimationFrame(() => {
+              const ta = textareaRef.current;
+              if (!ta) return;
+              ta.focus();
+              ta.setSelectionRange(text.length, text.length);
+            });
+          }}
+        />
+        <button
+          type="button"
+          className={"agnt-button-ghost" + (previewOpen ? " agnt-button-ghost-active" : "")}
+          onClick={() => setPreviewOpen((open) => !open)}
+          title={previewOpen ? "Hide markdown preview" : "Show markdown preview"}
+          aria-pressed={previewOpen}
+        >
+          👁
+        </button>
         {running ? (
           <button type="button" className="agnt-button-danger" onClick={onStop}>
             Stop
@@ -704,6 +750,89 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         )}
       </div>
     </form>
+  );
+}
+
+// Reveals the active thread's past user prompts as a dropdown so users can
+// pick one to drop into the draft without hunting for ↑-arrow recall mode.
+// Closes on outside click, on Esc, and after any pick. Newest-first; long
+// prompts are truncated for display only — picking still drops the full text.
+function PromptHistoryDropdown({
+  open,
+  history,
+  onPick,
+  onOpenChange,
+}: {
+  open: boolean;
+  history: string[];
+  onPick(text: string): void;
+  onOpenChange(open: boolean): void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!ref.current) return;
+      if (!ref.current.contains(event.target as Node)) onOpenChange(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onOpenChange(false);
+    };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onOpenChange]);
+
+  if (history.length === 0) {
+    return (
+      <button
+        type="button"
+        className="agnt-button-ghost agnt-button-ghost-disabled"
+        title="No prompt history yet for this thread"
+        disabled
+      >
+        ↺
+      </button>
+    );
+  }
+
+  // Newest first; cap at 25 so the dropdown stays scannable on long threads.
+  // Anything older is reachable via the existing ↑ arrow recall.
+  const recent = history.slice(-25).reverse();
+
+  return (
+    <div className="agnt-prompt-history" ref={ref}>
+      <button
+        type="button"
+        className={"agnt-button-ghost" + (open ? " agnt-button-ghost-active" : "")}
+        onClick={() => onOpenChange(!open)}
+        title={open ? "Close prompt history" : "Browse past prompts"}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+      >
+        ↺
+      </button>
+      {open && (
+        <div className="agnt-prompt-history-popover" role="listbox" aria-label="Prompt history">
+          {recent.map((text, index) => (
+            <button
+              key={index}
+              type="button"
+              role="option"
+              className="agnt-prompt-history-item"
+              onClick={() => onPick(text)}
+              aria-selected={false}
+              title={text}
+            >
+              {text.length > 80 ? text.slice(0, 77).trimEnd() + "…" : text}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -2144,3 +2144,128 @@ button {
   gap: 8px;
   margin-top: 6px;
 }
+
+/* Session 31 — inline rename, provider color badge, hunk-collapse, prompt
+   history dropdown, composer markdown preview, settings search. */
+
+.agnt-sidebar-thread-rename {
+  font: inherit;
+  color: var(--agnt-fg);
+  background: var(--agnt-bg);
+  border: 1px solid var(--agnt-accent);
+  border-radius: 4px;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+}
+.agnt-sidebar-row-editing .agnt-sidebar-thread { background: var(--agnt-bg-elev-2); }
+
+/* Provider badge color tones — pick distinct hues that survive the
+   light/dark theme swap. We tint the existing `.agnt-row-tag` pill. */
+.agnt-provider-codex { background: rgba(110, 138, 255, 0.18); color: #8aa3ff; }
+.agnt-provider-claude { background: rgba(255, 159, 90, 0.18); color: #f0a36a; }
+.agnt-provider-opencode { background: rgba(105, 200, 130, 0.18); color: #6cd07a; }
+.agnt-provider-cursor { background: rgba(220, 130, 200, 0.18); color: #d893bd; }
+.agnt-provider-other { /* falls through to the default agnt-row-tag tone */ }
+
+[data-theme="light"] .agnt-provider-codex { color: #3257d6; }
+[data-theme="light"] .agnt-provider-claude { color: #b56b07; }
+[data-theme="light"] .agnt-provider-opencode { color: #1d7c3c; }
+[data-theme="light"] .agnt-provider-cursor { color: #8a3173; }
+
+/* Hunk-collapse toggle in DiffView. Header line stays inline so the patch
+   keeps its monospace alignment; chevron flips horizontally on collapse. */
+.agnt-diff-hunk-toggle {
+  cursor: pointer;
+  display: inline;
+}
+.agnt-diff-hunk-toggle:hover { background: var(--agnt-bg-elev-2); }
+.agnt-diff-hunk-chevron {
+  display: inline-block;
+  width: 1ch;
+  margin-right: 4px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-diff-hunk-summary { color: var(--agnt-fg-dim); font-size: 0.92em; }
+
+.agnt-prompt-history { position: relative; display: inline-block; }
+.agnt-prompt-history-popover {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 280px;
+  max-width: 480px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--agnt-bg-elev);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+}
+.agnt-prompt-history-item {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--agnt-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agnt-prompt-history-item:last-child { border-bottom: 0; }
+.agnt-prompt-history-item:hover { background: var(--agnt-bg-elev-2); }
+
+.agnt-button-ghost-active {
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+}
+.agnt-button-ghost-disabled { opacity: 0.45; cursor: not-allowed; }
+
+.agnt-composer-editor { display: flex; flex-direction: column; gap: 0; }
+.agnt-composer-editor-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.agnt-composer-editor-split .agnt-composer-input { resize: vertical; }
+.agnt-composer-preview {
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-size: 13px;
+  /* Keep the preview pane comfortable to read alongside source markdown. */
+  line-height: 1.5;
+}
+.agnt-composer-preview-empty {
+  color: var(--agnt-fg-dim);
+  font-style: italic;
+}
+@media (max-width: 768px) {
+  .agnt-composer-editor-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+}
+
+.agnt-settings-search {
+  flex: 1;
+  margin-right: 8px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--agnt-fg);
+}
+.agnt-settings-search::placeholder { color: var(--agnt-fg-dim); }

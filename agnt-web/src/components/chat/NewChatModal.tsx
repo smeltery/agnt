@@ -8,12 +8,18 @@ import { useThreadsStore } from "../../state/threads-store";
 interface NewChatModalProps {
   onClose(): void;
   onPickProject(callback: (path: string) => void): void;
+  /** Pre-filled cwd — used by the "Duplicate thread" context-menu action so a
+   *  cloned thread inherits the source's project without an extra click. */
+  initialCwd?: string;
+  /** Pre-filled prompt — used by Duplicate so the user can review/tweak the
+   *  starter turn before it ships. */
+  initialPrompt?: string;
 }
 
-export function NewChatModal({ onClose, onPickProject }: NewChatModalProps) {
+export function NewChatModal({ onClose, onPickProject, initialCwd, initialPrompt }: NewChatModalProps) {
   const startNewThread = useThreadsStore((state) => state.startNewThread);
-  const [prompt, setPrompt] = useState("");
-  const [cwd, setCwd] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState(initialPrompt ?? "");
+  const [cwd, setCwd] = useState<string | null>(initialCwd ?? null);
   const [submitting, setSubmitting] = useState(false);
 
   async function submit(event: React.FormEvent) {

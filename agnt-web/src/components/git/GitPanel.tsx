@@ -30,6 +30,8 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
   const commit = useGitStore((state) => state.commit);
   const push = useGitStore((state) => state.push);
   const pull = useGitStore((state) => state.pull);
+  const stash = useGitStore((state) => state.stash);
+  const stashPop = useGitStore((state) => state.stashPop);
 
   const [commitMessage, setCommitMessage] = useState("");
   const [showBranches, setShowBranches] = useState(false);
@@ -191,6 +193,24 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
           disabled={loading || status.behindCount === 0}
         >
           Pull
+        </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => void stash(threadId, rpc)}
+          disabled={loading || !status.isDirty}
+          title="git stash push --include-untracked: save the working tree for later"
+        >
+          Stash
+        </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => void stashPop(threadId, rpc)}
+          disabled={loading || status.isDirty}
+          title="git stash pop: restore the most recent stash. Disabled when the working tree is dirty so a stash pop can't conflict with uncommitted changes."
+        >
+          Stash pop
         </button>
         <button
           type="button"

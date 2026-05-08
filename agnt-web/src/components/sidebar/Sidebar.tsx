@@ -477,6 +477,23 @@ function SidebarRow({
   onDrop?(): void;
 }) {
   const title = thread.name ?? thread.title ?? "Untitled";
+  const renameThread = useThreadsStore((state) => state.renameThread);
+  // Inline rename: double-click the title to swap the row into edit mode.
+  // Enter commits the rename via threads-store; Esc / blur reverts.
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(title);
+
+  function startEditing() {
+    if (selectMode) return;
+    setDraftName(title);
+    setEditing(true);
+  }
+  function commitEdit() {
+    const trimmed = draftName.trim();
+    if (trimmed && trimmed !== title) void renameThread(thread.id, trimmed);
+    setEditing(false);
+  }
+
   return (
     <li
       className={
@@ -487,6 +504,7 @@ function SidebarRow({
         + (color ? ` agnt-sidebar-row-color agnt-thread-color-${color}` : "")
         + (isDragSource ? " agnt-sidebar-row-dragging" : "")
         + (isDropTarget ? " agnt-sidebar-row-drop-target" : "")
+        + (editing ? " agnt-sidebar-row-editing" : "")
       }
       draggable={draggable}
       onDragStart={(event) => {
@@ -515,6 +533,10 @@ function SidebarRow({
         type="button"
         className="agnt-sidebar-thread"
         onClick={onSelect}
+        onDoubleClick={(event) => {
+          event.preventDefault();
+          startEditing();
+        }}
         aria-pressed={selectMode ? checked : undefined}
       >
         <span className="agnt-sidebar-thread-title">
@@ -537,7 +559,29 @@ function SidebarRow({
               ★
             </span>
           )}
-          {title}
+          {editing ? (
+            <input
+              type="text"
+              autoFocus
+              className="agnt-sidebar-thread-rename"
+              value={draftName}
+              onChange={(event) => setDraftName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitEdit();
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  setEditing(false);
+                }
+              }}
+              onClick={(event) => event.stopPropagation()}
+              onBlur={commitEdit}
+              aria-label={`Rename ${title}`}
+            />
+          ) : (
+            title
+          )}
         </span>
         {thread.cwd && <span className="agnt-sidebar-thread-cwd">{thread.cwd}</span>}
       </button>

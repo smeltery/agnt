@@ -143,13 +143,20 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |
 | Per-turn flag bar | `components/chat/TurnFlagBar.tsx` | ✅ (model, reasoning effort, plan mode, permission mode) |
 | Voice composer button | `components/chat/VoiceButton.tsx` + `state/voice-store.ts` + `lib/audio-encode.ts` | ✅ (record → resample → WAV → voice/transcribe; final transcript drops into composer draft) |
-| Settings | `components/settings/SettingsModal.tsx` + `state/account-store.ts` | ✅ (connection info, account status, trusted-Mac mgmt with forget) |
+| Settings | `components/settings/SettingsModal.tsx` + `state/account-store.ts` | ✅ (connection info, account status, trusted-Mac mgmt with forget; Session 31 adds a search-as-you-type filter that hides sections by keyword tags) |
 | State backup / restore | `lib/state-backup.ts` + `storage/idb.ts:keys` + Settings "Backup & restore" section | ✅ (Session 30; exports `prefs.*` + `messages:*` keys to a versioned JSON file; identity + pairing keys hard-blocklisted; import overwrites matching keys + prompts a reload) |
 | Per-turn timing chip | `state/turn-timing-store.ts` + `components/chat/rows/AssistantRow.tsx` | ✅ (Session 30; records start/end ms by turnId; `⏱ N.Ns` chip on completed assistant rows; memory-only, retention capped at 200 turns/thread) |
 | About | `components/settings/AboutModal.tsx` | ✅ (version, source link, license) |
 | Chat header (title + cwd + provider) | `components/chat/ChatHeader.tsx` | ✅ |
-| Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ |
-| Git panel (status / diff / branches / commit / push / pull / checkout / create-branch / create-worktree) | `components/git/GitPanel.tsx` | ✅ (Sessions 4 + 8 + 11 + 30; Session 30 adds a header total chip from `git/status.diffTotals` and inline `+N −M` chips per dirty file via `lib/git-diff-stats.ts`; managed-worktree handoff + stacked actions deferred) |
+| Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ (Session 31 adds Duplicate… via `state/new-chat-prefill-store.ts`, plus inline rename via double-click on the thread row) |
+| Sidebar inline rename | `components/sidebar/Sidebar.tsx:SidebarRow` + `state/threads-store.ts:renameThread` | ✅ (Session 31; double-click the title to swap into an input; Enter commits, Esc/blur reverts) |
+| Provider color badge | `components/chat/ChatHeader.tsx:providerSlug` + `agnt-provider-*` CSS | ✅ (Session 31; tints the existing tag for codex / claude / opencode / cursor; light + dark theme tones) |
+| Vim-style chat jump (`gg` / `G`) | `components/chat/ChatView.tsx` | ✅ (Session 31; double-press `g` within 600ms scrolls to top; `G` jumps to latest) |
+| Slow-response toast (15s without output) | `state/slow-response-watcher.ts` | ✅ (Session 31; armed on `turn/started`, cancelled on terminal frames; surfaces as an info notice via `notices-store`) |
+| Disconnect drafts-saved toast | `state/connection-store.ts:onStatus` | ✅ (Session 31; one-shot warn notice on `open → closed/error` so users know their drafts persist locally even though the link dropped) |
+| Composer markdown preview | `components/chat/Composer.tsx` + `MarkdownContent` | ✅ (Session 31; toggle button in the actions row swaps the editor into a side-by-side preview; stacked layout below 768px) |
+| Composer prompt history dropdown | `components/chat/Composer.tsx:PromptHistoryDropdown` | ✅ (Session 31; ↺ button reveals the active thread's recent user prompts; clicking drops the full text into the draft) |
+| Git panel (status / diff / branches / commit / push / pull / stash / stashPop / checkout / create-branch / create-worktree) | `components/git/GitPanel.tsx` | ✅ (Sessions 4 + 8 + 11 + 30 + 31; Session 31 adds quick `Stash` / `Stash pop` buttons (gated on dirty/clean tree respectively) plus per-hunk collapse in `DiffView` via `lib/diff-hunk-grouper.ts`; managed-worktree handoff + stacked actions deferred) |
 | Structured user-input prompts | `components/structured-input/StructuredInputModal.tsx` | ✅ (free text, secret, single-/multi-select) |
 | Pet | ⛔ dropped | iOS-specific UX |
 | Payments | ⛔ n/a | StoreKit doesn't apply to self-hosted web |
