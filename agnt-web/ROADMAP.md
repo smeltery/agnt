@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 13 — Theme + export + lazy code-highlight ✅ DONE
+
+- ✅ Light theme via CSS-variable swap with explicit Auto/Light/Dark picker; system pref honored in Auto. Prism token colors recolored for the light palette so code blocks stay legible.
+- ✅ Export thread to Markdown from the sidebar context menu — renders user / assistant / reasoning / command / file change / plan / failed-turn rows with sensible delimiters; `<details>` for collapsible reasoning + command output so GitHub renders cleanly.
+- ✅ Lazy-load Prism language packs. Replaced 11 static imports with dynamic loaders + an `ensureLanguage` ready hook in `MarkdownContent`. Plain HTML-escaped fallback paints immediately while the chunk fetches. Main bundle: 335 KB JS / 108 KB gzipped (−5 KB gzip vs Session 12; per-language chunks 0.3–3 KB each).
+
 ## Session 12 — Polish + doc accuracy ✅ DONE
 
 - ✅ Doc accuracy pass: PARITY.md staleness fixes (manual pairing-code resolver was already shipped, account row deduped, TrustedPairPresentation flipped to ✅, CodexModelOption noted as inline-ported, GitActionModels updated for create-branch + create-worktree, bridge-blocked surfaces explicitly tagged); agnt-web README status line refreshed; top-level README quickstart now walks both clients; AGENTS.md + CLAUDE.md acknowledge the web client in the first guardrail.

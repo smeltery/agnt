@@ -6,11 +6,13 @@
 import { useEffect, useState } from "react";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
+import { useThemeStore } from "../../state/theme-store";
 import {
   pairingStore,
   type TrustedMacRecord,
   type TrustedMacRegistry,
 } from "../../storage/pairing-store";
+import type { ThemePreference } from "../../storage/prefs-store";
 
 export function SettingsModal({ onClose }: { onClose(): void }) {
   const status = useConnectionStore((state) => state.status);
@@ -18,6 +20,8 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
   const forgetCurrent = useConnectionStore((state) => state.forget);
   const account = useAccountStore((state) => state.snapshot);
   const refreshAccount = useAccountStore((state) => state.refresh);
+  const theme = useThemeStore((state) => state.theme);
+  const setTheme = useThemeStore((state) => state.setTheme);
   const [registry, setRegistry] = useState<TrustedMacRegistry | null>(null);
 
   useEffect(() => {
@@ -52,6 +56,27 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             ×
           </button>
         </header>
+
+        <section className="agnt-settings-section">
+          <h3>Appearance</h3>
+          <div className="agnt-settings-row">
+            <span>Theme</span>
+            <div className="agnt-settings-segments" role="radiogroup" aria-label="Theme">
+              {(["auto", "light", "dark"] as ThemePreference[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={theme === value}
+                  className={"agnt-settings-segment" + (theme === value ? " agnt-settings-segment-active" : "")}
+                  onClick={() => void setTheme(value)}
+                >
+                  {value === "auto" ? "Auto" : value === "light" ? "Light" : "Dark"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
 
         <section className="agnt-settings-section">
           <h3>Connection</h3>

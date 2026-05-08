@@ -3,6 +3,7 @@
 // action runs and closes the menu.
 
 import { useEffect, useRef, useState } from "react";
+import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from "../../lib/thread-export";
 import type { CodexThread } from "../../models";
 import { useThreadsStore } from "../../state/threads-store";
 
@@ -18,6 +19,14 @@ export function ThreadContextMenu({ thread }: Props) {
   const unarchiveThread = useThreadsStore((state) => state.unarchiveThread);
   const forkThread = useThreadsStore((state) => state.forkThread);
   const compactThread = useThreadsStore((state) => state.compactThread);
+  const exportMessages = useThreadsStore(
+    (state) => state.reducerStates[thread.id]?.messages ?? []
+  );
+
+  function exportThread() {
+    const markdown = exportThreadToMarkdown({ thread, messages: exportMessages });
+    downloadMarkdown(defaultExportFilename(thread.name ?? thread.title), markdown);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +91,15 @@ export function ThreadContextMenu({ thread }: Props) {
             title="Summarize older turns to free context window space"
           >
             Compact thread…
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={action(() => exportThread())}
+            disabled={exportMessages.length === 0}
+            title={exportMessages.length === 0 ? "No messages to export yet" : "Download a Markdown copy"}
+          >
+            Export to Markdown
           </button>
           {thread.syncState === "live" ? (
             <button type="button" role="menuitem" onClick={action(() => archiveThread(thread.id))}>

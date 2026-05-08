@@ -3,6 +3,7 @@
 
 import { useEffect } from "react";
 import { useConnectionStore } from "./state/connection-store";
+import { useThemeStore } from "./state/theme-store";
 import { PairingScreen } from "./components/pairing/PairingScreen";
 import { Workspace } from "./components/workspace/Workspace";
 import { LoadingScreen } from "./components/shared/LoadingScreen";
@@ -12,11 +13,13 @@ export function App() {
   const saved = useConnectionStore((state) => state.saved);
   const status = useConnectionStore((state) => state.status);
   const hydrate = useConnectionStore((state) => state.hydrate);
+  const hydrateTheme = useThemeStore((state) => state.hydrate);
   const reconnect = useConnectionStore((state) => state.reconnect);
 
   useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+    // Theme hydrates first to avoid a flash of wrong palette.
+    void hydrateTheme().then(() => hydrate());
+  }, [hydrate, hydrateTheme]);
 
   useEffect(() => {
     if (!bootstrapping && saved && status.kind === "idle") {

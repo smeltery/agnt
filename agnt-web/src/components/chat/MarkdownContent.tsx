@@ -8,9 +8,9 @@
 // nested lists, or HTML inline tags — bundle stays small and the output
 // stays predictable.
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
-import { highlightCode, resolveLanguage } from "./syntax-highlight";
+import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
 
 const INLINE_CODE_PATTERN = /`([^`\n]+)`/g;
 const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
@@ -58,16 +58,41 @@ function renderBlock(block: MarkdownBlock): ReactNode {
 }
 
 function renderFence(language: string | null, body: string): ReactNode {
-  const resolved = resolveLanguage(language ?? undefined);
+  return <CodeBlock language={language} body={body} />;
+}
+
+/**
+ * Code-fence renderer that lazy-loads the requested Prism language. While the
+ * grammar is being fetched we render plain (HTML-escaped) text — same shape
+ * as the highlighted output so the layout doesn't shift when the chunk lands.
+ */
+function CodeBlock({ language, body }: { language: string | null; body: string }) {
+  const canonical = knownLanguage(language ?? undefined);
+  const [ready, setReady] = useState(canonical ? isLanguageReady(canonical) : false);
+
+  useEffect(() => {
+    if (!canonical || ready) return;
+    let cancelled = false;
+    void ensureLanguage(canonical).then((ok) => {
+      if (!cancelled && ok) setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canonical, ready]);
+
   return (
-    <pre className={"agnt-md-pre" + (resolved ? " agnt-md-lang-" + resolved : "")}>
-      {resolved ? (
+    <pre className={"agnt-md-pre" + (canonical ? " agnt-md-lang-" + canonical : "")}>
+      {canonical && ready ? (
         <code
-          className={"language-" + resolved}
-          dangerouslySetInnerHTML={{ __html: highlightCode(body, resolved) }}
+          className={"language-" + canonical}
+          dangerouslySetInnerHTML={{ __html: highlightCode(body, canonical) }}
         />
       ) : (
-        <code>{body}</code>
+        <code
+          className={canonical ? "language-" + canonical : undefined}
+          dangerouslySetInnerHTML={{ __html: escapeHtml(body) }}
+        />
       )}
     </pre>
   );

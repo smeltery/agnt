@@ -124,6 +124,9 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Image attachments (composer + user-row thumbs) | `components/chat/Composer.tsx` + `lib/image-attach.ts` + `models/message.ts:ImageAttachment` | ✅ (file picker, paste, drag-drop, canvas-downscaled thumbnails, sent as `params.input[].image`) |
 | Branch + worktree creation | `components/git/GitPanel.tsx` + `state/git-store.ts:createBranch/createWorktree` | ✅ (basic flow; managed-worktree handoff + stacked actions still deferred) |
 | Service worker (offline app shell) | `public/sw.js` | ✅ (production-only registration; cache-first hashed assets, network-first navigations, never caches relay/WS) |
+| Theme picker (Auto / Light / Dark) | `state/theme-store.ts` + `storage/prefs-store.ts:applyThemeToDocument` + Settings segmented control | ✅ (Session 13; persisted to IndexedDB, respects `prefers-color-scheme` in Auto, Prism token colors recoloured for light) |
+| Export thread to Markdown | `lib/thread-export.ts` + sidebar context menu | ✅ (Session 13; renders user / assistant / reasoning / command / file change / plan / failed-turn rows) |
+| Lazy-load Prism language packs | `components/chat/syntax-highlight.ts` | ✅ (Session 13; per-language Vite chunks fetched on first use, ~5 KB gzip off the main bundle) |
 | Inline failed-turn rows | `components/chat/rows/index.tsx` (`role: "system"` + `deliveryState: "failed"`) | ✅ (Session 12; replaces the global error banner for turn failures) |
 | Reconnect banner | `components/shared/ReconnectBanner.tsx` | ✅ (Session 12; visible during `connecting` / `handshaking` after first successful pair) |
 | Stop button in chat header | `components/chat/ChatHeader.tsx` | ✅ (Session 12; mirrors composer Stop so it's reachable while scrolled up) |

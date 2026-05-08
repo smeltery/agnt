@@ -1,4 +1,8 @@
-/* Minimal dark theme. Visual polish + responsive layout land in the UI session. */
+/* Theme tokens. The default :root values define the dark palette so anything
+   that ignores the [data-theme] attribute (e.g. an HTML preview) still looks
+   right. [data-theme="light"] overrides for the light palette. The Auto mode
+   in Settings just unsets [data-theme] and lets prefers-color-scheme:light
+   kick in via the @media block at the end. */
 
 :root {
   --agnt-bg: #0b0c0f;
@@ -13,6 +17,37 @@
   --agnt-ok: #5fd07a;
   --agnt-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --agnt-radius: 10px;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --agnt-bg: #f6f7fa;
+  --agnt-bg-elev: #ffffff;
+  --agnt-bg-elev-2: #eef0f5;
+  --agnt-border: #d3d7df;
+  --agnt-fg: #1b1d22;
+  --agnt-fg-dim: #5b6271;
+  --agnt-accent: #3257d6;
+  --agnt-danger: #c83142;
+  --agnt-warn: #b56b07;
+  --agnt-ok: #1d7c3c;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --agnt-bg: #f6f7fa;
+    --agnt-bg-elev: #ffffff;
+    --agnt-bg-elev-2: #eef0f5;
+    --agnt-border: #d3d7df;
+    --agnt-fg: #1b1d22;
+    --agnt-fg-dim: #5b6271;
+    --agnt-accent: #3257d6;
+    --agnt-danger: #c83142;
+    --agnt-warn: #b56b07;
+    --agnt-ok: #1d7c3c;
+    color-scheme: light;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -842,6 +877,45 @@ button {
   font-family: var(--agnt-mono);
   font-size: 12px;
 }
+/* Prism's prism-tomorrow theme is dark-only. The light overrides below give
+   readable token colors when the user picks a light theme; we keep tomorrow
+   for dark because it's still the most legible default. */
+[data-theme="light"] .agnt-md-pre code[class*="language-"] { color: #1b1d22; }
+[data-theme="light"] .token.comment,
+[data-theme="light"] .token.prolog,
+[data-theme="light"] .token.doctype,
+[data-theme="light"] .token.cdata { color: #6a737d; }
+[data-theme="light"] .token.punctuation { color: #1b1d22; }
+[data-theme="light"] .token.keyword,
+[data-theme="light"] .token.tag { color: #b1284c; }
+[data-theme="light"] .token.string,
+[data-theme="light"] .token.attr-value,
+[data-theme="light"] .token.char { color: #1d7c3c; }
+[data-theme="light"] .token.number,
+[data-theme="light"] .token.constant,
+[data-theme="light"] .token.builtin { color: #b56b07; }
+[data-theme="light"] .token.function,
+[data-theme="light"] .token.class-name { color: #3257d6; }
+[data-theme="light"] .token.operator,
+[data-theme="light"] .token.entity,
+[data-theme="light"] .token.url { color: #5b6271; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .agnt-md-pre code[class*="language-"] { color: #1b1d22; }
+  :root:not([data-theme]) .token.comment,
+  :root:not([data-theme]) .token.prolog,
+  :root:not([data-theme]) .token.doctype,
+  :root:not([data-theme]) .token.cdata { color: #6a737d; }
+  :root:not([data-theme]) .token.keyword,
+  :root:not([data-theme]) .token.tag { color: #b1284c; }
+  :root:not([data-theme]) .token.string,
+  :root:not([data-theme]) .token.attr-value,
+  :root:not([data-theme]) .token.char { color: #1d7c3c; }
+  :root:not([data-theme]) .token.number,
+  :root:not([data-theme]) .token.constant,
+  :root:not([data-theme]) .token.builtin { color: #b56b07; }
+  :root:not([data-theme]) .token.function,
+  :root:not([data-theme]) .token.class-name { color: #3257d6; }
+}
 
 .agnt-voice { display: flex; align-items: center; gap: 8px; }
 .agnt-voice-button {
@@ -1178,6 +1252,32 @@ button {
   margin-left: auto;
   align-items: center;
 }
+
+.agnt-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.agnt-settings-segments {
+  display: inline-flex;
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.agnt-settings-segment {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--agnt-border);
+  color: var(--agnt-fg-dim);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.agnt-settings-segment:last-child { border-right: 0; }
+.agnt-settings-segment:hover { color: var(--agnt-fg); }
+.agnt-settings-segment-active { background: var(--agnt-bg-elev-2); color: var(--agnt-fg); }
 
 .agnt-status-pill {
   font-size: 11px;

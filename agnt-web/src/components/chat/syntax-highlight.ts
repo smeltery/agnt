@@ -1,20 +1,15 @@
-// Prism wrapper with a curated language pack. We ship the languages the agent
-// most often emits (bash/diff/json/typescript/python/yaml/rust/go/swift) and
-// fall back to plain monospace for everything else. Static imports keep the
-// build deterministic; the whole pack adds ~15 KB gzipped to the main bundle.
+// Prism wrapper with **lazy** language loading. Prism core ships with the main
+// bundle; each language pack is fetched on demand the first time someone
+// posts a code fence in that language. Vite handles the dynamic-import
+// chunking so a user who never pastes code blocks pays for nothing here.
+//
+// Prism component files set `Prism.languages.X = ...` as a side effect of
+// importing them. They reference siblings via `prism-clike` etc. — those
+// inter-component imports work because the component files use ESM's static
+// `require`-equivalent inside, which Vite resolves into the same async
+// chunks. No manual dependency wiring needed.
 
 import Prism from "prismjs";
-import "prismjs/components/prism-bash";
-import "prismjs/components/prism-diff";
-import "prismjs/components/prism-go";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-jsx";
-import "prismjs/components/prism-python";
-import "prismjs/components/prism-rust";
-import "prismjs/components/prism-swift";
-import "prismjs/components/prism-tsx";
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-yaml";
 
 const ALIASES: Record<string, string> = {
   shell: "bash",
@@ -26,21 +21,70 @@ const ALIASES: Record<string, string> = {
   yml: "yaml",
 };
 
-export function resolveLanguage(language: string | undefined): string | null {
+// Each entry is a thunk so Vite emits one chunk per language that we only
+// fetch on first use. Adding a language here is the one-line edit.
+const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
+  bash: () => import("prismjs/components/prism-bash"),
+  diff: () => import("prismjs/components/prism-diff"),
+  go: () => import("prismjs/components/prism-go"),
+  json: () => import("prismjs/components/prism-json"),
+  jsx: () => import("prismjs/components/prism-jsx"),
+  python: () => import("prismjs/components/prism-python"),
+  rust: () => import("prismjs/components/prism-rust"),
+  swift: () => import("prismjs/components/prism-swift"),
+  tsx: () => import("prismjs/components/prism-tsx"),
+  typescript: () => import("prismjs/components/prism-typescript"),
+  yaml: () => import("prismjs/components/prism-yaml"),
+};
+
+const inflight = new Map<string, Promise<void>>();
+
+export function knownLanguage(language: string | undefined): string | null {
   if (!language) return null;
   const normalized = language.trim().toLowerCase();
   if (!normalized) return null;
   const resolved = ALIASES[normalized] ?? normalized;
-  return Prism.languages[resolved] ? resolved : null;
+  return LANGUAGE_LOADERS[resolved] ? resolved : null;
 }
 
-export function highlightCode(source: string, language: string): string {
-  const grammar = Prism.languages[language];
+/** True when the canonical name has been registered with Prism (synchronous). */
+export function isLanguageReady(canonicalName: string): boolean {
+  return Boolean(Prism.languages[canonicalName]);
+}
+
+/**
+ * Kicks off the dynamic import for a language and resolves once the grammar
+ * is registered. Idempotent — repeated calls share the same in-flight promise
+ * and resolve immediately if the grammar is already present.
+ */
+export async function ensureLanguage(canonicalName: string): Promise<boolean> {
+  if (isLanguageReady(canonicalName)) return true;
+  const loader = LANGUAGE_LOADERS[canonicalName];
+  if (!loader) return false;
+  let pending = inflight.get(canonicalName);
+  if (!pending) {
+    pending = loader().then(
+      () => undefined,
+      (error) => {
+        // A failed import (offline, blocked) should clear so a later retry
+        // can succeed once connectivity is back.
+        inflight.delete(canonicalName);
+        throw error;
+      }
+    );
+    inflight.set(canonicalName, pending);
+  }
+  await pending;
+  return isLanguageReady(canonicalName);
+}
+
+export function highlightCode(source: string, canonicalName: string): string {
+  const grammar = Prism.languages[canonicalName];
   if (!grammar) return escapeHtml(source);
-  return Prism.highlight(source, grammar, language);
+  return Prism.highlight(source, grammar, canonicalName);
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
