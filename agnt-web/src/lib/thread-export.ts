@@ -150,6 +150,68 @@ export function exportThreadsToMarkdown(threads: ExportThreadOptions[], exported
   return parts.join("\n").trimEnd() + "\n";
 }
 
+/**
+ * Structured JSON export. Useful for piping a thread into other tools (search
+ * indices, downstream LLMs, archiving). We deliberately serialize a stable
+ * shape rather than dumping the in-memory `CodexMessage` — internal flags
+ * like `isStreaming` or `deliveryState: "pending"` would never be true at
+ * export time but would still be in the type.
+ *
+ * Image attachments are exported by reference (id + filename + byteLength).
+ * The thumbnail/payload data URLs can be tens of MB; users who want them in
+ * the export can grab the image via the lightbox separately.
+ */
+export function exportThreadToJson(options: ExportThreadOptions): string {
+  const exportedAt = options.exportedAt ?? new Date();
+  const payload = {
+    schemaVersion: 1,
+    exportedAt: exportedAt.toISOString(),
+    thread: options.thread
+      ? {
+          id: options.thread.id,
+          title: options.thread.name ?? options.thread.title,
+          cwd: options.thread.cwd,
+          modelProvider: options.thread.modelProvider,
+          model: options.thread.model,
+        }
+      : null,
+    messages: options.messages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      kind: message.kind,
+      text: message.text,
+      turnId: message.turnId,
+      itemId: message.itemId,
+      createdAt: message.createdAt,
+      command: message.command
+        ? {
+            command: message.command.fullCommand,
+            outputTail: message.command.outputTail,
+            exitCode: message.command.exitCode,
+          }
+        : undefined,
+      fileChange: message.fileChange
+        ? {
+            path: message.fileChange.path,
+            diff: message.fileChange.diff,
+          }
+        : undefined,
+      plan: message.plan
+        ? {
+            explanation: message.plan.explanation,
+            steps: message.plan.steps,
+          }
+        : undefined,
+      attachments: message.attachments?.map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        byteLength: attachment.byteLength,
+      })),
+    })),
+  };
+  return JSON.stringify(payload, null, 2) + "\n";
+}
+
 export function defaultExportFilename(threadTitle: string | undefined): string {
   const slug = (threadTitle ?? "thread")
     .toLowerCase()
@@ -158,6 +220,27 @@ export function defaultExportFilename(threadTitle: string | undefined): string {
     .slice(0, 60) || "thread";
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   return `${slug}-${stamp}.md`;
+}
+
+export function defaultJsonExportFilename(threadTitle: string | undefined): string {
+  return defaultExportFilename(threadTitle).replace(/\.md$/, ".json");
+}
+
+export function downloadJson(filename: string, content: string): void {
+  downloadBlob(filename, new Blob([content], { type: "application/json;charset=utf-8" }));
+}
+
+function downloadBlob(filename: string, blob: Blob): void {
+  if (typeof document === "undefined") return;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function downloadMarkdown(filename: string, content: string): void {

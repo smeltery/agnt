@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 26 — @file mentions + composer auto-resize + JSON thread export ✅ DONE
+
+- ✅ `@file` mention picker in the composer. Caret-aware detection (`lib/mention-detector.ts`) opens an inline picker when the user types `@` at the start of a token; debounced fetch via `project/searchDirectories` rooted at the active thread's `cwd` (or `project/listDirectory` for the empty query). Selecting a result splices the cwd-relative path into the draft and parks the caret past the insert with a trailing space. Email-style false positives (`name@host`) are rejected by requiring the leading `@` to sit at start-of-string, after whitespace, or after a sentence-opener like `(`/`[`.
+- ✅ Composer auto-resize textarea. The textarea now grows with the draft up to ~10 visual rows (then scrolls internally), driven by a `useLayoutEffect` that measures `scrollHeight` against the computed line-height. Replaces the previous `rows={3}` hard-cap that forced multi-paragraph drafts into a tiny scrolled window.
+- ✅ Conversation export to JSON. New `exportThreadToJson` helper emits a stable `schemaVersion: 1` payload alongside the existing Markdown export. Sidebar context menu gets an "Export to JSON" entry. Image attachments export by reference (`{id, fileName, byteLength}`) — payload data URLs can be tens of MB and would balloon the file; users wanting the bytes can grab them from the lightbox.
+
 ## Session 25 — Per-message bookmarks + mark-as-unread + composer find/replace ✅ DONE
 
 - ✅ Per-message bookmarks. New `state/bookmarks-store.ts` keeps `Set<messageId>` per thread, persisted via `prefsStore.{loadSaveBookmarks}`. A small `BookmarkButton` (☆/★) sits in the row-actions slot for assistant + user rows. The `ThreadSearchBar` gets a "☆ N / ★ all" toggle that filters the timeline to bookmarked rows; a banner across the chat shows the active filter and the matched-of-total count. Combines with Session 15's in-thread search so you can text-search inside the starred set.

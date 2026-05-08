@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { attachmentFromFile, ImageAttachError } from "../../lib/image-attach";
 import { attachmentFromTextFile, looksLikeTextFile, TextAttachError } from "../../lib/text-attach";
+import { formatMentionPath, searchFilesForMention } from "../../lib/file-mention";
+import { applyMentionReplacement, detectMention, type MentionContext } from "../../lib/mention-detector";
 import type { ImageAttachment } from "../../models";
 import { computeDraftStats, formatCount } from "../../lib/draft-stats";
+import type { ProjectDirectoryEntry } from "../../protocol/project";
+import { useConnectionStore } from "../../state/connection-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
@@ -159,6 +163,96 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     setSlashCursor(0);
   }, [slashMatches.length]);
 
+  // @-file mention surface. Detection is caret-aware (not just "draft starts
+  // with @") so users can drop file references in the middle of a sentence.
+  const [mentionContext, setMentionContext] = useState<MentionContext | null>(null);
+  const [mentionMatches, setMentionMatches] = useState<ProjectDirectoryEntry[]>([]);
+  const [mentionCursor, setMentionCursor] = useState(0);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const connection = useConnectionStore((state) => state.connection);
+  const activeThread = useThreadsStore((state) => {
+    if (!state.selectedThreadId) return undefined;
+    return state.threads.find((t) => t.id === state.selectedThreadId)
+      ?? state.archivedThreads.find((t) => t.id === state.selectedThreadId);
+  });
+  const mentionCwd = activeThread?.cwd;
+
+  // Debounced fetch when the mention query changes. We bail out if there's no
+  // cwd (we'd have nothing to root the search against) or no rpc connection.
+  useEffect(() => {
+    if (!mentionContext || !connection?.rpc || !mentionCwd) {
+      setMentionMatches([]);
+      return;
+    }
+    let cancelled = false;
+    setMentionLoading(true);
+    const handle = window.setTimeout(async () => {
+      try {
+        const entries = await searchFilesForMention(connection.rpc, mentionCwd, mentionContext.query);
+        if (!cancelled) {
+          setMentionMatches(entries);
+          setMentionCursor(0);
+        }
+      } catch {
+        // Bridge errors here (cwd permission, provider quirks) shouldn't
+        // wedge the composer — just collapse the picker silently.
+        if (!cancelled) setMentionMatches([]);
+      } finally {
+        if (!cancelled) setMentionLoading(false);
+      }
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [mentionContext, connection?.rpc, mentionCwd]);
+
+  // Recompute the mention context whenever the draft, caret, or thread cwd
+  // changes. The slash menu wins so we don't double-open both surfaces.
+  function updateMentionContext(text: string, caret: number) {
+    if (slashQuery !== null) {
+      setMentionContext(null);
+      return;
+    }
+    if (!mentionCwd) {
+      setMentionContext(null);
+      return;
+    }
+    setMentionContext(detectMention(text, caret));
+  }
+
+  // Auto-resize the textarea up to ~10 visual rows of content; longer drafts
+  // start scrolling internally so the composer doesn't push the chat
+  // timeline off the screen. Runs in layoutEffect so the new height is in
+  // place before paint (no visible jump).
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    // Reset to the CSS-driven minimum (rows=3) before measuring scrollHeight,
+    // otherwise shrinking is impossible — the element keeps its prior height.
+    ta.style.height = "auto";
+    const computed = window.getComputedStyle(ta);
+    const lineHeight = parseFloat(computed.lineHeight) || 18;
+    const paddingY = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
+    const maxHeight = lineHeight * 10 + paddingY;
+    ta.style.height = Math.min(ta.scrollHeight, maxHeight) + "px";
+    ta.style.overflowY = ta.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [draft]);
+
+  function applyMention(entry: ProjectDirectoryEntry) {
+    if (!mentionContext) return;
+    const path = formatMentionPath(entry.path, mentionCwd ?? "");
+    const { text, caret } = applyMentionReplacement(draft, mentionContext, path);
+    setDraft(text);
+    setMentionContext(null);
+    setMentionMatches([]);
+    requestAnimationFrame(() => {
+      if (!textareaRef.current) return;
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(caret, caret);
+    });
+  }
+
   function runSlashCommand(command: SlashCommand) {
     const context = { threadId: selectedThreadId ?? "", threads: useThreadsStore.getState() };
     // Custom commands expand into the draft so the user can review/edit before
@@ -254,6 +348,31 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
       setFindReplaceOpen(true);
       return;
     }
+    // Mention picker wins over the rest when active — Enter inserts, ↑/↓
+    // navigate, Esc dismisses without clearing the draft (unlike the slash
+    // menu which clears the leading `/` token).
+    if (mentionContext && mentionMatches.length > 0) {
+      if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        applyMention(mentionMatches[Math.min(mentionCursor, mentionMatches.length - 1)]);
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setMentionCursor((current) => (current + 1) % mentionMatches.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setMentionCursor((current) => (current - 1 + mentionMatches.length) % mentionMatches.length);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMentionContext(null);
+        return;
+      }
+    }
     // Slash menu wins over every other shortcut when it's visible — Enter
     // runs the highlighted command, ↑/↓ moves the cursor, Esc dismisses the
     // menu (without resetting any other state).
@@ -320,6 +439,19 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
       setHistoryCursor(-1);
       draftBeforeRecallRef.current = "";
     }
+    // Re-detect the @-mention against the new draft + caret on the next
+    // tick (selectionStart hasn't been updated synchronously by React's
+    // change handler in some browsers).
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      updateMentionContext(value, ta.selectionStart ?? value.length);
+    });
+  }
+
+  function handleCaretMove(event: React.SyntheticEvent<HTMLTextAreaElement>) {
+    const ta = event.currentTarget;
+    updateMentionContext(ta.value, ta.selectionStart ?? ta.value.length);
   }
 
   async function ingestFiles(files: FileList | File[] | null) {
@@ -451,6 +583,36 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
       {slashQuery !== null && slashMatches.length === 0 && (
         <div className="agnt-slash-empty">No matching commands. Press Esc to dismiss or keep typing.</div>
       )}
+      {mentionContext && mentionMatches.length > 0 && (
+        <div className="agnt-slash-menu" role="listbox" aria-label="File mentions">
+          {mentionMatches.map((entry, index) => (
+            <button
+              key={entry.path}
+              type="button"
+              role="option"
+              aria-selected={index === mentionCursor}
+              className={"agnt-slash-item" + (index === mentionCursor ? " agnt-slash-item-active" : "")}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                applyMention(entry);
+              }}
+            >
+              <code className="agnt-slash-item-name">{entry.name}</code>
+              <span className="agnt-slash-item-description">{formatMentionPath(entry.path, mentionCwd ?? "")}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {mentionContext && mentionMatches.length === 0 && !mentionLoading && (
+        <div className="agnt-slash-empty">
+          {mentionCwd
+            ? "No files match — Esc to dismiss or keep typing."
+            : "Pick a project (set the thread cwd) to search files."}
+        </div>
+      )}
+      {mentionContext && mentionLoading && mentionMatches.length === 0 && (
+        <div className="agnt-slash-empty">Searching files…</div>
+      )}
       {findReplaceOpen && (
         <ComposerFindReplace
           textarea={textareaRef.current}
@@ -466,8 +628,10 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         value={draft}
         onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={handleKeyDown}
+        onKeyUp={handleCaretMove}
+        onClick={handleCaretMove}
         onPaste={handlePaste}
-        placeholder="Send a turn… (⌘/Ctrl+Enter; / for commands; paste or drop images and text files)"
+        placeholder="Send a turn… (⌘/Ctrl+Enter; / for commands; @ to reference a file; paste or drop images and text files)"
         rows={3}
         spellCheck={false}
       />

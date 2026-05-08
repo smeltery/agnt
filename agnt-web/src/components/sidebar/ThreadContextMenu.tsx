@@ -3,7 +3,14 @@
 // action runs and closes the menu.
 
 import { useEffect, useRef, useState } from "react";
-import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from "../../lib/thread-export";
+import {
+  defaultExportFilename,
+  defaultJsonExportFilename,
+  downloadJson,
+  downloadMarkdown,
+  exportThreadToJson,
+  exportThreadToMarkdown,
+} from "../../lib/thread-export";
 import type { CodexThread } from "../../models";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 
@@ -30,6 +37,11 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
   function exportThread() {
     const markdown = exportThreadToMarkdown({ thread, messages: exportMessages });
     downloadMarkdown(defaultExportFilename(thread.name ?? thread.title), markdown);
+  }
+
+  function exportThreadAsJson() {
+    const json = exportThreadToJson({ thread, messages: exportMessages });
+    downloadJson(defaultJsonExportFilename(thread.name ?? thread.title), json);
   }
 
   useEffect(() => {
@@ -112,6 +124,15 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
             title={exportMessages.length === 0 ? "No messages to export yet" : "Download a Markdown copy"}
           >
             Export to Markdown
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={action(() => exportThreadAsJson())}
+            disabled={exportMessages.length === 0}
+            title={exportMessages.length === 0 ? "No messages to export yet" : "Download a structured JSON copy"}
+          >
+            Export to JSON
           </button>
           <button
             type="button"
