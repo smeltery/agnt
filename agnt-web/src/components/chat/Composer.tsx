@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { attachmentFromFile, ImageAttachError } from "../../lib/image-attach";
 import { attachmentFromTextFile, looksLikeTextFile, TextAttachError } from "../../lib/text-attach";
 import type { ImageAttachment } from "../../models";
+import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
 import { useVoiceStore } from "../../state/voice-store";
 import { VoiceButton } from "./VoiceButton";
 
@@ -17,6 +18,20 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   const [attachError, setAttachError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Composer history: up-arrow at an empty draft (or while the cursor is
+  // already engaged) walks backward through past user prompts. Stays in sync
+  // with the active thread's messages — switching threads resets the cursor.
+  const messages = useThreadsStore(selectActiveMessages);
+  const userPromptHistory = useMemo(
+    () =>
+      messages
+        .filter((message) => message.role === "user" && message.text.trim())
+        .map((message) => message.text),
+    [messages]
+  );
+  // -1 = no recall (typing a fresh draft). 0 = most recent prompt, etc.
+  const [historyCursor, setHistoryCursor] = useState(-1);
+  const draftBeforeRecallRef = useRef<string>("");
 
   // Voice transcript drains on completion: when the voice-store stamps a new
   // transcript, append it (with a leading space if the draft already has text)
@@ -30,7 +45,48 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     const transcript = consumeTranscript();
     if (!transcript) return;
     setDraft((current) => (current.trim() ? `${current.trimEnd()} ${transcript}` : transcript));
+    // Voice typically isn't used while browsing history, but if it is, the
+    // appended transcript means the user is back to composing fresh.
+    setHistoryCursor(-1);
+    draftBeforeRecallRef.current = "";
   }, [pendingTranscript, consumeTranscript]);
+
+  // Switching threads (or starting fresh) wipes the recall cursor — past
+  // prompts from another thread shouldn't paste into this one.
+  const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
+  useEffect(() => {
+    setHistoryCursor(-1);
+    draftBeforeRecallRef.current = "";
+  }, [selectedThreadId]);
+
+  // Cursor semantics: -1 = not recalling; 0 = most recent prompt; N-1 =
+  // oldest prompt. Up (older) increments; Down (newer) decrements past 0
+  // back to -1 which restores the in-progress draft we stashed on entry.
+  function recallStep(direction: "older" | "newer") {
+    if (userPromptHistory.length === 0) return;
+    const lastIndex = userPromptHistory.length - 1;
+    setHistoryCursor((current) => {
+      let next = current;
+      if (direction === "older") {
+        if (current === -1) {
+          draftBeforeRecallRef.current = draft;
+          next = 0;
+        } else if (current < lastIndex) {
+          next = current + 1;
+        }
+      } else if (current >= 0) {
+        next = current - 1;
+      }
+      if (next === -1) {
+        setDraft(draftBeforeRecallRef.current);
+      } else if (next !== current) {
+        // userPromptHistory is oldest-first; cursor 0 = most recent, so we
+        // index from the end.
+        setDraft(userPromptHistory[lastIndex - next]);
+      }
+      return next;
+    });
+  }
 
   function submit() {
     const text = draft.trim();
@@ -40,6 +96,8 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     setDraft("");
     setAttachments([]);
     setAttachError(null);
+    setHistoryCursor(-1);
+    draftBeforeRecallRef.current = "";
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -51,6 +109,35 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       submit();
+      return;
+    }
+    // Up-arrow recalls the most recent prompt only when the textarea has no
+    // content (so it doesn't fight cursor navigation in a multi-line draft).
+    // Down-arrow exits recall mode; both are no-ops if nothing's in history.
+    if (event.key === "ArrowUp" && (historyCursor >= 0 || draft === "")) {
+      event.preventDefault();
+      recallStep("older");
+      return;
+    }
+    if (event.key === "ArrowDown" && historyCursor >= 0) {
+      event.preventDefault();
+      recallStep("newer");
+      return;
+    }
+    if (event.key === "Escape" && historyCursor >= 0) {
+      event.preventDefault();
+      setHistoryCursor(-1);
+      setDraft(draftBeforeRecallRef.current);
+    }
+  }
+
+  function onDraftChange(value: string) {
+    // Manual edits drop us out of recall mode; from this point forward the
+    // user is composing fresh, not browsing history.
+    setDraft(value);
+    if (historyCursor !== -1) {
+      setHistoryCursor(-1);
+      draftBeforeRecallRef.current = "";
     }
   }
 
@@ -162,7 +249,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         id="agnt-composer-input"
         className="agnt-composer-input"
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         placeholder="Send a turn… (⌘/Ctrl+Enter; paste or drop images and text files)"

@@ -23,6 +23,9 @@ const SECTIONS: Array<{
     heading: "Composer",
     rows: [
       { keys: ["⌘ / Ctrl", "Enter"], description: "Send the turn" },
+      { keys: ["↑"], description: "Recall the previous prompt (when draft is empty)" },
+      { keys: ["↓"], description: "Step forward through recalled prompts" },
+      { keys: ["Esc"], description: "Cancel recall and restore your in-progress draft" },
       { keys: ["Drop image"], description: "Attach an image" },
       { keys: ["Drop text file"], description: "Inline file contents as a fenced code block" },
       { keys: ["Paste image"], description: "Attach a clipboard image" },

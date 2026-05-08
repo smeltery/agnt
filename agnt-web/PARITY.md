@@ -101,7 +101,9 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Project picker | `components/project/ProjectPicker.tsx` + `state/project-store.ts` + `protocol/project.ts` | ✅ (quick locations, browse, search, ascend, select cwd) |
 | New chat modal | `components/chat/NewChatModal.tsx` | ✅ (prompt + project selector + flag-aware turn/start) |
 | Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
-| Markdown | `components/chat/MarkdownContent.tsx` + `markdown-blocks.ts` + `syntax-highlight.ts` | ✅ (fenced code w/ Prism, inline code, bold/italic, headings 1–6, ordered/bullet lists, tables w/ column alignment) |
+| Markdown | `components/chat/MarkdownContent.tsx` + `markdown-blocks.ts` + `syntax-highlight.ts` | ✅ (fenced code w/ Prism, inline code, bold/italic, headings 1–6, ordered/bullet lists, tables w/ column alignment, links + images w/ scheme allowlist) |
+| Composer history | `components/chat/Composer.tsx` | ✅ (Session 16; up-arrow recalls past prompts at empty draft, down-arrow steps forward, Esc restores in-progress draft, manual edit drops out of recall) |
+| Lightbox sibling navigation | `components/shared/Lightbox.tsx` + `state/lightbox-store.ts` | ✅ (Session 16; left/right arrow keys + on-screen ‹ › buttons cycle through a row's attachments; counter `1 / N`) |
 | Approvals modal | `components/approvals/ApprovalModal.tsx` + `state/approvals-store.ts` | ✅ (command + file change, accept / decline / acceptForSession) |
 | System-notice toasts | `components/shared/NoticeStack.tsx` + `state/notices-store.ts` | ✅ (auto-dismiss, severity-aware) |
 | Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |

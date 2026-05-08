@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 16 — Markdown links/images, composer history, lightbox nav ✅ DONE
+
+- ✅ Markdown links `[text](url)` and images `![alt](url)` rendered with a strict scheme allowlist (`https?:`, `mailto:`, `#anchor` for links; `https?:`, `data:image/*` for images). `javascript:` / `file:` schemes are refused — the original markdown text falls through unchanged.
+- ✅ Composer prompt history: up-arrow at an empty draft (or while in recall mode) walks backward through past user prompts in the active thread; down-arrow steps forward; Esc restores the in-progress draft; manual editing drops out of recall mode.
+- ✅ Lightbox sibling navigation: left/right arrow keys + on-screen ‹ › buttons cycle through the active row's attachments with a `1 / N` counter. `state/lightbox-store.ts` accepts an image set + index instead of a single image; UserRow passes the row's full attachment array.
+
 ## Session 15 — Streaming UX + thread search + lightbox ✅ DONE
 
 - ✅ Sticky-follow scroll: a `useStickyScroll` hook in `lib/sticky-scroll.ts` keeps the bottom anchored only when the user is already there; scroll-up disables follow. A floating "↓ Latest" button surfaces when the user is meaningfully offset so they can rejoin without manually scrolling.

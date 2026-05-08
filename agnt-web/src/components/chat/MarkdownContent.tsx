@@ -16,6 +16,8 @@ import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLangua
 const INLINE_CODE_PATTERN = /`([^`\n]+)`/g;
 const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
 const ITALIC_PATTERN = /(?<!\w)\*([^*\n]+)\*(?!\w)/g;
+const IMAGE_PATTERN = /!\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
+const LINK_PATTERN = /(?<!!)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
 
 export function MarkdownContent({ text }: { text: string }) {
   if (!text) return null;
@@ -178,6 +180,25 @@ function renderInlineFragments(text: string): ReactNode {
         return <strong key={index}>{token.value}</strong>;
       case "italic":
         return <em key={index}>{token.value}</em>;
+      case "link":
+        return (
+          <a key={index} href={token.url} target="_blank" rel="noreferrer noopener" title={token.title}>
+            {token.label}
+          </a>
+        );
+      case "image":
+        // alt text falls back to a non-empty placeholder so screen readers
+        // don't announce a bare "image" — most agent-emitted images have a
+        // descriptive alt anyway.
+        return (
+          <img
+            key={index}
+            src={token.url}
+            alt={token.label || token.title || "image"}
+            title={token.title}
+            className="agnt-md-image"
+          />
+        );
     }
   });
 }
@@ -186,17 +207,63 @@ type InlineToken =
   | { kind: "text"; value: string }
   | { kind: "code"; value: string }
   | { kind: "bold"; value: string }
-  | { kind: "italic"; value: string };
+  | { kind: "italic"; value: string }
+  | { kind: "link"; label: string; url: string; title?: string }
+  | { kind: "image"; label: string; url: string; title?: string };
+
+interface InlineHit {
+  kind: InlineToken["kind"];
+  start: number;
+  end: number;
+  // Token-shape fields. `value` is used by the simple kinds; richer kinds
+  // populate label/url/title.
+  value?: string;
+  label?: string;
+  url?: string;
+  title?: string;
+}
+
+const SAFE_LINK_SCHEMES = /^(https?:|mailto:|#)/i;
+const SAFE_IMAGE_SCHEMES = /^(https?:|data:image\/)/i;
 
 function tokenizeInline(text: string): InlineToken[] {
-  const matchers: Array<{ kind: InlineToken["kind"]; pattern: RegExp }> = [
-    { kind: "code", pattern: INLINE_CODE_PATTERN },
-    { kind: "bold", pattern: BOLD_PATTERN },
-    { kind: "italic", pattern: ITALIC_PATTERN },
-  ];
-  type Hit = { kind: InlineToken["kind"]; start: number; end: number; value: string };
-  const hits: Hit[] = [];
-  for (const { kind, pattern } of matchers) {
+  const hits: InlineHit[] = [];
+  // Image first so its leading `!` consumes the position before the link
+  // matcher can — we can't rely on regex alternation since each pattern is
+  // matched independently then deduped by start.
+  IMAGE_PATTERN.lastIndex = 0;
+  for (const match of text.matchAll(IMAGE_PATTERN)) {
+    if (match.index === undefined) continue;
+    const url = match[2];
+    if (!SAFE_IMAGE_SCHEMES.test(url)) continue;
+    hits.push({
+      kind: "image",
+      start: match.index,
+      end: match.index + match[0].length,
+      label: match[1],
+      url,
+      title: match[3],
+    });
+  }
+  LINK_PATTERN.lastIndex = 0;
+  for (const match of text.matchAll(LINK_PATTERN)) {
+    if (match.index === undefined) continue;
+    const url = match[2];
+    if (!SAFE_LINK_SCHEMES.test(url)) continue;
+    hits.push({
+      kind: "link",
+      start: match.index,
+      end: match.index + match[0].length,
+      label: match[1],
+      url,
+      title: match[3],
+    });
+  }
+  for (const [kind, pattern] of [
+    ["code", INLINE_CODE_PATTERN] as const,
+    ["bold", BOLD_PATTERN] as const,
+    ["italic", ITALIC_PATTERN] as const,
+  ]) {
     pattern.lastIndex = 0;
     for (const match of text.matchAll(pattern)) {
       if (match.index === undefined) continue;
@@ -209,7 +276,11 @@ function tokenizeInline(text: string): InlineToken[] {
   for (const hit of hits) {
     if (hit.start < cursor) continue;
     if (hit.start > cursor) tokens.push({ kind: "text", value: text.slice(cursor, hit.start) });
-    tokens.push({ kind: hit.kind, value: hit.value });
+    if (hit.kind === "link" || hit.kind === "image") {
+      tokens.push({ kind: hit.kind, label: hit.label ?? "", url: hit.url ?? "", title: hit.title });
+    } else {
+      tokens.push({ kind: hit.kind, value: hit.value ?? "" } as InlineToken);
+    }
     cursor = hit.end;
   }
   if (cursor < text.length) tokens.push({ kind: "text", value: text.slice(cursor) });
