@@ -12,6 +12,7 @@ import {
   exportThreadToMarkdown,
 } from "../../lib/thread-export";
 import type { CodexThread } from "../../models";
+import { useNewChatPrefillStore } from "../../state/new-chat-prefill-store";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 import { THREAD_COLOR_VALUES, type ThreadColor } from "../../storage/prefs-store";
 
@@ -102,6 +103,23 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
             onClick={action(() => forkThread(thread.id))}
           >
             Fork from this thread
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={action(() => {
+              // Pre-fill the New Chat modal with the source thread's cwd and
+              // the first user prompt. The user reviews/edits before sending —
+              // this is "clone the starting state" not "send the same turn".
+              const firstUserText = exportMessages.find((m) => m.role === "user" && m.text.trim())?.text;
+              useNewChatPrefillStore.getState().request({
+                cwd: thread.cwd,
+                prompt: firstUserText,
+              });
+            })}
+            title="Open New Chat with this thread's cwd + first prompt pre-filled"
+          >
+            Duplicate…
           </button>
           <button
             type="button"

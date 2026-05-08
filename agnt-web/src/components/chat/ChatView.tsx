@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShortcut } from "../../lib/keyboard";
 import { useStickyScroll } from "../../lib/sticky-scroll";
 import type { CodexMessage } from "../../models";
@@ -86,6 +86,23 @@ export function ChatView() {
   }
   useShortcut("[", () => stepBetweenUserMessages(-1));
   useShortcut("]", () => stepBetweenUserMessages(1));
+
+  // Vim-style jump-to-top (`gg`, double-press within 600ms) and jump-to-
+  // bottom (`G`). The double-press window is short enough that an accidental
+  // single `g` doesn't accumulate forever, but long enough to feel natural.
+  const lastGAtRef = useRef(0);
+  useShortcut("g", () => {
+    const now = Date.now();
+    if (now - lastGAtRef.current < 600) {
+      lastGAtRef.current = 0;
+      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    lastGAtRef.current = now;
+  });
+  useShortcut("G", () => {
+    jumpToBottom();
+  });
 
   const scrollMessageIntoView = useCallback(
     (messageId: string) => {

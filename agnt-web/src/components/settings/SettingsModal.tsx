@@ -71,6 +71,10 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
     if (record.macDeviceId === currentMacDeviceId) await forgetCurrent();
   }
 
+  const [search, setSearch] = useState("");
+  const matches = (tags: string[]) =>
+    !search.trim() || tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase().trim()));
+
   return (
     <div className="agnt-modal-backdrop" role="presentation" onClick={onClose}>
       <div
@@ -82,11 +86,20 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
       >
         <header className="agnt-modal-header agnt-settings-header">
           <h2 id="agnt-settings-title">Settings</h2>
+          <input
+            type="search"
+            className="agnt-settings-search"
+            placeholder="Filter…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            aria-label="Filter settings"
+          />
           <button type="button" className="agnt-button-ghost" onClick={onClose} aria-label="Close">
             ×
           </button>
         </header>
 
+        {matches(["Appearance", "Theme", "Light", "Dark", "Auto"]) && (
         <section className="agnt-settings-section">
           <h3>Appearance</h3>
           <div className="agnt-settings-row">
@@ -107,7 +120,9 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             </div>
           </div>
         </section>
+        )}
 
+        {matches(["Notifications", "Desktop alerts", "tab title", "permission"]) && (
         <section className="agnt-settings-section">
           <h3>Notifications</h3>
           <div className="agnt-settings-row">
@@ -137,7 +152,9 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
                   : "Pick On to grant notification permission. Auto stays quiet until you opt in."}
           </p>
         </section>
+        )}
 
+        {matches(["Connection", "Status", "Relay", "Session", "Mac", "pairing"]) && (
         <section className="agnt-settings-section">
           <h3>Connection</h3>
           <dl className="agnt-settings-kv">
@@ -155,7 +172,9 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             )}
           </dl>
         </section>
+        )}
 
+        {matches(["Account", "Provider", "Logged in", "auth", "login"]) && (
         <section className="agnt-settings-section">
           <h3>Account</h3>
           {!account ? (
@@ -176,11 +195,13 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             </a>
           )}
         </section>
+        )}
 
-        <CustomSlashCommandsSection />
+        {matches(["Custom slash commands", "slash", "snippet", "command"]) && <CustomSlashCommandsSection />}
 
-        <BackupRestoreSection />
+        {matches(["Backup", "Restore", "Export", "Import", "JSON"]) && <BackupRestoreSection />}
 
+        {matches(["Trusted Macs", "pair", "forget", "fingerprint"]) && (
         <section className="agnt-settings-section">
           <h3>Trusted Macs ({macs.length})</h3>
           {macs.length === 0 ? (
@@ -210,6 +231,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             </ul>
           )}
         </section>
+        )}
       </div>
     </div>
   );

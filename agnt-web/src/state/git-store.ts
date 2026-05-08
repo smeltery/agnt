@@ -60,6 +60,12 @@ export interface GitState {
   commit(threadId: string, rpc: JsonRpcClient, message: string): Promise<void>;
   push(threadId: string, rpc: JsonRpcClient): Promise<void>;
   pull(threadId: string, rpc: JsonRpcClient): Promise<void>;
+  /** `git stash push --include-untracked`. Saves the entire working tree
+   *  for later, leaving the branch clean. Bridge: `git/stash`. */
+  stash(threadId: string, rpc: JsonRpcClient): Promise<void>;
+  /** `git stash pop`. Restores the most recent stash; the bridge surfaces
+   *  conflicts as a `stash_pop_conflict` error. Bridge: `git/stashPop`. */
+  stashPop(threadId: string, rpc: JsonRpcClient): Promise<void>;
   reset(): void;
 }
 
@@ -194,6 +200,32 @@ export const useGitStore = create<GitState>((set, get) => ({
     try {
       await rpc.request("git/pull", { threadId });
       await get().refreshStatus(threadId, rpc);
+    } catch (error) {
+      setError(set, get, threadId, (error as Error).message);
+    } finally {
+      setLoading(set, threadId, false);
+    }
+  },
+
+  async stash(threadId, rpc) {
+    setLoading(set, threadId, true);
+    try {
+      await rpc.request("git/stash", { threadId });
+      await get().refreshStatus(threadId, rpc);
+      await get().refreshDiff(threadId, rpc);
+    } catch (error) {
+      setError(set, get, threadId, (error as Error).message);
+    } finally {
+      setLoading(set, threadId, false);
+    }
+  },
+
+  async stashPop(threadId, rpc) {
+    setLoading(set, threadId, true);
+    try {
+      await rpc.request("git/stashPop", { threadId });
+      await get().refreshStatus(threadId, rpc);
+      await get().refreshDiff(threadId, rpc);
     } catch (error) {
       setError(set, get, threadId, (error as Error).message);
     } finally {

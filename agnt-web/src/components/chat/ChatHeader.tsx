@@ -40,7 +40,12 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
         <h1 className="agnt-chat-header-title">{title}</h1>
         {thread.cwd && <code className="agnt-chat-header-cwd">{thread.cwd}</code>}
         {thread.modelProvider && (
-          <span className="agnt-row-tag agnt-chat-header-provider">{thread.modelProvider}</span>
+          <span
+            className={"agnt-row-tag agnt-chat-header-provider agnt-provider-" + providerSlug(thread.modelProvider)}
+            title={`Provider: ${thread.modelProvider}`}
+          >
+            {thread.modelProvider}
+          </span>
         )}
         <div className="agnt-chat-header-actions">
           {running && <ThroughputPill threadId={selectedThreadId} />}
@@ -82,6 +87,18 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
       {showGit && <GitPanel threadId={selectedThreadId} rpc={rpc} />}
     </header>
   );
+}
+
+// Maps a free-form `modelProvider` string (whatever the bridge reports) to a
+// short stable slug so `.agnt-provider-<slug>` CSS rules can color the badge.
+// Unknown providers fall through to a generic neutral tone.
+function providerSlug(provider: string): string {
+  const lower = provider.toLowerCase();
+  if (lower.includes("codex")) return "codex";
+  if (lower.includes("claude")) return "claude";
+  if (lower.includes("opencode")) return "opencode";
+  if (lower.includes("cursor")) return "cursor";
+  return "other";
 }
 
 // Re-renders every 500 ms while a turn is running so the elapsed counter ticks.

@@ -10,6 +10,7 @@ import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from 
 import { useChatFocusStore } from "../../state/chat-focus-store";
 import { useCheckpointsStore } from "../../state/checkpoints-store";
 import { useConnectionStore } from "../../state/connection-store";
+import { useNewChatPrefillStore } from "../../state/new-chat-prefill-store";
 import { useProjectStore } from "../../state/project-store";
 import { useThreadsStore } from "../../state/threads-store";
 import { ApprovalModal } from "../approvals/ApprovalModal";
@@ -43,7 +44,20 @@ export function Workspace() {
   });
   useDocumentTitle(activeThreadTitle);
   const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | "help" | null>(null);
+  const [newChatPrefill, setNewChatPrefill] = useState<{ cwd?: string; prompt?: string }>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Watch the prefill store for incoming "Duplicate thread" requests. The
+  // store is single-slot so we consume immediately and stash the values into
+  // local state for the modal.
+  const prefillPending = useNewChatPrefillStore((state) => state.pending);
+  useEffect(() => {
+    if (!prefillPending) return;
+    const value = useNewChatPrefillStore.getState().consume();
+    if (!value) return;
+    setNewChatPrefill(value);
+    setOverlay("newChat");
+  }, [prefillPending]);
   // The drawer toggle only matters on narrow viewports — on wide ones the
   // sidebar is always visible regardless of this flag, courtesy of CSS.
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -250,8 +264,15 @@ export function Workspace() {
       {overlay === "help" && <HelpModal onClose={() => setOverlay(null)} />}
       {overlay === "newChat" && (
         <NewChatModal
-          onClose={() => setOverlay(null)}
+          onClose={() => {
+            setOverlay(null);
+            // Clear any consumed prefill so the next plain "+ New" doesn't
+            // inherit a stale cwd/prompt from a duplicate-thread action.
+            setNewChatPrefill({});
+          }}
           onPickProject={pickProject}
+          initialCwd={newChatPrefill.cwd}
+          initialPrompt={newChatPrefill.prompt}
         />
       )}
       {projectPickerOpen && pickerCallback && (
