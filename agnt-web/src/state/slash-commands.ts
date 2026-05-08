@@ -7,6 +7,7 @@
 // means new commands are a single entry to add, and the slash menu's render
 // + filter logic stays generic.
 
+import type { CustomSlashCommand } from "../storage/prefs-store";
 import type { ThreadsState } from "../state/threads-store";
 
 export interface SlashCommandContext {
@@ -24,9 +25,16 @@ export interface SlashCommand {
   aliases?: string[];
   /** Returns true when this command can run against the current state. */
   canRun?(context: SlashCommandContext): boolean;
+  /** When defined, the composer inserts this text into the draft instead of
+   *  invoking `run`. Used by user-defined commands that just expand a snippet. */
+  expand?(context: SlashCommandContext): string;
   /** Runs the command. Should be idempotent and not throw. */
   run(context: SlashCommandContext): Promise<void> | void;
 }
+
+/** Slug rule for user-defined names — keep it lowercase + `-` so it can't
+ *  collide visually with future built-ins or be confused for whitespace. */
+export const CUSTOM_SLASH_NAME_RE = /^[a-z][a-z0-9-]{0,31}$/;
 
 /**
  * A small, hand-curated set focused on actions users hit often. We stay away
@@ -83,18 +91,50 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   },
 ];
 
+/** Wraps a user-defined `{name, body}` pair as a SlashCommand whose action is
+ *  expanding the body into the composer. Built-ins always win on name
+ *  collision — we filter those out at merge time. */
+export function buildCustomSlashCommand(custom: CustomSlashCommand): SlashCommand {
+  return {
+    name: custom.name,
+    description: previewSnippet(custom.body) || "(empty snippet)",
+    expand: () => custom.body,
+    run() {
+      // Unused for expand-style commands — the composer routes around `run`
+      // when `expand` is set. We keep a noop here so the type stays stable.
+    },
+  };
+}
+
+function previewSnippet(body: string): string {
+  const stripped = body.replace(/\s+/g, " ").trim();
+  return stripped.length > 80 ? `${stripped.slice(0, 77)}…` : stripped;
+}
+
 /**
  * Filter the catalog by a typed query (no leading slash). An empty query
  * returns every runnable command for the current context. Matching is
  * case-insensitive and uses substring on `name` + aliases first, then `name`
  * substring loosely so partial typos still find something.
+ *
+ * Custom commands appended after built-ins. A custom command whose `name`
+ * collides with a built-in is dropped silently — built-ins always win so a
+ * typo in user prefs can't hijack `/stop`.
  */
 export function filterSlashCommands(
   query: string,
-  context: SlashCommandContext
+  context: SlashCommandContext,
+  customCommands: readonly CustomSlashCommand[] = []
 ): SlashCommand[] {
   const trimmed = query.trim().toLowerCase();
-  return SLASH_COMMANDS.filter((command) => {
+  const builtinNames = new Set(SLASH_COMMANDS.map((command) => command.name));
+  const merged: SlashCommand[] = [
+    ...SLASH_COMMANDS,
+    ...customCommands
+      .filter((custom) => !builtinNames.has(custom.name) && CUSTOM_SLASH_NAME_RE.test(custom.name))
+      .map(buildCustomSlashCommand),
+  ];
+  return merged.filter((command) => {
     if (command.canRun && !command.canRun(context)) return false;
     if (!trimmed) return true;
     if (command.name.toLowerCase().includes(trimmed)) return true;

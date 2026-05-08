@@ -77,6 +77,9 @@ export interface ThreadsState {
   runningThreadIds: Set<string>;
   /** Pinned threads sort to the top of the live tab in the sidebar. Persisted. */
   pinnedThreadIds: Set<string>;
+  /** Per-thread last-visit timestamp. A thread shows an unread dot when its
+   *  `updatedAt` exceeds this. Persisted via `prefsStore.saveLastVisited`. */
+  lastVisitedByThread: Record<string, number>;
   loading: boolean;
   error: string | null;
   hydrated: boolean;
@@ -86,6 +89,8 @@ export interface ThreadsState {
   selectThread(threadId: string): Promise<void>;
   loadOlderTurns(threadId: string): Promise<void>;
   sendTurn(threadId: string, content: string, attachments?: ImageAttachment[]): Promise<void>;
+  /** Re-issues turn/start with the inputs of a failed turn. Returns whether a retry actually fired. */
+  retryFailedTurn(threadId: string, failedTurnId: string): Promise<boolean>;
   startNewThread(input: { content: string; cwd?: string; attachments?: ImageAttachment[] }): Promise<string | null>;
   stopTurn(): Promise<void>;
   patchTurnFlags(patch: Partial<TurnFlags>): void;
@@ -112,16 +117,18 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   turnFlags: {},
   runningThreadIds: new Set(),
   pinnedThreadIds: new Set(),
+  lastVisitedByThread: {},
   loading: false,
   error: null,
   hydrated: false,
 
   async hydrateFromDisk() {
     if (get().hydrated) return;
-    const [max, persistedFlags, pinnedIds] = await Promise.all([
+    const [max, persistedFlags, pinnedIds, lastVisited] = await Promise.all([
       messagesStore.loadHighestOrderIndex(),
       prefsStore.loadTurnFlags(),
       prefsStore.loadPinnedThreadIds(),
+      prefsStore.loadLastVisited(),
     ]);
     orderCounter.seedFrom(max);
     // Cast through the looser persisted shape — anything malformed (an old
@@ -135,6 +142,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
         planMode: persistedFlags.planMode,
       },
       pinnedThreadIds: new Set(pinnedIds),
+      lastVisitedByThread: lastVisited,
     });
   },
 
@@ -176,7 +184,12 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   },
 
   async selectThread(threadId) {
-    set({ selectedThreadId: threadId });
+    // Stamp the visit so the unread dot disappears. We bump the timestamp to
+    // *now* rather than thread.updatedAt — a turn that completes while we're
+    // already viewing the thread shouldn't immediately re-mark it unread.
+    const nextVisited = { ...get().lastVisitedByThread, [threadId]: Date.now() };
+    set({ selectedThreadId: threadId, lastVisitedByThread: nextVisited });
+    void prefsStore.saveLastVisited(nextVisited);
     // Hydrate from disk first so the timeline paints instantly.
     const cached = await messagesStore.load(threadId);
     if (cached.length > 0) {
@@ -227,6 +240,36 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       await activeConnection.rpc.request("turn/start", params);
     } catch (error) {
       set({ error: (error as Error).message });
+    }
+  },
+
+  async retryFailedTurn(threadId, failedTurnId) {
+    if (!activeConnection?.rpc) return false;
+    // Recover the original user input from the message log. The local-insert
+    // path that powers sendTurn already preserved the user row with the same
+    // turnId, so we walk backward to find the most recent matching one.
+    const reducer = get().reducerStates[threadId];
+    if (!reducer) return false;
+    const userMessage = [...reducer.messages].reverse().find(
+      (message) => message.role === "user" && message.turnId === failedTurnId
+    );
+    if (!userMessage) return false;
+    const content = userMessage.text ?? "";
+    const attachments = userMessage.attachments;
+    const input = buildTurnInput(content, attachments);
+    if (input.length === 0) return false;
+    const flags = get().turnFlags;
+    const params: Record<string, unknown> = { threadId, input, content };
+    if (flags.model) params.model = flags.model;
+    if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;
+    if (flags.permissionMode) params.permissionMode = flags.permissionMode;
+    if (flags.planMode) params.planMode = true;
+    try {
+      await activeConnection.rpc.request("turn/start", params);
+      return true;
+    } catch (error) {
+      set({ error: (error as Error).message });
+      return false;
     }
   },
 
@@ -396,6 +439,7 @@ function registerNotificationHandlers(
     withTurnEvent(params, (event) => {
       mutateReducer(event.threadId, set, get, (s) => applyTurnCompleted(s, event));
       useStreamingStatsStore.getState().noteTurnFinished(event.threadId);
+      bumpVisitIfActive(event.threadId, set, get);
       // Two layered "tab is hidden" signals: a desktop notification when the
       // user has granted permission and opted in, plus the title flash as a
       // permission-free fallback. Both no-op when the tab is focused.
@@ -408,6 +452,7 @@ function registerNotificationHandlers(
       const errorText = readString(params, "error", "message");
       mutateReducer(event.threadId, set, get, (s) => applyTurnFailed(s, event, errorText));
       useStreamingStatsStore.getState().noteTurnFinished(event.threadId);
+      bumpVisitIfActive(event.threadId, set, get);
       void notifyTurnFinished(event.threadId, get, "failed", errorText);
       flashTitle("Turn failed");
     })
@@ -881,4 +926,28 @@ export function selectActiveMessages(state: ThreadsState): CodexMessage[] {
 export function selectActiveTurnRunning(state: ThreadsState): boolean {
   if (!state.selectedThreadId) return false;
   return Boolean(state.reducerStates[state.selectedThreadId]?.activeTurnId);
+}
+
+/** Pure: a thread is unread when its server-side updatedAt outpaces the
+ *  recorded visit. Returns false if either timestamp is missing. */
+export function isThreadUnread(thread: CodexThread, lastVisited: Record<string, number>): boolean {
+  const updated = thread.updatedAt;
+  if (typeof updated !== "number") return false;
+  const visited = lastVisited[thread.id];
+  if (typeof visited !== "number") return updated > 0;
+  return updated > visited;
+}
+
+// When a turn completes (or fails) on the *currently selected* thread, the
+// user is already looking at it — re-stamp last-visited so the dot doesn't
+// pop on for a moment between updatedAt landing and a future click.
+function bumpVisitIfActive(
+  threadId: string,
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState
+): void {
+  if (get().selectedThreadId !== threadId) return;
+  const next = { ...get().lastVisitedByThread, [threadId]: Date.now() };
+  set({ lastVisitedByThread: next });
+  void prefsStore.saveLastVisited(next);
 }

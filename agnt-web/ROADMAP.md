@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 23 — Retry failed turn + unread indicator + custom slash commands ✅ DONE
+
+- ✅ Retry failed turn. The inline `SystemErrorRow` now exposes a Retry button that walks back to the user message with the same `turnId`, recovers its text + attachments, and re-issues `turn/start`. Today the only recovery from a network blip / provider hiccup was to re-type the prompt; this closes the gap and reuses the existing `buildTurnInput` path so per-turn flags stay consistent.
+- ✅ Per-thread unread indicator. Sidebar rows render a small dot when `thread.updatedAt > lastVisitedAt[id]`. `lastVisited` is persisted to IndexedDB; `selectThread` stamps it to `Date.now()`, and `turn/completed`/`turn/failed` on the active thread re-stamps too so the dot doesn't pop on for foreground turns. The dot vanishes the moment you open the thread. Reload-stable since both sides of the comparison live in storage / `thread/list`.
+- ✅ User-defined slash commands. New `state/custom-slash-commands-store.ts` keeps a list of `{name, body}` snippets persisted via `prefsStore.{loadSaveCustomSlashCommands}`; Settings has a "Custom slash commands" section to add / edit / delete. Names follow a strict slug rule (`/^[a-z][a-z0-9-]{0,31}$/`) so they can't visually collide with whitespace or built-ins; built-ins always win on a name match. Custom commands `expand` into the composer draft (so users can review/edit before sending) instead of running a side effect — cleanly distinct from `/compact` etc.
+
 ## Session 22 — Responsive drawer + multi-select bulk actions + streaming throughput ✅ DONE
 
 - ✅ Narrow-viewport sidebar drawer. The 768 px breakpoint used to hide the sidebar entirely (which left no way to switch threads on iPad-via-Tailscale); it now slides out as an overlay drawer with a hamburger button in the workspace header. Selecting a thread or tapping the backdrop closes it. Wide viewports keep the existing two-column grid unchanged.

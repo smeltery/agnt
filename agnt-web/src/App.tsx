@@ -3,6 +3,7 @@
 
 import { useEffect } from "react";
 import { useConnectionStore } from "./state/connection-store";
+import { useCustomSlashCommandsStore } from "./state/custom-slash-commands-store";
 import { useThemeStore } from "./state/theme-store";
 import { PairingScreen } from "./components/pairing/PairingScreen";
 import { Workspace } from "./components/workspace/Workspace";
@@ -14,12 +15,16 @@ export function App() {
   const status = useConnectionStore((state) => state.status);
   const hydrate = useConnectionStore((state) => state.hydrate);
   const hydrateTheme = useThemeStore((state) => state.hydrate);
+  const hydrateCustomSlash = useCustomSlashCommandsStore((state) => state.hydrate);
   const reconnect = useConnectionStore((state) => state.reconnect);
 
   useEffect(() => {
     // Theme hydrates first to avoid a flash of wrong palette.
     void hydrateTheme().then(() => hydrate());
-  }, [hydrate, hydrateTheme]);
+    // Custom slash commands aren't on the critical render path, so we let
+    // them load whenever idb gets around to it.
+    void hydrateCustomSlash();
+  }, [hydrate, hydrateTheme, hydrateCustomSlash]);
 
   useEffect(() => {
     if (!bootstrapping && saved && status.kind === "idle") {

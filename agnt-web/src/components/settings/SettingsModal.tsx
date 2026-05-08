@@ -7,13 +7,19 @@ import { useEffect, useState } from "react";
 import { permissionLabel, requestPermission } from "../../lib/notifications";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
+import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
 import { useThemeStore } from "../../state/theme-store";
 import {
   pairingStore,
   type TrustedMacRecord,
   type TrustedMacRegistry,
 } from "../../storage/pairing-store";
-import { prefsStore, type NotificationsPreference, type ThemePreference } from "../../storage/prefs-store";
+import {
+  prefsStore,
+  type CustomSlashCommand,
+  type NotificationsPreference,
+  type ThemePreference,
+} from "../../storage/prefs-store";
 
 export function SettingsModal({ onClose }: { onClose(): void }) {
   const status = useConnectionStore((state) => state.status);
@@ -165,6 +171,8 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
           )}
         </section>
 
+        <CustomSlashCommandsSection />
+
         <section className="agnt-settings-section">
           <h3>Trusted Macs ({macs.length})</h3>
           {macs.length === 0 ? (
@@ -196,6 +204,113 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function CustomSlashCommandsSection() {
+  const commands = useCustomSlashCommandsStore((state) => state.commands);
+  const addCommand = useCustomSlashCommandsStore((state) => state.addCommand);
+  const updateCommand = useCustomSlashCommandsStore((state) => state.updateCommand);
+  const removeCommand = useCustomSlashCommandsStore((state) => state.removeCommand);
+  const [editing, setEditing] = useState<{ originalName: string | null; name: string; body: string }>({
+    originalName: null,
+    name: "",
+    body: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  function startNew() {
+    setEditing({ originalName: null, name: "", body: "" });
+    setError(null);
+  }
+  function startEdit(command: CustomSlashCommand) {
+    setEditing({ originalName: command.name, name: command.name, body: command.body });
+    setError(null);
+  }
+  function save() {
+    const trimmed = { name: editing.name.trim(), body: editing.body };
+    const result = editing.originalName
+      ? updateCommand(editing.originalName, trimmed)
+      : addCommand(trimmed);
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    setEditing({ originalName: null, name: "", body: "" });
+    setError(null);
+  }
+  function cancel() {
+    setEditing({ originalName: null, name: "", body: "" });
+    setError(null);
+  }
+
+  return (
+    <section className="agnt-settings-section">
+      <h3>Custom slash commands ({commands.length})</h3>
+      <p className="agnt-settings-hint">
+        Type <code>/your-name</code> in the composer to drop the body in as a draft. Built-in commands always win on a name collision.
+      </p>
+      {commands.length > 0 && (
+        <ul className="agnt-settings-slash-list">
+          {commands.map((command) => (
+            <li key={command.name} className="agnt-settings-slash-row">
+              <div className="agnt-settings-slash-meta">
+                <code>/{command.name}</code>
+                <span className="agnt-settings-slash-preview">{command.body}</span>
+              </div>
+              <div className="agnt-settings-slash-actions">
+                <button type="button" className="agnt-button-ghost" onClick={() => startEdit(command)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="agnt-button-ghost agnt-button-danger"
+                  onClick={() => removeCommand(command.name)}
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {editing.originalName !== null || editing.name || editing.body ? (
+        <div className="agnt-settings-slash-edit">
+          <label className="agnt-settings-slash-field">
+            <span>Name</span>
+            <input
+              type="text"
+              value={editing.name}
+              onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+              placeholder="debug-this"
+              spellCheck={false}
+            />
+          </label>
+          <label className="agnt-settings-slash-field">
+            <span>Body</span>
+            <textarea
+              value={editing.body}
+              onChange={(event) => setEditing({ ...editing, body: event.target.value })}
+              placeholder="Walk the failing test and pinpoint the assertion that breaks…"
+              rows={4}
+            />
+          </label>
+          {error && <p className="agnt-settings-error">{error}</p>}
+          <div className="agnt-settings-slash-actions">
+            <button type="button" className="agnt-button-primary" onClick={save}>
+              {editing.originalName ? "Update" : "Add"}
+            </button>
+            <button type="button" className="agnt-button-ghost" onClick={cancel}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="agnt-button-ghost" onClick={startNew}>
+          + Add command
+        </button>
+      )}
+    </section>
   );
 }
 

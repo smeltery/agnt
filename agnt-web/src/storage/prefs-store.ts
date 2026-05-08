@@ -33,6 +33,15 @@ const THEME_KEY = "prefs.theme";
 const SIDEBAR_KEY = "prefs.sidebar";
 const PINNED_THREADS_KEY = "prefs.pinnedThreadIds";
 const NOTIFICATIONS_KEY = "prefs.notifications";
+const LAST_VISITED_KEY = "prefs.lastVisitedByThread";
+const CUSTOM_SLASH_KEY = "prefs.customSlashCommands";
+
+export interface CustomSlashCommand {
+  /** Unique slug — what the user types after `/`. Must match the slug regex. */
+  name: string;
+  /** Body inserted into the composer when the command runs. */
+  body: string;
+}
 
 export const prefsStore = {
   async loadTurnFlags(): Promise<PersistedTurnFlags> {
@@ -70,6 +79,30 @@ export const prefsStore = {
   },
   async saveNotifications(preference: NotificationsPreference): Promise<void> {
     await idb.set(NOTIFICATIONS_KEY, preference);
+  },
+  async loadLastVisited(): Promise<Record<string, number>> {
+    const raw = await idb.get<Record<string, number>>(LAST_VISITED_KEY);
+    if (!raw || typeof raw !== "object") return {};
+    // Defensive: drop non-numeric values left over from older shapes.
+    const out: Record<string, number> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+    }
+    return out;
+  },
+  async saveLastVisited(map: Record<string, number>): Promise<void> {
+    await idb.set(LAST_VISITED_KEY, map);
+  },
+  async loadCustomSlashCommands(): Promise<CustomSlashCommand[]> {
+    const raw = await idb.get<CustomSlashCommand[]>(CUSTOM_SLASH_KEY);
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (entry): entry is CustomSlashCommand =>
+        Boolean(entry) && typeof entry.name === "string" && typeof entry.body === "string"
+    );
+  },
+  async saveCustomSlashCommands(commands: CustomSlashCommand[]): Promise<void> {
+    await idb.set(CUSTOM_SLASH_KEY, commands);
   },
 };
 

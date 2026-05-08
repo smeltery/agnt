@@ -8,7 +8,7 @@ import {
 } from "../../lib/thread-export";
 import { filterThreads } from "../../state/thread-filter";
 import { groupThreadsByRecency, type ThreadGroup } from "../../state/thread-grouping";
-import { useThreadsStore } from "../../state/threads-store";
+import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 import { prefsStore, type SidebarTabPreference } from "../../storage/prefs-store";
 import { ThreadContextMenu } from "./ThreadContextMenu";
 
@@ -27,6 +27,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   const loading = useThreadsStore((state) => state.loading);
   const runningThreadIds = useThreadsStore((state) => state.runningThreadIds);
   const pinnedThreadIds = useThreadsStore((state) => state.pinnedThreadIds);
+  const lastVisitedByThread = useThreadsStore((state) => state.lastVisitedByThread);
   const selectThread = useThreadsStore((state) => state.selectThread);
   const archiveThread = useThreadsStore((state) => state.archiveThread);
   const unarchiveThread = useThreadsStore((state) => state.unarchiveThread);
@@ -232,6 +233,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
               selectedThreadId={selectedThreadId}
               runningThreadIds={runningThreadIds}
               pinnedThreadIds={pinnedThreadIds}
+              lastVisitedByThread={lastVisitedByThread}
               selectMode={selectMode}
               selectedIds={selectedIds}
               onSelect={handleRowSelect}
@@ -290,6 +292,7 @@ function SidebarGroup({
   selectedThreadId,
   runningThreadIds,
   pinnedThreadIds,
+  lastVisitedByThread,
   selectMode,
   selectedIds,
   onSelect,
@@ -299,6 +302,7 @@ function SidebarGroup({
   selectedThreadId: string | null;
   runningThreadIds: Set<string>;
   pinnedThreadIds: Set<string>;
+  lastVisitedByThread: Record<string, number>;
   selectMode: boolean;
   selectedIds: Set<string>;
   onSelect: (thread: CodexThread) => void;
@@ -314,6 +318,7 @@ function SidebarGroup({
             selected={thread.id === selectedThreadId}
             running={runningThreadIds.has(thread.id)}
             pinned={pinnedThreadIds.has(thread.id)}
+            unread={isThreadUnread(thread, lastVisitedByThread) && thread.id !== selectedThreadId}
             selectMode={selectMode}
             checked={selectedIds.has(thread.id)}
             onSelect={() => onSelect(thread)}
@@ -329,6 +334,7 @@ function SidebarRow({
   selected,
   running,
   pinned,
+  unread,
   selectMode,
   checked,
   onSelect,
@@ -337,6 +343,7 @@ function SidebarRow({
   selected: boolean;
   running: boolean;
   pinned: boolean;
+  unread: boolean;
   selectMode: boolean;
   checked: boolean;
   onSelect: () => void;
@@ -348,6 +355,7 @@ function SidebarRow({
         "agnt-sidebar-row"
         + (selected ? " agnt-sidebar-row-selected" : "")
         + (selectMode && checked ? " agnt-sidebar-row-checked" : "")
+        + (unread ? " agnt-sidebar-row-unread" : "")
       }
     >
       <button
@@ -366,6 +374,9 @@ function SidebarRow({
               onClick={(event) => event.stopPropagation()}
               aria-label={checked ? `Deselect ${title}` : `Select ${title}`}
             />
+          )}
+          {unread && !selectMode && (
+            <span className="agnt-sidebar-unread-dot" aria-label="unread" title="New activity since you last viewed this thread" />
           )}
           {running && <span className="agnt-sidebar-running-dot" aria-label="running" title="Running" />}
           {pinned && (

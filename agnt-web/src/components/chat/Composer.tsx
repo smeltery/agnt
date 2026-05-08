@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { attachmentFromFile, ImageAttachError } from "../../lib/image-attach";
 import { attachmentFromTextFile, looksLikeTextFile, TextAttachError } from "../../lib/text-attach";
 import type { ImageAttachment } from "../../models";
+import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
 import { useVoiceStore } from "../../state/voice-store";
@@ -132,17 +133,22 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   // We need the snapshot at run-time, not on every render; subscribing the
   // whole component to threads-store would re-render on every streaming
   // delta. Instead grab the snapshot lazily inside the action handler.
+  const customSlashCommands = useCustomSlashCommandsStore((state) => state.commands);
   const slashMatches = useMemo(() => {
     if (slashQuery === null) return [];
-    return filterSlashCommands(slashQuery, {
-      threadId: selectedThreadId ?? "",
-      threads: useThreadsStore.getState(),
-    });
+    return filterSlashCommands(
+      slashQuery,
+      {
+        threadId: selectedThreadId ?? "",
+        threads: useThreadsStore.getState(),
+      },
+      customSlashCommands
+    );
     // The match list only depends on the typed query + which thread is
     // selected. canRun() is queried again at run time so a thread switch
     // mid-typing still picks the right command.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slashQuery, selectedThreadId]);
+  }, [slashQuery, selectedThreadId, customSlashCommands]);
   const [slashCursor, setSlashCursor] = useState(0);
   // Reset the highlight cursor any time the visible match list changes.
   useEffect(() => {
@@ -150,11 +156,31 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   }, [slashMatches.length]);
 
   function runSlashCommand(command: SlashCommand) {
+    const context = { threadId: selectedThreadId ?? "", threads: useThreadsStore.getState() };
+    // Custom commands expand into the draft so the user can review/edit before
+    // sending — they're snippets, not actions. Built-ins clear the draft and
+    // run their side effect.
+    if (command.expand) {
+      const body = command.expand(context);
+      setDraft(body);
+      setHistoryCursor(-1);
+      draftBeforeRecallRef.current = "";
+      setSlashCursor(0);
+      // Push focus + caret to the end so users can keep typing immediately.
+      requestAnimationFrame(() => {
+        const input = document.getElementById("agnt-composer-input") as HTMLTextAreaElement | null;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(body.length, body.length);
+        }
+      });
+      return;
+    }
     setDraft("");
     setHistoryCursor(-1);
     draftBeforeRecallRef.current = "";
     setSlashCursor(0);
-    void command.run({ threadId: selectedThreadId ?? "", threads: useThreadsStore.getState() });
+    void command.run(context);
   }
 
   // Cursor semantics: -1 = not recalling; 0 = most recent prompt; N-1 =
