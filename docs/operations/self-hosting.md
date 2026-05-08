@@ -14,8 +14,8 @@ The public source tree is local-first and self-host friendly:
 - there is no public production relay baked into the GitHub source
 - local pairing should work out of the box with `./scripts/run-local-agnt.sh`
 - internet-facing setups should pass their own relay URL explicitly with `AGNT_RELAY`
-- the first QR scan bootstraps trust, then later reconnects can reuse the same trusted Mac through that relay
-- the built-in background daemon for trusted reconnect is currently macOS-only
+- the first QR scan bootstraps trust, then later reconnects can reuse the same trusted Mac/Linux host through that relay
+- the built-in background daemon supports macOS (launchd) and Linux (systemd-user); Codex provider features that depend on the macOS desktop app (`/Applications/Codex.app` mirroring, `desktop/continueOnMac`, ChatGPT sign-in helper) remain macOS-only
 
 ## What agnt Self-Hosting Means
 
@@ -23,9 +23,9 @@ agnt is local-first.
 
 That means:
 
-- the bridge runs on your own Mac
-- Codex runs on your own Mac
-- git commands run on your own Mac
+- the bridge runs on your own machine (macOS or Linux)
+- the agent CLI runs on your own machine
+- git commands run on your own machine
 - your iPhone is a remote control
 - the relay is only a transport layer for pairing, trusted-session resolve, and encrypted message forwarding
 
@@ -37,7 +37,7 @@ This is the easiest way to try the public repo, but on iPhone it should be treat
 
 ### What you need
 
-- a Mac with at least one supported agent CLI installed (Codex, Claude Code, opencode, or Cursor)
+- a macOS or Linux host with at least one supported agent CLI installed (Codex on macOS only; Claude Code, opencode, and Cursor work on both)
 - an iPhone with an agnt build installed
 - both devices on the same local network
 
@@ -174,7 +174,17 @@ After the first successful scan:
 - the relay can resolve the current live session for that trusted Mac
 - the app can reconnect without requiring a new QR every time
 
-Today, that background-service path is built in for macOS. If you self-host against a non-macOS bridge, pairing and relay routing still work, but you must manage persistence/background service behavior yourself.
+Today, the built-in background-service path supports macOS (launchd, via `~/Library/LaunchAgents/com.dotbrains.agnt.bridge.plist`) and Linux (systemd-user, via `~/.config/systemd/user/com.dotbrains.agnt.bridge.service`). Both are managed transparently by `agnt up` / `agnt start` / `agnt stop` / `agnt status`.
+
+On Linux, the systemd-user installer requires:
+
+- `XDG_RUNTIME_DIR` set (a real PAM/SSH session — present whenever a user is logged in)
+- `systemctl --user` available
+- for headless boxes that should keep the bridge running after logout: `loginctl enable-linger $USER`
+
+If `systemctl --user` is unavailable (for example, on a container without systemd, or Alpine), `agnt up` falls back to a foreground bridge with the same pairing QR. You can supervise that yourself (tmux, supervisord, your own systemd unit, etc.).
+
+On other operating systems pairing and relay routing still work, but you must manage persistence/background service behavior yourself.
 
 If you install the bridge from npm and do not use the local launcher, make sure you export `AGNT_RELAY` before running `agnt up`.
 
@@ -251,7 +261,7 @@ If you cloned the public repo, the supported self-hosting story is:
 - run the relay yourself
 - prefer a relay path reachable from iPhone over Tailscale or another stable private network
 - point the bridge at your relay with `AGNT_RELAY`
-- scan the QR from the iPhone app once to trust the Mac
-- let reconnect reuse that trusted Mac over the same relay
-- remember that the built-in daemon path is currently macOS-only
+- scan the QR from the iPhone app once to trust the Mac/Linux host
+- let reconnect reuse that trusted host over the same relay
+- the built-in daemon path supports macOS (launchd) and Linux (systemd-user); other operating systems run the bridge in the foreground and you supervise it yourself
 - keep private hostnames and credentials out of the public repo

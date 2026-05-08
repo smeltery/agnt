@@ -6,7 +6,7 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 
 ## Core guardrails
 
-- Prefer local Mac runtime, local bridge, QR pairing, and daemon workflows.
+- Prefer local Mac/Linux runtime, local bridge, QR pairing, and daemon workflows. Codex provider stays macOS-only (it depends on `Codex.app`); Claude Code, opencode, and Cursor work on both macOS and Linux.
 - Be a proactive agent: inspect local code, protocol/schema, and official sources to confirm facts before replying; do not stop to ask for confirmation when the next verification step is safe and obvious.
 - Keep repo isolation by thread/project metadata and local `cwd`.
 - Do not reintroduce filtering by selected repo in sidebar/content.

@@ -5,8 +5,8 @@ agnt is three components running on three machines:
 | Where | What | Lang | Source |
 |---|---|---|---|
 | Phone | iOS app (`AgntMobile`) | SwiftUI | `AgntMobile/` |
-| Mac | Bridge daemon (`@dotbrains/agnt`) | Node.js (CommonJS) | `agnt-bridge/` |
-| Mac (or your VPS) | Relay (`agnt-relay`) | Node.js | `relay/` |
+| Mac or Linux | Bridge daemon (`@dotbrains/agnt`) | Node.js (CommonJS) | `agnt-bridge/` |
+| Mac, Linux (or your VPS) | Relay (`agnt-relay`) | Node.js | `relay/` |
 
 Plus whichever **agent CLI** you've configured a provider for: `codex`, `claude`, `opencode`, or `cursor-agent`. The agent CLI is a separate process spawned (or spoken to) by the bridge.
 
@@ -22,12 +22,12 @@ flowchart TB
         Relay["relay/server.js<br/>(WebSocket)"]
     end
 
-    subgraph Mac["Your Mac"]
-        LaunchD["launchd<br/>(macOS)"]
+    subgraph Host["Your Mac or Linux box"]
+        Supervisor["launchd (macOS) /<br/>systemd-user (Linux)"]
         Bridge["agnt-bridge<br/>(run-service)"]
         AgentCLI["Agent CLI<br/>(spawned per session)"]
 
-        LaunchD -->|"keep-alive"| Bridge
+        Supervisor -->|"keep-alive"| Bridge
         Bridge <-->|"stdio /<br/>WebSocket /<br/>HTTP+SSE"| AgentCLI
     end
 
@@ -37,8 +37,8 @@ flowchart TB
 
 - **iOS app** never speaks to the agent CLI directly. It only speaks Codex JSON-RPC, on top of an end-to-end encrypted secure transport.
 - **Relay** is a dumb message switch. It sees connection metadata and ciphertext envelopes, never plaintext.
-- **Bridge** is the brain. It owns provider selection, the translator shim per provider, the secure transport, the adaptive pager, and all session state on the Mac.
-- **Agent CLI** runs on the Mac with full filesystem access. The user owns it and the credentials it uses.
+- **Bridge** is the brain. It owns provider selection, the translator shim per provider, the secure transport, the adaptive pager, and all session state on the host.
+- **Agent CLI** runs on the host (Mac or Linux) with full filesystem access. The user owns it and the credentials it uses.
 
 ## Repository layout
 
@@ -51,7 +51,8 @@ agnt/
 │   └── src/
 │       ├── bridge.js                     # Provider-agnostic core
 │       ├── secure-transport.js           # E2E-encrypted relay framing
-│       ├── macos-launch-agent.js         # launchd plist + lifecycle helpers
+│       ├── macos-launch-agent.js         # launchd plist + lifecycle helpers (macOS)
+│       ├── linux-systemd-agent.js        # systemd-user unit + lifecycle helpers (Linux)
 │       ├── git-handler.js                # Local git ops triggered from phone
 │       ├── workspace-handler.js          # cwd + workspace metadata
 │       ├── session-state.js              # ~/.agnt/ persistence
