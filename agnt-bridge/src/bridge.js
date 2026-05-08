@@ -1359,15 +1359,18 @@ function startBridge({
   }
 }
 
-// Holds a single macOS idle-sleep assertion for as long as the bridge process stays alive.
+// Holds a single host idle-sleep assertion for as long as the bridge process stays alive.
+// macOS uses `caffeinate -i -w <pid>`; Linux uses `systemd-inhibit --what=idle:sleep` if available.
 function createMacOSBridgeWakeAssertion({
   platform = process.platform,
   pid = process.pid,
   spawnImpl = spawn,
   consoleImpl = console,
   enabled = true,
+  envImpl = process.env,
 } = {}) {
-  if (platform !== "darwin") {
+  const command = resolveWakeAssertionCommand({ platform, pid, envImpl });
+  if (!command) {
     return {
       active: false,
       enabled: false,
@@ -1399,12 +1402,12 @@ function createMacOSBridgeWakeAssertion({
     }
 
     try {
-      const nextChild = spawnImpl("/usr/bin/caffeinate", ["-i", "-w", String(pid)], {
+      const nextChild = spawnImpl(command.bin, command.args, {
         stdio: "ignore",
       });
 
       nextChild.on?.("error", (error) => {
-        consoleImpl.warn(`[agnt] Failed to hold the Mac awake while the bridge is active: ${error.message}`);
+        consoleImpl.warn(`[agnt] Failed to hold the host awake while the bridge is active: ${error.message}`);
       });
       nextChild.on?.("exit", () => {
         if (child === nextChild) {
@@ -1447,6 +1450,57 @@ function createMacOSBridgeWakeAssertion({
     setEnabled,
     stop,
   };
+}
+
+function resolveWakeAssertionCommand({ platform, pid, envImpl }) {
+  if (platform === "darwin") {
+    return {
+      bin: "/usr/bin/caffeinate",
+      args: ["-i", "-w", String(pid)],
+    };
+  }
+  if (platform === "linux" && hasSystemdInhibit({ envImpl })) {
+    // `--who/--why` are advisory labels surfaced by `systemd-inhibit --list`.
+    // `sleep infinity` keeps the inhibitor alive until the bridge exits and reaps the child.
+    return {
+      bin: "systemd-inhibit",
+      args: [
+        "--what=idle:sleep",
+        "--who=agnt",
+        "--why=agnt bridge keeps the host reachable while paired",
+        "--mode=block",
+        "sleep",
+        "infinity",
+      ],
+    };
+  }
+  return null;
+}
+
+function hasSystemdInhibit({ envImpl = process.env } = {}) {
+  const path = typeof envImpl?.PATH === "string" ? envImpl.PATH : process.env.PATH || "";
+  if (!path) {
+    return false;
+  }
+  // Only consider the inhibitor available when a user/system D-Bus session is reachable;
+  // otherwise the spawn would just print "Failed to inhibit" and exit immediately.
+  if (!envImpl?.XDG_RUNTIME_DIR && !envImpl?.DBUS_SESSION_BUS_ADDRESS) {
+    return false;
+  }
+  // Inexpensive PATH probe — avoids spawning when systemd is not installed.
+  try {
+    const fsModule = require("fs");
+    for (const segment of path.split(":")) {
+      if (!segment) {
+        continue;
+      }
+      const candidate = require("path").join(segment, "systemd-inhibit");
+      if (fsModule.existsSync(candidate)) {
+        return true;
+      }
+    }
+  } catch {}
+  return false;
 }
 
 // Registers the canonical Mac identity and the one trusted iPhone allowed for auto-resolve.

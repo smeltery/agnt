@@ -4,7 +4,7 @@
 [![Bridge Check](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml)
 [![Build Unsigned IPA](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml)
 
-**Drive coding-agent CLIs from your iPhone or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac and proxies an end-to-end encrypted session to your iOS app or to a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
+**Drive coding-agent CLIs from your iPhone or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac or Linux box and proxies an end-to-end encrypted session to your iOS app or to a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
 
 ## What it is
 
@@ -23,7 +23,7 @@ flowchart LR
 ```
 
 - **iOS app** and **web app** are two clients of the same protocol — Codex JSON-RPC over a paired secure session.
-- **Bridge** runs on your Mac. It picks a provider, spawns the matching CLI, and translates between JSON-RPC and whatever native protocol the CLI uses (stream-json, REST+SSE, …).
+- **Bridge** runs on your Mac or Linux host. It picks a provider, spawns the matching CLI, and translates between JSON-RPC and whatever native protocol the CLI uses (stream-json, REST+SSE, …). The built-in service installer uses launchd on macOS and systemd-user on Linux; on other operating systems `agnt up` runs in the foreground.
 - **Relay** routes ciphertext bytes only. Run it locally for LAN use, or self-host it on a VPS / Tailscale for off-network access.
 
 agnt is a fork of [Remodex](https://github.com/Emanuele-web04/remodex) (Apache-2.0). Remodex was Codex-only; agnt generalizes the transport behind a provider plugin contract so other agents can be added without touching the bridge core.
@@ -47,12 +47,12 @@ For self-hosting (Tailscale, public VPS, etc.) see [`docs/operations/self-hostin
 
 ## Supported providers
 
-| Provider | Status | Notes |
-|---|---|---|
-| **Codex** ([install](https://github.com/openai/codex)) | feature-complete | native JSON-RPC; ChatGPT auth + voice + desktop mirror |
-| **Claude Code** ([install](https://docs.claude.com/en/docs/claude-code)) | feature-complete | long-lived stdin; plan mode; reasoning deltas; auto-accept edits |
-| **opencode** ([install](https://opencode.ai)) | feature-complete | runtime tool approvals from your phone; compact + fork |
-| **Cursor** ([install](https://cursor.com/docs/cli/installation)) | feature-complete | spawn-per-turn; tool calls auto-approved (`--force`) |
+| Provider | Status | OS | Notes |
+|---|---|---|---|
+| **Codex** ([install](https://github.com/openai/codex)) | feature-complete | macOS only | native JSON-RPC; ChatGPT auth + voice + desktop mirror (all bound to `Codex.app`) |
+| **Claude Code** ([install](https://docs.claude.com/en/docs/claude-code)) | feature-complete | macOS, Linux | long-lived stdin; plan mode; reasoning deltas; auto-accept edits |
+| **opencode** ([install](https://opencode.ai)) | feature-complete | macOS, Linux | runtime tool approvals from your phone; compact + fork |
+| **Cursor** ([install](https://cursor.com/docs/cli/installation)) | feature-complete | macOS, Linux | spawn-per-turn; tool calls auto-approved (`--force`) |
 
 Provider deep-dives + capability matrix: [`docs/providers/`](docs/providers/).
 

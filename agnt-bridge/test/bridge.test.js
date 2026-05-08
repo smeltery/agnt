@@ -533,10 +533,11 @@ test("createMacOSBridgeWakeAssertion can toggle the caffeinate assertion on and 
   assert.equal(children[0].killed, true);
 });
 
-test("createMacOSBridgeWakeAssertion is a no-op outside macOS", () => {
+test("createMacOSBridgeWakeAssertion is a no-op when no inhibitor is available", () => {
   let didSpawn = false;
   const assertion = createMacOSBridgeWakeAssertion({
     platform: "linux",
+    envImpl: {},
     spawnImpl() {
       didSpawn = true;
       throw new Error("should not spawn");
@@ -546,6 +547,56 @@ test("createMacOSBridgeWakeAssertion is a no-op outside macOS", () => {
   assert.equal(assertion.active, false);
   assertion.stop();
   assert.equal(didSpawn, false);
+});
+
+test("createMacOSBridgeWakeAssertion spawns systemd-inhibit on Linux when available", () => {
+  // Use this test file's directory as a fake PATH segment that contains a "systemd-inhibit"
+  // sibling we create on the fly, so the PATH probe finds an executable without touching real bins.
+  const fs = require("node:fs");
+  const os = require("node:os");
+  const path = require("node:path");
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-systemd-inhibit-"));
+  const inhibitPath = path.join(tmpDir, "systemd-inhibit");
+  fs.writeFileSync(inhibitPath, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+  try {
+    const spawnCalls = [];
+    const fakeChild = {
+      killed: false,
+      on() {},
+      unref() {},
+      kill() { this.killed = true; },
+    };
+
+    const assertion = createMacOSBridgeWakeAssertion({
+      platform: "linux",
+      pid: 1234,
+      envImpl: {
+        PATH: tmpDir,
+        XDG_RUNTIME_DIR: "/run/user/1000",
+      },
+      spawnImpl(command, args, options) {
+        spawnCalls.push({ command, args, options });
+        return fakeChild;
+      },
+    });
+
+    assert.equal(assertion.active, true);
+    assert.equal(spawnCalls.length, 1);
+    assert.equal(spawnCalls[0].command, "systemd-inhibit");
+    assert.deepEqual(spawnCalls[0].args.slice(0, 4), [
+      "--what=idle:sleep",
+      "--who=agnt",
+      "--why=agnt bridge keeps the host reachable while paired",
+      "--mode=block",
+    ]);
+    assert.deepEqual(spawnCalls[0].args.slice(4), ["sleep", "infinity"]);
+
+    assertion.stop();
+    assert.equal(fakeChild.killed, true);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test("persistBridgePreferences only saves the daemon preference field", () => {

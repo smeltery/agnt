@@ -1,8 +1,8 @@
 // FILE: index.js
 // Purpose: Small entrypoint wrapper for bridge lifecycle commands.
 // Layer: CLI entry
-// Exports: bridge lifecycle, pairing reset, thread resume/watch, and macOS service helpers.
-// Depends on: ./bridge, ./secure-device-state, ./session-state, ./rollout-watch, ./macos-launch-agent
+// Exports: bridge lifecycle, pairing reset, thread resume/watch, and per-platform service helpers.
+// Depends on: ./bridge, ./secure-device-state, ./session-state, ./rollout-watch, ./macos-launch-agent, ./linux-systemd-agent
 
 const { startBridge } = require("./bridge");
 const { readBridgeDeviceState, resetBridgeDeviceState } = require("./secure-device-state");
@@ -18,6 +18,16 @@ const {
   startMacOSBridgeService,
   stopMacOSBridgeService,
 } = require("./macos-launch-agent");
+const {
+  getLinuxBridgeServiceStatus,
+  isLinuxBridgeServiceNotInstalledError,
+  printLinuxBridgePairingQr,
+  printLinuxBridgeServiceStatus,
+  resetLinuxBridgePairing,
+  runLinuxBridgeService,
+  startLinuxBridgeService,
+  stopLinuxBridgeService,
+} = require("./linux-systemd-agent");
 
 module.exports = {
   getMacOSBridgeServiceStatus,
@@ -30,6 +40,14 @@ module.exports = {
   runMacOSBridgeService,
   startMacOSBridgeService,
   stopMacOSBridgeService,
+  getLinuxBridgeServiceStatus,
+  isLinuxBridgeServiceNotInstalledError,
+  printLinuxBridgePairingQr,
+  printLinuxBridgeServiceStatus,
+  resetLinuxBridgePairing,
+  runLinuxBridgeService,
+  startLinuxBridgeService,
+  stopLinuxBridgeService,
   resetBridgePairing: resetBridgeDeviceState,
   openLastActiveThread,
   watchThreadRollout,

@@ -48,11 +48,13 @@ Provider-specific env that sit alongside agnt's:
 | `AGNT_REFRESH_COMMAND` | (built-in) | Override the AppleScript / shell command used to refresh Codex.app. |
 | `AGNT_CODEX_BUNDLE_ID` | `com.openai.codex` | Override Codex.app bundle id (advanced — for non-default Codex builds). |
 
-## Mac wake / launchd
+## Wake / service supervision
 
 | Var | Default | Purpose |
 |---|---|---|
-| `AGNT_KEEP_MAC_AWAKE` | `false` | Hold a `caffeinate` assertion while the bridge is connected so the Mac doesn't sleep mid-session. |
+| `AGNT_KEEP_MAC_AWAKE` | `false` | Hold an idle-sleep inhibitor while the bridge is connected so the host doesn't sleep mid-session. macOS uses `caffeinate -i -w <pid>`; Linux uses `systemd-inhibit --what=idle:sleep` if available. The setting is preserved as `AGNT_KEEP_MAC_AWAKE` for compatibility but applies on both platforms. |
+
+The built-in service installer (`agnt up` / `agnt start` / `agnt stop` / `agnt status`) writes a launchd plist to `~/Library/LaunchAgents/com.dotbrains.agnt.bridge.plist` on macOS, and a systemd-user unit to `~/.config/systemd/user/com.dotbrains.agnt.bridge.service` on Linux. Headless Linux boxes that should keep the bridge running across logout need `loginctl enable-linger $USER`.
 
 ## Push notifications (optional, self-hosted)
 

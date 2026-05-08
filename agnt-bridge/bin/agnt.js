@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // FILE: agnt.js
-// Purpose: CLI surface for foreground bridge runs, pairing reset, thread resume, and macOS service control.
+// Purpose: CLI surface for foreground bridge runs, pairing reset, thread resume, and macOS/Linux service control.
 // Layer: CLI binary
 // Exports: none
 // Depends on: ../src
@@ -15,6 +15,14 @@ const {
   startBridge,
   startMacOSBridgeService,
   stopMacOSBridgeService,
+  getLinuxBridgeServiceStatus,
+  isLinuxBridgeServiceNotInstalledError,
+  printLinuxBridgePairingQr,
+  printLinuxBridgeServiceStatus,
+  resetLinuxBridgePairing,
+  runLinuxBridgeService,
+  startLinuxBridgeService,
+  stopLinuxBridgeService,
   resetBridgePairing,
   openLastActiveThread,
   watchThreadRollout,
@@ -31,6 +39,13 @@ const defaultDeps = {
   startBridge,
   startMacOSBridgeService,
   stopMacOSBridgeService,
+  getLinuxBridgeServiceStatus,
+  printLinuxBridgePairingQr,
+  printLinuxBridgeServiceStatus,
+  resetLinuxBridgePairing,
+  runLinuxBridgeService,
+  startLinuxBridgeService,
+  stopLinuxBridgeService,
   resetBridgePairing,
   openLastActiveThread,
   watchThreadRollout,
@@ -69,6 +84,25 @@ async function main({
       return;
     }
 
+    if (platform === "linux" && canUseLinuxBridgeService(consoleImpl)) {
+      consoleImpl.log("[agnt] Starting bridge and pairing QR...");
+      try {
+        const result = await deps.startLinuxBridgeService({
+          waitForPairing: true,
+          providerId,
+        });
+        deps.printLinuxBridgePairingQr({
+          pairingSession: result.pairingSession,
+        });
+        return;
+      } catch (error) {
+        consoleImpl.warn(
+          `[agnt] systemd-user service unavailable (${(error && error.message) || "unknown error"}). `
+          + "Falling back to foreground bridge."
+        );
+      }
+    }
+
     deps.startBridge({ providerId });
     return;
   }
@@ -79,28 +113,31 @@ async function main({
   }
 
   if (command === "run-service") {
-    deps.runMacOSBridgeService();
+    if (platform === "darwin") {
+      deps.runMacOSBridgeService();
+      return;
+    }
+    deps.runLinuxBridgeService();
     return;
   }
 
   if (command === "start") {
-    assertMacOSCommand(command, {
-      platform,
-      consoleImpl,
-      exitImpl,
-    });
+    assertServiceCommand(command, { platform, consoleImpl, exitImpl });
     deps.readBridgeConfig();
-    const result = await deps.startMacOSBridgeService({
-      waitForPairing: false,
-    });
+    const result = platform === "darwin"
+      ? await deps.startMacOSBridgeService({ waitForPairing: false, providerId })
+      : await deps.startLinuxBridgeService({ waitForPairing: false, providerId });
     emitResult({
       payload: {
         ok: true,
         currentVersion: version,
         plistPath: result?.plistPath,
+        unitPath: result?.unitPath,
         pairingSession: result?.pairingSession,
       },
-      message: "[agnt] macOS bridge service is running.",
+      message: platform === "darwin"
+        ? "[agnt] macOS bridge service is running."
+        : "[agnt] Linux bridge service is running.",
       jsonOutput,
       consoleImpl,
     });
@@ -108,23 +145,22 @@ async function main({
   }
 
   if (command === "restart") {
-    assertMacOSCommand(command, {
-      platform,
-      consoleImpl,
-      exitImpl,
-    });
+    assertServiceCommand(command, { platform, consoleImpl, exitImpl });
     deps.readBridgeConfig();
-    const result = await deps.startMacOSBridgeService({
-      waitForPairing: false,
-    });
+    const result = platform === "darwin"
+      ? await deps.startMacOSBridgeService({ waitForPairing: false, providerId })
+      : await deps.startLinuxBridgeService({ waitForPairing: false, providerId });
     emitResult({
       payload: {
         ok: true,
         currentVersion: version,
         plistPath: result?.plistPath,
+        unitPath: result?.unitPath,
         pairingSession: result?.pairingSession,
       },
-      message: "[agnt] macOS bridge service restarted.",
+      message: platform === "darwin"
+        ? "[agnt] macOS bridge service restarted."
+        : "[agnt] Linux bridge service restarted.",
       jsonOutput,
       consoleImpl,
     });
@@ -132,18 +168,20 @@ async function main({
   }
 
   if (command === "stop") {
-    assertMacOSCommand(command, {
-      platform,
-      consoleImpl,
-      exitImpl,
-    });
-    deps.stopMacOSBridgeService();
+    assertServiceCommand(command, { platform, consoleImpl, exitImpl });
+    if (platform === "darwin") {
+      deps.stopMacOSBridgeService();
+    } else {
+      deps.stopLinuxBridgeService();
+    }
     emitResult({
       payload: {
         ok: true,
         currentVersion: version,
       },
-      message: "[agnt] macOS bridge service stopped.",
+      message: platform === "darwin"
+        ? "[agnt] macOS bridge service stopped."
+        : "[agnt] Linux bridge service stopped.",
       jsonOutput,
       consoleImpl,
     });
@@ -151,19 +189,21 @@ async function main({
   }
 
   if (command === "status") {
-    assertMacOSCommand(command, {
-      platform,
-      consoleImpl,
-      exitImpl,
-    });
+    assertServiceCommand(command, { platform, consoleImpl, exitImpl });
     if (jsonOutput) {
       emitJson({
-        ...deps.getMacOSBridgeServiceStatus(),
+        ...(platform === "darwin"
+          ? deps.getMacOSBridgeServiceStatus()
+          : deps.getLinuxBridgeServiceStatus()),
         currentVersion: version,
       });
       return;
     }
-    deps.printMacOSBridgeServiceStatus();
+    if (platform === "darwin") {
+      deps.printMacOSBridgeServiceStatus();
+    } else {
+      deps.printLinuxBridgeServiceStatus();
+    }
     return;
   }
 
@@ -181,6 +221,37 @@ async function main({
           jsonOutput,
           consoleImpl,
         });
+      } else if (platform === "linux") {
+        try {
+          deps.resetLinuxBridgePairing();
+          emitResult({
+            payload: {
+              ok: true,
+              currentVersion: version,
+              platform: "linux",
+            },
+            message: "[agnt] Stopped the Linux bridge service and cleared the saved pairing state. Run `agnt up` to pair again.",
+            jsonOutput,
+            consoleImpl,
+          });
+        } catch (innerError) {
+          // Only fall back to a file-only reset when systemd has nothing to manage on this box.
+          // Real systemd errors (`systemctl` permission denied, dbus failure, etc.) must surface.
+          if (!isLinuxBridgeServiceNotInstalledError(innerError)) {
+            throw innerError;
+          }
+          deps.resetBridgePairing();
+          emitResult({
+            payload: {
+              ok: true,
+              currentVersion: version,
+              platform: "linux",
+            },
+            message: "[agnt] Cleared the saved pairing state. Run `agnt up` to pair again.",
+            jsonOutput,
+            consoleImpl,
+          });
+        }
       } else {
         deps.resetBridgePairing();
         emitResult({
@@ -304,17 +375,35 @@ function emitJson(payload) {
   process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
-function assertMacOSCommand(name, {
+function assertServiceCommand(name, {
   platform = process.platform,
   consoleImpl = console,
   exitImpl = process.exit,
 } = {}) {
-  if (platform === "darwin") {
+  if (platform === "darwin" || platform === "linux") {
     return;
   }
 
-  consoleImpl.error(`[agnt] \`${name}\` is only available on macOS. Use \`agnt up\` or \`agnt run\` for the foreground bridge on this OS.`);
+  consoleImpl.error(`[agnt] \`${name}\` is only available on macOS or Linux. Use \`agnt up\` or \`agnt run\` for the foreground bridge on this OS.`);
   exitImpl(1);
+}
+
+// Cheap pre-check so we can fall back to foreground when a Linux box has no user systemd.
+function canUseLinuxBridgeService(consoleImpl = console) {
+  if (process.platform !== "linux") {
+    return false;
+  }
+  if (!process.env.XDG_RUNTIME_DIR || !process.env.XDG_RUNTIME_DIR.trim()) {
+    return false;
+  }
+  try {
+    require("child_process").execFileSync("systemctl", ["--user", "--version"], {
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isVersionCommand(value) {

@@ -239,14 +239,15 @@ function isBroadWorkspaceRoot(candidatePath) {
 }
 
 async function readPreviewImageData(imagePath, maxPixelDimension, originalByteLength) {
-  if (!usesSipsImagePreview()) {
+  const downsampler = resolveImageDownsampler();
+  if (!downsampler) {
     if (originalByteLength <= MAX_IMAGE_PREVIEW_READ_BYTES) {
       return fs.promises.readFile(imagePath);
     }
 
     throw workspaceError(
       "image_preview_unsupported_platform",
-      "This computer cannot resize image previews yet. Try a smaller image or open it on the computer."
+      "This computer cannot resize image previews yet. Try a smaller image, install ImageMagick on Linux, or open it on the computer."
     );
   }
 
@@ -262,7 +263,7 @@ async function readPreviewImageData(imagePath, maxPixelDimension, originalByteLe
     }
 
     try {
-      const previewData = await downsampleImageWithSips(
+      const previewData = await downsampler(
         imagePath,
         candidateDimension,
         Math.min(IMAGE_PREVIEW_TOOL_TIMEOUT_MS, remainingTimeoutMs)
@@ -323,11 +324,72 @@ function usesSipsImagePreview() {
   return normalizedPlatform === "darwin" || normalizedPlatform === "macos" || normalizedPlatform === "mac";
 }
 
+// Picks the first available image resize tool: macOS `sips`, then ImageMagick on Linux
+// (`magick` for IM7 / `convert` for IM6). Other platforms fall back to direct reads.
+function resolveImageDownsampler() {
+  if (usesSipsImagePreview()) {
+    return downsampleImageWithSips;
+  }
+  if (process.platform !== "linux") {
+    return null;
+  }
+  const imageMagickBin = resolveImageMagickBinary();
+  if (imageMagickBin) {
+    return (imagePath, dim, timeoutMs) => downsampleImageWithImageMagick(imageMagickBin, imagePath, dim, timeoutMs);
+  }
+  return null;
+}
+
+let cachedImageMagickBinary;
+
+function resolveImageMagickBinary() {
+  if (cachedImageMagickBinary !== undefined) {
+    return cachedImageMagickBinary;
+  }
+  const pathEnv = typeof process.env.PATH === "string" ? process.env.PATH : "";
+  const segments = pathEnv ? pathEnv.split(path.delimiter) : [];
+  for (const candidate of ["magick", "convert"]) {
+    for (const segment of segments) {
+      if (!segment) {
+        continue;
+      }
+      const fullPath = path.join(segment, candidate);
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat.isFile()) {
+          cachedImageMagickBinary = candidate;
+          return candidate;
+        }
+      } catch {}
+    }
+  }
+  cachedImageMagickBinary = null;
+  return null;
+}
+
 async function downsampleImageWithSips(imagePath, maxPixelDimension, timeoutMs = IMAGE_PREVIEW_TOOL_TIMEOUT_MS) {
   const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "agnt-image-preview-"));
   const outputPath = path.join(tempDir, `preview${path.extname(imagePath) || ".png"}`);
   try {
     await execFileAsync("sips", ["-Z", String(maxPixelDimension), imagePath, "--out", outputPath], {
+      timeout: Math.max(1, Math.floor(timeoutMs)),
+      maxBuffer: 1024 * 1024,
+    });
+    return await fs.promises.readFile(outputPath);
+  } finally {
+    await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// `-resize <dim>x<dim>>` (the trailing `>` only shrinks larger images and matches sips's `-Z` semantics).
+async function downsampleImageWithImageMagick(bin, imagePath, maxPixelDimension, timeoutMs = IMAGE_PREVIEW_TOOL_TIMEOUT_MS) {
+  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "agnt-image-preview-"));
+  const outputPath = path.join(tempDir, `preview${path.extname(imagePath) || ".png"}`);
+  try {
+    const args = bin === "convert"
+      ? [imagePath, "-resize", `${maxPixelDimension}x${maxPixelDimension}>`, outputPath]
+      : ["convert", imagePath, "-resize", `${maxPixelDimension}x${maxPixelDimension}>`, outputPath];
+    await execFileAsync(bin, args, {
       timeout: Math.max(1, Math.floor(timeoutMs)),
       maxBuffer: 1024 * 1024,
     });
