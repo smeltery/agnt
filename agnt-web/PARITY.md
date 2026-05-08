@@ -99,7 +99,7 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Onboarding / pairing | `components/pairing/{PairingScreen,CameraQRScanner}.tsx` | ✅ (paste, short code w/ relay round-trip, camera scan via BarcodeDetector) |
 | Sidebar | `components/sidebar/Sidebar.tsx` | ✅ (live/archived tabs, cwd hint, selection) |
 | Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
-| Markdown | `components/chat/MarkdownContent.tsx` + `syntax-highlight.ts` | 🟡 (fenced code w/ Prism syntax highlighting for 11 languages, inline code, bold/italic; tables/lists deferred) |
+| Markdown | `components/chat/MarkdownContent.tsx` + `markdown-blocks.ts` + `syntax-highlight.ts` | ✅ (fenced code w/ Prism, inline code, bold/italic, headings 1–6, ordered/bullet lists, tables w/ column alignment) |
 | Approvals modal | `components/approvals/ApprovalModal.tsx` + `state/approvals-store.ts` | ✅ (command + file change, accept / decline / acceptForSession) |
 | System-notice toasts | `components/shared/NoticeStack.tsx` + `state/notices-store.ts` | ✅ (auto-dismiss, severity-aware) |
 | Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |
@@ -109,7 +109,7 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | About | `components/settings/AboutModal.tsx` | ✅ (version, source link, license) |
 | Chat header (title + cwd + provider) | `components/chat/ChatHeader.tsx` | ✅ |
 | Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ |
-| Git panel (status / diff / commit / push / pull) | `components/git/GitPanel.tsx` | ✅ (read + basic write; worktree + advanced flows deferred) |
+| Git panel (status / diff / branches / commit / push / pull / checkout) | `components/git/GitPanel.tsx` | ✅ (read + basic write + branch picker w/ checkout; worktree creation + stacked actions deferred) |
 | Structured user-input prompts | `components/structured-input/StructuredInputModal.tsx` | ✅ (free text, secret, single-/multi-select) |
 | Pet | ⛔ dropped | iOS-specific UX |
 | Payments | ⛔ n/a | StoreKit doesn't apply to self-hosted web |

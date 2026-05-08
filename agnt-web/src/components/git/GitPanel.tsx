@@ -14,16 +14,20 @@ interface GitPanelProps {
 export function GitPanel({ threadId, rpc }: GitPanelProps) {
   const status = useGitStore((state) => state.byThread[threadId]);
   const diff = useGitStore((state) => state.diffByThread[threadId]);
+  const branches = useGitStore((state) => state.branchesByThread[threadId]);
   const loading = useGitStore((state) => Boolean(state.loadingByThread[threadId]));
   const error = useGitStore((state) => state.errorByThread[threadId]);
   const refreshStatus = useGitStore((state) => state.refreshStatus);
   const refreshDiff = useGitStore((state) => state.refreshDiff);
+  const refreshBranches = useGitStore((state) => state.refreshBranches);
+  const checkoutBranch = useGitStore((state) => state.checkoutBranch);
   const commit = useGitStore((state) => state.commit);
   const push = useGitStore((state) => state.push);
   const pull = useGitStore((state) => state.pull);
 
   const [commitMessage, setCommitMessage] = useState("");
   const [showDiff, setShowDiff] = useState(false);
+  const [showBranches, setShowBranches] = useState(false);
 
   useEffect(() => {
     if (!rpc) return;
@@ -125,10 +129,63 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
         >
           {showDiff ? "Hide diff" : "View diff"}
         </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => {
+            const next = !showBranches;
+            setShowBranches(next);
+            if (next) void refreshBranches(threadId, rpc);
+          }}
+          disabled={loading}
+        >
+          {showBranches ? "Hide branches" : "Branches"}
+        </button>
       </div>
 
       {showDiff && diff && <pre className="agnt-gitpanel-diff">{diff}</pre>}
       {showDiff && !diff && <div className="agnt-gitpanel-empty">No diff yet.</div>}
+
+      {showBranches && (
+        <ul className="agnt-gitpanel-branches">
+          {!branches ? (
+            <li className="agnt-gitpanel-empty">Loading…</li>
+          ) : branches.branches.length === 0 ? (
+            <li className="agnt-gitpanel-empty">No branches.</li>
+          ) : (
+            branches.branches.map((branch) => {
+              const isCurrent = branch === branches.currentBranch;
+              const checkedOutElsewhere = branches.branchesCheckedOutElsewhere.has(branch);
+              return (
+                <li key={branch} className={"agnt-gitpanel-branch-row" + (isCurrent ? " agnt-gitpanel-branch-current" : "")}>
+                  <span className="agnt-gitpanel-branch-name">
+                    <code>{branch}</code>
+                    {branch === branches.defaultBranch && <span className="agnt-row-tag">default</span>}
+                    {checkedOutElsewhere && <span className="agnt-row-tag">other worktree</span>}
+                  </span>
+                  <button
+                    type="button"
+                    className="agnt-button-ghost"
+                    disabled={loading || isCurrent || checkedOutElsewhere || status.isDirty}
+                    title={
+                      isCurrent
+                        ? "Already on this branch"
+                        : checkedOutElsewhere
+                          ? "Checked out in another worktree"
+                          : status.isDirty
+                            ? "Working tree is dirty — commit or stash first"
+                            : "Checkout this branch"
+                    }
+                    onClick={() => void checkoutBranch(threadId, rpc, branch)}
+                  >
+                    {isCurrent ? "Current" : "Checkout"}
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      )}
     </section>
   );
 }

@@ -294,7 +294,45 @@ button {
 }
 
 .agnt-md-paragraph { margin: 0; white-space: pre-wrap; }
-.agnt-md-paragraph + .agnt-md-paragraph { margin-top: 6px; }
+.agnt-md-paragraph + .agnt-md-paragraph,
+.agnt-md-paragraph + .agnt-md-list,
+.agnt-md-paragraph + .agnt-md-heading,
+.agnt-md-paragraph + .agnt-md-table-wrapper,
+.agnt-md-list + .agnt-md-paragraph,
+.agnt-md-list + .agnt-md-list,
+.agnt-md-heading + *,
+.agnt-md-table-wrapper + .agnt-md-paragraph { margin-top: 8px; }
+
+.agnt-md-heading { margin: 0; font-weight: 600; line-height: 1.2; }
+.agnt-md-h1 { font-size: 18px; }
+.agnt-md-h2 { font-size: 16px; }
+.agnt-md-h3 { font-size: 15px; }
+.agnt-md-h4 { font-size: 14px; color: var(--agnt-fg-dim); text-transform: uppercase; letter-spacing: 0.6px; }
+.agnt-md-h5,
+.agnt-md-h6 { font-size: 13px; color: var(--agnt-fg-dim); }
+
+.agnt-md-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 2px; }
+.agnt-md-list li { line-height: 1.5; }
+
+.agnt-md-table-wrapper { overflow-x: auto; max-width: 100%; }
+.agnt-md-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 0;
+  min-width: 100%;
+}
+.agnt-md-table th,
+.agnt-md-table td {
+  border: 1px solid var(--agnt-border);
+  padding: 4px 8px;
+  vertical-align: top;
+}
+.agnt-md-table th {
+  background: var(--agnt-bg-elev-2);
+  font-weight: 600;
+  text-align: left;
+}
+.agnt-md-table tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
 .agnt-md-pre {
   margin: 8px 0;
   padding: 10px 12px;
@@ -570,6 +608,41 @@ button {
   color: var(--agnt-fg);
   font: inherit;
 }
+.agnt-gitpanel-branches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow: auto;
+}
+.agnt-gitpanel-branch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  background: var(--agnt-bg-elev-2);
+  font-size: 12px;
+}
+.agnt-gitpanel-branch-current { border-color: var(--agnt-accent); }
+.agnt-gitpanel-branch-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.agnt-gitpanel-branch-name code {
+  font-family: var(--agnt-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agnt-gitpanel-diff {
   font-family: var(--agnt-mono);
   font-size: 11px;

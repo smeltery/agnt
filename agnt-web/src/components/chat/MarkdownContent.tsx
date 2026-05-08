@@ -1,70 +1,142 @@
-// Tiny markdown renderer focused on the slice the bridge actually emits:
-// fenced code blocks, inline code, bold/italic, and newlines. We deliberately
-// avoid a full markdown library this session to keep the bundle small;
-// real syntax highlighting + tables/lists land in a later session.
+// Block-level dispatcher. Lexer in markdown-blocks.ts returns a typed
+// sequence; we render each block with a small dedicated component. Inline
+// tokenization (bold/italic/code) is shared across paragraph, heading,
+// list-item, and table-cell content via `renderInlineFragments`.
 //
-// Code blocks render as <pre><code> with the language as a CSS class so a
-// follow-up session can wire shiki/highlight.js without touching this file.
+// Bridge agents emit fenced code, inline code, bold/italic, lists, headings,
+// and tables. We deliberately do not handle blockquotes, link references,
+// nested lists, or HTML inline tags — bundle stays small and the output
+// stays predictable.
 
 import { Fragment, type ReactNode } from "react";
+import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
 import { highlightCode, resolveLanguage } from "./syntax-highlight";
 
-const FENCE_PATTERN = /```(\w+)?\n([\s\S]*?)```/g;
 const INLINE_CODE_PATTERN = /`([^`\n]+)`/g;
 const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
 const ITALIC_PATTERN = /(?<!\w)\*([^*\n]+)\*(?!\w)/g;
 
 export function MarkdownContent({ text }: { text: string }) {
   if (!text) return null;
-  return <>{renderFenced(text)}</>;
-}
-
-function renderFenced(text: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-  let key = 0;
-  for (const match of text.matchAll(FENCE_PATTERN)) {
-    const [full, language, body] = match;
-    const start = match.index ?? 0;
-    if (start > lastIndex) nodes.push(renderInline(text.slice(lastIndex, start), key++));
-    const resolved = resolveLanguage(language);
-    nodes.push(
-      <pre key={key++} className={"agnt-md-pre" + (resolved ? " agnt-md-lang-" + resolved : "")}>
-        {resolved ? (
-          <code
-            className={"language-" + resolved}
-            // Prism produces sanitized HTML (escapes &, <, >); safe to inject.
-            dangerouslySetInnerHTML={{ __html: highlightCode(body, resolved) }}
-          />
-        ) : (
-          <code>{body}</code>
-        )}
-      </pre>
-    );
-    lastIndex = start + full.length;
-  }
-  if (lastIndex < text.length) nodes.push(renderInline(text.slice(lastIndex), key++));
-  return nodes;
-}
-
-function renderInline(text: string, key: number): ReactNode {
+  const blocks = lexMarkdownBlocks(text);
   return (
-    <p key={key} className="agnt-md-paragraph">
-      {tokenizeInline(text).map((token, index) =>
-        token.kind === "text" ? (
-          <Fragment key={index}>{token.value}</Fragment>
-        ) : token.kind === "code" ? (
+    <>
+      {blocks.map((block, index) => (
+        <Fragment key={index}>{renderBlock(block)}</Fragment>
+      ))}
+    </>
+  );
+}
+
+function renderBlock(block: MarkdownBlock): ReactNode {
+  switch (block.kind) {
+    case "fence":
+      return renderFence(block.language, block.body);
+    case "heading":
+      return renderHeading(block.level, block.text);
+    case "listOrdered":
+      return (
+        <ol className="agnt-md-list" start={block.start}>
+          {block.items.map((item, index) => (
+            <li key={index}>{renderInlineFragments(item)}</li>
+          ))}
+        </ol>
+      );
+    case "listBullet":
+      return (
+        <ul className="agnt-md-list">
+          {block.items.map((item, index) => (
+            <li key={index}>{renderInlineFragments(item)}</li>
+          ))}
+        </ul>
+      );
+    case "table":
+      return renderTable(block);
+    case "paragraph":
+      return <p className="agnt-md-paragraph">{renderInlineFragments(block.text)}</p>;
+  }
+}
+
+function renderFence(language: string | null, body: string): ReactNode {
+  const resolved = resolveLanguage(language ?? undefined);
+  return (
+    <pre className={"agnt-md-pre" + (resolved ? " agnt-md-lang-" + resolved : "")}>
+      {resolved ? (
+        <code
+          className={"language-" + resolved}
+          dangerouslySetInnerHTML={{ __html: highlightCode(body, resolved) }}
+        />
+      ) : (
+        <code>{body}</code>
+      )}
+    </pre>
+  );
+}
+
+function renderHeading(level: 1 | 2 | 3 | 4 | 5 | 6, text: string): ReactNode {
+  const className = "agnt-md-heading agnt-md-h" + level;
+  const children = renderInlineFragments(text);
+  switch (level) {
+    case 1: return <h1 className={className}>{children}</h1>;
+    case 2: return <h2 className={className}>{children}</h2>;
+    case 3: return <h3 className={className}>{children}</h3>;
+    case 4: return <h4 className={className}>{children}</h4>;
+    case 5: return <h5 className={className}>{children}</h5>;
+    case 6: return <h6 className={className}>{children}</h6>;
+  }
+}
+
+function renderTable(block: Extract<MarkdownBlock, { kind: "table" }>): ReactNode {
+  return (
+    <div className="agnt-md-table-wrapper">
+      <table className="agnt-md-table">
+        <thead>
+          <tr>
+            {block.header.map((cell, index) => (
+              <th key={index} style={alignStyle(block.alignments[index])}>
+                {renderInlineFragments(cell)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map((cell, columnIndex) => (
+                <td key={columnIndex} style={alignStyle(block.alignments[columnIndex])}>
+                  {renderInlineFragments(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function alignStyle(align: "left" | "right" | "center" | null | undefined): React.CSSProperties | undefined {
+  if (!align) return undefined;
+  return { textAlign: align };
+}
+
+function renderInlineFragments(text: string): ReactNode {
+  return tokenizeInline(text).map((token, index) => {
+    switch (token.kind) {
+      case "text":
+        return <Fragment key={index}>{token.value}</Fragment>;
+      case "code":
+        return (
           <code key={index} className="agnt-md-code">
             {token.value}
           </code>
-        ) : token.kind === "bold" ? (
-          <strong key={index}>{token.value}</strong>
-        ) : (
-          <em key={index}>{token.value}</em>
-        )
-      )}
-    </p>
-  );
+        );
+      case "bold":
+        return <strong key={index}>{token.value}</strong>;
+      case "italic":
+        return <em key={index}>{token.value}</em>;
+    }
+  });
 }
 
 type InlineToken =
@@ -74,9 +146,6 @@ type InlineToken =
   | { kind: "italic"; value: string };
 
 function tokenizeInline(text: string): InlineToken[] {
-  // Greedy left-to-right pass: prefer code → bold → italic. Anything else is text.
-  // Keeps the parser obvious; the bridge doesn't send nested markup we need to
-  // worry about for this session's scope.
   const matchers: Array<{ kind: InlineToken["kind"]; pattern: RegExp }> = [
     { kind: "code", pattern: INLINE_CODE_PATTERN },
     { kind: "bold", pattern: BOLD_PATTERN },
@@ -95,7 +164,7 @@ function tokenizeInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
   let cursor = 0;
   for (const hit of hits) {
-    if (hit.start < cursor) continue; // overlapping match — skip
+    if (hit.start < cursor) continue;
     if (hit.start > cursor) tokens.push({ kind: "text", value: text.slice(cursor, hit.start) });
     tokens.push({ kind: hit.kind, value: hit.value });
     cursor = hit.end;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeRepoSync } from "../src/state/git-store";
+import { decodeBranches, decodeRepoSync } from "../src/state/git-store";
 
 describe("decodeRepoSync", () => {
   it("decodes a typical git/status response", () => {
@@ -48,5 +48,37 @@ describe("decodeRepoSync", () => {
   it("filters malformed file entries", () => {
     const status = decodeRepoSync({ files: [{ path: "" }, "not-an-object", { path: "ok.ts", status: "M" }] });
     expect(status.files).toEqual([{ path: "ok.ts", status: "M" }]);
+  });
+});
+
+describe("decodeBranches", () => {
+  it("returns empty defaults for missing input", () => {
+    const snapshot = decodeBranches(undefined);
+    expect(snapshot.branches).toEqual([]);
+    expect(snapshot.currentBranch).toBeUndefined();
+    expect(snapshot.defaultBranch).toBeUndefined();
+    expect(snapshot.branchesCheckedOutElsewhere.size).toBe(0);
+  });
+
+  it("decodes a typical git/branches response", () => {
+    const snapshot = decodeBranches({
+      branches: ["main", "feature/a", "feature/b"],
+      current: "feature/a",
+      default: "main",
+      branchesCheckedOutElsewhere: ["feature/b"],
+    });
+    expect(snapshot.branches).toEqual(["main", "feature/a", "feature/b"]);
+    expect(snapshot.currentBranch).toBe("feature/a");
+    expect(snapshot.defaultBranch).toBe("main");
+    expect(snapshot.branchesCheckedOutElsewhere.has("feature/b")).toBe(true);
+  });
+
+  it("filters non-string entries from arrays", () => {
+    const snapshot = decodeBranches({
+      branches: ["main", 42, null, "side"],
+      branchesCheckedOutElsewhere: [true, "side"],
+    });
+    expect(snapshot.branches).toEqual(["main", "side"]);
+    expect([...snapshot.branchesCheckedOutElsewhere]).toEqual(["side"]);
   });
 });

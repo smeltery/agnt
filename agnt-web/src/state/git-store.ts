@@ -33,14 +33,24 @@ export interface GitRepoSync {
   diffTotals?: GitDiffTotals;
 }
 
+export interface GitBranchesSnapshot {
+  branches: string[];
+  currentBranch?: string;
+  defaultBranch?: string;
+  branchesCheckedOutElsewhere: Set<string>;
+}
+
 export interface GitState {
   byThread: Record<string, GitRepoSync>;
   diffByThread: Record<string, string>;
+  branchesByThread: Record<string, GitBranchesSnapshot>;
   loadingByThread: Record<string, boolean>;
   errorByThread: Record<string, string>;
 
   refreshStatus(threadId: string, rpc: JsonRpcClient): Promise<void>;
   refreshDiff(threadId: string, rpc: JsonRpcClient): Promise<void>;
+  refreshBranches(threadId: string, rpc: JsonRpcClient): Promise<void>;
+  checkoutBranch(threadId: string, rpc: JsonRpcClient, branch: string): Promise<void>;
   commit(threadId: string, rpc: JsonRpcClient, message: string): Promise<void>;
   push(threadId: string, rpc: JsonRpcClient): Promise<void>;
   pull(threadId: string, rpc: JsonRpcClient): Promise<void>;
@@ -50,6 +60,7 @@ export interface GitState {
 export const useGitStore = create<GitState>((set, get) => ({
   byThread: {},
   diffByThread: {},
+  branchesByThread: {},
   loadingByThread: {},
   errorByThread: {},
 
@@ -74,6 +85,34 @@ export const useGitStore = create<GitState>((set, get) => ({
       const patch = typeof json.patch === "string" ? json.patch : "";
       set({ diffByThread: { ...get().diffByThread, [threadId]: patch } });
       clearError(set, get, threadId);
+    } catch (error) {
+      setError(set, get, threadId, (error as Error).message);
+    } finally {
+      setLoading(set, threadId, false);
+    }
+  },
+
+  async refreshBranches(threadId, rpc) {
+    setLoading(set, threadId, true);
+    try {
+      const json = await rpc.request<Record<string, unknown>>("git/branches", { threadId });
+      const snapshot = decodeBranches(json);
+      set({ branchesByThread: { ...get().branchesByThread, [threadId]: snapshot } });
+      clearError(set, get, threadId);
+    } catch (error) {
+      setError(set, get, threadId, (error as Error).message);
+    } finally {
+      setLoading(set, threadId, false);
+    }
+  },
+
+  async checkoutBranch(threadId, rpc, branch) {
+    setLoading(set, threadId, true);
+    try {
+      await rpc.request("git/checkout", { threadId, branch });
+      // Refresh both views concurrently — status reflects working-tree
+      // changes, branches reflects the new HEAD pointer.
+      await Promise.all([get().refreshStatus(threadId, rpc), get().refreshBranches(threadId, rpc)]);
     } catch (error) {
       setError(set, get, threadId, (error as Error).message);
     } finally {
@@ -119,9 +158,27 @@ export const useGitStore = create<GitState>((set, get) => ({
   },
 
   reset() {
-    set({ byThread: {}, diffByThread: {}, loadingByThread: {}, errorByThread: {} });
+    set({ byThread: {}, diffByThread: {}, branchesByThread: {}, loadingByThread: {}, errorByThread: {} });
   },
 }));
+
+export function decodeBranches(json: Record<string, unknown> | undefined): GitBranchesSnapshot {
+  const obj = json ?? {};
+  const branches = Array.isArray(obj.branches)
+    ? (obj.branches as unknown[]).filter((b): b is string => typeof b === "string")
+    : [];
+  const elsewhere = Array.isArray(obj.branchesCheckedOutElsewhere)
+    ? new Set(
+        (obj.branchesCheckedOutElsewhere as unknown[]).filter((b): b is string => typeof b === "string")
+      )
+    : new Set<string>();
+  return {
+    branches,
+    currentBranch: typeof obj.current === "string" ? obj.current : undefined,
+    defaultBranch: typeof obj.default === "string" ? obj.default : undefined,
+    branchesCheckedOutElsewhere: elsewhere,
+  };
+}
 
 export function decodeRepoSync(json: Record<string, unknown> | undefined): GitRepoSync {
   const obj = json ?? {};

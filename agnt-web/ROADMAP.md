@@ -72,11 +72,15 @@ later session because the protocol and storage layers are already complete.
 - ✅ Copy-to-clipboard on completed assistant rows
 - ✅ Workspace shortcuts: `/` focuses the composer, `Esc` closes any open overlay
 
+## Session 8 — Markdown polish + git branches ✅ DONE
+
+- ✅ Block-level markdown lexer (`markdown-blocks.ts`): headings 1–6, ordered + bullet lists, tables with column alignment, fenced code (kept the existing Prism path)
+- ✅ Git branch picker + checkout in `GitPanel`. Disables checkout when the working tree is dirty, when the target is the current branch, or when it's checked out in another worktree (matches `git/branches.branchesCheckedOutElsewhere`)
+
 ## Session N — Future hardening (deferred — not blocking)
 
 - WebPush for completion notifications (gated on a self-hostable web-push gateway; meanwhile completions surface via the existing `system/notice` toasts)
 - E2E tests against a local relay + bridge in CI (would need a CI runner that can spin up the bridge with a fake provider; high lift, low parity benefit right now)
-- Markdown tables / lists rendering
 - Full Codex OAuth flow (cross-tab redirect handoff design)
-- Worktree + stacked-action git operations
+- Worktree creation + stacked-action git operations (the read-only branch picker covers the 80% case; worktrees are an iOS power-user feature)
 - AI change sets, workspace checkpoints, workspace images, project switcher UI (need design work — not blocked by infra)

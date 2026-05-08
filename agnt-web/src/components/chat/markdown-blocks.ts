@@ -1,0 +1,149 @@
+// Block-level lexer for the agnt-web markdown renderer. Splits source text
+// into a sequence of typed blocks so the React renderer can dispatch on kind
+// without re-scanning the input.
+//
+// Block kinds we recognise:
+//   - fence       ```lang\n…\n```
+//   - heading     #, ##, … ######
+//   - listOrdered 1. item / 2. item / …
+//   - listBullet  - item / * item
+//   - table       | h1 | h2 |\n|---|---|\n| a | b |
+//   - paragraph   anything else
+//
+// We deliberately do NOT recognize blockquotes, horizontal rules, link
+// references, footnotes, or HTML inline tags — the bridge doesn't emit those
+// and shipping a full CommonMark parser would balloon the bundle.
+
+export type MarkdownBlock =
+  | { kind: "fence"; language: string | null; body: string }
+  | { kind: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; text: string }
+  | { kind: "listOrdered"; items: string[]; start: number }
+  | { kind: "listBullet"; items: string[] }
+  | { kind: "table"; header: string[]; rows: string[][]; alignments: Array<"left" | "right" | "center" | null> }
+  | { kind: "paragraph"; text: string };
+
+const FENCE_OPEN = /^```(\w+)?\s*$/;
+const FENCE_CLOSE = /^```\s*$/;
+const HEADING = /^(#{1,6})\s+(.+?)\s*$/;
+const ORDERED_ITEM = /^(\s*)(\d+)[.)]\s+(.+)$/;
+const BULLET_ITEM = /^(\s*)[-*+]\s+(.+)$/;
+const TABLE_DIVIDER = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+
+export function lexMarkdownBlocks(source: string): MarkdownBlock[] {
+  const lines = source.split("\n");
+  const blocks: MarkdownBlock[] = [];
+  let cursor = 0;
+
+  while (cursor < lines.length) {
+    const line = lines[cursor];
+
+    // Fenced code blocks are sticky — anything between opening and closing
+    // fence is taken verbatim, including blank lines.
+    const fenceMatch = FENCE_OPEN.exec(line);
+    if (fenceMatch) {
+      const language = fenceMatch[1] ?? null;
+      const body: string[] = [];
+      cursor += 1;
+      while (cursor < lines.length && !FENCE_CLOSE.test(lines[cursor])) {
+        body.push(lines[cursor]);
+        cursor += 1;
+      }
+      // Eat the closing fence if we hit one (otherwise the block runs to EOF).
+      if (cursor < lines.length) cursor += 1;
+      blocks.push({ kind: "fence", language, body: body.join("\n") });
+      continue;
+    }
+
+    if (!line.trim()) {
+      cursor += 1;
+      continue;
+    }
+
+    const headingMatch = HEADING.exec(line);
+    if (headingMatch) {
+      const hashes = headingMatch[1];
+      const level = Math.min(6, hashes.length) as 1 | 2 | 3 | 4 | 5 | 6;
+      blocks.push({ kind: "heading", level, text: headingMatch[2] });
+      cursor += 1;
+      continue;
+    }
+
+    if (ORDERED_ITEM.test(line)) {
+      const start = Number(ORDERED_ITEM.exec(line)![2]);
+      const items: string[] = [];
+      while (cursor < lines.length && ORDERED_ITEM.test(lines[cursor])) {
+        items.push(ORDERED_ITEM.exec(lines[cursor])![3]);
+        cursor += 1;
+      }
+      blocks.push({ kind: "listOrdered", items, start });
+      continue;
+    }
+
+    if (BULLET_ITEM.test(line)) {
+      const items: string[] = [];
+      while (cursor < lines.length && BULLET_ITEM.test(lines[cursor])) {
+        items.push(BULLET_ITEM.exec(lines[cursor])![2]);
+        cursor += 1;
+      }
+      blocks.push({ kind: "listBullet", items });
+      continue;
+    }
+
+    // Tables need a header row immediately followed by a divider row, then
+    // zero or more body rows. If the divider doesn't show up on the next line
+    // we treat it as a paragraph instead.
+    if (TABLE_ROW.test(line) && cursor + 1 < lines.length && TABLE_DIVIDER.test(lines[cursor + 1])) {
+      const header = splitTableRow(line);
+      const alignments = parseTableAlignments(lines[cursor + 1]);
+      // Pad alignments to header length so renderer can index by column safely.
+      while (alignments.length < header.length) alignments.push(null);
+      cursor += 2;
+      const rows: string[][] = [];
+      while (cursor < lines.length && TABLE_ROW.test(lines[cursor])) {
+        rows.push(splitTableRow(lines[cursor]));
+        cursor += 1;
+      }
+      blocks.push({ kind: "table", header, rows, alignments });
+      continue;
+    }
+
+    // Plain paragraph — accumulate consecutive non-empty, non-block lines.
+    const paragraphLines: string[] = [line];
+    cursor += 1;
+    while (
+      cursor < lines.length &&
+      lines[cursor].trim() &&
+      !FENCE_OPEN.test(lines[cursor]) &&
+      !HEADING.test(lines[cursor]) &&
+      !ORDERED_ITEM.test(lines[cursor]) &&
+      !BULLET_ITEM.test(lines[cursor]) &&
+      !(TABLE_ROW.test(lines[cursor]) && cursor + 1 < lines.length && TABLE_DIVIDER.test(lines[cursor + 1]))
+    ) {
+      paragraphLines.push(lines[cursor]);
+      cursor += 1;
+    }
+    blocks.push({ kind: "paragraph", text: paragraphLines.join(" ") });
+  }
+
+  return blocks;
+}
+
+function splitTableRow(line: string): string[] {
+  // Trim the outer pipes (if any) before splitting so we don't get empty
+  // leading/trailing cells. Each cell is whitespace-trimmed.
+  const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return trimmed.split("|").map((cell) => cell.trim());
+}
+
+function parseTableAlignments(line: string): Array<"left" | "right" | "center" | null> {
+  const cells = splitTableRow(line);
+  return cells.map((cell) => {
+    const startsWithColon = cell.startsWith(":");
+    const endsWithColon = cell.endsWith(":");
+    if (startsWithColon && endsWithColon) return "center";
+    if (endsWithColon) return "right";
+    if (startsWithColon) return "left";
+    return null;
+  });
+}
