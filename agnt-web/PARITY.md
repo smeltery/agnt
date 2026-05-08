@@ -131,6 +131,10 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Per-fence Copy button | `components/chat/MarkdownContent.tsx:CodeBlock` | ✅ (Session 14; hover-reveal, two-second "Copied" feedback) |
 | Keyboard-shortcut help overlay | `components/shared/HelpModal.tsx` | ✅ (Session 14; `?` opens, lists nav / composer / sidebar shortcuts) |
 | Sidebar prefs persistence (tab + query) | `storage/prefs-store.ts:loadSidebar/saveSidebar` | ✅ (Session 14; survives reload via IndexedDB) |
+| Sticky-follow scroll + Jump-to-bottom | `lib/sticky-scroll.ts` + `components/chat/ChatView.tsx` | ✅ (Session 15; doesn't yank scroll while user reads history; floating Latest button surfaces when offset is significant) |
+| In-thread search | `components/chat/ThreadSearchBar.tsx` | ✅ (Session 15; `f` and ⌘/Ctrl+F open it; Enter / shift-Enter cycles matches; scrolls into view + highlights row) |
+| Image lightbox | `components/shared/Lightbox.tsx` + `state/lightbox-store.ts` | ✅ (Session 15; click any user-row attachment; Esc / backdrop-click closes) |
+| Context-window warning | `components/chat/ChatView.tsx` | ✅ (Session 15; bar turns warn-amber + inline banner when usage ≥ 80% suggesting compact) |
 | Inline failed-turn rows | `components/chat/rows/index.tsx` (`role: "system"` + `deliveryState: "failed"`) | ✅ (Session 12; replaces the global error banner for turn failures) |
 | Reconnect banner | `components/shared/ReconnectBanner.tsx` | ✅ (Session 12; visible during `connecting` / `handshaking` after first successful pair) |
 | Stop button in chat header | `components/chat/ChatHeader.tsx` | ✅ (Session 12; mirrors composer Stop so it's reachable while scrolled up) |

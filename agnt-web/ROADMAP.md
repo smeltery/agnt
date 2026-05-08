@@ -86,6 +86,13 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 15 — Streaming UX + thread search + lightbox ✅ DONE
+
+- ✅ Sticky-follow scroll: a `useStickyScroll` hook in `lib/sticky-scroll.ts` keeps the bottom anchored only when the user is already there; scroll-up disables follow. A floating "↓ Latest" button surfaces when the user is meaningfully offset so they can rejoin without manually scrolling.
+- ✅ In-thread search: bare `f` (outside inputs) and ⌘/Ctrl+F open `ThreadSearchBar`; Enter / shift-Enter cycles matches, each match scrolls into view and gets a brief 2 s highlight ring on the row. Search reads `text + command output + diff body + plan steps` so terminal noise and patches are findable.
+- ✅ Image lightbox: clicking any user-row attachment opens a full-window viewer; Esc or backdrop click closes. Driven by `state/lightbox-store.ts` so future surfaces (assistant-emitted workspace images, etc.) can drop into the same overlay.
+- ✅ Context-window warning: the existing context bar turns warn-amber and an inline banner appears at ≥ 80 % usage, suggesting the Compact thread action.
+
 ## Session 14 — Composer + UX polish ✅ DONE
 
 - ✅ Drag-drop / paste / picker now accepts text files alongside images. Recognized files (~80 extensions: source code, markup, config, log) get inlined as fenced code blocks with the right language hint and a backtick-run-aware fence escape; binaries are refused with a friendly message.

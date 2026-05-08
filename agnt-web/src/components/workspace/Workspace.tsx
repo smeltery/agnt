@@ -16,6 +16,7 @@ import { AboutModal } from "../settings/AboutModal";
 import { SettingsModal } from "../settings/SettingsModal";
 import { Sidebar } from "../sidebar/Sidebar";
 import { HelpModal } from "../shared/HelpModal";
+import { Lightbox } from "../shared/Lightbox";
 import { NoticeStack } from "../shared/NoticeStack";
 import { ReconnectBanner } from "../shared/ReconnectBanner";
 import { StatusPill } from "../shared/StatusPill";
@@ -99,6 +100,7 @@ export function Workspace() {
       <ApprovalModal />
       <StructuredInputModal />
       <RevertSheet />
+      <Lightbox />
       {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
       {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
       {overlay === "help" && <HelpModal onClose={() => setOverlay(null)} />}

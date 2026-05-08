@@ -13,6 +13,8 @@ const SECTIONS: Array<{
       { keys: ["j"], description: "Next thread in sidebar" },
       { keys: ["k"], description: "Previous thread in sidebar" },
       { keys: ["/"], description: "Focus the composer" },
+      { keys: ["f"], description: "Search this thread" },
+      { keys: ["⌘ / Ctrl", "F"], description: "Search this thread (also captures the browser shortcut)" },
       { keys: ["?"], description: "Open this help" },
       { keys: ["Esc"], description: "Close any open modal" },
     ],
