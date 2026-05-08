@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { copyText } from "../../../lib/clipboard";
+import { quoteAsMarkdown } from "../../../lib/quote";
 import type { CodexMessage } from "../../../models";
 import { useCheckpointsStore } from "../../../state/checkpoints-store";
+import { useComposerInboxStore } from "../../../state/composer-inbox-store";
 import { useConnectionStore } from "../../../state/connection-store";
 import { useThreadsStore } from "../../../state/threads-store";
 import { BookmarkButton } from "./BookmarkButton";
@@ -34,6 +36,17 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
     });
   }
 
+  function handleReply() {
+    if (!message.threadId) return;
+    const quoted = quoteAsMarkdown(message.text);
+    if (!quoted) return;
+    useComposerInboxStore.getState().request({
+      threadId: message.threadId,
+      body: `${quoted}\n\n`,
+    });
+    document.getElementById("agnt-composer-input")?.focus();
+  }
+
   // Revert is only meaningful when the turn is closed AND we know the cwd —
   // without cwd the bridge errors with missing_working_directory anyway, so
   // hiding the button beats showing a broken one.
@@ -51,6 +64,14 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       {!message.isStreaming && message.text && (
         <div className="agnt-row-actions">
           <BookmarkButton threadId={message.threadId} messageId={message.id} />
+          <button
+            type="button"
+            className="agnt-row-action"
+            onClick={handleReply}
+            title="Quote this message into a new draft"
+          >
+            ⤴ Reply
+          </button>
           {canRevert && (
             <button
               type="button"

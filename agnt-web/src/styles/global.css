@@ -1561,6 +1561,19 @@ button {
   flex-direction: column;
   max-height: 80vh;
 }
+.agnt-command-palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+}
+.agnt-command-palette-input-row .agnt-command-palette-input {
+  flex: 1;
+  border: 0;
+  border-bottom: 0;
+  padding: 6px 6px;
+}
 .agnt-command-palette-input {
   background: transparent;
   border: 0;

@@ -7,6 +7,7 @@
 // means new commands are a single entry to add, and the slash menu's render
 // + filter logic stays generic.
 
+import { expandSlashVariables, type SlashVariableContext } from "../lib/slash-variables";
 import type { CustomSlashCommand } from "../storage/prefs-store";
 import type { ThreadsState } from "../state/threads-store";
 
@@ -14,6 +15,8 @@ export interface SlashCommandContext {
   threadId: string;
   threads: ThreadsState;
   closeNewChat?: () => void;
+  /** Variables available to user-defined snippet bodies (`{cwd}`, etc.). */
+  variables?: SlashVariableContext;
 }
 
 export interface SlashCommand {
@@ -98,7 +101,7 @@ export function buildCustomSlashCommand(custom: CustomSlashCommand): SlashComman
   return {
     name: custom.name,
     description: previewSnippet(custom.body) || "(empty snippet)",
-    expand: () => custom.body,
+    expand: (context) => expandSlashVariables(custom.body, context.variables ?? {}),
     run() {
       // Unused for expand-style commands — the composer routes around `run`
       // when `expand` is set. We keep a noop here so the type stays stable.

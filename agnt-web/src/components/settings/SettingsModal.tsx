@@ -249,6 +249,7 @@ function CustomSlashCommandsSection() {
       <h3>Custom slash commands ({commands.length})</h3>
       <p className="agnt-settings-hint">
         Type <code>/your-name</code> in the composer to drop the body in as a draft. Built-in commands always win on a name collision.
+        Tokens expanded at run time: <code>{"{cwd}"}</code>, <code>{"{thread}"}</code>, <code>{"{selection}"}</code>, <code>{"{date}"}</code>, <code>{"{datetime}"}</code>, <code>{"{time}"}</code>.
       </p>
       {commands.length > 0 && (
         <ul className="agnt-settings-slash-list">

@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { searchableText } from "../chat/ThreadSearchBar";
 import type { CodexMessage } from "../../models";
+import { useBookmarksStore } from "../../state/bookmarks-store";
 import { useThreadsStore } from "../../state/threads-store";
 
 interface CommandPaletteProps {
@@ -30,11 +31,17 @@ const SNIPPET_RADIUS = 60;
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
+  const [starredOnly, setStarredOnly] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const threads = useThreadsStore((state) => state.threads);
   const archived = useThreadsStore((state) => state.archivedThreads);
   const reducerStates = useThreadsStore((state) => state.reducerStates);
   const selectThread = useThreadsStore((state) => state.selectThread);
+  const bookmarksByThread = useBookmarksStore((state) => state.byThread);
+  const totalBookmarks = useMemo(
+    () => Object.values(bookmarksByThread).reduce((sum, set) => sum + set.size, 0),
+    [bookmarksByThread]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -42,12 +49,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     inputRef.current?.select();
     setQuery("");
     setCursor(0);
+    setStarredOnly(false);
   }, [open]);
 
   const hits: Hit[] = useMemo(() => {
     if (!open) return [];
     const trimmed = query.trim().toLowerCase();
-    if (!trimmed) return [];
+    // The "starred only" mode walks bookmarks even when the query is empty
+    // — that's the whole point of the global star list view.
+    if (!trimmed && !starredOnly) return [];
     const labelByThread = new Map<string, string>();
     for (const thread of threads) labelByThread.set(thread.id, thread.name ?? thread.title ?? "Untitled");
     for (const thread of archived) labelByThread.set(thread.id, thread.name ?? thread.title ?? "Untitled (archived)");
@@ -57,23 +67,32 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       // Skip threads we no longer know about (sidebar may have purged them)
       // — surfacing a hit we can't navigate to would be confusing.
       if (!label) continue;
+      const threadBookmarks = bookmarksByThread[threadId];
+      if (starredOnly && !threadBookmarks) continue;
       for (const message of reducer.messages) {
+        if (starredOnly && !threadBookmarks?.has(message.id)) continue;
         const haystack = searchableText(message);
         if (!haystack) continue;
-        const lowerHaystack = haystack.toLowerCase();
-        const offset = lowerHaystack.indexOf(trimmed);
-        if (offset < 0) continue;
+        let snippetOffset = 0;
+        let snippetLength = Math.min(haystack.length, 80);
+        if (trimmed) {
+          const lowerHaystack = haystack.toLowerCase();
+          const offset = lowerHaystack.indexOf(trimmed);
+          if (offset < 0) continue;
+          snippetOffset = offset;
+          snippetLength = trimmed.length;
+        }
         out.push({
           threadId,
           threadLabel: label,
           message,
-          snippet: extractSnippet(haystack, offset, trimmed.length),
+          snippet: extractSnippet(haystack, snippetOffset, snippetLength),
         });
         if (out.length >= MAX_HITS) return out;
       }
     }
     return out;
-  }, [open, query, threads, archived, reducerStates]);
+  }, [open, query, starredOnly, threads, archived, reducerStates, bookmarksByThread]);
 
   // Clamp the cursor whenever the hit list shrinks; otherwise Enter could
   // run a stale selection.
@@ -97,34 +116,52 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         aria-label="Search across all threads"
         onClick={(event) => event.stopPropagation()}
       >
-        <input
-          ref={inputRef}
-          type="search"
-          className="agnt-command-palette-input"
-          placeholder="Search across all threads…"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              onClose();
-            } else if (event.key === "ArrowDown" && hits.length > 0) {
-              event.preventDefault();
-              setCursor((current) => (current + 1) % hits.length);
-            } else if (event.key === "ArrowUp" && hits.length > 0) {
-              event.preventDefault();
-              setCursor((current) => (current - 1 + hits.length) % hits.length);
-            } else if (event.key === "Enter" && hits.length > 0) {
-              event.preventDefault();
-              commit(hits[Math.min(cursor, hits.length - 1)]);
-            }
-          }}
-        />
+        <div className="agnt-command-palette-input-row">
+          <input
+            ref={inputRef}
+            type="search"
+            className="agnt-command-palette-input"
+            placeholder={starredOnly ? "Filter your starred messages…" : "Search across all threads…"}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                onClose();
+              } else if (event.key === "ArrowDown" && hits.length > 0) {
+                event.preventDefault();
+                setCursor((current) => (current + 1) % hits.length);
+              } else if (event.key === "ArrowUp" && hits.length > 0) {
+                event.preventDefault();
+                setCursor((current) => (current - 1 + hits.length) % hits.length);
+              } else if (event.key === "Enter" && hits.length > 0) {
+                event.preventDefault();
+                commit(hits[Math.min(cursor, hits.length - 1)]);
+              }
+            }}
+          />
+          <button
+            type="button"
+            className={"agnt-button-ghost" + (starredOnly ? " agnt-button-ghost-active" : "")}
+            onClick={() => setStarredOnly((current) => !current)}
+            disabled={!starredOnly && totalBookmarks === 0}
+            title={starredOnly ? "Show every cached message" : "Filter to starred messages only"}
+            aria-pressed={starredOnly}
+          >
+            {starredOnly ? "★ all" : `☆ ${totalBookmarks}`}
+          </button>
+        </div>
         <div className="agnt-command-palette-hits">
-          {query.trim() === "" ? (
+          {!query.trim() && !starredOnly ? (
             <div className="agnt-command-palette-empty">Type to search every cached thread.</div>
           ) : hits.length === 0 ? (
-            <div className="agnt-command-palette-empty">No matches in your cached threads.</div>
+            <div className="agnt-command-palette-empty">
+              {starredOnly
+                ? totalBookmarks === 0
+                  ? "No starred messages yet. Use the ☆ on a row to start a list."
+                  : "No starred messages match that query."
+                : "No matches in your cached threads."}
+            </div>
           ) : (
             hits.map((hit, index) => (
               <button

@@ -7,6 +7,7 @@ import type { ImageAttachment } from "../../models";
 import { computeDraftStats, formatCount } from "../../lib/draft-stats";
 import type { ProjectDirectoryEntry } from "../../protocol/project";
 import { useConnectionStore } from "../../state/connection-store";
+import { useComposerInboxStore } from "../../state/composer-inbox-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
@@ -115,6 +116,20 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     }, DRAFT_SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeoutId);
   }, [draft, selectedThreadId]);
+
+  // Inbox subscription: rows can ask the composer to prepend text via
+  // useComposerInboxStore.request(...). We consume the slot on every change
+  // so a Reply published while a different thread was active gets applied
+  // the moment the user navigates back.
+  const inboxPending = useComposerInboxStore((state) => state.pending);
+  useEffect(() => {
+    if (!selectedThreadId) return;
+    const body = useComposerInboxStore.getState().consume(selectedThreadId);
+    if (!body) return;
+    setDraft((current) => (current.trim() ? `${body}${current}` : body));
+    setHistoryCursor(-1);
+    draftBeforeRecallRef.current = "";
+  }, [inboxPending, selectedThreadId]);
 
   // beforeunload: best-effort sync drain so a tab close/navigation doesn't
   // lose the last few hundred ms of typing. IndexedDB writes can lag here;
@@ -254,7 +269,22 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   }
 
   function runSlashCommand(command: SlashCommand) {
-    const context = { threadId: selectedThreadId ?? "", threads: useThreadsStore.getState() };
+    // Capture the textarea's current selection so `{selection}` works when
+    // the user has highlighted a chunk of an in-progress draft. Empty when
+    // the textarea is unfocused or has no selection (caret only).
+    const ta = textareaRef.current;
+    const selection = ta && ta.selectionStart !== ta.selectionEnd
+      ? ta.value.slice(ta.selectionStart, ta.selectionEnd)
+      : "";
+    const context = {
+      threadId: selectedThreadId ?? "",
+      threads: useThreadsStore.getState(),
+      variables: {
+        cwd: activeThread?.cwd,
+        threadTitle: activeThread?.name ?? activeThread?.title,
+        selection,
+      },
+    };
     // Custom commands expand into the draft so the user can review/edit before
     // sending — they're snippets, not actions. Built-ins clear the draft and
     // run their side effect.

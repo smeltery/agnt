@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 27 — Reply/quote + slash variables + cross-thread bookmark filter ✅ DONE
+
+- ✅ Per-row Reply / quote on assistant rows. New "⤴ Reply" button next to Bookmark/Copy/Revert pushes a `> quoted text\n\n` block into the composer's draft via a tiny new `state/composer-inbox-store.ts` (single-slot pub/sub keyed by threadId so a Reply published while a different thread was active gets applied the moment the user navigates back). Code fences in the source are stripped so the quote can't reopen a fence in the user's draft; long quotes are truncated at ~1500 chars with an ellipsis.
+- ✅ Custom slash command variables. New `lib/slash-variables.ts` expands `{cwd}`, `{thread}` / `{threadtitle}`, `{selection}` (current composer textarea selection), `{date}` (YYYY-MM-DD local), `{time}` (HH:MM local), and `{datetime}` (ISO) at run time. `buildCustomSlashCommand` now wires the expansion through. Unknown tokens are left intact so users notice typos rather than getting silent empty strings. Settings hint updated.
+- ✅ Cross-thread bookmark filter in the `⌘/Ctrl+K` command palette. New "★ all / ☆ N" toggle filters hits to bookmarked messages across every cached thread. Empty-query mode still works (the toggle without any text shows the global star list). Empty-state messaging spells out which mode the user is in. Closes the loop on Session 25 — bookmarks are now discoverable globally, not just per-thread.
+
 ## Session 26 — @file mentions + composer auto-resize + JSON thread export ✅ DONE
 
 - ✅ `@file` mention picker in the composer. Caret-aware detection (`lib/mention-detector.ts`) opens an inline picker when the user types `@` at the start of a token; debounced fetch via `project/searchDirectories` rooted at the active thread's `cwd` (or `project/listDirectory` for the empty query). Selecting a result splices the cwd-relative path into the draft and parks the caret past the insert with a trailing space. Email-style false positives (`name@host`) are rejected by requiring the leading `@` to sit at start-of-string, after whitespace, or after a sentence-opener like `(`/`[`.
