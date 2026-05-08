@@ -1065,6 +1065,13 @@ button {
   vertical-align: middle;
   animation: agnt-pulse 1.4s ease-in-out infinite;
 }
+.agnt-sidebar-pinned {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--agnt-accent);
+  font-size: 11px;
+  vertical-align: middle;
+}
 @keyframes agnt-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }

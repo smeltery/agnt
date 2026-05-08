@@ -4,6 +4,8 @@
 
 import { useEffect, useState } from "react";
 import { useShortcut } from "../../lib/keyboard";
+import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from "../../lib/thread-export";
+import { useCheckpointsStore } from "../../state/checkpoints-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useProjectStore } from "../../state/project-store";
 import { useThreadsStore } from "../../state/threads-store";
@@ -53,6 +55,52 @@ export function Workspace() {
   useShortcut("Escape", () => {
     if (overlay) setOverlay(null);
   }, { skipWhenTyping: false });
+
+  // `e` exports the active thread to Markdown. Lazy-grabs the threads-store
+  // snapshot so we don't subscribe Workspace to per-message state churn.
+  useShortcut("e", () => {
+    const state = useThreadsStore.getState();
+    const threadId = state.selectedThreadId;
+    if (!threadId) return;
+    const thread =
+      state.threads.find((t) => t.id === threadId)
+      ?? state.archivedThreads.find((t) => t.id === threadId);
+    const messages = state.reducerStates[threadId]?.messages ?? [];
+    if (messages.length === 0) return;
+    const markdown = exportThreadToMarkdown({ thread, messages });
+    downloadMarkdown(defaultExportFilename(thread?.name ?? thread?.title), markdown);
+  });
+
+  // `r` opens the revert sheet for the last-completed turn so power users
+  // can roll back without scrolling to find the per-row Revert button.
+  useShortcut("r", () => {
+    if (!connection?.rpc) return;
+    const state = useThreadsStore.getState();
+    const threadId = state.selectedThreadId;
+    if (!threadId) return;
+    const thread =
+      state.threads.find((t) => t.id === threadId)
+      ?? state.archivedThreads.find((t) => t.id === threadId);
+    if (!thread?.cwd) return;
+    const messages = state.reducerStates[threadId]?.messages ?? [];
+    // Walk backward and pick the last assistant turn that's settled — a
+    // streaming turn isn't checkpoint-revertable yet.
+    let targetTurnId: string | undefined;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (!message.turnId) continue;
+      if (message.role === "assistant" && !message.isStreaming) {
+        targetTurnId = message.turnId;
+        break;
+      }
+    }
+    if (!targetTurnId) return;
+    void useCheckpointsStore.getState().show(connection.rpc, {
+      threadId,
+      turnId: targetTurnId,
+      cwd: thread.cwd,
+    });
+  });
 
   function openNewChat() {
     setOverlay("newChat");

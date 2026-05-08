@@ -15,6 +15,8 @@ const SECTIONS: Array<{
       { keys: ["/"], description: "Focus the composer" },
       { keys: ["f"], description: "Search this thread" },
       { keys: ["⌘ / Ctrl", "F"], description: "Search this thread (also captures the browser shortcut)" },
+      { keys: ["e"], description: "Export the active thread to Markdown" },
+      { keys: ["r"], description: "Revert the last completed turn (workspace checkpoint)" },
       { keys: ["?"], description: "Open this help" },
       { keys: ["Esc"], description: "Close any open modal" },
     ],

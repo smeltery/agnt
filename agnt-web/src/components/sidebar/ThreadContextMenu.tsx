@@ -9,9 +9,10 @@ import { useThreadsStore } from "../../state/threads-store";
 
 interface Props {
   thread: CodexThread;
+  pinned?: boolean;
 }
 
-export function ThreadContextMenu({ thread }: Props) {
+export function ThreadContextMenu({ thread, pinned = false }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const renameThread = useThreadsStore((state) => state.renameThread);
@@ -19,6 +20,7 @@ export function ThreadContextMenu({ thread }: Props) {
   const unarchiveThread = useThreadsStore((state) => state.unarchiveThread);
   const forkThread = useThreadsStore((state) => state.forkThread);
   const compactThread = useThreadsStore((state) => state.compactThread);
+  const togglePinThread = useThreadsStore((state) => state.togglePinThread);
   const exportMessages = useThreadsStore(
     (state) => state.reducerStates[thread.id]?.messages ?? []
   );
@@ -83,6 +85,14 @@ export function ThreadContextMenu({ thread }: Props) {
             onClick={action(() => forkThread(thread.id))}
           >
             Fork from this thread
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={action(() => togglePinThread(thread.id))}
+            title={pinned ? "Remove from the top of the sidebar" : "Sort to the top of the sidebar"}
+          >
+            {pinned ? "Unpin" : "Pin to top"}
           </button>
           <button
             type="button"

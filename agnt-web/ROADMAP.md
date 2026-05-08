@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 19 — Drafts autosave + pinned threads + power-user shortcuts ✅ DONE
+
+- ✅ Composer drafts auto-saved per thread to IndexedDB. 400 ms debounce while typing, immediate save on thread switch and `beforeunload`, cleared on successful send. Empty drafts are removed (not stored as `""`) so the cache stays small.
+- ✅ Pin threads to the top of the sidebar's live tab. New `state/threads-store.ts:togglePinThread` action persists IDs through `prefs-store.savePinnedThreadIds`. ★ glyph appears in the row's title and `Pin to top` / `Unpin` joins the context menu.
+- ✅ `e` exports the active thread to Markdown (same path as the sidebar context menu); `r` opens the revert sheet for the most recent completed turn (walks the message list backward, picks the latest `role:"assistant"` non-streaming turn). Both gated on `skipWhenTyping` so they don't fire while users are in an input.
+
 ## Session 18 — Workspace images + markdown task lists + autolinks ✅ DONE
 
 - ✅ `workspace/readImage` wrapper + per-(cwd, path) cache. `MarkdownContent` accepts a `cwd` prop; markdown image refs without an explicit scheme (`![cap](screenshot.png)`) route through the cache and render the bridge-downscaled preview. Errors and missing-cwd states surface as styled placeholder spans rather than broken `<img>` tags. Cache uses `ifByteLength`/`ifMtimeMs` on subsequent renders so the bridge can short-circuit with `notModified`.

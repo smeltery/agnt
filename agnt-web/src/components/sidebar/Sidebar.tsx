@@ -18,6 +18,7 @@ export function Sidebar({ onNewChat }: SidebarProps) {
   const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
   const loading = useThreadsStore((state) => state.loading);
   const runningThreadIds = useThreadsStore((state) => state.runningThreadIds);
+  const pinnedThreadIds = useThreadsStore((state) => state.pinnedThreadIds);
   const selectThread = useThreadsStore((state) => state.selectThread);
   const [tab, setTab] = useState<SidebarTab>("live");
   const [query, setQuery] = useState("");
@@ -40,10 +41,20 @@ export function Sidebar({ onNewChat }: SidebarProps) {
     // Tiny payloads, no debounce — every tab toggle and every keystroke writes.
     void prefsStore.saveSidebar({ tab, query });
   }, [tab, query]);
-  const visible = useMemo(
-    () => filterThreads(tab === "live" ? liveThreads : archivedThreads, query),
-    [tab, liveThreads, archivedThreads, query]
-  );
+  const visible = useMemo(() => {
+    const filtered = filterThreads(tab === "live" ? liveThreads : archivedThreads, query);
+    // Pinned threads sort to the top of the live tab; archived stays in its
+    // server order. Stable within each partition so users see consistent
+    // positions across re-renders.
+    if (tab !== "live" || pinnedThreadIds.size === 0) return filtered;
+    const pinned: CodexThread[] = [];
+    const rest: CodexThread[] = [];
+    for (const thread of filtered) {
+      if (pinnedThreadIds.has(thread.id)) pinned.push(thread);
+      else rest.push(thread);
+    }
+    return [...pinned, ...rest];
+  }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds]);
 
   // j/k navigate the visible list, like Gmail/Linear. Wraps at the boundaries
   // so muscle memory works either direction.
@@ -92,6 +103,7 @@ export function Sidebar({ onNewChat }: SidebarProps) {
               thread={thread}
               selected={thread.id === selectedThreadId}
               running={runningThreadIds.has(thread.id)}
+              pinned={pinnedThreadIds.has(thread.id)}
               onSelect={() => void selectThread(thread.id)}
             />
           ))}
@@ -146,11 +158,13 @@ function SidebarRow({
   thread,
   selected,
   running,
+  pinned,
   onSelect,
 }: {
   thread: CodexThread;
   selected: boolean;
   running: boolean;
+  pinned: boolean;
   onSelect: () => void;
 }) {
   const title = thread.name ?? thread.title ?? "Untitled";
@@ -159,11 +173,16 @@ function SidebarRow({
       <button type="button" className="agnt-sidebar-thread" onClick={onSelect}>
         <span className="agnt-sidebar-thread-title">
           {running && <span className="agnt-sidebar-running-dot" aria-label="running" title="Running" />}
+          {pinned && (
+            <span className="agnt-sidebar-pinned" aria-label="pinned" title="Pinned">
+              ★
+            </span>
+          )}
           {title}
         </span>
         {thread.cwd && <span className="agnt-sidebar-thread-cwd">{thread.cwd}</span>}
       </button>
-      <ThreadContextMenu thread={thread} />
+      <ThreadContextMenu thread={thread} pinned={pinned} />
     </li>
   );
 }

@@ -27,6 +27,7 @@ export interface SidebarPreferences {
 const TURN_FLAGS_KEY = "prefs.turnFlags";
 const THEME_KEY = "prefs.theme";
 const SIDEBAR_KEY = "prefs.sidebar";
+const PINNED_THREADS_KEY = "prefs.pinnedThreadIds";
 
 export const prefsStore = {
   async loadTurnFlags(): Promise<PersistedTurnFlags> {
@@ -50,6 +51,13 @@ export const prefsStore = {
   },
   async saveSidebar(prefs: SidebarPreferences): Promise<void> {
     await idb.set(SIDEBAR_KEY, prefs);
+  },
+  async loadPinnedThreadIds(): Promise<string[]> {
+    const raw = await idb.get<string[]>(PINNED_THREADS_KEY);
+    return Array.isArray(raw) ? raw.filter((value): value is string => typeof value === "string") : [];
+  },
+  async savePinnedThreadIds(ids: string[]): Promise<void> {
+    await idb.set(PINNED_THREADS_KEY, ids);
   },
 };
 

@@ -11,6 +11,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     reducerStates: {},
     contextUsageByThread: {},
     runningThreadIds: new Set(),
+    pinnedThreadIds: new Set(),
     models: [],
     selectedThreadId: null,
     turnFlags: {},
@@ -30,6 +31,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     archiveThread: async () => {},
     unarchiveThread: async () => {},
     compactThread: async () => false,
+    togglePinThread: async () => {},
     reset: () => {},
     ...overrides,
   };

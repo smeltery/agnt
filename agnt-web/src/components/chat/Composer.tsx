@@ -5,7 +5,10 @@ import type { ImageAttachment } from "../../models";
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
 import { useVoiceStore } from "../../state/voice-store";
+import { draftsStore } from "../../storage/drafts-store";
 import { VoiceButton } from "./VoiceButton";
+
+const DRAFT_SAVE_DEBOUNCE_MS = 400;
 
 export interface ComposerProps {
   running: boolean;
@@ -53,12 +56,69 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   }, [pendingTranscript, consumeTranscript]);
 
   // Switching threads (or starting fresh) wipes the recall cursor — past
-  // prompts from another thread shouldn't paste into this one.
+  // prompts from another thread shouldn't paste into this one — and hydrates
+  // a previously-saved draft from disk so users can resume what they were
+  // typing in a thread they left mid-composition.
   const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
+  const previousThreadIdRef = useRef<string | null>(null);
+  // Tracks whether the current `draft` value is the result of a hydrate so
+  // the save effect can skip the no-op write.
+  const draftHydratedFromRef = useRef<string>("");
   useEffect(() => {
     setHistoryCursor(-1);
     draftBeforeRecallRef.current = "";
+    let cancelled = false;
+    const previous = previousThreadIdRef.current;
+    previousThreadIdRef.current = selectedThreadId;
+    // Persist whatever the user had typed in the previous thread before
+    // overwriting our state with the new thread's draft.
+    if (previous && previous !== selectedThreadId) {
+      void draftsStore.save(previous, draft);
+    }
+    if (!selectedThreadId) {
+      setDraft("");
+      draftHydratedFromRef.current = "";
+      return;
+    }
+    void draftsStore.load(selectedThreadId).then((value) => {
+      if (cancelled || previousThreadIdRef.current !== selectedThreadId) return;
+      setDraft(value);
+      draftHydratedFromRef.current = value;
+    });
+    return () => {
+      cancelled = true;
+    };
+    // We intentionally read `draft` lazily here via a closure — including it
+    // in the deps would persist on every keystroke, which the debounced
+    // saver below already handles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedThreadId]);
+
+  // Debounced persistence: every change to `draft` (when there's a thread)
+  // schedules a save 400 ms later. The check against draftHydratedFromRef
+  // suppresses the no-op write that would happen immediately after hydrate.
+  useEffect(() => {
+    if (!selectedThreadId) return;
+    if (draft === draftHydratedFromRef.current) return;
+    const timeoutId = window.setTimeout(() => {
+      void draftsStore.save(selectedThreadId, draft);
+      draftHydratedFromRef.current = draft;
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [draft, selectedThreadId]);
+
+  // beforeunload: best-effort sync drain so a tab close/navigation doesn't
+  // lose the last few hundred ms of typing. IndexedDB writes can lag here;
+  // there's no synchronous guarantee, but the debounce window is short and
+  // most browsers honor in-flight writes long enough.
+  useEffect(() => {
+    if (!selectedThreadId) return;
+    const handler = () => {
+      void draftsStore.save(selectedThreadId, draft);
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [draft, selectedThreadId]);
 
   // Slash-menu surface. Matches when the draft starts with "/" and contains
   // no whitespace yet — that's the typing window we own. Once the user adds
@@ -142,6 +202,12 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     setAttachError(null);
     setHistoryCursor(-1);
     draftBeforeRecallRef.current = "";
+    // Sent successfully — drop the persisted draft so the user doesn't see
+    // their just-sent prompt re-hydrate when they come back later.
+    if (selectedThreadId) {
+      draftHydratedFromRef.current = "";
+      void draftsStore.clear(selectedThreadId);
+    }
   }
 
   function handleSubmit(event: React.FormEvent) {

@@ -72,6 +72,8 @@ export interface ThreadsState {
   turnFlags: TurnFlags;
   /** Threads with a running turn — derived from `thread/status/changed` notifications. */
   runningThreadIds: Set<string>;
+  /** Pinned threads sort to the top of the live tab in the sidebar. Persisted. */
+  pinnedThreadIds: Set<string>;
   loading: boolean;
   error: string | null;
   hydrated: boolean;
@@ -89,6 +91,7 @@ export interface ThreadsState {
   archiveThread(threadId: string): Promise<void>;
   unarchiveThread(threadId: string): Promise<void>;
   compactThread(threadId: string): Promise<boolean>;
+  togglePinThread(threadId: string): Promise<void>;
   reset(): void;
 }
 
@@ -105,15 +108,17 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   contextUsageByThread: {},
   turnFlags: {},
   runningThreadIds: new Set(),
+  pinnedThreadIds: new Set(),
   loading: false,
   error: null,
   hydrated: false,
 
   async hydrateFromDisk() {
     if (get().hydrated) return;
-    const [max, persistedFlags] = await Promise.all([
+    const [max, persistedFlags, pinnedIds] = await Promise.all([
       messagesStore.loadHighestOrderIndex(),
       prefsStore.loadTurnFlags(),
+      prefsStore.loadPinnedThreadIds(),
     ]);
     orderCounter.seedFrom(max);
     // Cast through the looser persisted shape — anything malformed (an old
@@ -126,7 +131,17 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
         permissionMode: persistedFlags.permissionMode as TurnFlags["permissionMode"],
         planMode: persistedFlags.planMode,
       },
+      pinnedThreadIds: new Set(pinnedIds),
     });
+  },
+
+  async togglePinThread(threadId) {
+    if (!threadId) return;
+    const next = new Set(get().pinnedThreadIds);
+    if (next.has(threadId)) next.delete(threadId);
+    else next.add(threadId);
+    set({ pinnedThreadIds: next });
+    void prefsStore.savePinnedThreadIds([...next]);
   },
 
   async bindToConnection(connection) {
