@@ -47,12 +47,13 @@ later session because the protocol and storage layers are already complete.
 - Thread fork + review mode
 - Git actions surface (status / branches / diff / commit)
 
-## Session 5 — Onboarding polish
+## Session 5 — Onboarding polish ✅ DONE
 
-- In-browser camera QR scanning via `BarcodeDetector` (with `jsQR` fallback)
-- Manual pairing-code resolver call (`/v1/pairing/code/resolve`)
-- Settings screen, about screen, trusted-Mac management UI
-- Account login flow (Codex provider only) with OAuth-style relay redirect
+- ✅ In-browser camera QR scanning via `BarcodeDetector` (clear "manual entry only" message on unsupported browsers; intentionally no `jsQR` polyfill — keeps the bundle ~30 KB smaller)
+- ✅ Manual pairing-code resolver call (`/v1/pairing/code/resolve`) with `/relay`-prefixed and root-path candidates
+- ✅ Settings screen + About screen + trusted-Mac management with forget
+- ✅ Code-block syntax highlighting via Prism core + curated language pack (bash/diff/go/json/jsx/python/rust/swift/tsx/typescript/yaml + aliases)
+- 🟡 Account login flow (Codex-only) read-only this session — full OAuth-style relay redirect deferred (needs cross-tab handoff design)
 
 ## Session 6 — Voice
 

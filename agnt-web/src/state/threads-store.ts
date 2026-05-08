@@ -17,6 +17,7 @@ import {
   orderCounter,
 } from "../models";
 import type { Connection } from "../protocol";
+import { useAccountStore } from "./account-store";
 import { buildApprovalServerRequestHandler, useApprovalsStore } from "./approvals-store";
 import { useGitStore } from "./git-store";
 import { useNoticesStore } from "./notices-store";
@@ -110,6 +111,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     useApprovalsStore.getState().clearAll();
     useStructuredInputStore.getState().clearAll();
     useGitStore.getState().reset();
+    useAccountStore.getState().bind(connection);
     activeConnection = connection;
     registerNotificationHandlers(connection, set, get);
     registerServerRequestHandlers(connection);

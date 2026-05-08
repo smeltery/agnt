@@ -41,6 +41,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `ThreadProjectRouting` | 🟡 | 4 (cwd surfaced in chat header + sidebar; no project switcher UI) |
 | `Sync` | ✅ | 2 (initialize, model/list, thread/list active+archived) |
 | `Status` | 🟡 | 1 (status pill only) |
+| `Account` | 🟡 | 5 (read-only `account/status/read` + `getAuthStatus` fallback; full OAuth flow deferred) |
 | `RuntimeCompatibility` + `RuntimeConfig` | 🟡 | 2 (initialize round-trip + capability gate; full version negotiation in later sessions) |
 | `History` | ✅ | 2 (history events replayed through the same reducer) |
 | `Account` | ⛔ | 5 (Codex login flow, OAuth-style redirect dance) |
@@ -95,20 +96,20 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 
 | iOS area | Web component | Status |
 | --- | --- | --- |
-| Onboarding / pairing | `components/pairing/PairingScreen.tsx` | 🟡 (paste only — no camera scan) |
+| Onboarding / pairing | `components/pairing/{PairingScreen,CameraQRScanner}.tsx` | ✅ (paste, short code w/ relay round-trip, camera scan via BarcodeDetector) |
 | Sidebar | `components/sidebar/Sidebar.tsx` | ✅ (live/archived tabs, cwd hint, selection) |
 | Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
-| Markdown | `components/chat/MarkdownContent.tsx` | 🟡 (fenced code, inline code, bold/italic; tables/lists/syntax highlighting in 5) |
+| Markdown | `components/chat/MarkdownContent.tsx` + `syntax-highlight.ts` | 🟡 (fenced code w/ Prism syntax highlighting for 11 languages, inline code, bold/italic; tables/lists deferred) |
 | Approvals modal | `components/approvals/ApprovalModal.tsx` + `state/approvals-store.ts` | ✅ (command + file change, accept / decline / acceptForSession) |
 | System-notice toasts | `components/shared/NoticeStack.tsx` + `state/notices-store.ts` | ✅ (auto-dismiss, severity-aware) |
 | Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |
 | Per-turn flag bar | `components/chat/TurnFlagBar.tsx` | ✅ (model, reasoning effort, plan mode, permission mode) |
+| Settings | `components/settings/SettingsModal.tsx` + `state/account-store.ts` | ✅ (connection info, account status, trusted-Mac mgmt with forget) |
+| About | `components/settings/AboutModal.tsx` | ✅ (version, source link, license) |
 | Chat header (title + cwd + provider) | `components/chat/ChatHeader.tsx` | ✅ |
 | Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ |
 | Git panel (status / diff / commit / push / pull) | `components/git/GitPanel.tsx` | ✅ (read + basic write; worktree + advanced flows deferred) |
 | Structured user-input prompts | `components/structured-input/StructuredInputModal.tsx` | ✅ (free text, secret, single-/multi-select) |
-| Settings | ⛔ | 5 |
-| About | ⛔ | 5 |
 | Pet | ⛔ | 7 |
 | Payments | ⛔ | n/a |
 | Turn detail (`Views/Turn/*`) | ⛔ | 3 |

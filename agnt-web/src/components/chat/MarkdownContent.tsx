@@ -7,6 +7,7 @@
 // follow-up session can wire shiki/highlight.js without touching this file.
 
 import { Fragment, type ReactNode } from "react";
+import { highlightCode, resolveLanguage } from "./syntax-highlight";
 
 const FENCE_PATTERN = /```(\w+)?\n([\s\S]*?)```/g;
 const INLINE_CODE_PATTERN = /`([^`\n]+)`/g;
@@ -26,9 +27,18 @@ function renderFenced(text: string): ReactNode[] {
     const [full, language, body] = match;
     const start = match.index ?? 0;
     if (start > lastIndex) nodes.push(renderInline(text.slice(lastIndex, start), key++));
+    const resolved = resolveLanguage(language);
     nodes.push(
-      <pre key={key++} className={"agnt-md-pre" + (language ? " agnt-md-lang-" + language : "")}>
-        <code>{body}</code>
+      <pre key={key++} className={"agnt-md-pre" + (resolved ? " agnt-md-lang-" + resolved : "")}>
+        {resolved ? (
+          <code
+            className={"language-" + resolved}
+            // Prism produces sanitized HTML (escapes &, <, >); safe to inject.
+            dangerouslySetInnerHTML={{ __html: highlightCode(body, resolved) }}
+          />
+        ) : (
+          <code>{body}</code>
+        )}
       </pre>
     );
     lastIndex = start + full.length;

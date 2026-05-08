@@ -2,11 +2,13 @@
 // Mirrors AgntMobile's split-view at the highest level — feature parity rolls out
 // inside each column over follow-up sessions.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useConnectionStore } from "../../state/connection-store";
 import { useThreadsStore } from "../../state/threads-store";
 import { ApprovalModal } from "../approvals/ApprovalModal";
 import { ChatView } from "../chat/ChatView";
+import { AboutModal } from "../settings/AboutModal";
+import { SettingsModal } from "../settings/SettingsModal";
 import { Sidebar } from "../sidebar/Sidebar";
 import { NoticeStack } from "../shared/NoticeStack";
 import { StatusPill } from "../shared/StatusPill";
@@ -15,8 +17,8 @@ import { StructuredInputModal } from "../structured-input/StructuredInputModal";
 export function Workspace() {
   const status = useConnectionStore((state) => state.status);
   const reconnect = useConnectionStore((state) => state.reconnect);
-  const forget = useConnectionStore((state) => state.forget);
   const hydrateFromDisk = useThreadsStore((state) => state.hydrateFromDisk);
+  const [overlay, setOverlay] = useState<"settings" | "about" | null>(null);
 
   useEffect(() => {
     void hydrateFromDisk();
@@ -33,8 +35,11 @@ export function Workspace() {
               Reconnect
             </button>
           )}
-          <button className="agnt-button-ghost agnt-button-danger" onClick={() => void forget()}>
-            Forget pairing
+          <button className="agnt-button-ghost" onClick={() => setOverlay("settings")}>
+            Settings
+          </button>
+          <button className="agnt-button-ghost" onClick={() => setOverlay("about")}>
+            About
           </button>
         </div>
       </header>
@@ -45,6 +50,8 @@ export function Workspace() {
       <NoticeStack />
       <ApprovalModal />
       <StructuredInputModal />
+      {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
+      {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
     </div>
   );
 }
