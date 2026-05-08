@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { flashTitle } from "../lib/document-title";
 import { makeLogger } from "../lib/log";
+import { showNotification, shouldNotify } from "../lib/notifications";
 import {
   type CodexMessage,
   type CodexThread,
@@ -389,10 +390,10 @@ function registerNotificationHandlers(
   on(connection, "turn/completed", (params) =>
     withTurnEvent(params, (event) => {
       mutateReducer(event.threadId, set, get, (s) => applyTurnCompleted(s, event));
-      // Flash the tab title when the user has switched away — gives them a
-      // visible signal a turn finished without needing a real WebPush gateway.
-      // The active-tab case stays quiet; the streaming row going non-streaming
-      // is already its own visible cue.
+      // Two layered "tab is hidden" signals: a desktop notification when the
+      // user has granted permission and opted in, plus the title flash as a
+      // permission-free fallback. Both no-op when the tab is focused.
+      void notifyTurnFinished(event.threadId, get, "completed");
       flashTitle("Turn done");
     })
   );
@@ -400,6 +401,7 @@ function registerNotificationHandlers(
     withTurnEvent(params, (event) => {
       const errorText = readString(params, "error", "message");
       mutateReducer(event.threadId, set, get, (s) => applyTurnFailed(s, event, errorText));
+      void notifyTurnFinished(event.threadId, get, "failed", errorText);
       flashTitle("Turn failed");
     })
   );
@@ -656,6 +658,32 @@ async function fetchContextWindowSnapshot(
 }
 
 const TITLE_GENERATION_DELAY_MS = 4_000;
+
+async function notifyTurnFinished(
+  threadId: string,
+  get: () => ThreadsState,
+  outcome: "completed" | "failed",
+  errorText?: string
+): Promise<void> {
+  if (!(await shouldNotify())) return;
+  const state = get();
+  const thread = state.threads.find((t) => t.id === threadId)
+    ?? state.archivedThreads.find((t) => t.id === threadId);
+  const threadName = thread?.name ?? thread?.title ?? "Untitled thread";
+  showNotification({
+    title: outcome === "completed" ? `Turn done — ${threadName}` : `Turn failed — ${threadName}`,
+    body: outcome === "failed" ? (errorText ?? "Open agnt to see the error.") : "Open agnt to read the response.",
+    // Tag by thread so back-to-back completions in the same thread coalesce
+    // rather than stacking ten dock badges.
+    tag: threadId,
+    onClick() {
+      // Best-effort: bring the user to the thread that fired the
+      // notification. window.focus() works on most browsers when the click
+      // came from a notification.
+      void useThreadsStore.getState().selectThread(threadId);
+    },
+  });
+}
 
 function scheduleAutoTitle(
   threadId: string,

@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 21 — Browser notifications + cross-thread palette + power-user shortcuts ✅ DONE
+
+- ✅ Browser desktop notifications on `turn/completed` and `turn/failed`. New `lib/notifications.ts` wraps the `Notification` API with permission gating, a Settings-side auto/on/off override (default `auto` = "on if granted"), and a per-thread `tag` so a chatty thread doesn't stack ten dock badges. Silent when the tab is focused — the inline UI is enough — and never auto-prompts; users opt in from Settings so we don't trip the browser's "this site wants to notify you" blocker. Combines with Session 20's title-flash so users notice completions whether or not they've granted permission.
+- ✅ Cross-thread search palette — ⌘/Ctrl+K opens `CommandPalette`, which walks every cached thread's reducer state with the same `searchableText` helper that powers in-thread search. Hits show thread label + a 60-char snippet; ↑/↓/Enter select; clicking jumps into the thread. Capped at 80 hits so a runaway query doesn't lock up the UI.
+- ✅ Three more power-user shortcuts wired into `Workspace`: `n` opens the New Chat modal, `p` toggles pin on the active thread, ⌘/Ctrl+K toggles the palette. All registered in `HelpModal` so the keyboard reference stays accurate.
+
 ## Session 20 — Document title + sidebar grouping + completion flash ✅ DONE
 
 - ✅ Document title reflects the active thread: `[name] · agnt`. Helps when agnt is open in several tabs at once.

@@ -4,6 +4,7 @@
 // for the same reason as iOS — full OAuth handoff happens out-of-band.
 
 import { useEffect, useState } from "react";
+import { permissionLabel, requestPermission } from "../../lib/notifications";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useThemeStore } from "../../state/theme-store";
@@ -12,7 +13,7 @@ import {
   type TrustedMacRecord,
   type TrustedMacRegistry,
 } from "../../storage/pairing-store";
-import type { ThemePreference } from "../../storage/prefs-store";
+import { prefsStore, type NotificationsPreference, type ThemePreference } from "../../storage/prefs-store";
 
 export function SettingsModal({ onClose }: { onClose(): void }) {
   const status = useConnectionStore((state) => state.status);
@@ -34,6 +35,23 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
   const macs = registry ? Object.values(registry.records).sort((a, b) => b.lastUsedAt - a.lastUsedAt) : [];
   const currentMacDeviceId = saved?.macDeviceId;
+
+  const [notificationsPref, setNotificationsPref] = useState<NotificationsPreference>("auto");
+  const [permission, setPermission] = useState(permissionLabel());
+  useEffect(() => {
+    void prefsStore.loadNotifications().then(setNotificationsPref);
+  }, []);
+  async function pickNotifications(next: NotificationsPreference) {
+    setNotificationsPref(next);
+    await prefsStore.saveNotifications(next);
+    // Asking for permission only when the user explicitly opts in keeps the
+    // app from triggering the browser's "site wants to notify you" prompt
+    // unsolicited at first load.
+    if (next === "on" && permission === "default") {
+      const result = await requestPermission();
+      setPermission(result);
+    }
+  }
 
   async function forgetMac(record: TrustedMacRecord) {
     const next = await pairingStore.forgetTrustedMac(record.macDeviceId);
@@ -76,6 +94,36 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
               ))}
             </div>
           </div>
+        </section>
+
+        <section className="agnt-settings-section">
+          <h3>Notifications</h3>
+          <div className="agnt-settings-row">
+            <span>Desktop alerts on turn completion</span>
+            <div className="agnt-settings-segments" role="radiogroup" aria-label="Desktop notifications">
+              {(["auto", "on", "off"] as NotificationsPreference[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={notificationsPref === value}
+                  className={"agnt-settings-segment" + (notificationsPref === value ? " agnt-settings-segment-active" : "")}
+                  onClick={() => void pickNotifications(value)}
+                >
+                  {value === "auto" ? "Auto" : value === "on" ? "On" : "Off"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="agnt-settings-hint">
+            {permission === "unsupported"
+              ? "This browser doesn't support desktop notifications. The tab title will still flash."
+              : permission === "denied"
+                ? "You blocked notifications for this site in your browser. Re-enable them in site settings to allow desktop alerts."
+                : permission === "granted"
+                  ? "Permission granted. Notifications fire only while the agnt tab is hidden so you don't get duplicate signals."
+                  : "Pick On to grant notification permission. Auto stays quiet until you opt in."}
+          </p>
         </section>
 
         <section className="agnt-settings-section">

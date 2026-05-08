@@ -18,6 +18,7 @@ import { ProjectPicker } from "../project/ProjectPicker";
 import { AboutModal } from "../settings/AboutModal";
 import { SettingsModal } from "../settings/SettingsModal";
 import { Sidebar } from "../sidebar/Sidebar";
+import { CommandPalette } from "../shared/CommandPalette";
 import { HelpModal } from "../shared/HelpModal";
 import { Lightbox } from "../shared/Lightbox";
 import { NoticeStack } from "../shared/NoticeStack";
@@ -40,6 +41,7 @@ export function Workspace() {
   });
   useDocumentTitle(activeThreadTitle);
   const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | "help" | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   // The picker can be invoked either from a "Change project" affordance or
   // from the "New Chat" flow. We track who asked so we can route the result.
   const [pickerCallback, setPickerCallback] = useState<((path: string) => void) | null>(null);
@@ -63,6 +65,30 @@ export function Workspace() {
   useShortcut("Escape", () => {
     if (overlay) setOverlay(null);
   }, { skipWhenTyping: false });
+
+  // ⌘/Ctrl+K opens the cross-thread search palette. Handled at the workspace
+  // level (rather than through useShortcut's bare-key gate) so the modifier
+  // chord wins inside inputs too — nothing in the composer expects K with a
+  // modifier.
+  useShortcut("k", (event) => {
+    if (!(event.metaKey || event.ctrlKey)) return;
+    event.preventDefault();
+    setPaletteOpen((open) => !open);
+  }, { skipWhenTyping: false });
+
+  // `n` opens the New Chat modal — bypasses the sidebar button when the
+  // user's hands are already on the keyboard.
+  useShortcut("n", () => {
+    setOverlay("newChat");
+  });
+
+  // `p` toggles pin on the active thread. Skipped when nothing's selected so
+  // we don't surprise users with a "what just happened" no-op.
+  useShortcut("p", () => {
+    const state = useThreadsStore.getState();
+    if (!state.selectedThreadId) return;
+    void state.togglePinThread(state.selectedThreadId);
+  });
 
   // `e` exports the active thread to Markdown. Lazy-grabs the threads-store
   // snapshot so we don't subscribe Workspace to per-message state churn.
@@ -157,6 +183,7 @@ export function Workspace() {
       <StructuredInputModal />
       <RevertSheet />
       <Lightbox />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
       {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
       {overlay === "help" && <HelpModal onClose={() => setOverlay(null)} />}

@@ -45,7 +45,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `RuntimeCompatibility` + `RuntimeConfig` | 🟡 | 2 (initialize round-trip + capability gate; full version negotiation in later sessions) |
 | `History` | ✅ | 2 (history events replayed through the same reducer) |
 | `Voice` + `VoiceCompatibility` | ✅ | 6 (MediaRecorder + Web Audio resample → 24 kHz mono WAV → voice/transcribe; Codex-only at the bridge) |
-| `Notifications` | ⛔ | future (web-push when we tackle it) |
+| `Notifications` | 🟡 | 21 (browser desktop notifications via `Notification` API on `turn/completed`/`turn/failed` when tab is hidden; auto/on/off pref; per-thread coalescing tag. Web-push for fully-closed-tab delivery still future.) |
 | `Pets` | ⛔ dropped | iOS-specific UX (animations / haptics / Live Activities). Use the iOS app for pets. |
 | `Review` | ⛔ | future (`review/start` UI; bridge supports the RPC, no clear web surface yet) |
 | `AIChangeSets` | ⛔ deferred | per-turn `RevertSheet` (Session 10) covers the practical "undo what this turn did" workflow; finer-grained per-message patch revert needs reducer to track forward patches captured during streaming |
@@ -105,7 +105,9 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Composer slash commands | `components/chat/Composer.tsx` + `state/slash-commands.ts` | ✅ (Session 17; `/compact`, `/fork`, `/archive`, `/unarchive`, `/stop`; ↑/↓ navigate, Enter runs, Tab autocompletes, Esc dismisses) |
 | Composer draft autosave | `storage/drafts-store.ts` + `components/chat/Composer.tsx` | ✅ (Session 19; per-thread draft persisted to IndexedDB with 400 ms debounce; hydrates on thread switch and beforeunload, clears on send) |
 | Pinned threads | `storage/prefs-store.ts:loadPinnedThreadIds` + `state/threads-store.ts:togglePinThread` + sidebar | ✅ (Session 19; pinned threads sort to top of the live tab, ★ glyph in the row, Pin/Unpin in the context menu) |
-| Power-user keyboard shortcuts | `components/workspace/Workspace.tsx` | ✅ (Session 19; `e` exports active thread, `r` opens revert sheet for the last completed turn) |
+| Power-user keyboard shortcuts | `components/workspace/Workspace.tsx` | ✅ (Session 19 + 21; `e` exports, `r` reverts last turn, `n` opens New Chat, `p` toggles pin, ⌘/Ctrl+K opens cross-thread palette) |
+| Cross-thread search palette | `components/shared/CommandPalette.tsx` | ✅ (Session 21; ⌘/Ctrl+K opens; walks every cached thread's messages with `searchableText`; ↑/↓/Enter/Esc; capped at 80 hits) |
+| Browser desktop notifications | `lib/notifications.ts` + `storage/prefs-store.ts:loadNotifications` + `state/threads-store.ts:notifyTurnFinished` + Settings | ✅ (Session 21; gated on tab-hidden + permission + auto/on/off pref; per-thread coalescing tag; opt-in only — never auto-prompts) |
 | Document title reflects active thread | `lib/document-title.ts` + `components/workspace/Workspace.tsx` | ✅ (Session 20; `[name] · agnt`) |
 | Sidebar grouped by recency | `state/thread-grouping.ts` + `components/sidebar/Sidebar.tsx` | ✅ (Session 20; Pinned / Today / Yesterday / This week / Earlier; archived stays flat) |
 | Title flash on hidden-tab turn completion | `lib/document-title.ts:flashTitle` + threads-store `turn/completed`/`turn/failed` handlers | ✅ (Session 20; cycles "(Turn done) [name] · agnt" against neutral; auto-stops on visibility) |

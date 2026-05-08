@@ -24,10 +24,15 @@ export interface SidebarPreferences {
   query?: string;
 }
 
+/** "auto" = follow platform permission; "on" = always notify when granted;
+ *  "off" = never notify even when granted. */
+export type NotificationsPreference = "auto" | "on" | "off";
+
 const TURN_FLAGS_KEY = "prefs.turnFlags";
 const THEME_KEY = "prefs.theme";
 const SIDEBAR_KEY = "prefs.sidebar";
 const PINNED_THREADS_KEY = "prefs.pinnedThreadIds";
+const NOTIFICATIONS_KEY = "prefs.notifications";
 
 export const prefsStore = {
   async loadTurnFlags(): Promise<PersistedTurnFlags> {
@@ -58,6 +63,13 @@ export const prefsStore = {
   },
   async savePinnedThreadIds(ids: string[]): Promise<void> {
     await idb.set(PINNED_THREADS_KEY, ids);
+  },
+  async loadNotifications(): Promise<NotificationsPreference> {
+    const raw = await idb.get<NotificationsPreference>(NOTIFICATIONS_KEY);
+    return raw === "on" || raw === "off" || raw === "auto" ? raw : "auto";
+  },
+  async saveNotifications(preference: NotificationsPreference): Promise<void> {
+    await idb.set(NOTIFICATIONS_KEY, preference);
   },
 };
 
