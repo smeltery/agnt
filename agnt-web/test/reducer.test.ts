@@ -6,6 +6,7 @@ import {
   applyItemStarted,
   applyReasoningDelta,
   applyTurnCompleted,
+  applyTurnFailed,
   applyTurnStarted,
   emptyThreadState,
 } from "../src/state/turn-reducer";
@@ -93,6 +94,34 @@ describe("turn-reducer assistant streaming", () => {
     expect(state.messages[0].text).toBe("core-suffix");
     expect(state.messages[0].isStreaming).toBe(false);
     expect(state.activeTurnId).toBeUndefined();
+  });
+});
+
+describe("turn-reducer failed turns", () => {
+  it("emits an inline failed-row marker even when the bridge didn't include error text", () => {
+    let state = emptyThreadState();
+    state = applyTurnStarted(state, { threadId: "t", turnId: "u" });
+    state = applyTurnFailed(state, { threadId: "t", turnId: "u" });
+    const failureRows = state.messages.filter(
+      (message) => message.role === "system" && message.deliveryState === "failed"
+    );
+    expect(failureRows).toHaveLength(1);
+    expect(failureRows[0].text).toBe("Turn failed.");
+    expect(failureRows[0].turnId).toBe("u");
+    // closeStreamingRowsForTurn already runs via applyTurnCompleted, so the
+    // failed turn must also be flagged terminal.
+    expect(state.terminalTurns["u"]).toBe(true);
+    expect(state.activeTurnId).toBeUndefined();
+  });
+
+  it("uses the bridge-supplied error text verbatim when present", () => {
+    let state = emptyThreadState();
+    state = applyTurnStarted(state, { threadId: "t", turnId: "u" });
+    state = applyTurnFailed(state, { threadId: "t", turnId: "u" }, "rate_limit_exceeded");
+    const row = state.messages.find(
+      (message) => message.role === "system" && message.deliveryState === "failed"
+    );
+    expect(row?.text).toBe("rate_limit_exceeded");
   });
 });
 

@@ -17,6 +17,7 @@ export function ThreadContextMenu({ thread }: Props) {
   const archiveThread = useThreadsStore((state) => state.archiveThread);
   const unarchiveThread = useThreadsStore((state) => state.unarchiveThread);
   const forkThread = useThreadsStore((state) => state.forkThread);
+  const compactThread = useThreadsStore((state) => state.compactThread);
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +74,14 @@ export function ThreadContextMenu({ thread }: Props) {
             onClick={action(() => forkThread(thread.id))}
           >
             Fork from this thread
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={action(() => compactThread(thread.id))}
+            title="Summarize older turns to free context window space"
+          >
+            Compact thread…
           </button>
           {thread.syncState === "live" ? (
             <button type="button" role="menuitem" onClick={action(() => archiveThread(thread.id))}>

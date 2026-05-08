@@ -86,6 +86,15 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 12 — Polish + doc accuracy ✅ DONE
+
+- ✅ Doc accuracy pass: PARITY.md staleness fixes (manual pairing-code resolver was already shipped, account row deduped, TrustedPairPresentation flipped to ✅, CodexModelOption noted as inline-ported, GitActionModels updated for create-branch + create-worktree, bridge-blocked surfaces explicitly tagged); agnt-web README status line refreshed; top-level README quickstart now walks both clients; AGENTS.md + CLAUDE.md acknowledge the web client in the first guardrail.
+- ✅ Inline error rows for failed turns — `applyTurnFailed` always emits a `role:"system" deliveryState:"failed"` marker (even when the bridge didn't supply text); new `SystemErrorRow` styles it distinctly from assistant rows.
+- ✅ `thread/compact/start` action wired into the sidebar context menu with a `system/notice` toast on success and a graceful "provider doesn't support this" fallback on `-32601`.
+- ✅ Sticky reconnect banner during `connecting` / `handshaking` / `closed` / `error` after the first successful pair (initial connect is still owned by the pairing screen).
+- ✅ Stop button mirrored in the chat header so it's reachable while scrolled up.
+- ✅ Per-message timestamps on hover via `title={new Date(message.createdAt).toLocaleString()}` on every row component.
+
 ## Session 11 — Critical bug fix + image attachments + worktree creation ✅ DONE
 
 - 🔴 **Bug fix:** `turn/start` was sending `params.content: string`, but no bridge translator reads that — every web turn was emitting `"turn/start had no usable text or attachments"` (tests didn't catch it because vitest mocks the RPC). Now sends `params.input: [{type:"text",text}, ...]` matching `AgntMobile/Services/CodexService+ThreadsTurns.swift:makeTurnInputPayload`. `params.content` is kept alongside as a courtesy in case any future provider wants the pre-flattened string.

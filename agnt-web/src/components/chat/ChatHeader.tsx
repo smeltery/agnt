@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
-import { useThreadsStore } from "../../state/threads-store";
+import { selectActiveTurnRunning, useThreadsStore } from "../../state/threads-store";
 import { GitPanel } from "../git/GitPanel";
 
 interface ChatHeaderProps {
@@ -18,6 +18,8 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
         state.archivedThreads.find((t) => t.id === selectedThreadId)
       : undefined
   );
+  const running = useThreadsStore(selectActiveTurnRunning);
+  const stopTurn = useThreadsStore((state) => state.stopTurn);
   const [showGit, setShowGit] = useState(false);
 
   if (!selectedThreadId || !thread) return null;
@@ -31,15 +33,29 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
         {thread.modelProvider && (
           <span className="agnt-row-tag agnt-chat-header-provider">{thread.modelProvider}</span>
         )}
+        <div className="agnt-chat-header-actions">
+          {running && (
+            // Header-level Stop mirrors the composer button so users who've
+            // scrolled up to read history don't have to hunt for it.
+            <button
+              type="button"
+              className="agnt-button-danger"
+              onClick={() => void stopTurn()}
+              title="Interrupt the running turn"
+            >
+              Stop
+            </button>
+          )}
+          <button
+            type="button"
+            className="agnt-button-ghost"
+            onClick={() => setShowGit((open) => !open)}
+            aria-expanded={showGit}
+          >
+            {showGit ? "Hide git" : "Git"}
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        className="agnt-button-ghost"
-        onClick={() => setShowGit((open) => !open)}
-        aria-expanded={showGit}
-      >
-        {showGit ? "Hide git" : "Git"}
-      </button>
       {showGit && <GitPanel threadId={selectedThreadId} rpc={rpc} />}
     </header>
   );

@@ -4,10 +4,19 @@ Browser client for the agnt local-first coding-agent bridge. Pair it once with t
 QR/JSON payload your Mac bridge prints, then drive your CLI from anywhere — over
 Tailscale, behind a self-hosted relay on a VPS, or just on the same Wi-Fi.
 
-> **Status:** Session 1 foundation. Crypto, secure transport, JSON-RPC framing,
-> pairing, and a minimum chat UI are real and end-to-end. Many feature surfaces
-> from the iOS app are intentionally not yet ported — see [`PARITY.md`](./PARITY.md)
-> for the full ledger and [`ROADMAP.md`](./ROADMAP.md) for the session plan.
+> **Status:** at parity with the iOS app for the everyday-use loop — pairing
+> (paste / short code / camera scan), threads + sidebar w/ search + j/k nav,
+> kind-aware chat rendering with markdown + Prism syntax highlighting,
+> approvals, plan mode, structured user-input prompts, system-notice toasts,
+> per-turn flags (model / reasoning / permission / plan), voice transcription,
+> image attachments, git panel (status / diff / commit / push / pull / branch /
+> worktree), per-turn workspace-checkpoint revert, project picker for new
+> chats, settings + about + trusted-Mac mgmt, service worker for offline shell,
+> keyboard shortcuts. Pets and StoreKit are explicitly dropped (iOS-specific).
+> Bridge-blocked surfaces (`skills/list`, `plugin/list`, `account/rateLimits`,
+> `fuzzyFileSearch`) and design-bound work (full Codex OAuth, AI change sets,
+> WebPush) are deferred — see [`PARITY.md`](./PARITY.md) and
+> [`ROADMAP.md`](./ROADMAP.md).
 
 ## Architecture
 

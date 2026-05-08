@@ -88,6 +88,7 @@ export interface ThreadsState {
   renameThread(threadId: string, name: string): Promise<void>;
   archiveThread(threadId: string): Promise<void>;
   unarchiveThread(threadId: string): Promise<void>;
+  compactThread(threadId: string): Promise<boolean>;
   reset(): void;
 }
 
@@ -305,6 +306,29 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       moveThreadBetweenLists(set, get, threadId, "unarchive");
     } catch (error) {
       set({ error: (error as Error).message });
+    }
+  },
+
+  async compactThread(threadId) {
+    if (!activeConnection?.rpc) return false;
+    try {
+      // Bridge handles the actual summarization + thread/turns/list
+      // re-emission. Once it returns, refresh the local turn cache so the
+      // compacted view is live without a thread switch.
+      await activeConnection.rpc.request("thread/compact/start", { threadId });
+      await get().loadOlderTurns(threadId);
+      useNoticesStore.getState().enqueue({
+        severity: "info",
+        title: "Thread compacted",
+        message: "Older turns were summarized to save context.",
+      });
+      return true;
+    } catch (error) {
+      const message = (error as { code?: number; message?: string }).code === -32601
+        ? "This provider doesn't support thread compaction."
+        : (error as Error).message;
+      set({ error: message });
+      return false;
     }
   },
 

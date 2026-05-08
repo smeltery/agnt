@@ -7,11 +7,18 @@ import { CommandExecutionRow } from "./CommandExecutionRow";
 import { FileChangeRow } from "./FileChangeRow";
 import { PlanRow } from "./PlanRow";
 import { ReasoningRow } from "./ReasoningRow";
+import { SystemErrorRow } from "./SystemErrorRow";
 import { ToolActivityRow } from "./ToolActivityRow";
 import { UserRow } from "./UserRow";
 
 export function MessageRow({ message }: { message: CodexMessage }) {
   if (message.role === "user") return <UserRow message={message} />;
+  // Failed-turn marker rows come through as role:system + deliveryState:failed.
+  // Surfacing them as a dedicated component keeps the assistant row's hover
+  // actions from leaking onto error markers.
+  if (message.role === "system" && message.deliveryState === "failed") {
+    return <SystemErrorRow message={message} />;
+  }
   switch (message.kind) {
     case "thinking":
       return <ReasoningRow message={message} />;

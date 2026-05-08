@@ -1125,6 +1125,60 @@ button {
 .agnt-project-entry-glyph { font-size: 14px; }
 .agnt-project-entry-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.agnt-row-system-error {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--agnt-danger);
+  border-radius: 8px;
+  background: rgba(255, 80, 80, 0.06);
+  font-size: 13px;
+}
+.agnt-row-system-error-tag {
+  border-color: var(--agnt-danger);
+  color: var(--agnt-danger);
+}
+.agnt-row-system-error-text { flex: 1; color: var(--agnt-fg); }
+
+.agnt-reconnect-banner {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--agnt-bg-elev);
+  border-bottom: 1px solid var(--agnt-border);
+  font-size: 12px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-reconnect-banner-text { flex: 1; }
+.agnt-reconnect-banner-closed,
+.agnt-reconnect-banner-error {
+  background: rgba(255, 80, 80, 0.08);
+  border-bottom-color: var(--agnt-danger);
+  color: var(--agnt-fg);
+}
+.agnt-reconnect-banner-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--agnt-border);
+  border-top-color: var(--agnt-accent);
+  animation: agnt-voice-spin 0.8s linear infinite;
+}
+.agnt-reconnect-banner-closed .agnt-reconnect-banner-spinner,
+.agnt-reconnect-banner-error .agnt-reconnect-banner-spinner {
+  animation: none;
+  border-top-color: var(--agnt-danger);
+}
+
+.agnt-chat-header-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+
 .agnt-status-pill {
   font-size: 11px;
   font-weight: 600;

@@ -39,7 +39,10 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
   const canRevert = !message.isStreaming && Boolean(message.turnId) && Boolean(thread?.cwd);
 
   return (
-    <div className={"agnt-row agnt-row-assistant" + (message.isStreaming ? " agnt-row-streaming" : "")}>
+    <div
+      className={"agnt-row agnt-row-assistant" + (message.isStreaming ? " agnt-row-streaming" : "")}
+      title={new Date(message.createdAt).toLocaleString()}
+    >
       <div className="agnt-row-bubble">
         <MarkdownContent text={message.text} />
         {message.isStreaming && <span className="agnt-cursor-blink" aria-hidden />}

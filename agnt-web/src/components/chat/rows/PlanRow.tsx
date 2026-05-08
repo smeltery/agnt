@@ -20,7 +20,7 @@ export function PlanRow({ message }: { message: CodexMessage }) {
           ? "Plan · ready"
           : "Plan · closed";
   return (
-    <div className="agnt-row agnt-row-plan">
+    <div className="agnt-row agnt-row-plan" title={new Date(message.createdAt).toLocaleString()}>
       <div className="agnt-row-tag">{presentationLabel}</div>
       {plan.explanation && <p className="agnt-row-plan-explanation">{plan.explanation}</p>}
       {plan.steps.length > 0 && (

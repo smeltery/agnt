@@ -36,7 +36,12 @@ cd agnt
 ./scripts/run-local-agnt.sh
 ```
 
-That spins up a local relay + the bridge in the foreground and prints a QR code. Install the agnt iOS app, scan the QR once to trust your Mac, and the phone will reconnect automatically afterward. Force a specific provider with `--provider codex|claude|opencode|cursor`.
+That spins up a local relay + the bridge in the foreground and prints a QR code, the JSON payload, and a short alphanumeric pairing code. Force a specific provider with `--provider codex|claude|opencode|cursor`.
+
+Pair from either client:
+
+- **iOS app** — install [agnt](https://github.com/dotbrains/agnt), scan the QR. The phone reconnects automatically afterward.
+- **Browser** — `cd agnt-web && npm install && npm run dev`, open `http://localhost:5173`, then paste the JSON, type the short code, or scan the QR with your camera. Same E2EE handshake. See [`agnt-web/README.md`](agnt-web/README.md) for static-build deployment (Tailscale, VPS, S3+CloudFront, …).
 
 For self-hosting (Tailscale, public VPS, etc.) see [`docs/operations/self-hosting.md`](docs/operations/self-hosting.md).
 

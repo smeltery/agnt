@@ -19,7 +19,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | Encrypted envelope crypto (`secure-transport.js` Node side) | ✅ | `src/crypto/envelope.ts` with vitest cross-check |
 | Replay protection (`bridgeOutboundSeq`, `lastInboundCounter`) | ✅ | both directions enforced |
 | Trusted-session HTTP resolver (`/v1/trusted/session/resolve`) | ✅ | `src/protocol/trusted-session.ts` |
-| Manual pairing-code resolver (`/v1/pairing/code/resolve`) | 🔲 | parser recognizes short codes; resolver call pending Session 2 |
+| Manual pairing-code resolver (`/v1/pairing/code/resolve`) | ✅ | `src/protocol/pairing-code.ts` (Session 5); pairing screen has a dedicated short-code tab |
 | Push notification registration | ⛔ | browsers can't receive APNs; web push is a future option |
 | JSON-RPC framing | ✅ | `src/protocol/jsonrpc-client.ts` |
 
@@ -44,16 +44,15 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Account` | 🟡 | 5 (read-only `account/status/read` + `getAuthStatus` fallback; full OAuth flow deferred) |
 | `RuntimeCompatibility` + `RuntimeConfig` | 🟡 | 2 (initialize round-trip + capability gate; full version negotiation in later sessions) |
 | `History` | ✅ | 2 (history events replayed through the same reducer) |
-| `Account` | ⛔ | 5 (Codex login flow, OAuth-style redirect dance) |
 | `Voice` + `VoiceCompatibility` | ✅ | 6 (MediaRecorder + Web Audio resample → 24 kHz mono WAV → voice/transcribe; Codex-only at the bridge) |
 | `Notifications` | ⛔ | future (web-push when we tackle it) |
 | `Pets` | ⛔ dropped | iOS-specific UX (animations / haptics / Live Activities). Use the iOS app for pets. |
-| `Review` | ⛔ | 4 |
-| `AIChangeSets` | ⛔ | 4 |
+| `Review` | ⛔ | future (`review/start` UI; bridge supports the RPC, no clear web surface yet) |
+| `AIChangeSets` | ⛔ deferred | per-turn `RevertSheet` (Session 10) covers the practical "undo what this turn did" workflow; finer-grained per-message patch revert needs reducer to track forward patches captured during streaming |
 | `WorkspaceCheckpoints` | ✅ | 10 (preview + apply per turn; checkpointDiff + Copy not yet wired in UI but bridge-ready) |
 | `WorkspaceImages` | ⛔ | future (needs image attachment composer first) |
 | `ProjectFolders` | ✅ | 9 (project/quickLocations + listDirectory + searchDirectories + folder picker UI) |
-| `TrustedPairPresentation` | 🔲 | sidebar shows nothing about trusted Mac yet |
+| `TrustedPairPresentation` | ✅ | 5 (Settings shows current Mac fingerprint + per-Mac forget; no inline sidebar badge) |
 | `Helpers` | n/a | utility — port functions on demand |
 | `AssistantReplayDeduper` | ✅ | 2 |
 | `CodexMessagePersistence` | ✅ | 2 (IndexedDB-backed, debounced per thread) |
@@ -78,15 +77,15 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | `ContextWindowUsage` | ✅ | `models/context-window.ts` |
 | `CommandExecutionDetails` | ✅ | `models/message.ts` (with `appendCommandOutput` trimmer) |
 | `CodexImageAttachment` | ✅ | 11 (`models/message.ts:ImageAttachment` — payload + thumbnail data URLs, optional fileName + byteLength) |
-| `CodexSkillMetadata` | ⛔ | 2 |
-| `CodexModelOption` | ⛔ | 2 |
-| `CodexCollaboration` | ⛔ | 4 |
-| `CodexAccessMode` | ⛔ | 4 |
+| `CodexSkillMetadata` | ⛔ bridge-blocked | bridge translators don't expose `skills/list` |
+| `CodexModelOption` | ✅ | 2 (inline as `state/sync.ts:ModelOption`) |
+| `CodexCollaboration` | ⛔ | future |
+| `CodexAccessMode` | ✅ | 3 (as `state/threads-store.ts:PermissionMode`) |
 | `CodexReasoningEffortOption` | ✅ | 3 (per-turn flag) |
-| `CodexFuzzyFileMatch` | ⛔ | 4 |
-| `CodexRateLimitStatus` | ⛔ | 5 |
-| `CodexServiceTier` | ⛔ | 5 |
-| `GitActionModels` | 🟡 | 4 (sync/diff/commit/push subset; full worktree + stacked-action models deferred) |
+| `CodexFuzzyFileMatch` | ⛔ bridge-blocked | bridge translators don't expose `fuzzyFileSearch` |
+| `CodexRateLimitStatus` | ⛔ bridge-blocked | bridge translators don't expose `account/rateLimits` |
+| `CodexServiceTier` | ⛔ | future |
+| `GitActionModels` | 🟡 | sync/diff/commit/push/branches/checkout/createBranch/createWorktree (Sessions 4 + 8 + 11); managed-worktree handoff + stacked actions still deferred |
 | `AIChangeSetModels` | ⛔ | future |
 | `PetCompanionModels` | ⛔ | future |
 | `AppFont` | n/a | use system fonts |
@@ -112,11 +111,11 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | About | `components/settings/AboutModal.tsx` | ✅ (version, source link, license) |
 | Chat header (title + cwd + provider) | `components/chat/ChatHeader.tsx` | ✅ |
 | Sidebar context menu (rename / fork / archive) | `components/sidebar/ThreadContextMenu.tsx` | ✅ |
-| Git panel (status / diff / branches / commit / push / pull / checkout) | `components/git/GitPanel.tsx` | ✅ (read + basic write + branch picker w/ checkout; worktree creation + stacked actions deferred) |
+| Git panel (status / diff / branches / commit / push / pull / checkout / create-branch / create-worktree) | `components/git/GitPanel.tsx` | ✅ (Sessions 4 + 8 + 11; managed-worktree handoff + stacked actions deferred) |
 | Structured user-input prompts | `components/structured-input/StructuredInputModal.tsx` | ✅ (free text, secret, single-/multi-select) |
 | Pet | ⛔ dropped | iOS-specific UX |
 | Payments | ⛔ n/a | StoreKit doesn't apply to self-hosted web |
-| Turn detail (`Views/Turn/*`) | ⛔ | 3 |
+| Turn detail (`Views/Turn/*`) | ✅ | rendered inline by `components/chat/rows/*.tsx`; no separate detail view needed |
 | Shared (modals, badges, toasts) | `components/shared/` | ✅ (loading, status pill, notice toasts) |
 | Sidebar search + j/k navigation | `components/sidebar/Sidebar.tsx` + `state/thread-filter.ts` + `lib/keyboard.ts` | ✅ |
 | Copy-to-clipboard on assistant rows | `components/chat/rows/AssistantRow.tsx` + `lib/clipboard.ts` | ✅ (Async Clipboard API + execCommand fallback for non-secure dev origins) |
@@ -125,6 +124,11 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Image attachments (composer + user-row thumbs) | `components/chat/Composer.tsx` + `lib/image-attach.ts` + `models/message.ts:ImageAttachment` | ✅ (file picker, paste, drag-drop, canvas-downscaled thumbnails, sent as `params.input[].image`) |
 | Branch + worktree creation | `components/git/GitPanel.tsx` + `state/git-store.ts:createBranch/createWorktree` | ✅ (basic flow; managed-worktree handoff + stacked actions still deferred) |
 | Service worker (offline app shell) | `public/sw.js` | ✅ (production-only registration; cache-first hashed assets, network-first navigations, never caches relay/WS) |
+| Inline failed-turn rows | `components/chat/rows/index.tsx` (`role: "system"` + `deliveryState: "failed"`) | ✅ (Session 12; replaces the global error banner for turn failures) |
+| Reconnect banner | `components/shared/ReconnectBanner.tsx` | ✅ (Session 12; visible during `connecting` / `handshaking` after first successful pair) |
+| Stop button in chat header | `components/chat/ChatHeader.tsx` | ✅ (Session 12; mirrors composer Stop so it's reachable while scrolled up) |
+| Per-message timestamps | row hover via `title={new Date(message.createdAt).toLocaleString()}` | ✅ (Session 12; lightweight, no extra layout) |
+| `thread/compact/start` | `state/threads-store.ts:compactThread` + sidebar context menu | ✅ (Session 12; bridge supports across all providers) |
 
 ## Storage
 

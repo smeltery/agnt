@@ -16,6 +16,7 @@ import { AboutModal } from "../settings/AboutModal";
 import { SettingsModal } from "../settings/SettingsModal";
 import { Sidebar } from "../sidebar/Sidebar";
 import { NoticeStack } from "../shared/NoticeStack";
+import { ReconnectBanner } from "../shared/ReconnectBanner";
 import { StatusPill } from "../shared/StatusPill";
 import { StructuredInputModal } from "../structured-input/StructuredInputModal";
 
@@ -73,6 +74,7 @@ export function Workspace() {
           </button>
         </div>
       </header>
+      <ReconnectBanner />
       <div className="agnt-workspace-body">
         <Sidebar onNewChat={openNewChat} />
         <ChatView />

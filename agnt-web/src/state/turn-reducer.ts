@@ -79,18 +79,21 @@ export function applyTurnCompleted(state: ThreadReducerState, event: ReducerEven
 
 export function applyTurnFailed(state: ThreadReducerState, event: ReducerEvent, errorText?: string): ThreadReducerState {
   let next = applyTurnCompleted(state, event);
-  if (errorText) {
-    next = appendOrUpdate(next, (messages) => [
-      ...messages,
-      createMessage({
-        threadId: event.threadId,
-        role: "system",
-        kind: "chat",
-        text: errorText,
-        turnId: event.turnId,
-      }),
-    ]);
-  }
+  // Always emit an inline marker — even when the bridge didn't include a
+  // message — so the user can see *which* turn failed when scrolled. The
+  // `deliveryState: "failed"` flag is what UserRow / MessageRow use to pick a
+  // dedicated style instead of falling through to plain assistant rendering.
+  next = appendOrUpdate(next, (messages) => [
+    ...messages,
+    createMessage({
+      threadId: event.threadId,
+      role: "system",
+      kind: "chat",
+      text: errorText && errorText.trim() ? errorText : "Turn failed.",
+      turnId: event.turnId,
+      deliveryState: "failed",
+    }),
+  ]);
   return next;
 }
 

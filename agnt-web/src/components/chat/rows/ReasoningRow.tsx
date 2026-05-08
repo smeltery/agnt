@@ -7,7 +7,7 @@ export function ReasoningRow({ message }: { message: CodexMessage }) {
   const [expanded, setExpanded] = useState(message.isStreaming);
   const showText = expanded || message.isStreaming;
   return (
-    <div className="agnt-row agnt-row-reasoning">
+    <div className="agnt-row agnt-row-reasoning" title={new Date(message.createdAt).toLocaleString()}>
       <button
         className="agnt-row-tag agnt-row-reasoning-toggle"
         onClick={() => setExpanded((open) => !open)}

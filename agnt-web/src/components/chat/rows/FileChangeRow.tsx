@@ -6,7 +6,7 @@ export function FileChangeRow({ message }: { message: CodexMessage }) {
   const fileChange = message.fileChange;
   if (!fileChange) return null;
   return (
-    <div className="agnt-row agnt-row-filechange">
+    <div className="agnt-row agnt-row-filechange" title={new Date(message.createdAt).toLocaleString()}>
       <button
         type="button"
         className="agnt-row-filechange-summary"

@@ -5,7 +5,7 @@ export function UserRow({ message }: { message: CodexMessage }) {
     "agnt-row agnt-row-user" +
     (message.deliveryState === "pending" ? " agnt-row-pending" : message.deliveryState === "failed" ? " agnt-row-failed" : "");
   return (
-    <div className={className}>
+    <div className={className} title={new Date(message.createdAt).toLocaleString()}>
       <div className="agnt-row-bubble">
         {message.attachments && message.attachments.length > 0 && (
           <div className="agnt-row-attachments">
