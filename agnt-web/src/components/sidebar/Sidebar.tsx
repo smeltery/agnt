@@ -31,6 +31,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   const selectThread = useThreadsStore((state) => state.selectThread);
   const archiveThread = useThreadsStore((state) => state.archiveThread);
   const unarchiveThread = useThreadsStore((state) => state.unarchiveThread);
+  const reorderPinnedThreads = useThreadsStore((state) => state.reorderPinnedThreads);
   const reducerStates = useThreadsStore((state) => state.reducerStates);
   const [tab, setTab] = useState<SidebarTab>("live");
   const [query, setQuery] = useState("");
@@ -237,6 +238,11 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
               selectMode={selectMode}
               selectedIds={selectedIds}
               onSelect={handleRowSelect}
+              onReorderPinned={
+                group.id === "pinned" && !selectMode
+                  ? (orderedIds) => void reorderPinnedThreads(orderedIds)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -296,6 +302,7 @@ function SidebarGroup({
   selectMode,
   selectedIds,
   onSelect,
+  onReorderPinned,
 }: {
   group: ThreadGroup;
   showHeader: boolean;
@@ -306,7 +313,24 @@ function SidebarGroup({
   selectMode: boolean;
   selectedIds: Set<string>;
   onSelect: (thread: CodexThread) => void;
+  onReorderPinned?(orderedIds: string[]): void;
 }) {
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const draggable = Boolean(onReorderPinned);
+
+  function commitReorder(targetId: string) {
+    if (!onReorderPinned || !dragSourceId || dragSourceId === targetId) return;
+    const ids = group.threads.map((thread) => thread.id);
+    const fromIndex = ids.indexOf(dragSourceId);
+    const toIndex = ids.indexOf(targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const next = [...ids];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    onReorderPinned(next);
+  }
+
   return (
     <section className="agnt-sidebar-group">
       {showHeader && <h3 className="agnt-sidebar-group-header">{group.label}</h3>}
@@ -322,6 +346,22 @@ function SidebarGroup({
             selectMode={selectMode}
             checked={selectedIds.has(thread.id)}
             onSelect={() => onSelect(thread)}
+            draggable={draggable}
+            isDragSource={dragSourceId === thread.id}
+            isDropTarget={dropTargetId === thread.id && dragSourceId !== thread.id}
+            onDragStart={() => setDragSourceId(thread.id)}
+            onDragEnd={() => {
+              setDragSourceId(null);
+              setDropTargetId(null);
+            }}
+            onDragEnter={() => {
+              if (dragSourceId && dragSourceId !== thread.id) setDropTargetId(thread.id);
+            }}
+            onDrop={() => {
+              commitReorder(thread.id);
+              setDragSourceId(null);
+              setDropTargetId(null);
+            }}
           />
         ))}
       </ul>
@@ -338,6 +378,13 @@ function SidebarRow({
   selectMode,
   checked,
   onSelect,
+  draggable,
+  isDragSource,
+  isDropTarget,
+  onDragStart,
+  onDragEnd,
+  onDragEnter,
+  onDrop,
 }: {
   thread: CodexThread;
   selected: boolean;
@@ -347,6 +394,13 @@ function SidebarRow({
   selectMode: boolean;
   checked: boolean;
   onSelect: () => void;
+  draggable?: boolean;
+  isDragSource?: boolean;
+  isDropTarget?: boolean;
+  onDragStart?(): void;
+  onDragEnd?(): void;
+  onDragEnter?(): void;
+  onDrop?(): void;
 }) {
   const title = thread.name ?? thread.title ?? "Untitled";
   return (
@@ -356,7 +410,31 @@ function SidebarRow({
         + (selected ? " agnt-sidebar-row-selected" : "")
         + (selectMode && checked ? " agnt-sidebar-row-checked" : "")
         + (unread ? " agnt-sidebar-row-unread" : "")
+        + (isDragSource ? " agnt-sidebar-row-dragging" : "")
+        + (isDropTarget ? " agnt-sidebar-row-drop-target" : "")
       }
+      draggable={draggable}
+      onDragStart={(event) => {
+        // Stash the thread id so a future cross-component drop could read it,
+        // but keep the move logic state-driven via the React handlers.
+        if (draggable) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", thread.id);
+          onDragStart?.();
+        }
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      onDragEnter={() => onDragEnter?.()}
+      onDragOver={(event) => {
+        if (!draggable) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(event) => {
+        if (!draggable) return;
+        event.preventDefault();
+        onDrop?.();
+      }}
     >
       <button
         type="button"

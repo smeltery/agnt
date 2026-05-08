@@ -1,10 +1,13 @@
 // Per-thread git panel. Shows branch + state + dirty file list, with a
-// commit-message field and Commit/Push/Pull buttons. Diff toggles open a
-// monospaced patch view (lazy: only fetched when user opens it).
+// commit-message field and Commit/Push/Pull buttons. Each file row in the
+// status list expands inline to its per-file diff slice (lazy: the unified
+// diff is fetched once on first expand and reused across files).
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { splitUnifiedDiff } from "../../lib/git-diff-parser";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
 import { useGitStore } from "../../state/git-store";
+import { DiffView } from "./DiffView";
 
 interface GitPanelProps {
   threadId: string;
@@ -28,11 +31,20 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
   const pull = useGitStore((state) => state.pull);
 
   const [commitMessage, setCommitMessage] = useState("");
-  const [showDiff, setShowDiff] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createMode, setCreateMode] = useState<"branch" | "worktree">("branch");
   const [creationFeedback, setCreationFeedback] = useState<string | null>(null);
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set());
+
+  // Slice the unified patch into per-file fragments once per fetch — every
+  // expand-toggle would otherwise re-walk the full string.
+  const diffByFile = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!diff) return map;
+    for (const entry of splitUnifiedDiff(diff)) map.set(entry.path, entry.patch);
+    return map;
+  }, [diff]);
 
   useEffect(() => {
     if (!rpc) return;
@@ -75,14 +87,41 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
 
       {status.files.length > 0 && (
         <ul className="agnt-gitpanel-files">
-          {status.files.map((file) => (
-            <li key={file.path}>
-              <span className={"agnt-gitpanel-file-status agnt-gitpanel-file-status-" + (file.status[0] ?? "?").toLowerCase()}>
-                {file.status || "?"}
-              </span>
-              <code>{file.path}</code>
-            </li>
-          ))}
+          {status.files.map((file) => {
+            const expanded = expandedFiles.has(file.path);
+            const filePatch = diffByFile.get(file.path);
+            return (
+              <li key={file.path} className={"agnt-gitpanel-file" + (expanded ? " agnt-gitpanel-file-expanded" : "")}>
+                <button
+                  type="button"
+                  className="agnt-gitpanel-file-row"
+                  aria-expanded={expanded}
+                  onClick={() => {
+                    // Lazy-fetch on first expand so a clean repo doesn't pay
+                    // the round-trip; later expands reuse the cached patch.
+                    if (!diff) void refreshDiff(threadId, rpc);
+                    setExpandedFiles((current) => {
+                      const next = new Set(current);
+                      if (next.has(file.path)) next.delete(file.path);
+                      else next.add(file.path);
+                      return next;
+                    });
+                  }}
+                >
+                  <span className={"agnt-gitpanel-file-status agnt-gitpanel-file-status-" + (file.status[0] ?? "?").toLowerCase()}>
+                    {file.status || "?"}
+                  </span>
+                  <code>{file.path}</code>
+                  <span className="agnt-gitpanel-file-chevron" aria-hidden>{expanded ? "▾" : "▸"}</span>
+                </button>
+                {expanded && (
+                  filePatch
+                    ? <DiffView patch={filePatch} />
+                    : <div className="agnt-gitpanel-empty">{diff ? "No textual diff (binary or untracked)." : "Loading diff…"}</div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -126,18 +165,6 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
           type="button"
           className="agnt-button-ghost"
           onClick={() => {
-            const next = !showDiff;
-            setShowDiff(next);
-            if (next) void refreshDiff(threadId, rpc);
-          }}
-          disabled={loading}
-        >
-          {showDiff ? "Hide diff" : "View diff"}
-        </button>
-        <button
-          type="button"
-          className="agnt-button-ghost"
-          onClick={() => {
             const next = !showBranches;
             setShowBranches(next);
             if (next) void refreshBranches(threadId, rpc);
@@ -147,9 +174,6 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
           {showBranches ? "Hide branches" : "Branches"}
         </button>
       </div>
-
-      {showDiff && diff && <pre className="agnt-gitpanel-diff">{diff}</pre>}
-      {showDiff && !diff && <div className="agnt-gitpanel-empty">No diff yet.</div>}
 
       {showBranches && (
         <div className="agnt-gitpanel-create">

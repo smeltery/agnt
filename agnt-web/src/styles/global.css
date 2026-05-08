@@ -1786,3 +1786,57 @@ button {
 }
 .agnt-settings-slash-field textarea { font-family: var(--agnt-mono); resize: vertical; }
 .agnt-settings-error { color: var(--agnt-danger); font-size: 12px; margin: 0; }
+
+.agnt-diff-view {
+  margin: 6px 0 4px 24px;
+  padding: 8px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  background: var(--agnt-bg);
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre;
+}
+.agnt-diff-view span { display: block; }
+.agnt-diff-meta { color: var(--agnt-fg-dim); }
+.agnt-diff-hunk { color: var(--agnt-accent); }
+.agnt-diff-add { color: var(--agnt-ok); background: rgba(80, 200, 120, 0.07); }
+.agnt-diff-remove { color: var(--agnt-danger); background: rgba(255, 80, 80, 0.07); }
+.agnt-diff-context { color: var(--agnt-fg); }
+
+.agnt-gitpanel-file { margin: 0; }
+.agnt-gitpanel-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.agnt-gitpanel-file-row:hover { background: var(--agnt-bg-elev-2); }
+.agnt-gitpanel-file-row code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agnt-gitpanel-file-chevron {
+  color: var(--agnt-fg-dim);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.agnt-gitpanel-file-expanded > .agnt-gitpanel-file-row { color: var(--agnt-fg); }
+
+.agnt-sidebar-row-dragging { opacity: 0.45; }
+.agnt-sidebar-row-drop-target { box-shadow: inset 0 2px 0 0 var(--agnt-accent); }
+
+.agnt-composer-stats {
+  font-size: 10px;
+  color: var(--agnt-fg-dim);
+  padding: 2px 8px 0;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}

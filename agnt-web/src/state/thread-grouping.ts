@@ -29,17 +29,23 @@ export function groupThreadsByRecency(threads: CodexThread[], options: GroupOpti
   const startOfYesterday = startOfToday - DAY_MS;
   const startOfThisWeek = startOfToday - 6 * DAY_MS; // Today + previous 6 = "this week"
 
+  // Pinned bucket follows pin-list iteration order so the user's manual
+  // ordering survives. We index threads by id once so the lookup stays O(1)
+  // per pin even on big lists.
+  const threadById = new Map(threads.map((thread) => [thread.id, thread]));
   const pinned: CodexThread[] = [];
+  for (const pinnedId of options.pinnedIds) {
+    const thread = threadById.get(pinnedId);
+    if (thread) pinned.push(thread);
+  }
+
   const today: CodexThread[] = [];
   const yesterday: CodexThread[] = [];
   const thisWeek: CodexThread[] = [];
   const earlier: CodexThread[] = [];
 
   for (const thread of threads) {
-    if (options.pinnedIds.has(thread.id)) {
-      pinned.push(thread);
-      continue;
-    }
+    if (options.pinnedIds.has(thread.id)) continue;
     const timestamp = thread.updatedAt ?? thread.createdAt ?? 0;
     if (timestamp >= startOfToday) today.push(thread);
     else if (timestamp >= startOfYesterday) yesterday.push(thread);

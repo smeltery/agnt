@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { attachmentFromFile, ImageAttachError } from "../../lib/image-attach";
 import { attachmentFromTextFile, looksLikeTextFile, TextAttachError } from "../../lib/text-attach";
 import type { ImageAttachment } from "../../models";
+import { computeDraftStats, formatCount } from "../../lib/draft-stats";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
@@ -463,6 +464,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
           if (fileInputRef.current) fileInputRef.current.value = "";
         }}
       />
+      <DraftStatsFooter draft={draft} />
       <div className="agnt-composer-actions">
         <button
           type="button"
@@ -488,5 +490,18 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         )}
       </div>
     </form>
+  );
+}
+
+// Tiny footer beneath the textarea: char + word + approximate token counts.
+// We surface the `~` on the token count so users know it's a heuristic and
+// don't budget their context window against it for hard limits.
+function DraftStatsFooter({ draft }: { draft: string }) {
+  const stats = computeDraftStats(draft);
+  if (stats.chars === 0) return null;
+  return (
+    <div className="agnt-composer-stats" aria-live="polite">
+      {formatCount(stats.chars)} chars · {formatCount(stats.words)} {stats.words === 1 ? "word" : "words"} · ~{formatCount(stats.approxTokens)} tokens
+    </div>
   );
 }

@@ -100,6 +100,8 @@ export interface ThreadsState {
   unarchiveThread(threadId: string): Promise<void>;
   compactThread(threadId: string): Promise<boolean>;
   togglePinThread(threadId: string): Promise<void>;
+  /** Replace the pinned-thread ordering with the given list (pin order = list order). */
+  reorderPinnedThreads(orderedIds: string[]): Promise<void>;
   reset(): void;
 }
 
@@ -153,6 +155,22 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     else next.add(threadId);
     set({ pinnedThreadIds: next });
     void prefsStore.savePinnedThreadIds([...next]);
+  },
+
+  async reorderPinnedThreads(orderedIds) {
+    // The Set's iteration order is the pin order — rebuilding it from the
+    // caller's array is the whole reorder. We filter against the existing
+    // membership so a stale drag-source can't accidentally promote a
+    // non-pinned thread, and append any pins missing from the input so a
+    // partial reorder doesn't drop pins on the floor.
+    const current = get().pinnedThreadIds;
+    const filtered = orderedIds.filter((id) => current.has(id));
+    for (const id of current) {
+      if (!filtered.includes(id)) filtered.push(id);
+    }
+    const next = new Set(filtered);
+    set({ pinnedThreadIds: next });
+    void prefsStore.savePinnedThreadIds(filtered);
   },
 
   async bindToConnection(connection) {

@@ -34,6 +34,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     unarchiveThread: async () => {},
     compactThread: async () => false,
     togglePinThread: async () => {},
+    reorderPinnedThreads: async () => {},
     reset: () => {},
     ...overrides,
   };

@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 24 — Inline file diff + drag-reorder pins + composer stats footer ✅ DONE
+
+- ✅ Inline file diff viewer in `GitPanel`. Clicking any row in the dirty-files list expands its per-file diff inline; the unified patch returned by `git/diff` is sliced client-side via new `lib/git-diff-parser.ts` and rendered with line-level coloring (`+` green, `-` red, `@@` accent) by `components/git/DiffView.tsx`. Lazy: the patch is only fetched on first expand and reused across files. Removes the workflow detour to a terminal to see what's about to be committed.
+- ✅ Drag-reorder pinned threads. Pinned rows now `draggable=true`; HTML5 drag/drop fires a new `reorderPinnedThreads(orderedIds)` action that rebuilds the `pinnedThreadIds` Set in user-chosen order and persists it. `groupThreadsByRecency` was updated to walk the Set's iteration order for the pinned bucket so the manual order is what users see. Pin-state changes still append (most-recently-pinned ends up at the bottom of the pin list — fix it with a drag).
+- ✅ Composer footer with char + word + approximate-token counts. Tiny line under the textarea: `1,234 chars · 215 words · ~310 tokens`. Token count uses the chars/4 heuristic and is prefixed with `~` so users know not to budget against it for hard limits. Hidden when the draft is empty.
+
 ## Session 23 — Retry failed turn + unread indicator + custom slash commands ✅ DONE
 
 - ✅ Retry failed turn. The inline `SystemErrorRow` now exposes a Retry button that walks back to the user message with the same `turnId`, recovers its text + attachments, and re-issues `turn/start`. Today the only recovery from a network blip / provider hiccup was to re-type the prompt; this closes the gap and reuses the existing `buildTurnInput` path so per-turn flags stay consistent.
