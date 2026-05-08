@@ -8,3 +8,4 @@ export * from "./jsonrpc-client";
 export * from "./connection";
 export * from "./trusted-session";
 export * from "./pairing-code";
+export * from "./project";

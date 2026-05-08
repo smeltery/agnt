@@ -34,11 +34,11 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Incoming` | ✅ | 2 (item/agentMessage/delta, item/reasoning/textDelta, item/*/outputDelta, item/started, item/completed, turn lifecycle, thread/tokenUsage/updated) |
 | `IncomingAssistant` | ✅ | 2 |
 | `IncomingPlanMode` | ✅ | 3 (turn/plan/updated, item/plan/delta, presentation transitions) |
-| `IncomingSupport` | ✅ | 3 (context-window + approvals queue + system/notice toasts) |
-| `ThreadsTurns` | ✅ | 2 + 4 (thread/list, turns/list, turn/start/interrupt, fork, name/set, archive, unarchive) |
+| `IncomingSupport` | ✅ | 3 + 9 (context-window + approvals + system/notice + thread/status/changed + turn/diff/updated) |
+| `ThreadsTurns` | ✅ | 2 + 4 + 9 (thread/list, turns/list, turn/start/interrupt, fork, name/set, archive, unarchive, generateTitle, contextWindow/read) |
 | `ThreadHistoryPagination` | ✅ | 2 |
 | `ThreadFork` + `ThreadForkCompatibility` | ✅ | 4 (no per-target-project routing yet) |
-| `ThreadProjectRouting` | 🟡 | 4 (cwd surfaced in chat header + sidebar; no project switcher UI) |
+| `ThreadProjectRouting` | ✅ | 9 (cwd surfaced in header + project picker drives `thread/start.cwd`) |
 | `Sync` | ✅ | 2 (initialize, model/list, thread/list active+archived) |
 | `Status` | 🟡 | 1 (status pill only) |
 | `Account` | 🟡 | 5 (read-only `account/status/read` + `getAuthStatus` fallback; full OAuth flow deferred) |
@@ -51,7 +51,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Review` | ⛔ | 4 |
 | `AIChangeSets` | ⛔ | 4 |
 | `WorkspaceCheckpoints` + `WorkspaceImages` | ⛔ | 4 |
-| `ProjectFolders` | ⛔ | 4 |
+| `ProjectFolders` | ✅ | 9 (project/quickLocations + listDirectory + searchDirectories + folder picker UI) |
 | `TrustedPairPresentation` | 🔲 | sidebar shows nothing about trusted Mac yet |
 | `Helpers` | n/a | utility — port functions on demand |
 | `AssistantReplayDeduper` | ✅ | 2 |
@@ -97,7 +97,9 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | iOS area | Web component | Status |
 | --- | --- | --- |
 | Onboarding / pairing | `components/pairing/{PairingScreen,CameraQRScanner}.tsx` | ✅ (paste, short code w/ relay round-trip, camera scan via BarcodeDetector) |
-| Sidebar | `components/sidebar/Sidebar.tsx` | ✅ (live/archived tabs, cwd hint, selection) |
+| Sidebar | `components/sidebar/Sidebar.tsx` | ✅ (live/archived tabs, cwd hint, selection, "+ New" button, running indicator) |
+| Project picker | `components/project/ProjectPicker.tsx` + `state/project-store.ts` + `protocol/project.ts` | ✅ (quick locations, browse, search, ascend, select cwd) |
+| New chat modal | `components/chat/NewChatModal.tsx` | ✅ (prompt + project selector + flag-aware turn/start) |
 | Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
 | Markdown | `components/chat/MarkdownContent.tsx` + `markdown-blocks.ts` + `syntax-highlight.ts` | ✅ (fenced code w/ Prism, inline code, bold/italic, headings 1–6, ordered/bullet lists, tables w/ column alignment) |
 | Approvals modal | `components/approvals/ApprovalModal.tsx` + `state/approvals-store.ts` | ✅ (command + file change, accept / decline / acceptForSession) |

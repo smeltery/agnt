@@ -5,13 +5,18 @@ import { filterThreads } from "../../state/thread-filter";
 import { useThreadsStore } from "../../state/threads-store";
 import { ThreadContextMenu } from "./ThreadContextMenu";
 
+interface SidebarProps {
+  onNewChat(): void;
+}
+
 type SidebarTab = "live" | "archived";
 
-export function Sidebar() {
+export function Sidebar({ onNewChat }: SidebarProps) {
   const liveThreads = useThreadsStore((state) => state.threads);
   const archivedThreads = useThreadsStore((state) => state.archivedThreads);
   const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
   const loading = useThreadsStore((state) => state.loading);
+  const runningThreadIds = useThreadsStore((state) => state.runningThreadIds);
   const selectThread = useThreadsStore((state) => state.selectThread);
   const [tab, setTab] = useState<SidebarTab>("live");
   const [query, setQuery] = useState("");
@@ -32,6 +37,9 @@ export function Sidebar() {
       <div className="agnt-sidebar-header">
         <span className="agnt-sidebar-title">Threads</span>
         {loading && <span className="agnt-sidebar-loading">syncing…</span>}
+        <button type="button" className="agnt-sidebar-new" onClick={onNewChat} title="New chat">
+          + New
+        </button>
       </div>
       <div className="agnt-sidebar-tabs" role="tablist">
         <SidebarTabButton current={tab} value="live" label={`Live (${liveThreads.length})`} onClick={setTab} />
@@ -63,6 +71,7 @@ export function Sidebar() {
               key={thread.id}
               thread={thread}
               selected={thread.id === selectedThreadId}
+              running={runningThreadIds.has(thread.id)}
               onSelect={() => void selectThread(thread.id)}
             />
           ))}
@@ -113,12 +122,25 @@ function SidebarTabButton({
   );
 }
 
-function SidebarRow({ thread, selected, onSelect }: { thread: CodexThread; selected: boolean; onSelect: () => void }) {
+function SidebarRow({
+  thread,
+  selected,
+  running,
+  onSelect,
+}: {
+  thread: CodexThread;
+  selected: boolean;
+  running: boolean;
+  onSelect: () => void;
+}) {
   const title = thread.name ?? thread.title ?? "Untitled";
   return (
     <li className={"agnt-sidebar-row" + (selected ? " agnt-sidebar-row-selected" : "")}>
       <button type="button" className="agnt-sidebar-thread" onClick={onSelect}>
-        <span className="agnt-sidebar-thread-title">{title}</span>
+        <span className="agnt-sidebar-thread-title">
+          {running && <span className="agnt-sidebar-running-dot" aria-label="running" title="Running" />}
+          {title}
+        </span>
         {thread.cwd && <span className="agnt-sidebar-thread-cwd">{thread.cwd}</span>}
       </button>
       <ThreadContextMenu thread={thread} />

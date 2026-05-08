@@ -77,10 +77,20 @@ later session because the protocol and storage layers are already complete.
 - ✅ Block-level markdown lexer (`markdown-blocks.ts`): headings 1–6, ordered + bullet lists, tables with column alignment, fenced code (kept the existing Prism path)
 - ✅ Git branch picker + checkout in `GitPanel`. Disables checkout when the working tree is dirty, when the target is the current branch, or when it's checked out in another worktree (matches `git/branches.branchesCheckedOutElsewhere`)
 
+## Session 9 — Close critical gaps from the iOS audit ✅ DONE
+
+- ✅ Project folder picker (`project/quickLocations` + `listDirectory` + `searchDirectories`) backing a "New Chat" flow that drives `thread/start.cwd`
+- ✅ Sidebar `+ New` entry point + per-thread running indicator from `thread/status/changed`
+- ✅ `turn/diff/updated` notification → renders in the existing FileChange row keyed off the turnId
+- ✅ Auto-title threads via `thread/generateTitle` after first turn (skips if user already named it)
+- ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
+- ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
+
 ## Session N — Future hardening (deferred — not blocking)
 
 - WebPush for completion notifications (gated on a self-hostable web-push gateway; meanwhile completions surface via the existing `system/notice` toasts)
 - E2E tests against a local relay + bridge in CI (would need a CI runner that can spin up the bridge with a fake provider; high lift, low parity benefit right now)
 - Full Codex OAuth flow (cross-tab redirect handoff design)
 - Worktree creation + stacked-action git operations (the read-only branch picker covers the 80% case; worktrees are an iOS power-user feature)
-- AI change sets, workspace checkpoints, workspace images, project switcher UI (need design work — not blocked by infra)
+- Workspace checkpoints (`workspace/checkpoint*`) + AI change sets (next critical gap from the iOS audit; warrants its own session)
+- `turn/steer` (mid-run steering) — bridge supports it, no UI yet

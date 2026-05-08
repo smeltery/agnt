@@ -11,6 +11,7 @@ import {
   type CodexMessage,
   type CodexThread,
   type ContextWindowUsage,
+  createMessage,
   decodePlanSteps,
   extractContextWindowUsage,
   normalizeThread,
@@ -41,6 +42,7 @@ import {
   type ThreadReducerState,
 } from "./turn-reducer";
 import { messagesStore } from "../storage/messages-store";
+import { prefsStore } from "../storage/prefs-store";
 
 const log = makeLogger("threads");
 const PERSIST_DEBOUNCE_MS = 250;
@@ -66,6 +68,8 @@ export interface ThreadsState {
   reducerStates: Record<string, ThreadReducerState>;
   contextUsageByThread: Record<string, ContextWindowUsage>;
   turnFlags: TurnFlags;
+  /** Threads with a running turn — derived from `thread/status/changed` notifications. */
+  runningThreadIds: Set<string>;
   loading: boolean;
   error: string | null;
   hydrated: boolean;
@@ -75,6 +79,7 @@ export interface ThreadsState {
   selectThread(threadId: string): Promise<void>;
   loadOlderTurns(threadId: string): Promise<void>;
   sendTurn(threadId: string, content: string): Promise<void>;
+  startNewThread(input: { content: string; cwd?: string }): Promise<string | null>;
   stopTurn(): Promise<void>;
   patchTurnFlags(patch: Partial<TurnFlags>): void;
   forkThread(sourceThreadId: string): Promise<string | null>;
@@ -96,15 +101,29 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   reducerStates: {},
   contextUsageByThread: {},
   turnFlags: {},
+  runningThreadIds: new Set(),
   loading: false,
   error: null,
   hydrated: false,
 
   async hydrateFromDisk() {
     if (get().hydrated) return;
-    const max = await messagesStore.loadHighestOrderIndex();
+    const [max, persistedFlags] = await Promise.all([
+      messagesStore.loadHighestOrderIndex(),
+      prefsStore.loadTurnFlags(),
+    ]);
     orderCounter.seedFrom(max);
-    set({ hydrated: true });
+    // Cast through the looser persisted shape — anything malformed (an old
+    // schema) just falls back to the empty default.
+    set({
+      hydrated: true,
+      turnFlags: {
+        model: persistedFlags.model,
+        reasoningEffort: persistedFlags.reasoningEffort as TurnFlags["reasoningEffort"],
+        permissionMode: persistedFlags.permissionMode as TurnFlags["permissionMode"],
+        planMode: persistedFlags.planMode,
+      },
+    });
   },
 
   async bindToConnection(connection) {
@@ -143,6 +162,10 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       mutateReducer(threadId, set, get, (state) => ({ ...state, messages: cached }));
     }
     await messagesStore.registerThread(threadId);
+    // Pull a fresh context-window snapshot so the bar renders before the next
+    // turn fires the push notification. Best-effort — silently no-ops if the
+    // bridge doesn't expose this for the active provider.
+    void fetchContextWindowSnapshot(threadId, set, get);
     await get().loadOlderTurns(threadId);
   },
 
@@ -180,7 +203,47 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   },
 
   patchTurnFlags(patch) {
-    set({ turnFlags: { ...get().turnFlags, ...patch } });
+    const next = { ...get().turnFlags, ...patch };
+    set({ turnFlags: next });
+    // Persist async, debounced through the timer pool we already use for
+    // messages. This is a tiny write so we don't bother debouncing further.
+    void prefsStore.saveTurnFlags({
+      model: next.model,
+      reasoningEffort: next.reasoningEffort,
+      permissionMode: next.permissionMode,
+      planMode: next.planMode,
+    });
+  },
+
+  async startNewThread(input) {
+    if (!activeConnection?.rpc) return null;
+    const { content, cwd } = input;
+    const flags = get().turnFlags;
+    const params: Record<string, unknown> = { content };
+    if (cwd) params.cwd = cwd;
+    if (flags.model) params.model = flags.model;
+    if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;
+    if (flags.permissionMode) params.permissionMode = flags.permissionMode;
+    if (flags.planMode) params.planMode = true;
+    try {
+      const response = await activeConnection.rpc.request<{ threadId?: string; thread?: { id?: string } }>(
+        "thread/start",
+        params
+      );
+      const threadId = response.threadId ?? response.thread?.id;
+      if (!threadId) return null;
+      // Refresh sidebar + select; the thread/started notification will also
+      // fire but the sidebar pulls from thread/list, not from notifications.
+      await refreshLiveThreads(set, get);
+      await get().selectThread(threadId);
+      // Auto-title after a short delay so the bridge has the first turn's
+      // content to summarize. Best-effort: failures are logged and ignored.
+      scheduleAutoTitle(threadId, set, get);
+      return threadId;
+    } catch (error) {
+      set({ error: (error as Error).message });
+      return null;
+    }
   },
 
   async forkThread(sourceThreadId) {
@@ -338,6 +401,31 @@ function registerNotificationHandlers(
     if (!threadId || !name) return;
     patchThreadName(set, get, threadId, name);
   });
+  // thread/status/changed lets the sidebar show a running indicator on
+  // non-active threads. Bridge emits "running" / "idle" / terminal labels —
+  // we treat anything that isn't terminal as running.
+  on(connection, "thread/status/changed", (params) => {
+    const threadId = readString(params, "threadId");
+    const status = readString(params, "status") ?? "";
+    if (!threadId) return;
+    const terminal = TERMINAL_STATUSES.has(status.toLowerCase());
+    const next = new Set(get().runningThreadIds);
+    if (terminal) next.delete(threadId);
+    else next.add(threadId);
+    if (setEqual(next, get().runningThreadIds)) return;
+    set({ runningThreadIds: next });
+  });
+  // turn/diff/updated streams a per-turn diff while the turn is running.
+  // We pipe it through the existing reducer as a synthetic file-change item
+  // so the existing FileChange row renders it; this avoids a parallel UI.
+  on(connection, "turn/diff/updated", (params) => {
+    withTurnEvent(params, (event) => {
+      const diff = readString(params, "diff") ?? readString(params, "patch");
+      if (!event.turnId || !diff) return;
+      mutateReducer(event.threadId, set, get, (state) => upsertTurnDiff(state, event, diff));
+      schedulePersist(event.threadId, get);
+    });
+  });
   on(connection, "thread/tokenUsage/updated", (params) => {
     const threadId = readString(params, "threadId");
     if (!threadId) return;
@@ -433,6 +521,102 @@ function moveThreadBetweenLists(
     archivedThreads: get().archivedThreads.filter((t) => t.id !== threadId),
     threads: [{ ...target, syncState: "live" }, ...get().threads],
   });
+}
+
+const TERMINAL_STATUSES = new Set([
+  "idle",
+  "stopped",
+  "completed",
+  "done",
+  "finished",
+  "failed",
+  "error",
+  "cancelled",
+  "canceled",
+  "rejected",
+  "compacted",
+]);
+
+function setEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const value of a) if (!b.has(value)) return false;
+  return true;
+}
+
+// Stamps a per-turn diff onto a single fileChange row keyed by turnId. We
+// upsert in-place so streaming diffs don't spawn one row per delta.
+function upsertTurnDiff(state: ThreadReducerState, event: TurnEventBase, diff: string): ThreadReducerState {
+  const sentinelItemId = "__turnDiff__";
+  const messages = state.messages.slice();
+  const existingIndex = messages.findIndex(
+    (message) => message.turnId === event.turnId && message.itemId === sentinelItemId
+  );
+  if (existingIndex >= 0) {
+    const previous = messages[existingIndex];
+    if (previous.fileChange?.diff === diff) return state;
+    messages[existingIndex] = {
+      ...previous,
+      fileChange: { ...(previous.fileChange ?? {}), diff },
+    };
+    return { ...state, messages };
+  }
+  const row = createMessage({
+    threadId: event.threadId,
+    role: "system",
+    kind: "fileChange",
+    turnId: event.turnId,
+    itemId: sentinelItemId,
+    isStreaming: true,
+    fileChange: { diff },
+  });
+  messages.push(row);
+  return { ...state, messages };
+}
+
+async function fetchContextWindowSnapshot(
+  threadId: string,
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState
+): Promise<void> {
+  if (!activeConnection?.rpc) return;
+  try {
+    const result = await activeConnection.rpc.request<Record<string, unknown>>("thread/contextWindow/read", {
+      threadId,
+    });
+    const usage = extractContextWindowUsage(result);
+    if (!usage) return;
+    set({ contextUsageByThread: { ...get().contextUsageByThread, [threadId]: usage } });
+  } catch (error) {
+    // Method-not-found is the common case for providers that don't support it.
+    if ((error as { code?: number })?.code !== -32601) log.warn("contextWindow/read failed", error);
+  }
+}
+
+const TITLE_GENERATION_DELAY_MS = 4_000;
+
+function scheduleAutoTitle(
+  threadId: string,
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState
+): void {
+  if (typeof window === "undefined") return;
+  setTimeout(async () => {
+    if (!activeConnection?.rpc) return;
+    try {
+      const result = await activeConnection.rpc.request<{ title?: string; name?: string }>(
+        "thread/generateTitle",
+        { threadId }
+      );
+      const title = result.title ?? result.name;
+      if (!title) return;
+      // Don't fight a manual rename: if the user already named the thread, skip.
+      const current = get().threads.find((t) => t.id === threadId) ?? get().archivedThreads.find((t) => t.id === threadId);
+      if (current?.name) return;
+      patchThreadName(set, get, threadId, title);
+    } catch (error) {
+      if ((error as { code?: number })?.code !== -32601) log.warn("auto-title failed", error);
+    }
+  }, TITLE_GENERATION_DELAY_MS);
 }
 
 async function refreshLiveThreads(
