@@ -119,4 +119,25 @@ describe("lexMarkdownBlocks", () => {
       { kind: "heading", level: 1, text: "heading after quote" },
     ]);
   });
+
+  it("recognizes task lists (`- [x]` / `- [ ]`) and captures the done flag", () => {
+    const source = "- [ ] write tests\n- [x] read code\n- [X] ship it";
+    expect(lexMarkdownBlocks(source)).toEqual([
+      {
+        kind: "taskList",
+        items: [
+          { done: false, text: "write tests" },
+          { done: true, text: "read code" },
+          { done: true, text: "ship it" },
+        ],
+      },
+    ]);
+  });
+
+  it("treats a bullet without a checkbox as a plain bullet list, not a task list", () => {
+    expect(lexMarkdownBlocks("- alpha\n- [ ] beta")).toEqual([
+      { kind: "listBullet", items: ["alpha"] },
+      { kind: "taskList", items: [{ done: false, text: "beta" }] },
+    ]);
+  });
 });

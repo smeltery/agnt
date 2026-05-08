@@ -10,6 +10,8 @@
 
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { copyText } from "../../lib/clipboard";
+import { useConnectionStore } from "../../state/connection-store";
+import { selectImageState, useWorkspaceImageCache } from "../../state/workspace-image-cache";
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
 import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
 
@@ -18,30 +20,45 @@ const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
 const ITALIC_PATTERN = /(?<!\w)\*([^*\n]+)\*(?!\w)/g;
 const IMAGE_PATTERN = /!\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
 const LINK_PATTERN = /(?<!!)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
+// Bare-URL autolinks. Recognises http(s) URLs not already inside a `[](…)`
+// or `![](…)` construct (the explicit-link patterns above run first and
+// consume those positions via the dedup step in the cursor walk). Trailing
+// punctuation (.,;:!?]) ) is excluded from the match so a sentence like
+// "Visit https://example.com." doesn't link the period. We deliberately
+// don't add `(` to the negative lookbehind because URLs frequently appear
+// in parentheses ("see (https://example.com)") and the dedup against
+// LINK_PATTERN already prevents double-wrapping inside `[](…)`.
+const AUTOLINK_PATTERN = /(?<![\w@:/])\bhttps?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?\]\)]/g;
 
-export function MarkdownContent({ text }: { text: string }) {
+export interface MarkdownContentProps {
+  text: string;
+  /** Thread cwd — when set, non-http image refs route through `workspace/readImage`. */
+  cwd?: string;
+}
+
+export function MarkdownContent({ text, cwd }: MarkdownContentProps) {
   if (!text) return null;
   const blocks = lexMarkdownBlocks(text);
   return (
     <>
       {blocks.map((block, index) => (
-        <Fragment key={index}>{renderBlock(block)}</Fragment>
+        <Fragment key={index}>{renderBlock(block, cwd)}</Fragment>
       ))}
     </>
   );
 }
 
-function renderBlock(block: MarkdownBlock): ReactNode {
+function renderBlock(block: MarkdownBlock, cwd: string | undefined): ReactNode {
   switch (block.kind) {
     case "fence":
       return renderFence(block.language, block.body);
     case "heading":
-      return renderHeading(block.level, block.text);
+      return renderHeading(block.level, block.text, cwd);
     case "listOrdered":
       return (
         <ol className="agnt-md-list" start={block.start}>
           {block.items.map((item, index) => (
-            <li key={index}>{renderInlineFragments(item)}</li>
+            <li key={index}>{renderInlineFragments(item, cwd)}</li>
           ))}
         </ol>
       );
@@ -49,18 +66,38 @@ function renderBlock(block: MarkdownBlock): ReactNode {
       return (
         <ul className="agnt-md-list">
           {block.items.map((item, index) => (
-            <li key={index}>{renderInlineFragments(item)}</li>
+            <li key={index}>{renderInlineFragments(item, cwd)}</li>
+          ))}
+        </ul>
+      );
+    case "taskList":
+      return (
+        <ul className="agnt-md-list agnt-md-tasklist">
+          {block.items.map((item, index) => (
+            <li
+              key={index}
+              className={"agnt-md-tasklist-item" + (item.done ? " agnt-md-tasklist-done" : "")}
+            >
+              <input
+                type="checkbox"
+                checked={item.done}
+                disabled
+                aria-label={item.done ? "Completed" : "Not completed"}
+                className="agnt-md-tasklist-checkbox"
+              />
+              <span>{renderInlineFragments(item.text, cwd)}</span>
+            </li>
           ))}
         </ul>
       );
     case "table":
-      return renderTable(block);
+      return renderTable(block, cwd);
     case "blockquote":
-      return <blockquote className="agnt-md-blockquote">{renderInlineFragments(block.text)}</blockquote>;
+      return <blockquote className="agnt-md-blockquote">{renderInlineFragments(block.text, cwd)}</blockquote>;
     case "horizontal":
       return <hr className="agnt-md-hr" />;
     case "paragraph":
-      return <p className="agnt-md-paragraph">{renderInlineFragments(block.text)}</p>;
+      return <p className="agnt-md-paragraph">{renderInlineFragments(block.text, cwd)}</p>;
   }
 }
 
@@ -122,9 +159,9 @@ function CodeBlock({ language, body }: { language: string | null; body: string }
   );
 }
 
-function renderHeading(level: 1 | 2 | 3 | 4 | 5 | 6, text: string): ReactNode {
+function renderHeading(level: 1 | 2 | 3 | 4 | 5 | 6, text: string, cwd: string | undefined): ReactNode {
   const className = "agnt-md-heading agnt-md-h" + level;
-  const children = renderInlineFragments(text);
+  const children = renderInlineFragments(text, cwd);
   switch (level) {
     case 1: return <h1 className={className}>{children}</h1>;
     case 2: return <h2 className={className}>{children}</h2>;
@@ -135,7 +172,7 @@ function renderHeading(level: 1 | 2 | 3 | 4 | 5 | 6, text: string): ReactNode {
   }
 }
 
-function renderTable(block: Extract<MarkdownBlock, { kind: "table" }>): ReactNode {
+function renderTable(block: Extract<MarkdownBlock, { kind: "table" }>, cwd: string | undefined): ReactNode {
   return (
     <div className="agnt-md-table-wrapper">
       <table className="agnt-md-table">
@@ -143,7 +180,7 @@ function renderTable(block: Extract<MarkdownBlock, { kind: "table" }>): ReactNod
           <tr>
             {block.header.map((cell, index) => (
               <th key={index} style={alignStyle(block.alignments[index])}>
-                {renderInlineFragments(cell)}
+                {renderInlineFragments(cell, cwd)}
               </th>
             ))}
           </tr>
@@ -153,7 +190,7 @@ function renderTable(block: Extract<MarkdownBlock, { kind: "table" }>): ReactNod
             <tr key={rowIndex}>
               {row.map((cell, columnIndex) => (
                 <td key={columnIndex} style={alignStyle(block.alignments[columnIndex])}>
-                  {renderInlineFragments(cell)}
+                  {renderInlineFragments(cell, cwd)}
                 </td>
               ))}
             </tr>
@@ -169,7 +206,7 @@ function alignStyle(align: "left" | "right" | "center" | null | undefined): Reac
   return { textAlign: align };
 }
 
-function renderInlineFragments(text: string): ReactNode {
+function renderInlineFragments(text: string, cwd: string | undefined): ReactNode {
   return tokenizeInline(text).map((token, index) => {
     switch (token.kind) {
       case "text":
@@ -191,20 +228,81 @@ function renderInlineFragments(text: string): ReactNode {
           </a>
         );
       case "image":
-        // alt text falls back to a non-empty placeholder so screen readers
-        // don't announce a bare "image" — most agent-emitted images have a
-        // descriptive alt anyway.
+        // Direct http/data sources go straight to <img>; non-web paths route
+        // through workspace/readImage if we have a cwd to resolve against.
+        if (token.url.startsWith("http") || token.url.startsWith("data:")) {
+          return (
+            <img
+              key={index}
+              src={token.url}
+              alt={token.label || token.title || "image"}
+              title={token.title}
+              className="agnt-md-image"
+            />
+          );
+        }
         return (
-          <img
+          <WorkspaceImage
             key={index}
-            src={token.url}
-            alt={token.label || token.title || "image"}
+            cwd={cwd}
+            path={token.url}
+            label={token.label}
             title={token.title}
-            className="agnt-md-image"
           />
         );
     }
   });
+}
+
+interface WorkspaceImageProps {
+  cwd: string | undefined;
+  path: string;
+  label: string;
+  title?: string;
+}
+
+function WorkspaceImage({ cwd, path, label, title }: WorkspaceImageProps) {
+  const connection = useConnectionStore((state) => state.connection);
+  // Zustand re-renders this component when the selector's result reference
+  // changes; we don't need a forceUpdate here.
+  const cached = useWorkspaceImageCache(selectImageState(cwd ?? "", path));
+  const ensure = useWorkspaceImageCache((state) => state.ensure);
+
+  useEffect(() => {
+    if (!cwd || !connection?.rpc) return;
+    void ensure(connection.rpc, { cwd, path });
+  }, [cwd, path, connection, ensure]);
+
+  if (!cwd) {
+    return (
+      <span className="agnt-md-image-placeholder" title={`No workspace cwd; can't fetch ${path}`}>
+        {label || path}
+      </span>
+    );
+  }
+  if (cached && typeof cached === "object" && "error" in cached) {
+    return (
+      <span className="agnt-md-image-placeholder agnt-md-image-error" title={cached.error}>
+        ⚠ {label || path}
+      </span>
+    );
+  }
+  if (cached && typeof cached === "object" && "dataUrl" in cached) {
+    return (
+      <img
+        src={cached.dataUrl}
+        alt={label || title || path}
+        title={title ?? path}
+        className="agnt-md-image"
+      />
+    );
+  }
+  // loading | null
+  return (
+    <span className="agnt-md-image-placeholder" title={path}>
+      Loading {label || path}…
+    </span>
+  );
 }
 
 type InlineToken =
@@ -229,6 +327,10 @@ interface InlineHit {
 
 const SAFE_LINK_SCHEMES = /^(https?:|mailto:|#)/i;
 const SAFE_IMAGE_SCHEMES = /^(https?:|data:image\/)/i;
+// Plain paths with no scheme (`screenshot.png`, `.tmp/cap.png`) are accepted
+// and resolved against a thread cwd via workspace/readImage. The render layer
+// double-checks before fetching.
+const HAS_URL_SCHEME = /^[a-z][a-z0-9+\-.]*:/i;
 
 function tokenizeInline(text: string): InlineToken[] {
   const hits: InlineHit[] = [];
@@ -239,7 +341,9 @@ function tokenizeInline(text: string): InlineToken[] {
   for (const match of text.matchAll(IMAGE_PATTERN)) {
     if (match.index === undefined) continue;
     const url = match[2];
-    if (!SAFE_IMAGE_SCHEMES.test(url)) continue;
+    // Either the URL has a safe image scheme, or it has no scheme at all
+    // (= relative/absolute filesystem path → workspace fetch).
+    if (HAS_URL_SCHEME.test(url) && !SAFE_IMAGE_SCHEMES.test(url)) continue;
     hits.push({
       kind: "image",
       start: match.index,
@@ -261,6 +365,17 @@ function tokenizeInline(text: string): InlineToken[] {
       label: match[1],
       url,
       title: match[3],
+    });
+  }
+  AUTOLINK_PATTERN.lastIndex = 0;
+  for (const match of text.matchAll(AUTOLINK_PATTERN)) {
+    if (match.index === undefined) continue;
+    hits.push({
+      kind: "link",
+      start: match.index,
+      end: match.index + match[0].length,
+      label: match[0],
+      url: match[0],
     });
   }
   for (const [kind, pattern] of [

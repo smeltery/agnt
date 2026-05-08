@@ -21,16 +21,25 @@ export type MarkdownBlock =
   | { kind: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; text: string }
   | { kind: "listOrdered"; items: string[]; start: number }
   | { kind: "listBullet"; items: string[] }
+  | { kind: "taskList"; items: TaskListItem[] }
   | { kind: "table"; header: string[]; rows: string[][]; alignments: Array<"left" | "right" | "center" | null> }
   | { kind: "blockquote"; text: string }
   | { kind: "horizontal" }
   | { kind: "paragraph"; text: string };
+
+export interface TaskListItem {
+  done: boolean;
+  text: string;
+}
 
 const FENCE_OPEN = /^```(\w+)?\s*$/;
 const FENCE_CLOSE = /^```\s*$/;
 const HEADING = /^(#{1,6})\s+(.+?)\s*$/;
 const ORDERED_ITEM = /^(\s*)(\d+)[.)]\s+(.+)$/;
 const BULLET_ITEM = /^(\s*)[-*+]\s+(.+)$/;
+// Task list — same lead as a bullet but immediately followed by `[ ]` or
+// `[x]`/`[X]`. We capture the checkbox state and the remaining text.
+const TASK_LIST_ITEM = /^(\s*)[-*+]\s+\[([ xX])\]\s+(.+)$/;
 const TABLE_DIVIDER = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
 const BLOCKQUOTE = /^\s*>\s?(.*)$/;
@@ -90,9 +99,32 @@ export function lexMarkdownBlocks(source: string): MarkdownBlock[] {
       continue;
     }
 
+    // Task lists are a strict subset of bullet lists ("- [ ]" / "- [x]") so
+    // we test for them BEFORE BULLET_ITEM. If an item in a contiguous run
+    // doesn't have a checkbox, we fall back to treating the whole run as a
+    // bullet list — mixing tasks with plain bullets in one block isn't worth
+    // the renderer complexity.
+    if (TASK_LIST_ITEM.test(line)) {
+      const items: TaskListItem[] = [];
+      while (cursor < lines.length && TASK_LIST_ITEM.test(lines[cursor])) {
+        const match = TASK_LIST_ITEM.exec(lines[cursor])!;
+        items.push({ done: match[2].toLowerCase() === "x", text: match[3] });
+        cursor += 1;
+      }
+      blocks.push({ kind: "taskList", items });
+      continue;
+    }
+
     if (BULLET_ITEM.test(line)) {
       const items: string[] = [];
-      while (cursor < lines.length && BULLET_ITEM.test(lines[cursor])) {
+      // Stop at a task-list line so the next iteration emits a separate
+      // taskList block; otherwise a `- [ ]` would ride in as a plain bullet
+      // because `[ ] beta` matches the BULLET_ITEM regex.
+      while (
+        cursor < lines.length
+        && BULLET_ITEM.test(lines[cursor])
+        && !TASK_LIST_ITEM.test(lines[cursor])
+      ) {
         items.push(BULLET_ITEM.exec(lines[cursor])![2]);
         cursor += 1;
       }
@@ -151,6 +183,7 @@ export function lexMarkdownBlocks(source: string): MarkdownBlock[] {
       !HEADING.test(lines[cursor]) &&
       !ORDERED_ITEM.test(lines[cursor]) &&
       !BULLET_ITEM.test(lines[cursor]) &&
+      !TASK_LIST_ITEM.test(lines[cursor]) &&
       !HORIZONTAL_RULE.test(lines[cursor]) &&
       !BLOCKQUOTE.test(lines[cursor]) &&
       !(TABLE_ROW.test(lines[cursor]) && cursor + 1 < lines.length && TABLE_DIVIDER.test(lines[cursor + 1]))

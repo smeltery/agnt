@@ -1,4 +1,5 @@
 import type { CodexMessage, PlanStep } from "../../../models";
+import { useThreadsStore } from "../../../state/threads-store";
 import { MarkdownContent } from "../MarkdownContent";
 
 const STATUS_LABEL: Record<PlanStep["status"], string> = {
@@ -10,6 +11,13 @@ const STATUS_LABEL: Record<PlanStep["status"], string> = {
 
 export function PlanRow({ message }: { message: CodexMessage }) {
   const plan = message.plan;
+  const cwd = useThreadsStore((state) => {
+    if (!message.threadId) return undefined;
+    return (
+      state.threads.find((t) => t.id === message.threadId)?.cwd
+      ?? state.archivedThreads.find((t) => t.id === message.threadId)?.cwd
+    );
+  });
   if (!plan) return null;
   const presentationLabel =
     plan.presentation === "progress"
@@ -37,7 +45,7 @@ export function PlanRow({ message }: { message: CodexMessage }) {
       )}
       {message.text && (
         <div className="agnt-row-plan-text">
-          <MarkdownContent text={message.text} />
+          <MarkdownContent text={message.text} cwd={cwd} />
         </div>
       )}
     </div>

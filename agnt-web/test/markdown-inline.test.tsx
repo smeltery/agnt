@@ -62,4 +62,33 @@ describe("inline markdown — images", () => {
     const html = render('![](https://example.com/b.png "tooltip")');
     expect(html).toContain("alt=\"tooltip\"");
   });
+
+  it("renders local-path images as a placeholder when no cwd is supplied", () => {
+    const html = render("![cap](screenshot.png)");
+    // Without cwd, WorkspaceImage falls back to a placeholder span.
+    expect(html).toContain("agnt-md-image-placeholder");
+    expect(html).not.toContain("<img src=\"screenshot.png\"");
+  });
+});
+
+describe("inline markdown — autolinks", () => {
+  it("links bare http(s) URLs", () => {
+    const html = render("Visit https://example.com today.");
+    expect(html).toContain("<a href=\"https://example.com\"");
+    expect(html).toContain(">https://example.com</a>");
+    expect(html).toContain("today.");
+  });
+
+  it("does not double-wrap URLs already inside a [](…) link", () => {
+    const html = render("[Example](https://example.com)");
+    expect((html.match(/<a /g) || []).length).toBe(1);
+    expect(html).toContain(">Example</a>");
+  });
+
+  it("excludes trailing punctuation from the matched URL", () => {
+    const html = render("End of sentence (https://example.com).");
+    expect(html).toContain("href=\"https://example.com\"");
+    expect(html).toContain(">https://example.com</a>");
+    expect(html).toContain(").");
+  });
 });

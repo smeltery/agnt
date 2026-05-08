@@ -1402,6 +1402,20 @@ button {
   border: 1px solid var(--agnt-border);
   margin: 6px 0;
 }
+.agnt-md-image-placeholder {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px dashed var(--agnt-border);
+  border-radius: 4px;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-md-image-error { border-color: var(--agnt-danger); color: var(--agnt-danger); }
+.agnt-md-tasklist { padding-left: 4px; list-style: none; }
+.agnt-md-tasklist-item { display: flex; align-items: baseline; gap: 6px; }
+.agnt-md-tasklist-checkbox { margin: 0; cursor: not-allowed; }
+.agnt-md-tasklist-done span { color: var(--agnt-fg-dim); text-decoration: line-through; }
 .agnt-md-blockquote {
   margin: 0;
   padding: 6px 12px;

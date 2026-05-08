@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 18 — Workspace images + markdown task lists + autolinks ✅ DONE
+
+- ✅ `workspace/readImage` wrapper + per-(cwd, path) cache. `MarkdownContent` accepts a `cwd` prop; markdown image refs without an explicit scheme (`![cap](screenshot.png)`) route through the cache and render the bridge-downscaled preview. Errors and missing-cwd states surface as styled placeholder spans rather than broken `<img>` tags. Cache uses `ifByteLength`/`ifMtimeMs` on subsequent renders so the bridge can short-circuit with `notModified`.
+- ✅ Markdown task lists — `- [x]` / `- [ ]` (case-insensitive) render as disabled checkboxes with strikethrough on the completed items. The bullet-list loop now stops at a task line so a mixed run splits cleanly into two adjacent blocks.
+- ✅ Bare-URL autolinks — `https?://…` URLs in plain text become `<a target="_blank">` links. Trailing punctuation (`.,;:!?]) `) is excluded from the match so `(visit https://example.com).` keeps the closing paren and period as text.
+
 ## Session 17 — Slash commands + blockquotes + horizontal rules ✅ DONE
 
 - ✅ Composer slash menu — typing `/` at the start of an empty draft opens a filtered palette (`/compact`, `/fork`, `/archive`, `/unarchive`, `/stop` — `canRun()` per command hides ones that don't apply, e.g. `/unarchive` only shows on archived threads, `/stop` only on a running turn). ↑/↓ navigate, Enter runs the highlighted command, Tab autocompletes the name, Esc dismisses. The form's submit also routes to the slash runner so Enter in the textarea fires the command instead of shipping the literal `/foo` to the bridge.

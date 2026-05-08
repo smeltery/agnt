@@ -44,7 +44,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       title={new Date(message.createdAt).toLocaleString()}
     >
       <div className="agnt-row-bubble">
-        <MarkdownContent text={message.text} />
+        <MarkdownContent text={message.text} cwd={thread?.cwd} />
         {message.isStreaming && <span className="agnt-cursor-blink" aria-hidden />}
       </div>
       {!message.isStreaming && message.text && (
