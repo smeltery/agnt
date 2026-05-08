@@ -13,11 +13,11 @@ export function Workspace() {
   const status = useConnectionStore((state) => state.status);
   const reconnect = useConnectionStore((state) => state.reconnect);
   const forget = useConnectionStore((state) => state.forget);
-  const refreshThreads = useThreadsStore((state) => state.refreshThreads);
+  const hydrateFromDisk = useThreadsStore((state) => state.hydrateFromDisk);
 
   useEffect(() => {
-    if (status.kind === "open") void refreshThreads();
-  }, [status.kind, refreshThreads]);
+    void hydrateFromDisk();
+  }, [hydrateFromDisk]);
 
   return (
     <div className="agnt-workspace">

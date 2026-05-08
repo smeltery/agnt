@@ -30,19 +30,19 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Connection` | ✅ | 1 |
 | `SecureTransport` | ✅ | 1 |
 | `Transport` | ✅ | 1 |
-| `Messages` | 🟡 | 1 (basic send/receive) |
-| `Incoming` | 🟡 | 1 (turn/started, item/started\|updated\|completed, turn/completed\|failed) |
-| `IncomingAssistant` | 🟡 | 2 — assistant text + reasoning deltas merge naively, need full item-scoped reconciliation |
+| `Messages` | ✅ | 2 (item-scoped reconciliation, late-replay deltas, block-replay dedup) |
+| `Incoming` | ✅ | 2 (item/agentMessage/delta, item/reasoning/textDelta, item/*/outputDelta, item/started, item/completed, turn lifecycle, thread/tokenUsage/updated) |
+| `IncomingAssistant` | ✅ | 2 |
 | `IncomingPlanMode` | ⛔ | 3 |
-| `IncomingSupport` | ⛔ | 3 (notifications routing) |
-| `ThreadsTurns` | 🟡 | 1 (`thread/list`, `thread/read`, `turn/start`, `turn/interrupt`) |
-| `ThreadHistoryPagination` | ⛔ | 2 |
+| `IncomingSupport` | 🟡 | 2 (context-window extractor only; approvals + notice routing in 3) |
+| `ThreadsTurns` | ✅ | 2 (`thread/list` archived split, `thread/turns/list` cursor, `turn/start`, `turn/interrupt`) |
+| `ThreadHistoryPagination` | ✅ | 2 |
 | `ThreadFork` + `ThreadForkCompatibility` | ⛔ | 4 |
 | `ThreadProjectRouting` | ⛔ | 4 |
-| `Sync` | ⛔ | 2 (post-connect bootstrap of model list, skills, threads) |
+| `Sync` | ✅ | 2 (initialize, model/list, thread/list active+archived) |
 | `Status` | 🟡 | 1 (status pill only) |
-| `RuntimeCompatibility` + `RuntimeConfig` | ⛔ | 2 |
-| `History` | 🟡 | 1 (single-page) |
+| `RuntimeCompatibility` + `RuntimeConfig` | 🟡 | 2 (initialize round-trip + capability gate; full version negotiation in later sessions) |
+| `History` | ✅ | 2 (history events replayed through the same reducer) |
 | `Account` | ⛔ | 5 (Codex login flow, OAuth-style redirect dance) |
 | `Voice` + `VoiceCompatibility` | ⛔ | 6 (browser MediaRecorder + voice/transcribe RPC) |
 | `Notifications` | ⛔ | future (web-push when we tackle it) |
@@ -53,8 +53,9 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `ProjectFolders` | ⛔ | 4 |
 | `TrustedPairPresentation` | 🔲 | sidebar shows nothing about trusted Mac yet |
 | `Helpers` | n/a | utility — port functions on demand |
-| `AssistantReplayDeduper` | ⛔ | 2 |
-| `CodexMessagePersistence` + `AIChangeSetPersistence` | ⛔ | 2 (IndexedDB-backed) |
+| `AssistantReplayDeduper` | ✅ | 2 |
+| `CodexMessagePersistence` | ✅ | 2 (IndexedDB-backed, debounced per thread) |
+| `AIChangeSetPersistence` | ⛔ | 4 (deferred with AI change sets) |
 | `Coordination/*` | ⛔ | 4 |
 | `Payments` (StoreKit) | ⛔ | not applicable in browser; needs a different provider story |
 | `DesktopHandoffService` | ⛔ | not applicable |
@@ -69,9 +70,12 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | --- | --- | --- |
 | `RPCMessage` | ✅ | `src/protocol/types.ts` |
 | `JSONValue` | n/a | TS uses `unknown` |
-| `CodexThread` | 🟡 | `state/threads-store.ts` (subset) |
-| `CodexMessage` | 🟡 | `state/threads-store.ts` (`AssistantStreamRow` subset) |
-| `CodexImageAttachment` | ⛔ | 2 |
+| `CodexThread` | ✅ | `models/thread.ts` (with snake_case aliases) |
+| `CodexMessage` | ✅ | `models/message.ts` (full kind/role/deliveryState surface) |
+| `CodexMessageOrderCounter` | ✅ | `models/order-counter.ts` |
+| `ContextWindowUsage` | ✅ | `models/context-window.ts` |
+| `CommandExecutionDetails` | ✅ | `models/message.ts` (with `appendCommandOutput` trimmer) |
+| `CodexImageAttachment` | ⛔ | 4 |
 | `CodexSkillMetadata` | ⛔ | 2 |
 | `CodexModelOption` | ⛔ | 2 |
 | `CodexCollaboration` | ⛔ | 4 |
@@ -79,12 +83,10 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | `CodexFuzzyFileMatch` | ⛔ | 4 |
 | `CodexRateLimitStatus` | ⛔ | 5 |
 | `CodexServiceTier` | ⛔ | 5 |
-| `CommandExecutionDetails` | ⛔ | 3 |
 | `GitActionModels` | ⛔ | 4 |
 | `AIChangeSetModels` | ⛔ | 4 |
 | `ContextWindowUsage` | ⛔ | 4 |
 | `PetCompanionModels` | ⛔ | 7 |
-| `CodexMessageOrderCounter` | ⛔ | 2 |
 | `AppFont` | n/a | use system fonts |
 | `CodexReasoningEffortOption` | ⛔ | 2 |
 
@@ -95,8 +97,9 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | iOS area | Web component | Status |
 | --- | --- | --- |
 | Onboarding / pairing | `components/pairing/PairingScreen.tsx` | 🟡 (paste only — no camera scan) |
-| Sidebar | `components/sidebar/Sidebar.tsx` | 🟡 (list + select) |
-| Home (chat) | `components/chat/ChatView.tsx` + `TurnRow.tsx` + `Composer.tsx` | 🟡 |
+| Sidebar | `components/sidebar/Sidebar.tsx` | ✅ (live/archived tabs, cwd hint, selection) |
+| Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
+| Markdown | `components/chat/MarkdownContent.tsx` | 🟡 (fenced code, inline code, bold/italic; tables/lists/syntax highlighting in 5) |
 | Settings | ⛔ | 5 |
 | About | ⛔ | 5 |
 | Pet | ⛔ | 7 |

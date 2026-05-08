@@ -1,136 +1,135 @@
-// Threads + active turn state. Faithful port of the slice of CodexService that the
-// minimum viable web client needs: list threads, open a thread, send a turn, stream
-// assistant deltas, stop a turn. Not a full port — see PARITY.md for what's missing.
+// Thread + chat coordinator. Owns one ThreadReducerState per thread and routes
+// inbound JSON-RPC notifications into the pure reducer. Persistence to IndexedDB
+// is debounced per thread so high-frequency streaming deltas don't thrash disk.
+//
+// This file is the only consumer of the protocol layer — UI components subscribe
+// to slices via zustand selectors and never see Connection/JsonRpcClient.
 
 import { create } from "zustand";
-import type { Connection } from "../protocol";
 import { makeLogger } from "../lib/log";
+import {
+  type CodexMessage,
+  type CodexThread,
+  type ContextWindowUsage,
+  extractContextWindowUsage,
+  orderCounter,
+} from "../models";
+import type { Connection } from "../protocol";
+import { fetchThreadTurnsPage } from "./pagination";
+import { runPostHandshakeBootstrap, type ModelOption } from "./sync";
+import {
+  applyAgentDelta,
+  applyItemCompleted,
+  applyItemOutputDelta,
+  applyItemStarted,
+  applyLocalUserMessage,
+  applyReasoningDelta,
+  applyTurnCompleted,
+  applyTurnFailed,
+  applyTurnStarted,
+  emptyThreadState,
+  type ThreadReducerState,
+} from "./turn-reducer";
+import { messagesStore } from "../storage/messages-store";
 
 const log = makeLogger("threads");
+const PERSIST_DEBOUNCE_MS = 250;
 
-export interface ThreadSummary {
-  id: string;
-  title: string;
-  updatedAt?: number;
-}
-
-export type AssistantStreamRow =
-  | { kind: "user"; itemId: string; text: string }
-  | { kind: "assistant"; itemId: string; text: string }
-  | { kind: "reasoning"; itemId: string; text: string }
-  | { kind: "tool"; itemId: string; name: string; status: "started" | "completed" | "failed"; details?: string };
-
-export interface ActiveTurn {
-  threadId: string;
-  turnId: string | null;
-  rows: AssistantStreamRow[];
-  status: "running" | "completed" | "failed";
-}
-
-interface ThreadsState {
-  threads: ThreadSummary[];
+export interface ThreadsState {
+  threads: CodexThread[];
+  archivedThreads: CodexThread[];
+  models: ModelOption[];
   selectedThreadId: string | null;
-  activeTurn: ActiveTurn | null;
+  reducerStates: Record<string, ThreadReducerState>;
+  contextUsageByThread: Record<string, ContextWindowUsage>;
   loading: boolean;
   error: string | null;
-  bindToConnection(connection: Connection): void;
-  refreshThreads(): Promise<void>;
+  hydrated: boolean;
+
+  bindToConnection(connection: Connection): Promise<void>;
+  hydrateFromDisk(): Promise<void>;
   selectThread(threadId: string): Promise<void>;
+  loadOlderTurns(threadId: string): Promise<void>;
   sendTurn(threadId: string, content: string): Promise<void>;
   stopTurn(): Promise<void>;
+  reset(): void;
 }
 
 let activeConnection: Connection | null = null;
 const teardownHandlers: Array<() => void> = [];
+const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const useThreadsStore = create<ThreadsState>((set, get) => ({
   threads: [],
+  archivedThreads: [],
+  models: [],
   selectedThreadId: null,
-  activeTurn: null,
+  reducerStates: {},
+  contextUsageByThread: {},
   loading: false,
   error: null,
+  hydrated: false,
 
-  bindToConnection(connection) {
-    while (teardownHandlers.length) teardownHandlers.pop()?.();
-    activeConnection = connection;
-    teardownHandlers.push(
-      connection.rpc.onNotification("turn/started", (params) => {
-        const p = params as { threadId?: string; turnId?: string };
-        if (!p?.threadId) return;
-        set({
-          activeTurn: {
-            threadId: p.threadId,
-            turnId: p.turnId ?? null,
-            rows: get().activeTurn?.threadId === p.threadId ? get().activeTurn?.rows ?? [] : [],
-            status: "running",
-          },
-        });
-      })
-    );
-    teardownHandlers.push(
-      connection.rpc.onNotification("turn/completed", () => {
-        const turn = get().activeTurn;
-        if (!turn) return;
-        set({ activeTurn: { ...turn, status: "completed" } });
-      })
-    );
-    teardownHandlers.push(
-      connection.rpc.onNotification("turn/failed", (params) => {
-        const turn = get().activeTurn;
-        const message = (params as { error?: string })?.error ?? "Turn failed";
-        if (turn) set({ activeTurn: { ...turn, status: "failed" } });
-        set({ error: message });
-      })
-    );
-    teardownHandlers.push(connection.rpc.onNotification("item/started", (params) => mergeItem(params, "started", set, get)));
-    teardownHandlers.push(connection.rpc.onNotification("item/updated", (params) => mergeItem(params, "updated", set, get)));
-    teardownHandlers.push(connection.rpc.onNotification("item/completed", (params) => mergeItem(params, "completed", set, get)));
-
-    void get().refreshThreads();
+  async hydrateFromDisk() {
+    if (get().hydrated) return;
+    const max = await messagesStore.loadHighestOrderIndex();
+    orderCounter.seedFrom(max);
+    set({ hydrated: true });
   },
 
-  async refreshThreads() {
-    if (!activeConnection?.rpc) return;
+  async bindToConnection(connection) {
+    while (teardownHandlers.length) teardownHandlers.pop()?.();
+    activeConnection = connection;
+    registerNotificationHandlers(connection, set, get);
     set({ loading: true, error: null });
     try {
-      const result = await activeConnection.rpc.request<{ data?: ThreadSummary[]; threads?: ThreadSummary[] }>("thread/list", {
-        limit: 100,
+      const snapshot = await runPostHandshakeBootstrap({
+        rpc: connection.rpc,
+        clientInfo: { name: "agnt-web", title: "agnt browser client", version: "0.0.1" },
       });
-      const list = result.data ?? result.threads ?? [];
-      set({ threads: list, loading: false });
+      set({
+        threads: snapshot.threads,
+        archivedThreads: snapshot.archivedThreads,
+        models: snapshot.models,
+        loading: false,
+      });
     } catch (error) {
-      log.warn("thread/list failed", error);
-      set({ error: (error as Error).message, loading: false });
+      log.warn("bootstrap failed", error);
+      set({ loading: false, error: (error as Error).message });
     }
   },
 
   async selectThread(threadId) {
+    set({ selectedThreadId: threadId });
+    // Hydrate from disk first so the timeline paints instantly.
+    const cached = await messagesStore.load(threadId);
+    if (cached.length > 0) {
+      mutateReducer(threadId, set, get, (state) => ({ ...state, messages: cached }));
+    }
+    await messagesStore.registerThread(threadId);
+    await get().loadOlderTurns(threadId);
+  },
+
+  async loadOlderTurns(threadId) {
     if (!activeConnection?.rpc) return;
-    set({ selectedThreadId: threadId, activeTurn: { threadId, turnId: null, rows: [], status: "completed" } });
     try {
-      const result = await activeConnection.rpc.request<{ turns?: Array<{ id: string; rows?: AssistantStreamRow[] }> }>(
-        "thread/read",
-        { threadId, includeTurns: true }
-      );
-      const rows = (result.turns ?? []).flatMap((turn) => turn.rows ?? []);
-      set({ activeTurn: { threadId, turnId: null, rows, status: "completed" } });
+      const page = await fetchThreadTurnsPage({ rpc: activeConnection.rpc, threadId, limit: 20 });
+      // The bridge returns turns containing items; we hydrate visible rows by
+      // replaying item/started + item/completed events through the reducer so
+      // the same state-machine that handles live streaming also handles history.
+      const events = flattenTurnsToEvents(page.turns, threadId);
+      mutateReducer(threadId, set, get, (state) => events.reduce(applyHistoryEvent, state));
+      schedulePersist(threadId, get);
     } catch (error) {
-      log.warn("thread/read failed", error);
+      log.warn("loadOlderTurns failed", error);
       set({ error: (error as Error).message });
     }
   },
 
   async sendTurn(threadId, content) {
     if (!activeConnection?.rpc) return;
-    const turn = get().activeTurn ?? { threadId, turnId: null, rows: [], status: "running" as const };
-    set({
-      activeTurn: {
-        ...turn,
-        threadId,
-        rows: [...turn.rows, { kind: "user", itemId: `local-${Date.now()}`, text: content }],
-        status: "running",
-      },
-    });
+    mutateReducer(threadId, set, get, (state) => applyLocalUserMessage(state, threadId, content));
+    schedulePersist(threadId, get);
     try {
       await activeConnection.rpc.request("turn/start", { threadId, content });
     } catch (error) {
@@ -139,68 +138,250 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   },
 
   async stopTurn() {
-    const turn = get().activeTurn;
-    if (!turn?.turnId || !activeConnection?.rpc) return;
+    const threadId = get().selectedThreadId;
+    if (!threadId || !activeConnection?.rpc) return;
+    const reducerState = get().reducerStates[threadId];
+    const turnId = reducerState?.activeTurnId;
+    if (!turnId) return;
     try {
-      await activeConnection.rpc.request("turn/interrupt", { threadId: turn.threadId, turnId: turn.turnId });
+      await activeConnection.rpc.request("turn/interrupt", { threadId, turnId });
     } catch (error) {
       log.warn("turn/interrupt failed", error);
     }
   },
+
+  reset() {
+    while (teardownHandlers.length) teardownHandlers.pop()?.();
+    activeConnection = null;
+    set({
+      threads: [],
+      archivedThreads: [],
+      models: [],
+      selectedThreadId: null,
+      reducerStates: {},
+      contextUsageByThread: {},
+      loading: false,
+      error: null,
+    });
+  },
 }));
 
-function mergeItem(
-  params: unknown,
-  phase: "started" | "updated" | "completed",
+// ─── Notification routing ─────────────────────────────────────────────────────
+
+function registerNotificationHandlers(
+  connection: Connection,
   set: (partial: Partial<ThreadsState>) => void,
   get: () => ThreadsState
 ): void {
-  const turn = get().activeTurn;
-  if (!turn) return;
-  const p = params as { itemId?: string; type?: string; text?: string; reasoning?: string; toolName?: string; status?: string };
-  if (!p?.itemId) return;
+  // Lifecycle.
+  on(connection, "turn/started", (params) => withTurnEvent(params, (event) => mutateReducer(event.threadId, set, get, (s) => applyTurnStarted(s, event))));
+  on(connection, "turn/completed", (params) => withTurnEvent(params, (event) => mutateReducer(event.threadId, set, get, (s) => applyTurnCompleted(s, event))));
+  on(connection, "turn/failed", (params) => withTurnEvent(params, (event) => {
+    const errorText = readString(params, "error", "message");
+    mutateReducer(event.threadId, set, get, (s) => applyTurnFailed(s, event, errorText));
+  }));
 
-  const existing = turn.rows.findIndex((row) => row.itemId === p.itemId);
-  let next = [...turn.rows];
+  // Streaming deltas.
+  on(connection, "item/agentMessage/delta", (params) =>
+    withTurnEvent(params, (event) => {
+      const delta = readString(params, "delta") ?? "";
+      const phase = readString(params, "phase");
+      mutateReducer(event.threadId, set, get, (s) =>
+        applyAgentDelta(s, { ...event, delta, assistantPhase: phase })
+      );
+      schedulePersist(event.threadId, get);
+    })
+  );
+  // Codex emits the same event under two legacy aliases; route both to the same handler.
+  on(connection, "codex/event/agent_message_delta", (params) =>
+    withTurnEvent(params, (event) => {
+      const delta = readString(params, "delta", "text") ?? "";
+      mutateReducer(event.threadId, set, get, (s) => applyAgentDelta(s, { ...event, delta }));
+      schedulePersist(event.threadId, get);
+    })
+  );
+  on(connection, "item/reasoning/textDelta", (params) =>
+    withTurnEvent(params, (event) => {
+      const delta = readString(params, "delta", "textDelta") ?? "";
+      mutateReducer(event.threadId, set, get, (s) => applyReasoningDelta(s, { ...event, delta }));
+      schedulePersist(event.threadId, get);
+    })
+  );
+  on(connection, "item/toolCall/outputDelta", (params) => routeOutputDelta(params, set, get));
+  on(connection, "item/commandExecution/outputDelta", (params) => routeOutputDelta(params, set, get));
+  on(connection, "item/fileChange/outputDelta", (params) => routeOutputDelta(params, set, get));
 
-  const row = buildRow(p, phase);
-  if (!row) return;
+  // Item lifecycle.
+  on(connection, "item/started", (params) => {
+    withTurnEvent(params, (event) => {
+      const type = readString(params, "type");
+      const role = readString(params, "role");
+      const phase = readString(params, "phase");
+      mutateReducer(event.threadId, set, get, (s) => applyItemStarted(s, { ...event, type, role, assistantPhase: phase }));
+    });
+  });
+  on(connection, "item/completed", (params) => {
+    withTurnEvent(params, (event) => {
+      const type = readString(params, "type");
+      const text = readString(params, "text", "message");
+      mutateReducer(event.threadId, set, get, (s) => applyItemCompleted(s, { ...event, type, text }));
+      schedulePersist(event.threadId, get);
+    });
+  });
 
-  if (existing >= 0) next[existing] = mergeRows(next[existing], row);
-  else next = [...next, row];
-
-  set({ activeTurn: { ...turn, rows: next } });
+  // Threads metadata.
+  on(connection, "thread/started", (params) => {
+    const threadId = readString(params, "threadId");
+    if (!threadId) return;
+    set({});  // touch for selector recomputation; refreshThreads pulls full data on next sync tick
+  });
+  on(connection, "thread/tokenUsage/updated", (params) => {
+    const threadId = readString(params, "threadId");
+    if (!threadId) return;
+    const usage = extractContextWindowUsage(params);
+    if (!usage) return;
+    set({ contextUsageByThread: { ...get().contextUsageByThread, [threadId]: usage } });
+  });
 }
 
-function buildRow(
-  p: { itemId?: string; type?: string; text?: string; reasoning?: string; toolName?: string; status?: string },
-  phase: "started" | "updated" | "completed"
-): AssistantStreamRow | null {
-  if (!p.itemId) return null;
-  if (typeof p.text === "string" && p.text.length > 0) return { kind: "assistant", itemId: p.itemId, text: p.text };
-  if (typeof p.reasoning === "string" && p.reasoning.length > 0) return { kind: "reasoning", itemId: p.itemId, text: p.reasoning };
-  if (p.toolName) {
-    return {
-      kind: "tool",
-      itemId: p.itemId,
-      name: p.toolName,
-      status: phase === "completed" ? "completed" : "started",
-      details: typeof p.status === "string" ? p.status : undefined,
-    };
-  }
-  return null;
+function on(connection: Connection, method: string, handler: (params: unknown) => void): void {
+  teardownHandlers.push(connection.rpc.onNotification(method, handler));
 }
 
-function mergeRows(existing: AssistantStreamRow, incoming: AssistantStreamRow): AssistantStreamRow {
-  if (existing.kind !== incoming.kind) return incoming;
-  if (existing.kind === "assistant" && incoming.kind === "assistant") {
-    return { ...existing, text: incoming.text };
+function routeOutputDelta(
+  params: unknown,
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState
+): void {
+  withTurnEvent(params, (event) => {
+    const delta = readString(params, "delta", "textDelta") ?? "";
+    if (!delta) return;
+    mutateReducer(event.threadId, set, get, (s) => applyItemOutputDelta(s, { ...event, delta }));
+    schedulePersist(event.threadId, get);
+  });
+}
+
+// ─── Reducer plumbing ─────────────────────────────────────────────────────────
+
+function mutateReducer(
+  threadId: string,
+  set: (partial: Partial<ThreadsState>) => void,
+  get: () => ThreadsState,
+  mutator: (state: ThreadReducerState) => ThreadReducerState
+): void {
+  const existing = get().reducerStates[threadId] ?? emptyThreadState();
+  const next = mutator(existing);
+  if (next === existing) return;
+  set({ reducerStates: { ...get().reducerStates, [threadId]: next } });
+}
+
+function schedulePersist(threadId: string, get: () => ThreadsState): void {
+  if (typeof window === "undefined") return; // tests run in node
+  const existingTimer = persistTimers.get(threadId);
+  if (existingTimer) clearTimeout(existingTimer);
+  persistTimers.set(
+    threadId,
+    setTimeout(() => {
+      persistTimers.delete(threadId);
+      const messages = get().reducerStates[threadId]?.messages ?? [];
+      void messagesStore.save(threadId, messages);
+      void messagesStore.registerThread(threadId);
+    }, PERSIST_DEBOUNCE_MS)
+  );
+}
+
+// ─── Param decoding helpers ───────────────────────────────────────────────────
+
+interface TurnEventBase {
+  threadId: string;
+  turnId?: string;
+  itemId?: string;
+}
+
+function withTurnEvent(params: unknown, run: (event: TurnEventBase) => void): void {
+  const threadId = readString(params, "threadId");
+  if (!threadId) return;
+  const turnId = readString(params, "turnId");
+  const itemId = readString(params, "itemId");
+  run({ threadId, turnId, itemId });
+}
+
+function readString(params: unknown, ...keys: string[]): string | undefined {
+  if (!params || typeof params !== "object") return undefined;
+  for (const key of keys) {
+    const value = (params as Record<string, unknown>)[key];
+    if (typeof value === "string" && value.trim()) return value;
   }
-  if (existing.kind === "reasoning" && incoming.kind === "reasoning") {
-    return { ...existing, text: incoming.text };
+  return undefined;
+}
+
+// ─── History → reducer-event adapter ──────────────────────────────────────────
+//
+// thread/turns/list returns whole turns. We replay them through the same reducer
+// the live-streaming path uses by emitting synthetic item/started + item/completed
+// events. This guarantees the on-disk timeline shape is identical to what's
+// rendered live — there is no separate "history merge" code path to keep in sync.
+
+interface SyntheticEvent {
+  kind: "started" | "completed";
+  params: Record<string, unknown>;
+}
+
+function flattenTurnsToEvents(turns: unknown[], threadId: string): SyntheticEvent[] {
+  const events: SyntheticEvent[] = [];
+  // Bridge sends turns newest-first; replay them oldest-first so orderIndex
+  // is monotonic. Items inside a turn keep their natural order.
+  const ordered = [...turns].reverse();
+  for (const turnUnknown of ordered) {
+    const turn = turnUnknown as Record<string, unknown>;
+    const turnId = (turn.id as string | undefined) ?? (turn.turnId as string | undefined);
+    const items = (turn.items as unknown[]) ?? (turn.events as unknown[]) ?? [];
+    for (const itemUnknown of items) {
+      const item = itemUnknown as Record<string, unknown>;
+      const baseParams: Record<string, unknown> = {
+        threadId,
+        turnId,
+        itemId: item.id ?? item.itemId,
+        type: item.type,
+        role: item.role,
+      };
+      events.push({ kind: "started", params: baseParams });
+      events.push({
+        kind: "completed",
+        params: { ...baseParams, text: item.text ?? item.message },
+      });
+    }
   }
-  if (existing.kind === "tool" && incoming.kind === "tool") {
-    return { ...existing, ...incoming };
+  return events;
+}
+
+function applyHistoryEvent(state: ThreadReducerState, event: SyntheticEvent): ThreadReducerState {
+  const baseEvent = {
+    threadId: event.params.threadId as string,
+    turnId: event.params.turnId as string | undefined,
+    itemId: event.params.itemId as string | undefined,
+  };
+  if (event.kind === "started") {
+    return applyItemStarted(state, {
+      ...baseEvent,
+      type: event.params.type as string | undefined,
+      role: event.params.role as string | undefined,
+    });
   }
-  return incoming;
+  return applyItemCompleted(state, {
+    ...baseEvent,
+    type: event.params.type as string | undefined,
+    text: event.params.text as string | undefined,
+  });
+}
+
+// Public read selector: get the (sorted) message list for the currently-selected thread.
+export function selectActiveMessages(state: ThreadsState): CodexMessage[] {
+  if (!state.selectedThreadId) return [];
+  return state.reducerStates[state.selectedThreadId]?.messages ?? [];
+}
+
+export function selectActiveTurnRunning(state: ThreadsState): boolean {
+  if (!state.selectedThreadId) return false;
+  return Boolean(state.reducerStates[state.selectedThreadId]?.activeTurnId);
 }

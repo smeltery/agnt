@@ -13,14 +13,15 @@ later session because the protocol and storage layers are already complete.
 - Cross-checked vitest suite for crypto and pairing parser
 - Deployment notes for VPS / Tailscale / nginx
 
-## Session 2 — Chat fidelity & sync
+## Session 2 — Chat fidelity & sync ✅ DONE
 
-- Post-connect sync: model list, skills, archived/active thread split, plugin list
-- Item-scoped reconciliation for streamed deltas (no flattening; matches `IncomingAssistant`)
-- Reasoning + tool-call rendering with collapse/expand, code-block syntax highlight
-- Pagination for long threads (`thread/turns/list` cursor)
-- IndexedDB-backed message cache so reconnects render instantly
-- `AssistantReplayDeduper` port
+- ✅ Post-connect sync: `initialize`, `model/list`, `thread/list` archived split
+- ✅ Item-scoped reconciliation (faithful port of iOS `appendAssistantDelta` + `applyLateTerminalAssistantDelta` + `completeAssistantMessage`)
+- ✅ Reasoning + tool-call + command-execution + file-change rendering with collapse/expand
+- ✅ Pagination for long threads (`thread/turns/list` cursor walker)
+- ✅ IndexedDB-backed message cache (debounced, per-thread)
+- ✅ `AssistantReplayDeduper` port (exact + block replay)
+- 🟡 Code-block syntax highlighting deferred to Session 5 — fenced code renders as monospace, language tag exposed via CSS class so a highlighter can drop in without touching components
 
 ## Session 3 — Approvals & plan mode
 

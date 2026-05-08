@@ -1,40 +1,53 @@
-import { useEffect, useRef, useState } from "react";
-import { useThreadsStore } from "../../state/threads-store";
-import { TurnRow } from "./TurnRow";
+import { useEffect, useRef } from "react";
+import { fractionUsed } from "../../models";
+import {
+  selectActiveMessages,
+  selectActiveTurnRunning,
+  useThreadsStore,
+} from "../../state/threads-store";
 import { Composer } from "./Composer";
+import { MessageRow } from "./rows";
 
 export function ChatView() {
   const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
-  const activeTurn = useThreadsStore((state) => state.activeTurn);
+  const messages = useThreadsStore(selectActiveMessages);
+  const running = useThreadsStore(selectActiveTurnRunning);
   const sendTurn = useThreadsStore((state) => state.sendTurn);
   const stopTurn = useThreadsStore((state) => state.stopTurn);
   const error = useThreadsStore((state) => state.error);
+  const usage = useThreadsStore((state) =>
+    selectedThreadId ? state.contextUsageByThread[selectedThreadId] : undefined
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [draftThreadId] = useState(() => `draft-${crypto.randomUUID()}`);
-
-  const threadId = selectedThreadId ?? draftThreadId;
-  const rows = activeTurn?.rows ?? [];
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [rows.length]);
+  }, [messages.length, running]);
 
   return (
     <main className="agnt-chat">
+      {usage && (
+        <div className="agnt-context-bar" title={`${usage.tokensUsed.toLocaleString()} / ${usage.tokenLimit.toLocaleString()} tokens used`}>
+          <div className="agnt-context-bar-fill" style={{ width: `${(fractionUsed(usage) * 100).toFixed(0)}%` }} />
+        </div>
+      )}
       <div className="agnt-chat-scroll" ref={scrollRef}>
-        {rows.length === 0 ? (
+        {messages.length === 0 ? (
           <div className="agnt-chat-empty">
-            <h2>Start a turn</h2>
-            <p>Type something below. The bridge will route it to your selected provider's CLI.</p>
+            <h2>{selectedThreadId ? "No messages yet" : "Pick a thread or start a turn"}</h2>
+            <p>Type below to send a turn to the bridge's active provider.</p>
           </div>
         ) : (
-          rows.map((row) => <TurnRow key={row.itemId} row={row} />)
+          messages.map((message) => <MessageRow key={message.id} message={message} />)
         )}
         {error && <div className="agnt-chat-error">{error}</div>}
       </div>
       <Composer
-        running={activeTurn?.status === "running"}
-        onSend={(text) => void sendTurn(threadId, text)}
+        running={running}
+        onSend={(text) => {
+          if (!selectedThreadId) return;
+          void sendTurn(selectedThreadId, text);
+        }}
         onStop={() => void stopTurn()}
       />
     </main>

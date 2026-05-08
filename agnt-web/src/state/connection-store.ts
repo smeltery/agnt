@@ -104,7 +104,7 @@ async function connect(
     onStatus(status) {
       set({ status });
       if (status.kind === "open") {
-        useThreadsStore.getState().bindToConnection(connection);
+        void useThreadsStore.getState().bindToConnection(connection);
         if (handshakeMode === "qr_bootstrap") {
           void pairingStore.saveRelayPairing({ ...saved, shouldForceQrBootstrap: false });
           void pairingStore.upsertTrustedMac({
