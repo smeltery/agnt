@@ -55,6 +55,10 @@ function renderBlock(block: MarkdownBlock): ReactNode {
       );
     case "table":
       return renderTable(block);
+    case "blockquote":
+      return <blockquote className="agnt-md-blockquote">{renderInlineFragments(block.text)}</blockquote>;
+    case "horizontal":
+      return <hr className="agnt-md-hr" />;
     case "paragraph":
       return <p className="agnt-md-paragraph">{renderInlineFragments(block.text)}</p>;
   }

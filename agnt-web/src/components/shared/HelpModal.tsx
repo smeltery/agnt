@@ -23,6 +23,7 @@ const SECTIONS: Array<{
     heading: "Composer",
     rows: [
       { keys: ["⌘ / Ctrl", "Enter"], description: "Send the turn" },
+      { keys: ["/"], description: "Open the slash command menu (compact / fork / archive / stop / …)" },
       { keys: ["↑"], description: "Recall the previous prompt (when draft is empty)" },
       { keys: ["↓"], description: "Step forward through recalled prompts" },
       { keys: ["Esc"], description: "Cancel recall and restore your in-progress draft" },

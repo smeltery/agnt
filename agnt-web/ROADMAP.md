@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 17 — Slash commands + blockquotes + horizontal rules ✅ DONE
+
+- ✅ Composer slash menu — typing `/` at the start of an empty draft opens a filtered palette (`/compact`, `/fork`, `/archive`, `/unarchive`, `/stop` — `canRun()` per command hides ones that don't apply, e.g. `/unarchive` only shows on archived threads, `/stop` only on a running turn). ↑/↓ navigate, Enter runs the highlighted command, Tab autocompletes the name, Esc dismisses. The form's submit also routes to the slash runner so Enter in the textarea fires the command instead of shipping the literal `/foo` to the bridge.
+- ✅ Markdown blockquotes — collapse consecutive `>`-prefixed lines into a single `<blockquote>` so the renderer can run the standard inline tokenizer over it (links / bold / italic still work inside).
+- ✅ Markdown horizontal rules — `---`, `***`, `___` (3+ matching characters) on their own line render as `<hr>`. Excluded from the paragraph fall-through so they don't get swallowed.
+
 ## Session 16 — Markdown links/images, composer history, lightbox nav ✅ DONE
 
 - ✅ Markdown links `[text](url)` and images `![alt](url)` rendered with a strict scheme allowlist (`https?:`, `mailto:`, `#anchor` for links; `https?:`, `data:image/*` for images). `javascript:` / `file:` schemes are refused — the original markdown text falls through unchanged.

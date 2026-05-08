@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { attachmentFromFile, ImageAttachError } from "../../lib/image-attach";
 import { attachmentFromTextFile, looksLikeTextFile, TextAttachError } from "../../lib/text-attach";
 import type { ImageAttachment } from "../../models";
+import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
 import { useVoiceStore } from "../../state/voice-store";
 import { VoiceButton } from "./VoiceButton";
@@ -59,6 +60,43 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     draftBeforeRecallRef.current = "";
   }, [selectedThreadId]);
 
+  // Slash-menu surface. Matches when the draft starts with "/" and contains
+  // no whitespace yet — that's the typing window we own. Once the user adds
+  // a space the draft is just a normal prompt that happens to start with a
+  // slash, which we intentionally do NOT intercept.
+  const slashQuery = useMemo(() => {
+    if (!draft.startsWith("/")) return null;
+    if (/\s/.test(draft)) return null;
+    return draft.slice(1);
+  }, [draft]);
+  // We need the snapshot at run-time, not on every render; subscribing the
+  // whole component to threads-store would re-render on every streaming
+  // delta. Instead grab the snapshot lazily inside the action handler.
+  const slashMatches = useMemo(() => {
+    if (slashQuery === null) return [];
+    return filterSlashCommands(slashQuery, {
+      threadId: selectedThreadId ?? "",
+      threads: useThreadsStore.getState(),
+    });
+    // The match list only depends on the typed query + which thread is
+    // selected. canRun() is queried again at run time so a thread switch
+    // mid-typing still picks the right command.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slashQuery, selectedThreadId]);
+  const [slashCursor, setSlashCursor] = useState(0);
+  // Reset the highlight cursor any time the visible match list changes.
+  useEffect(() => {
+    setSlashCursor(0);
+  }, [slashMatches.length]);
+
+  function runSlashCommand(command: SlashCommand) {
+    setDraft("");
+    setHistoryCursor(-1);
+    draftBeforeRecallRef.current = "";
+    setSlashCursor(0);
+    void command.run({ threadId: selectedThreadId ?? "", threads: useThreadsStore.getState() });
+  }
+
   // Cursor semantics: -1 = not recalling; 0 = most recent prompt; N-1 =
   // oldest prompt. Up (older) increments; Down (newer) decrements past 0
   // back to -1 which restores the in-progress draft we stashed on entry.
@@ -89,6 +127,12 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   }
 
   function submit() {
+    // Slash menu owns the draft when it's visible; the form's submit must
+    // not strip the leading slash and ship the command name to the bridge.
+    if (slashQuery !== null && slashMatches.length > 0) {
+      runSlashCommand(slashMatches[Math.min(slashCursor, slashMatches.length - 1)]);
+      return;
+    }
     const text = draft.trim();
     if (!text && attachments.length === 0) return;
     if (running) return;
@@ -106,6 +150,39 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Slash menu wins over every other shortcut when it's visible — Enter
+    // runs the highlighted command, ↑/↓ moves the cursor, Esc dismisses the
+    // menu (without resetting any other state).
+    if (slashQuery !== null && slashMatches.length > 0) {
+      if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        runSlashCommand(slashMatches[Math.min(slashCursor, slashMatches.length - 1)]);
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setSlashCursor((current) => (current + 1) % slashMatches.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setSlashCursor((current) => (current - 1 + slashMatches.length) % slashMatches.length);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDraft("");
+        return;
+      }
+      if (event.key === "Tab" && !event.shiftKey) {
+        // Tab autocompletes to the highlighted command's name so users can
+        // see what they're about to run before committing with Enter.
+        event.preventDefault();
+        const completion = slashMatches[Math.min(slashCursor, slashMatches.length - 1)];
+        setDraft(`/${completion.name}`);
+        return;
+      }
+    }
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       submit();
@@ -245,6 +322,31 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         </div>
       )}
       {attachError && <div className="agnt-composer-attach-error">{attachError}</div>}
+      {slashQuery !== null && slashMatches.length > 0 && (
+        <div className="agnt-slash-menu" role="listbox" aria-label="Slash commands">
+          {slashMatches.map((command, index) => (
+            <button
+              key={command.name}
+              type="button"
+              role="option"
+              aria-selected={index === slashCursor}
+              className={"agnt-slash-item" + (index === slashCursor ? " agnt-slash-item-active" : "")}
+              // onMouseDown beats the textarea's onBlur — clicking should run
+              // the command, not steal focus mid-cycle.
+              onMouseDown={(event) => {
+                event.preventDefault();
+                runSlashCommand(command);
+              }}
+            >
+              <code className="agnt-slash-item-name">/{command.name}</code>
+              <span className="agnt-slash-item-description">{command.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {slashQuery !== null && slashMatches.length === 0 && (
+        <div className="agnt-slash-empty">No matching commands. Press Esc to dismiss or keep typing.</div>
+      )}
       <textarea
         id="agnt-composer-input"
         className="agnt-composer-input"
@@ -252,7 +354,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        placeholder="Send a turn… (⌘/Ctrl+Enter; paste or drop images and text files)"
+        placeholder="Send a turn… (⌘/Ctrl+Enter; / for commands; paste or drop images and text files)"
         rows={3}
         spellCheck={false}
       />

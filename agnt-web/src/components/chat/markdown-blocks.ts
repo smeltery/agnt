@@ -8,11 +8,13 @@
 //   - listOrdered 1. item / 2. item / …
 //   - listBullet  - item / * item
 //   - table       | h1 | h2 |\n|---|---|\n| a | b |
+//   - blockquote  > line (each `>`-prefixed line collapses into one block)
+//   - horizontal  --- on its own line (or *** / ___)
 //   - paragraph   anything else
 //
-// We deliberately do NOT recognize blockquotes, horizontal rules, link
-// references, footnotes, or HTML inline tags — the bridge doesn't emit those
-// and shipping a full CommonMark parser would balloon the bundle.
+// We deliberately do NOT recognize link references, footnotes, or HTML
+// inline tags — the bridge doesn't emit those and shipping a full
+// CommonMark parser would balloon the bundle.
 
 export type MarkdownBlock =
   | { kind: "fence"; language: string | null; body: string }
@@ -20,6 +22,8 @@ export type MarkdownBlock =
   | { kind: "listOrdered"; items: string[]; start: number }
   | { kind: "listBullet"; items: string[] }
   | { kind: "table"; header: string[]; rows: string[][]; alignments: Array<"left" | "right" | "center" | null> }
+  | { kind: "blockquote"; text: string }
+  | { kind: "horizontal" }
   | { kind: "paragraph"; text: string };
 
 const FENCE_OPEN = /^```(\w+)?\s*$/;
@@ -29,6 +33,12 @@ const ORDERED_ITEM = /^(\s*)(\d+)[.)]\s+(.+)$/;
 const BULLET_ITEM = /^(\s*)[-*+]\s+(.+)$/;
 const TABLE_DIVIDER = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const BLOCKQUOTE = /^\s*>\s?(.*)$/;
+// Three-or-more contiguous dashes/asterisks/underscores on a line by themselves.
+// We don't allow mixing the three because mid-paragraph emphasis like
+// `*** something ***` shouldn't accidentally match. Table dividers don't reach
+// this line because they always contain `|` and TABLE_ROW catches them first.
+const HORIZONTAL_RULE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
 
 export function lexMarkdownBlocks(source: string): MarkdownBlock[] {
   const lines = source.split("\n");
@@ -108,6 +118,29 @@ export function lexMarkdownBlocks(source: string): MarkdownBlock[] {
       continue;
     }
 
+    // Horizontal rule must be checked before blockquote/paragraph because
+    // an `*` HR could otherwise look like a malformed bullet list.
+    if (HORIZONTAL_RULE.test(line)) {
+      blocks.push({ kind: "horizontal" });
+      cursor += 1;
+      continue;
+    }
+
+    // Blockquotes collapse consecutive `>`-prefixed lines into one block.
+    // We strip the leading `>` (and one optional space) from each line so
+    // the renderer can run the normal paragraph inline tokenizer over the
+    // result — bold/italic/links inside a quote should still work.
+    if (BLOCKQUOTE.test(line)) {
+      const quoteLines: string[] = [BLOCKQUOTE.exec(line)![1]];
+      cursor += 1;
+      while (cursor < lines.length && BLOCKQUOTE.test(lines[cursor])) {
+        quoteLines.push(BLOCKQUOTE.exec(lines[cursor])![1]);
+        cursor += 1;
+      }
+      blocks.push({ kind: "blockquote", text: quoteLines.join(" ").trim() });
+      continue;
+    }
+
     // Plain paragraph — accumulate consecutive non-empty, non-block lines.
     const paragraphLines: string[] = [line];
     cursor += 1;
@@ -118,6 +151,8 @@ export function lexMarkdownBlocks(source: string): MarkdownBlock[] {
       !HEADING.test(lines[cursor]) &&
       !ORDERED_ITEM.test(lines[cursor]) &&
       !BULLET_ITEM.test(lines[cursor]) &&
+      !HORIZONTAL_RULE.test(lines[cursor]) &&
+      !BLOCKQUOTE.test(lines[cursor]) &&
       !(TABLE_ROW.test(lines[cursor]) && cursor + 1 < lines.length && TABLE_DIVIDER.test(lines[cursor + 1]))
     ) {
       paragraphLines.push(lines[cursor]);

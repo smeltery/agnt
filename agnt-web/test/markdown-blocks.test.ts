@@ -86,4 +86,37 @@ describe("lexMarkdownBlocks", () => {
       { kind: "fence", language: null, body: "## not a heading\n- not a bullet" },
     ]);
   });
+
+  it("collapses consecutive `>`-prefixed lines into one blockquote", () => {
+    const source = "> first line\n> second line\n\nfollow-up";
+    expect(lexMarkdownBlocks(source)).toEqual([
+      { kind: "blockquote", text: "first line second line" },
+      { kind: "paragraph", text: "follow-up" },
+    ]);
+  });
+
+  it("strips `>` and exactly one optional space — preserves further indentation", () => {
+    expect(lexMarkdownBlocks("> hi\n>nospace")).toEqual([
+      { kind: "blockquote", text: "hi nospace" },
+    ]);
+  });
+
+  it("recognizes --- / *** / ___ as horizontal rules", () => {
+    expect(lexMarkdownBlocks("---")).toEqual([{ kind: "horizontal" }]);
+    expect(lexMarkdownBlocks("***")).toEqual([{ kind: "horizontal" }]);
+    expect(lexMarkdownBlocks("___")).toEqual([{ kind: "horizontal" }]);
+    // Mixed runs should NOT match.
+    expect(lexMarkdownBlocks("--*")).toEqual([{ kind: "paragraph", text: "--*" }]);
+  });
+
+  it("doesn't confuse a one-line table-divider with a horizontal rule (table needs the header row first)", () => {
+    expect(lexMarkdownBlocks("---|---")).toEqual([{ kind: "paragraph", text: "---|---" }]);
+  });
+
+  it("blockquote terminator stops at a blank line, not at any other block kind", () => {
+    expect(lexMarkdownBlocks("> q\n# heading after quote")).toEqual([
+      { kind: "blockquote", text: "q" },
+      { kind: "heading", level: 1, text: "heading after quote" },
+    ]);
+  });
 });
