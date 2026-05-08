@@ -148,10 +148,46 @@ button {
 }
 .agnt-brand { font-weight: 700; letter-spacing: 0.5px; }
 .agnt-workspace-actions { margin-left: auto; display: flex; gap: 8px; }
-.agnt-workspace-body { display: grid; grid-template-columns: 280px 1fr; flex: 1; min-height: 0; }
+.agnt-workspace-body { display: grid; grid-template-columns: 280px 1fr; flex: 1; min-height: 0; position: relative; }
+.agnt-workspace-menu { display: none; }
+.agnt-sidebar-backdrop { display: none; }
 @media (max-width: 768px) {
+  /* On narrow viewports the sidebar becomes an overlay drawer pinned to the
+     left so the chat column gets the full width. The hamburger button in the
+     workspace header drives `agnt-sidebar-open`; tapping the backdrop or
+     selecting a thread closes it. */
   .agnt-workspace-body { grid-template-columns: 1fr; }
-  .agnt-sidebar { display: none; }
+  .agnt-workspace-menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--agnt-border);
+    color: var(--agnt-fg);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    margin-right: 4px;
+    cursor: pointer;
+  }
+  .agnt-workspace-menu:hover { background: var(--agnt-bg-elev-2); }
+  .agnt-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(85vw, 320px);
+    z-index: 30;
+    transform: translateX(-100%);
+    transition: transform 160ms ease;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+  }
+  .agnt-sidebar-open .agnt-sidebar { transform: translateX(0); }
+  .agnt-sidebar-open .agnt-sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 20;
+  }
 }
 
 .agnt-sidebar {
@@ -1612,3 +1648,62 @@ button {
 .agnt-status-warn { color: var(--agnt-warn); border-color: var(--agnt-warn); }
 .agnt-status-error { color: var(--agnt-danger); border-color: var(--agnt-danger); }
 .agnt-status-idle { color: var(--agnt-fg-dim); }
+
+.agnt-sidebar-select-toggle {
+  background: transparent;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  color: var(--agnt-fg-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+.agnt-sidebar-select-toggle:hover {
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+}
+.agnt-sidebar-select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--agnt-border);
+  background: var(--agnt-bg-elev-2);
+  font-size: 12px;
+}
+.agnt-sidebar-select-count { color: var(--agnt-fg-dim); }
+.agnt-sidebar-select-actions { display: flex; gap: 4px; }
+.agnt-sidebar-select-actions .agnt-button-ghost { padding: 2px 8px; font-size: 11px; }
+.agnt-sidebar-select-actions .agnt-button-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.agnt-sidebar-row-checkbox {
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+}
+.agnt-sidebar-row-checked { background: rgba(80, 140, 255, 0.08); }
+
+.agnt-chat-header-throughput {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 999px;
+}
+.agnt-chat-header-throughput-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--agnt-accent);
+  animation: agnt-throughput-pulse 1.4s ease-in-out infinite;
+}
+@keyframes agnt-throughput-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}

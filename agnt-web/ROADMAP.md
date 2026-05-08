@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 22 — Responsive drawer + multi-select bulk actions + streaming throughput ✅ DONE
+
+- ✅ Narrow-viewport sidebar drawer. The 768 px breakpoint used to hide the sidebar entirely (which left no way to switch threads on iPad-via-Tailscale); it now slides out as an overlay drawer with a hamburger button in the workspace header. Selecting a thread or tapping the backdrop closes it. Wide viewports keep the existing two-column grid unchanged.
+- ✅ Multi-select bulk actions in the sidebar. A new "Select" button in the sidebar header flips rows into checkbox mode; the action bar runs Archive (live tab), Unarchive (archived tab), or Export across the chosen set. Bulk export concatenates all chosen threads into one Markdown file with per-thread headers and `---` separators (`exportThreadsToMarkdown` helper). j/k navigation auto-disables in select mode so muscle-memory archive can't fire by accident.
+- ✅ Streaming throughput indicator in the chat header. New `state/streaming-stats-store.ts` keeps a per-thread `{startedAtMs, charCount}` counter — `turn/started` resets, every assistant/reasoning delta increments, `turn/completed`/`turn/failed` clears. The `ChatHeader` shows `● 482 ch/s · 0:14` while streaming; ticks every 500 ms. Late deltas that arrive without a started entry are dropped (no phantom counters).
+
 ## Session 21 — Browser notifications + cross-thread palette + power-user shortcuts ✅ DONE
 
 - ✅ Browser desktop notifications on `turn/completed` and `turn/failed`. New `lib/notifications.ts` wraps the `Notification` API with permission gating, a Settings-side auto/on/off override (default `auto` = "on if granted"), and a per-thread `tag` so a chatty thread doesn't stack ten dock badges. Silent when the tab is focused — the inline UI is enough — and never auto-prompts; users opt in from Settings so we don't trip the browser's "this site wants to notify you" blocker. Combines with Session 20's title-flash so users notice completions whether or not they've granted permission.

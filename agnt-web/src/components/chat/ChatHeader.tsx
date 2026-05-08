@@ -1,8 +1,9 @@
 // Sticky header that surfaces the active thread's title + cwd, plus a toggle
 // for the git panel. Visible only when a thread is selected.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
+import { formatStreamingStats, useStreamingStatsStore } from "../../state/streaming-stats-store";
 import { selectActiveTurnRunning, useThreadsStore } from "../../state/threads-store";
 import { GitPanel } from "../git/GitPanel";
 
@@ -34,6 +35,7 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
           <span className="agnt-row-tag agnt-chat-header-provider">{thread.modelProvider}</span>
         )}
         <div className="agnt-chat-header-actions">
+          {running && <ThroughputPill threadId={selectedThreadId} />}
           {running && (
             // Header-level Stop mirrors the composer button so users who've
             // scrolled up to read history don't have to hunt for it.
@@ -58,5 +60,26 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
       </div>
       {showGit && <GitPanel threadId={selectedThreadId} rpc={rpc} />}
     </header>
+  );
+}
+
+// Re-renders every 500 ms while a turn is running so the elapsed counter ticks.
+// Only mounted when `running` is true, so the interval is naturally bounded.
+function ThroughputPill({ threadId }: { threadId: string }) {
+  const stats = useStreamingStatsStore((state) => state.byThread[threadId]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, []);
+  if (!stats) return null;
+  const { rate, elapsed } = formatStreamingStats(stats, now);
+  return (
+    <span
+      className="agnt-chat-header-throughput"
+      title="Streaming activity since this turn started — characters per second is a rough proxy for throughput."
+    >
+      <span className="agnt-chat-header-throughput-dot" aria-hidden /> {rate} · {elapsed}
+    </span>
   );
 }

@@ -25,6 +25,7 @@ import { buildApprovalServerRequestHandler, useApprovalsStore } from "./approval
 import { useGitStore } from "./git-store";
 import { useNoticesStore } from "./notices-store";
 import { fetchThreadTurnsPage } from "./pagination";
+import { useStreamingStatsStore } from "./streaming-stats-store";
 import { buildStructuredInputServerRequestHandler, useStructuredInputStore } from "./structured-input-store";
 import { runPostHandshakeBootstrap, type ModelOption } from "./sync";
 import { useVoiceStore } from "./voice-store";
@@ -365,6 +366,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   reset() {
     while (teardownHandlers.length) teardownHandlers.pop()?.();
     activeConnection = null;
+    useStreamingStatsStore.setState({ byThread: {} });
     set({
       threads: [],
       archivedThreads: [],
@@ -386,10 +388,14 @@ function registerNotificationHandlers(
   get: () => ThreadsState
 ): void {
   // Lifecycle.
-  on(connection, "turn/started", (params) => withTurnEvent(params, (event) => mutateReducer(event.threadId, set, get, (s) => applyTurnStarted(s, event))));
+  on(connection, "turn/started", (params) => withTurnEvent(params, (event) => {
+    mutateReducer(event.threadId, set, get, (s) => applyTurnStarted(s, event));
+    useStreamingStatsStore.getState().noteTurnStarted(event.threadId);
+  }));
   on(connection, "turn/completed", (params) =>
     withTurnEvent(params, (event) => {
       mutateReducer(event.threadId, set, get, (s) => applyTurnCompleted(s, event));
+      useStreamingStatsStore.getState().noteTurnFinished(event.threadId);
       // Two layered "tab is hidden" signals: a desktop notification when the
       // user has granted permission and opted in, plus the title flash as a
       // permission-free fallback. Both no-op when the tab is focused.
@@ -401,6 +407,7 @@ function registerNotificationHandlers(
     withTurnEvent(params, (event) => {
       const errorText = readString(params, "error", "message");
       mutateReducer(event.threadId, set, get, (s) => applyTurnFailed(s, event, errorText));
+      useStreamingStatsStore.getState().noteTurnFinished(event.threadId);
       void notifyTurnFinished(event.threadId, get, "failed", errorText);
       flashTitle("Turn failed");
     })
@@ -414,6 +421,7 @@ function registerNotificationHandlers(
       mutateReducer(event.threadId, set, get, (s) =>
         applyAgentDelta(s, { ...event, delta, assistantPhase: phase })
       );
+      useStreamingStatsStore.getState().noteDelta(event.threadId, delta.length);
       schedulePersist(event.threadId, get);
     })
   );
@@ -422,6 +430,7 @@ function registerNotificationHandlers(
     withTurnEvent(params, (event) => {
       const delta = readString(params, "delta", "text") ?? "";
       mutateReducer(event.threadId, set, get, (s) => applyAgentDelta(s, { ...event, delta }));
+      useStreamingStatsStore.getState().noteDelta(event.threadId, delta.length);
       schedulePersist(event.threadId, get);
     })
   );
@@ -429,6 +438,7 @@ function registerNotificationHandlers(
     withTurnEvent(params, (event) => {
       const delta = readString(params, "delta", "textDelta") ?? "";
       mutateReducer(event.threadId, set, get, (s) => applyReasoningDelta(s, { ...event, delta }));
+      useStreamingStatsStore.getState().noteDelta(event.threadId, delta.length);
       schedulePersist(event.threadId, get);
     })
   );

@@ -133,6 +133,23 @@ function labelFor(message: CodexMessage): string {
   }
 }
 
+/**
+ * Concatenates multiple thread exports into a single Markdown document — used
+ * by the sidebar's bulk-export action. Each thread keeps its full header and
+ * is separated from the next by a horizontal rule, so users get one file
+ * instead of N spawned downloads.
+ */
+export function exportThreadsToMarkdown(threads: ExportThreadOptions[], exportedAt: Date = new Date()): string {
+  const parts: string[] = [];
+  parts.push(`# Threads export (${threads.length})`, "");
+  parts.push(`- **exported:** ${exportedAt.toISOString()}`, "");
+  parts.push("---", "");
+  for (const thread of threads) {
+    parts.push(exportThreadToMarkdown({ ...thread, exportedAt }).trimEnd(), "", "---", "");
+  }
+  return parts.join("\n").trimEnd() + "\n";
+}
+
 export function defaultExportFilename(threadTitle: string | undefined): string {
   const slug = (threadTitle ?? "thread")
     .toLowerCase()

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodexThread } from "../../models";
 import { useShortcuts } from "../../lib/keyboard";
+import {
+  defaultExportFilename,
+  downloadMarkdown,
+  exportThreadsToMarkdown,
+} from "../../lib/thread-export";
 import { filterThreads } from "../../state/thread-filter";
 import { groupThreadsByRecency, type ThreadGroup } from "../../state/thread-grouping";
 import { useThreadsStore } from "../../state/threads-store";
@@ -9,11 +14,13 @@ import { ThreadContextMenu } from "./ThreadContextMenu";
 
 interface SidebarProps {
   onNewChat(): void;
+  /** Called after a thread row is single-clicked (used to close the mobile drawer). */
+  onAfterSelect?(): void;
 }
 
 type SidebarTab = SidebarTabPreference;
 
-export function Sidebar({ onNewChat }: SidebarProps) {
+export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   const liveThreads = useThreadsStore((state) => state.threads);
   const archivedThreads = useThreadsStore((state) => state.archivedThreads);
   const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
@@ -21,8 +28,16 @@ export function Sidebar({ onNewChat }: SidebarProps) {
   const runningThreadIds = useThreadsStore((state) => state.runningThreadIds);
   const pinnedThreadIds = useThreadsStore((state) => state.pinnedThreadIds);
   const selectThread = useThreadsStore((state) => state.selectThread);
+  const archiveThread = useThreadsStore((state) => state.archiveThread);
+  const unarchiveThread = useThreadsStore((state) => state.unarchiveThread);
+  const reducerStates = useThreadsStore((state) => state.reducerStates);
   const [tab, setTab] = useState<SidebarTab>("live");
   const [query, setQuery] = useState("");
+  // Multi-select mode: when on, row clicks toggle selection instead of
+  // navigating. The action bar at the top performs Archive / Unarchive /
+  // Export across the chosen set.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const hydratedRef = useRef(false);
 
   // Hydrate persisted prefs once; later changes to tab/query persist via the
@@ -42,6 +57,13 @@ export function Sidebar({ onNewChat }: SidebarProps) {
     // Tiny payloads, no debounce — every tab toggle and every keystroke writes.
     void prefsStore.saveSidebar({ tab, query });
   }, [tab, query]);
+
+  // Switching tabs while in select mode would surface a confusing "selected
+  // count" that includes IDs no longer visible. Reset selection on tab change.
+  useEffect(() => {
+    if (selectedIds.size > 0) setSelectedIds(new Set());
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The visible list drives j/k navigation (it has to be flat for that),
   // while `groups` is the partitioned view we render. Both stay in sync via
   // the same filter + grouping pass.
@@ -56,21 +78,127 @@ export function Sidebar({ onNewChat }: SidebarProps) {
   }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds]);
 
   // j/k navigate the visible list, like Gmail/Linear. Wraps at the boundaries
-  // so muscle memory works either direction.
+  // so muscle memory works either direction. Disabled in multi-select mode so
+  // users can't accidentally jump-and-archive the wrong thread.
   useShortcuts({
-    j: () => stepSelection(visible, selectedThreadId, 1, selectThread),
-    k: () => stepSelection(visible, selectedThreadId, -1, selectThread),
+    j: () => !selectMode && stepSelection(visible, selectedThreadId, 1, selectThread),
+    k: () => !selectMode && stepSelection(visible, selectedThreadId, -1, selectThread),
   });
+
+  function handleRowSelect(thread: CodexThread) {
+    if (selectMode) {
+      toggleId(thread.id);
+      return;
+    }
+    void selectThread(thread.id);
+    onAfterSelect?.();
+  }
+
+  function toggleId(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+
+  async function archiveSelected() {
+    // Walk a copy because each archive call moves the thread out of `threads`
+    // and our snapshot would shift under the iterator.
+    const ids = Array.from(selectedIds);
+    for (const id of ids) await archiveThread(id);
+    exitSelectMode();
+  }
+
+  async function unarchiveSelected() {
+    const ids = Array.from(selectedIds);
+    for (const id of ids) await unarchiveThread(id);
+    exitSelectMode();
+  }
+
+  function exportSelected() {
+    const all = [...liveThreads, ...archivedThreads];
+    const exports = Array.from(selectedIds).flatMap((id) => {
+      const thread = all.find((t) => t.id === id);
+      if (!thread) return [];
+      const messages = reducerStates[id]?.messages ?? [];
+      if (messages.length === 0) return [];
+      return [{ thread, messages }];
+    });
+    if (exports.length === 0) {
+      exitSelectMode();
+      return;
+    }
+    const markdown = exportThreadsToMarkdown(exports);
+    const filename = exports.length === 1
+      ? defaultExportFilename(exports[0].thread.name ?? exports[0].thread.title)
+      : `agnt-threads-${new Date().toISOString().replace(/[:.]/g, "-")}.md`;
+    downloadMarkdown(filename, markdown);
+    exitSelectMode();
+  }
 
   return (
     <aside className="agnt-sidebar">
       <div className="agnt-sidebar-header">
         <span className="agnt-sidebar-title">Threads</span>
         {loading && <span className="agnt-sidebar-loading">syncing…</span>}
+        {!selectMode && (
+          <button
+            type="button"
+            className="agnt-sidebar-select-toggle"
+            onClick={() => setSelectMode(true)}
+            title="Select multiple threads"
+          >
+            Select
+          </button>
+        )}
         <button type="button" className="agnt-sidebar-new" onClick={onNewChat} title="New chat">
           + New
         </button>
       </div>
+      {selectMode && (
+        <div className="agnt-sidebar-select-bar">
+          <span className="agnt-sidebar-select-count">{selectedIds.size} selected</span>
+          <div className="agnt-sidebar-select-actions">
+            {tab === "live" ? (
+              <button
+                type="button"
+                className="agnt-button-ghost"
+                disabled={selectedIds.size === 0}
+                onClick={() => void archiveSelected()}
+              >
+                Archive
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="agnt-button-ghost"
+                disabled={selectedIds.size === 0}
+                onClick={() => void unarchiveSelected()}
+              >
+                Unarchive
+              </button>
+            )}
+            <button
+              type="button"
+              className="agnt-button-ghost"
+              disabled={selectedIds.size === 0}
+              onClick={exportSelected}
+            >
+              Export
+            </button>
+            <button type="button" className="agnt-button-ghost" onClick={exitSelectMode}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       <div className="agnt-sidebar-tabs" role="tablist">
         <SidebarTabButton current={tab} value="live" label={`Live (${liveThreads.length})`} onClick={setTab} />
         <SidebarTabButton current={tab} value="archived" label={`Archived (${archivedThreads.length})`} onClick={setTab} />
@@ -104,7 +232,9 @@ export function Sidebar({ onNewChat }: SidebarProps) {
               selectedThreadId={selectedThreadId}
               runningThreadIds={runningThreadIds}
               pinnedThreadIds={pinnedThreadIds}
-              onSelect={selectThread}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onSelect={handleRowSelect}
             />
           ))}
         </div>
@@ -160,6 +290,8 @@ function SidebarGroup({
   selectedThreadId,
   runningThreadIds,
   pinnedThreadIds,
+  selectMode,
+  selectedIds,
   onSelect,
 }: {
   group: ThreadGroup;
@@ -167,7 +299,9 @@ function SidebarGroup({
   selectedThreadId: string | null;
   runningThreadIds: Set<string>;
   pinnedThreadIds: Set<string>;
-  onSelect: (threadId: string) => Promise<void> | void;
+  selectMode: boolean;
+  selectedIds: Set<string>;
+  onSelect: (thread: CodexThread) => void;
 }) {
   return (
     <section className="agnt-sidebar-group">
@@ -180,7 +314,9 @@ function SidebarGroup({
             selected={thread.id === selectedThreadId}
             running={runningThreadIds.has(thread.id)}
             pinned={pinnedThreadIds.has(thread.id)}
-            onSelect={() => void onSelect(thread.id)}
+            selectMode={selectMode}
+            checked={selectedIds.has(thread.id)}
+            onSelect={() => onSelect(thread)}
           />
         ))}
       </ul>
@@ -193,19 +329,44 @@ function SidebarRow({
   selected,
   running,
   pinned,
+  selectMode,
+  checked,
   onSelect,
 }: {
   thread: CodexThread;
   selected: boolean;
   running: boolean;
   pinned: boolean;
+  selectMode: boolean;
+  checked: boolean;
   onSelect: () => void;
 }) {
   const title = thread.name ?? thread.title ?? "Untitled";
   return (
-    <li className={"agnt-sidebar-row" + (selected ? " agnt-sidebar-row-selected" : "")}>
-      <button type="button" className="agnt-sidebar-thread" onClick={onSelect}>
+    <li
+      className={
+        "agnt-sidebar-row"
+        + (selected ? " agnt-sidebar-row-selected" : "")
+        + (selectMode && checked ? " agnt-sidebar-row-checked" : "")
+      }
+    >
+      <button
+        type="button"
+        className="agnt-sidebar-thread"
+        onClick={onSelect}
+        aria-pressed={selectMode ? checked : undefined}
+      >
         <span className="agnt-sidebar-thread-title">
+          {selectMode && (
+            <input
+              type="checkbox"
+              className="agnt-sidebar-row-checkbox"
+              checked={checked}
+              onChange={onSelect}
+              onClick={(event) => event.stopPropagation()}
+              aria-label={checked ? `Deselect ${title}` : `Select ${title}`}
+            />
+          )}
           {running && <span className="agnt-sidebar-running-dot" aria-label="running" title="Running" />}
           {pinned && (
             <span className="agnt-sidebar-pinned" aria-label="pinned" title="Pinned">
@@ -216,7 +377,7 @@ function SidebarRow({
         </span>
         {thread.cwd && <span className="agnt-sidebar-thread-cwd">{thread.cwd}</span>}
       </button>
-      <ThreadContextMenu thread={thread} pinned={pinned} />
+      {!selectMode && <ThreadContextMenu thread={thread} pinned={pinned} />}
     </li>
   );
 }

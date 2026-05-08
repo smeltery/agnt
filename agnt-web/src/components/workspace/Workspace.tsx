@@ -42,6 +42,9 @@ export function Workspace() {
   useDocumentTitle(activeThreadTitle);
   const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | "help" | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // The drawer toggle only matters on narrow viewports — on wide ones the
+  // sidebar is always visible regardless of this flag, courtesy of CSS.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // The picker can be invoked either from a "Change project" affordance or
   // from the "New Chat" flow. We track who asked so we can route the result.
   const [pickerCallback, setPickerCallback] = useState<((path: string) => void) | null>(null);
@@ -149,6 +152,15 @@ export function Workspace() {
   return (
     <div className="agnt-workspace">
       <header className="agnt-workspace-header">
+        <button
+          type="button"
+          className="agnt-workspace-menu"
+          aria-label={sidebarOpen ? "Close threads sidebar" : "Open threads sidebar"}
+          aria-expanded={sidebarOpen}
+          onClick={() => setSidebarOpen((open) => !open)}
+        >
+          ☰
+        </button>
         <span className="agnt-brand">agnt</span>
         <StatusPill status={status} />
         <div className="agnt-workspace-actions">
@@ -174,8 +186,21 @@ export function Workspace() {
         </div>
       </header>
       <ReconnectBanner />
-      <div className="agnt-workspace-body">
-        <Sidebar onNewChat={openNewChat} />
+      <div className={"agnt-workspace-body" + (sidebarOpen ? " agnt-sidebar-open" : "")}>
+        {sidebarOpen && (
+          <div
+            className="agnt-sidebar-backdrop"
+            role="presentation"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <Sidebar
+          onNewChat={() => {
+            setSidebarOpen(false);
+            openNewChat();
+          }}
+          onAfterSelect={() => setSidebarOpen(false)}
+        />
         <ChatView />
       </div>
       <NoticeStack />
