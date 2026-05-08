@@ -10,6 +10,7 @@ import { useThreadsStore } from "../../state/threads-store";
 import { ApprovalModal } from "../approvals/ApprovalModal";
 import { ChatView } from "../chat/ChatView";
 import { NewChatModal } from "../chat/NewChatModal";
+import { RevertSheet } from "../checkpoints/RevertSheet";
 import { ProjectPicker } from "../project/ProjectPicker";
 import { AboutModal } from "../settings/AboutModal";
 import { SettingsModal } from "../settings/SettingsModal";
@@ -79,6 +80,7 @@ export function Workspace() {
       <NoticeStack />
       <ApprovalModal />
       <StructuredInputModal />
+      <RevertSheet />
       {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
       {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
       {overlay === "newChat" && (

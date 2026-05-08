@@ -9,3 +9,4 @@ export * from "./connection";
 export * from "./trusted-session";
 export * from "./pairing-code";
 export * from "./project";
+export * from "./workspace-checkpoints";

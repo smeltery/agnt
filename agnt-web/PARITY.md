@@ -50,7 +50,8 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Pets` | ⛔ dropped | iOS-specific UX (animations / haptics / Live Activities). Use the iOS app for pets. |
 | `Review` | ⛔ | 4 |
 | `AIChangeSets` | ⛔ | 4 |
-| `WorkspaceCheckpoints` + `WorkspaceImages` | ⛔ | 4 |
+| `WorkspaceCheckpoints` | ✅ | 10 (preview + apply per turn; checkpointDiff + Copy not yet wired in UI but bridge-ready) |
+| `WorkspaceImages` | ⛔ | future (needs image attachment composer first) |
 | `ProjectFolders` | ✅ | 9 (project/quickLocations + listDirectory + searchDirectories + folder picker UI) |
 | `TrustedPairPresentation` | 🔲 | sidebar shows nothing about trusted Mac yet |
 | `Helpers` | n/a | utility — port functions on demand |
@@ -120,6 +121,7 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Sidebar search + j/k navigation | `components/sidebar/Sidebar.tsx` + `state/thread-filter.ts` + `lib/keyboard.ts` | ✅ |
 | Copy-to-clipboard on assistant rows | `components/chat/rows/AssistantRow.tsx` + `lib/clipboard.ts` | ✅ (Async Clipboard API + execCommand fallback for non-secure dev origins) |
 | `/` to focus composer · `Esc` closes overlays | `components/workspace/Workspace.tsx` | ✅ |
+| Per-turn revert (workspace checkpoints) | `components/checkpoints/RevertSheet.tsx` + `state/checkpoints-store.ts` + `protocol/workspace-checkpoints.ts` | ✅ (preview shows affected/staged/untracked, apply requires confirmDestructiveRestore) |
 | Service worker (offline app shell) | `public/sw.js` | ✅ (production-only registration; cache-first hashed assets, network-first navigations, never caches relay/WS) |
 
 ## Storage

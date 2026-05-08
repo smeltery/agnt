@@ -86,11 +86,20 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 10 — Workspace checkpoints (per-turn revert) ✅ DONE
+
+- ✅ `protocol/workspace-checkpoints.ts` typed wrappers for `workspace/checkpointRestorePreview` + `workspace/checkpointRestoreApply` (capture happens automatically on the bridge)
+- ✅ `state/checkpoints-store.ts` per-turn lifecycle (idle → preview → applying → done | error). `apply()` always sends `confirmDestructiveRestore: true` plus `expectedTargetCommit` so a checkpoint that drifts between preview and apply errors out.
+- ✅ `RevertSheet` shows affected files + staged-files warning + untracked-files warning before allowing the destructive Restore button
+- ✅ Per-row "↶ Revert" affordance on completed assistant rows; gated on `thread.cwd` (without it the bridge errors with `missing_working_directory`)
+- ⛔ `turn/steer` skipped this session: 3 of 4 providers explicitly reject it (`-32601`); only Codex's native pass-through might work, and behavior is unverified. Document as provider-limited rather than ship a button that fails for most users.
+
 ## Session N — Future hardening (deferred — not blocking)
 
 - WebPush for completion notifications (gated on a self-hostable web-push gateway; meanwhile completions surface via the existing `system/notice` toasts)
 - E2E tests against a local relay + bridge in CI (would need a CI runner that can spin up the bridge with a fake provider; high lift, low parity benefit right now)
 - Full Codex OAuth flow (cross-tab redirect handoff design)
 - Worktree creation + stacked-action git operations (the read-only branch picker covers the 80% case; worktrees are an iOS power-user feature)
-- Workspace checkpoints (`workspace/checkpoint*`) + AI change sets (next critical gap from the iOS audit; warrants its own session)
-- `turn/steer` (mid-run steering) — bridge supports it, no UI yet
+- AI change sets (per-message patch revert UI on top of `workspace/revertPatchPreview` + `workspace/revertPatchApply`); the per-turn revert covers the bigger workflow
+- `turn/steer` mid-run steering (Codex-only via native pass-through; gate on provider capability)
+- Image attachments + `workspace/readImage` (composer drag-drop + viewer)

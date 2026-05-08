@@ -842,10 +842,17 @@ button {
 }
 
 .agnt-row-assistant { position: relative; }
-.agnt-row-copy {
+.agnt-row-actions {
   position: absolute;
   top: 6px;
   right: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.agnt-row-assistant:hover .agnt-row-actions { opacity: 1; }
+.agnt-row-action {
   background: var(--agnt-bg-elev-2);
   border: 1px solid var(--agnt-border);
   border-radius: 6px;
@@ -853,13 +860,39 @@ button {
   font: inherit;
   font-size: 10px;
   padding: 2px 6px;
-  opacity: 0;
   cursor: pointer;
-  transition: opacity 120ms ease;
 }
-.agnt-row-assistant:hover .agnt-row-copy { opacity: 1; }
-.agnt-row-copy:hover { color: var(--agnt-fg); border-color: var(--agnt-accent); }
-.agnt-row-copy-done { color: var(--agnt-ok); border-color: var(--agnt-ok); opacity: 1; }
+.agnt-row-action:hover { color: var(--agnt-fg); border-color: var(--agnt-accent); }
+.agnt-row-action-done { color: var(--agnt-ok); border-color: var(--agnt-ok); }
+
+.agnt-revert-modal { max-width: 560px; max-height: 80vh; overflow: auto; }
+.agnt-revert-error { color: var(--agnt-danger); font-size: 12px; }
+.agnt-revert-section { margin-top: 8px; }
+.agnt-revert-warn {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--agnt-warn);
+  border-radius: 8px;
+  background: rgba(255, 200, 0, 0.05);
+  color: var(--agnt-fg);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.agnt-revert-warn strong { color: var(--agnt-warn); }
+.agnt-revert-files {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+}
+.agnt-revert-files code { font-family: var(--agnt-mono); }
 
 .agnt-sidebar-new {
   margin-left: auto;
