@@ -1840,3 +1840,70 @@ button {
   font-variant-numeric: tabular-nums;
   user-select: none;
 }
+
+.agnt-row-bookmark {
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+.agnt-row-bookmark-on {
+  color: var(--agnt-warn);
+  border-color: var(--agnt-warn);
+}
+.agnt-row-user .agnt-row-actions {
+  margin-top: 2px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.agnt-row-user:hover .agnt-row-actions,
+.agnt-row-user:focus-within .agnt-row-actions { opacity: 1; }
+.agnt-row-user:has(.agnt-row-bookmark-on) .agnt-row-actions { opacity: 1; }
+
+.agnt-button-ghost-active {
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border-color: var(--agnt-accent);
+}
+
+.agnt-chat-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--agnt-bg-elev);
+  border-bottom: 1px solid var(--agnt-border);
+  font-size: 12px;
+  color: var(--agnt-fg-dim);
+}
+
+.agnt-composer-findreplace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  background: var(--agnt-bg-elev);
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.agnt-composer-findreplace-input {
+  font: inherit;
+  font-size: 12px;
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  border: 1px solid var(--agnt-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  min-width: 100px;
+}
+.agnt-composer-findreplace-count {
+  color: var(--agnt-fg-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 50px;
+}
+.agnt-composer-findreplace .agnt-button-ghost { padding: 2px 6px; font-size: 11px; }

@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useShortcut } from "../../lib/keyboard";
 import { useStickyScroll } from "../../lib/sticky-scroll";
 import { fractionUsed } from "../../models";
+import { useBookmarksStore } from "../../state/bookmarks-store";
 import { useConnectionStore } from "../../state/connection-store";
 import {
   selectActiveMessages,
@@ -28,9 +29,22 @@ export function ChatView() {
   );
   const connection = useConnectionStore((state) => state.connection);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const bookmarks = useBookmarksStore((state) =>
+    selectedThreadId ? state.byThread[selectedThreadId] : undefined
+  );
 
-  const { scrollRef, showJumpButton, jumpToBottom } = useStickyScroll([messages, running]);
+  // When the starred filter is on, hide non-bookmarked rows from the
+  // timeline. Search hits are recomputed by the search bar against the same
+  // (already-filtered) message list, so navigation stays consistent.
+  const visibleMessages = useMemo(() => {
+    if (!starredOnly) return messages;
+    if (!bookmarks || bookmarks.size === 0) return [];
+    return messages.filter((message) => bookmarks.has(message.id));
+  }, [messages, starredOnly, bookmarks]);
+
+  const { scrollRef, showJumpButton, jumpToBottom } = useStickyScroll([visibleMessages, running]);
 
   // Ctrl/⌘+F (and bare `f` outside inputs) toggles the search bar so users
   // can find anything in a long thread without leaning on browser native
@@ -83,18 +97,35 @@ export function ChatView() {
       )}
       <ThreadSearchBar
         visible={searchOpen}
-        messages={messages}
+        messages={visibleMessages}
+        threadId={selectedThreadId}
+        starredOnly={starredOnly}
         onClose={() => setSearchOpen(false)}
         onScrollToMessage={scrollMessageIntoView}
+        onToggleStarredOnly={() => setStarredOnly((current) => !current)}
       />
+      {starredOnly && (
+        <div className="agnt-chat-filter-banner" role="status">
+          Showing starred messages only · {visibleMessages.length} of {messages.length}
+          <button type="button" className="agnt-button-ghost" onClick={() => setStarredOnly(false)}>
+            Show all
+          </button>
+        </div>
+      )}
       <div className="agnt-chat-scroll" ref={scrollRef}>
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <div className="agnt-chat-empty">
-            <h2>{selectedThreadId ? "No messages yet" : "Pick a thread or start a turn"}</h2>
-            <p>Type below to send a turn to the bridge's active provider.</p>
+            <h2>
+              {starredOnly && messages.length > 0
+                ? "No starred messages in this thread"
+                : selectedThreadId
+                  ? "No messages yet"
+                  : "Pick a thread or start a turn"}
+            </h2>
+            {!starredOnly && <p>Type below to send a turn to the bridge's active provider.</p>}
           </div>
         ) : (
-          messages.map((message) => (
+          visibleMessages.map((message) => (
             <div
               key={message.id}
               data-message-id={message.id}

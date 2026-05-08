@@ -6,6 +6,7 @@ import { computeDraftStats, formatCount } from "../../lib/draft-stats";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
+import { ComposerFindReplace } from "./ComposerFindReplace";
 import { useVoiceStore } from "../../state/voice-store";
 import { draftsStore } from "../../storage/drafts-store";
 import { VoiceButton } from "./VoiceButton";
@@ -23,7 +24,9 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Composer history: up-arrow at an empty draft (or while the cursor is
   // already engaged) walks backward through past user prompts. Stays in sync
   // with the active thread's messages — switching threads resets the cursor.
@@ -243,6 +246,14 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // ⌘/Ctrl+Shift+F opens the composer's find/replace bar. Scoped to the
+    // textarea so it only steals the chord while the user is typing here —
+    // outside the composer the global ⌘/Ctrl+F still owns thread search.
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === "f" || event.key === "F")) {
+      event.preventDefault();
+      setFindReplaceOpen(true);
+      return;
+    }
     // Slash menu wins over every other shortcut when it's visible — Enter
     // runs the highlighted command, ↑/↓ moves the cursor, Esc dismisses the
     // menu (without resetting any other state).
@@ -440,7 +451,16 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
       {slashQuery !== null && slashMatches.length === 0 && (
         <div className="agnt-slash-empty">No matching commands. Press Esc to dismiss or keep typing.</div>
       )}
+      {findReplaceOpen && (
+        <ComposerFindReplace
+          textarea={textareaRef.current}
+          draft={draft}
+          onChange={(next) => onDraftChange(next)}
+          onClose={() => setFindReplaceOpen(false)}
+        />
+      )}
       <textarea
+        ref={textareaRef}
         id="agnt-composer-input"
         className="agnt-composer-input"
         value={draft}

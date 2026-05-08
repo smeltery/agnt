@@ -102,6 +102,8 @@ export interface ThreadsState {
   togglePinThread(threadId: string): Promise<void>;
   /** Replace the pinned-thread ordering with the given list (pin order = list order). */
   reorderPinnedThreads(orderedIds: string[]): Promise<void>;
+  /** Force the unread dot back on by clearing the recorded last-visit time. */
+  markThreadUnread(threadId: string): Promise<void>;
   reset(): void;
 }
 
@@ -155,6 +157,17 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     else next.add(threadId);
     set({ pinnedThreadIds: next });
     void prefsStore.savePinnedThreadIds([...next]);
+  },
+
+  async markThreadUnread(threadId) {
+    if (!threadId) return;
+    const next = { ...get().lastVisitedByThread };
+    // Drop the entry rather than write 0 — the unread predicate already
+    // treats "no recorded visit" as unread, and a missing key keeps the
+    // persisted blob smaller as users mark/unmark over time.
+    delete next[threadId];
+    set({ lastVisitedByThread: next });
+    void prefsStore.saveLastVisited(next);
   },
 
   async reorderPinnedThreads(orderedIds) {

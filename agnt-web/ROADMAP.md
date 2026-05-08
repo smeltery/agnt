@@ -86,6 +86,12 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 25 — Per-message bookmarks + mark-as-unread + composer find/replace ✅ DONE
+
+- ✅ Per-message bookmarks. New `state/bookmarks-store.ts` keeps `Set<messageId>` per thread, persisted via `prefsStore.{loadSaveBookmarks}`. A small `BookmarkButton` (☆/★) sits in the row-actions slot for assistant + user rows. The `ThreadSearchBar` gets a "☆ N / ★ all" toggle that filters the timeline to bookmarked rows; a banner across the chat shows the active filter and the matched-of-total count. Combines with Session 15's in-thread search so you can text-search inside the starred set.
+- ✅ Mark thread as unread. New `markThreadUnread(threadId)` action drops the `lastVisitedAt[id]` entry so the Session 23 unread dot reappears. Wired into the sidebar context menu; disabled when the thread is already unread (no-op clarity).
+- ✅ Composer find/replace. ⌘/Ctrl+Shift+F (scoped to the textarea so it doesn't fight the global ⌘/Ctrl+F thread search) opens a small bar above the textarea: Find / Replace inputs, Next/Prev, Replace, Replace-all, count. Pure helpers (`findAllOccurrences`, `replaceAt`, `replaceAll`) live in `lib/draft-find-replace.ts`; `replaceAll` walks back-to-front so length-changing replacements don't corrupt later spans.
+
 ## Session 24 — Inline file diff + drag-reorder pins + composer stats footer ✅ DONE
 
 - ✅ Inline file diff viewer in `GitPanel`. Clicking any row in the dirty-files list expands its per-file diff inline; the unified patch returned by `git/diff` is sliced client-side via new `lib/git-diff-parser.ts` and rendered with line-level coloring (`+` green, `-` red, `@@` accent) by `components/git/DiffView.tsx`. Lazy: the patch is only fetched on first expand and reused across files. Removes the workflow detour to a terminal to see what's about to be committed.

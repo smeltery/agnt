@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from "../../lib/thread-export";
 import type { CodexThread } from "../../models";
-import { useThreadsStore } from "../../state/threads-store";
+import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 
 interface Props {
   thread: CodexThread;
@@ -21,6 +21,8 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
   const forkThread = useThreadsStore((state) => state.forkThread);
   const compactThread = useThreadsStore((state) => state.compactThread);
   const togglePinThread = useThreadsStore((state) => state.togglePinThread);
+  const markThreadUnread = useThreadsStore((state) => state.markThreadUnread);
+  const unread = useThreadsStore((state) => isThreadUnread(thread, state.lastVisitedByThread));
   const exportMessages = useThreadsStore(
     (state) => state.reducerStates[thread.id]?.messages ?? []
   );
@@ -110,6 +112,15 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
             title={exportMessages.length === 0 ? "No messages to export yet" : "Download a Markdown copy"}
           >
             Export to Markdown
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={action(() => markThreadUnread(thread.id))}
+            disabled={unread}
+            title={unread ? "Already marked unread" : "Restore the unread dot for revisit"}
+          >
+            Mark as unread
           </button>
           {thread.syncState === "live" ? (
             <button type="button" role="menuitem" onClick={action(() => archiveThread(thread.id))}>

@@ -1,5 +1,6 @@
 import type { CodexMessage } from "../../../models";
 import { useLightboxStore } from "../../../state/lightbox-store";
+import { BookmarkButton } from "./BookmarkButton";
 
 export function UserRow({ message }: { message: CodexMessage }) {
   const showLightbox = useLightboxStore((state) => state.show);
@@ -38,6 +39,11 @@ export function UserRow({ message }: { message: CodexMessage }) {
         )}
         {message.text && <span className="agnt-row-user-text">{message.text}</span>}
       </div>
+      {message.deliveryState !== "pending" && (
+        <div className="agnt-row-actions">
+          <BookmarkButton threadId={message.threadId} messageId={message.id} />
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 // stay dumb and don't need to know about saved-pairing hydration.
 
 import { useEffect } from "react";
+import { useBookmarksStore } from "./state/bookmarks-store";
 import { useConnectionStore } from "./state/connection-store";
 import { useCustomSlashCommandsStore } from "./state/custom-slash-commands-store";
 import { useThemeStore } from "./state/theme-store";
@@ -16,15 +17,17 @@ export function App() {
   const hydrate = useConnectionStore((state) => state.hydrate);
   const hydrateTheme = useThemeStore((state) => state.hydrate);
   const hydrateCustomSlash = useCustomSlashCommandsStore((state) => state.hydrate);
+  const hydrateBookmarks = useBookmarksStore((state) => state.hydrate);
   const reconnect = useConnectionStore((state) => state.reconnect);
 
   useEffect(() => {
     // Theme hydrates first to avoid a flash of wrong palette.
     void hydrateTheme().then(() => hydrate());
-    // Custom slash commands aren't on the critical render path, so we let
-    // them load whenever idb gets around to it.
+    // Background prefs load whenever idb gets around to it — they don't
+    // block the critical render path.
     void hydrateCustomSlash();
-  }, [hydrate, hydrateTheme, hydrateCustomSlash]);
+    void hydrateBookmarks();
+  }, [hydrate, hydrateTheme, hydrateCustomSlash, hydrateBookmarks]);
 
   useEffect(() => {
     if (!bootstrapping && saved && status.kind === "idle") {

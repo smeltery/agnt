@@ -35,6 +35,7 @@ const PINNED_THREADS_KEY = "prefs.pinnedThreadIds";
 const NOTIFICATIONS_KEY = "prefs.notifications";
 const LAST_VISITED_KEY = "prefs.lastVisitedByThread";
 const CUSTOM_SLASH_KEY = "prefs.customSlashCommands";
+const BOOKMARKS_KEY = "prefs.bookmarksByThread";
 
 export interface CustomSlashCommand {
   /** Unique slug — what the user types after `/`. Must match the slug regex. */
@@ -103,6 +104,20 @@ export const prefsStore = {
   },
   async saveCustomSlashCommands(commands: CustomSlashCommand[]): Promise<void> {
     await idb.set(CUSTOM_SLASH_KEY, commands);
+  },
+  async loadBookmarks(): Promise<Record<string, string[]>> {
+    const raw = await idb.get<Record<string, string[]>>(BOOKMARKS_KEY);
+    if (!raw || typeof raw !== "object") return {};
+    const out: Record<string, string[]> = {};
+    for (const [threadId, ids] of Object.entries(raw)) {
+      if (!Array.isArray(ids)) continue;
+      const filtered = ids.filter((value): value is string => typeof value === "string");
+      if (filtered.length > 0) out[threadId] = filtered;
+    }
+    return out;
+  },
+  async saveBookmarks(map: Record<string, string[]>): Promise<void> {
+    await idb.set(BOOKMARKS_KEY, map);
   },
 };
 

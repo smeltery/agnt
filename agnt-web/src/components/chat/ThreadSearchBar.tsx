@@ -12,22 +12,40 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodexMessage } from "../../models";
+import { useBookmarksStore } from "../../state/bookmarks-store";
 
 interface ThreadSearchBarProps {
   visible: boolean;
   messages: CodexMessage[];
+  /** Active thread id; used to scope the bookmark filter. */
+  threadId: string | null;
+  /** When true, only matches whose message id is bookmarked count as hits. */
+  starredOnly: boolean;
   onClose(): void;
   onScrollToMessage(messageId: string): void;
+  onToggleStarredOnly(): void;
 }
 
 interface Match {
   messageId: string;
 }
 
-export function ThreadSearchBar({ visible, messages, onClose, onScrollToMessage }: ThreadSearchBarProps) {
+export function ThreadSearchBar({
+  visible,
+  messages,
+  threadId,
+  starredOnly,
+  onClose,
+  onScrollToMessage,
+  onToggleStarredOnly,
+}: ThreadSearchBarProps) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const bookmarks = useBookmarksStore((state) =>
+    threadId ? state.byThread[threadId] : undefined
+  );
+  const bookmarkCount = bookmarks?.size ?? 0;
 
   useEffect(() => {
     if (!visible) return;
@@ -43,11 +61,17 @@ export function ThreadSearchBar({ visible, messages, onClose, onScrollToMessage 
 
   const matches: Match[] = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
-    if (!trimmed) return [];
+    // Empty query + no star filter = no matches (search is idle).
+    // Empty query + star filter = matches are every starred message in order.
+    if (!trimmed && !starredOnly) return [];
     return messages
-      .filter((message) => searchableText(message).toLowerCase().includes(trimmed))
+      .filter((message) => {
+        if (starredOnly && !bookmarks?.has(message.id)) return false;
+        if (!trimmed) return true;
+        return searchableText(message).toLowerCase().includes(trimmed);
+      })
       .map((message) => ({ messageId: message.id }));
-  }, [messages, query]);
+  }, [messages, query, starredOnly, bookmarks]);
 
   // Whenever the match set grows or shrinks, clamp activeIndex and scroll to
   // whatever it now points at — that's how the bar stays in sync with
@@ -88,12 +112,22 @@ export function ThreadSearchBar({ visible, messages, onClose, onScrollToMessage 
         }}
       />
       <span className="agnt-thread-search-count">
-        {query.trim() === ""
+        {!query.trim() && !starredOnly
           ? ""
           : matches.length === 0
             ? "no matches"
             : `${activeIndex + 1} / ${matches.length}`}
       </span>
+      <button
+        type="button"
+        className={"agnt-button-ghost" + (starredOnly ? " agnt-button-ghost-active" : "")}
+        onClick={onToggleStarredOnly}
+        title={starredOnly ? "Show all messages" : "Show starred messages only"}
+        aria-pressed={starredOnly}
+        disabled={!starredOnly && bookmarkCount === 0}
+      >
+        {starredOnly ? "★ all" : `☆ ${bookmarkCount}`}
+      </button>
       <button
         type="button"
         className="agnt-button-ghost"
