@@ -45,7 +45,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `RuntimeCompatibility` + `RuntimeConfig` | 🟡 | 2 (initialize round-trip + capability gate; full version negotiation in later sessions) |
 | `History` | ✅ | 2 (history events replayed through the same reducer) |
 | `Account` | ⛔ | 5 (Codex login flow, OAuth-style redirect dance) |
-| `Voice` + `VoiceCompatibility` | ⛔ | 6 (browser MediaRecorder + voice/transcribe RPC) |
+| `Voice` + `VoiceCompatibility` | ✅ | 6 (MediaRecorder + Web Audio resample → 24 kHz mono WAV → voice/transcribe; Codex-only at the bridge) |
 | `Notifications` | ⛔ | future (web-push when we tackle it) |
 | `Pets` | ⛔ | 7 (low priority, fun feature) |
 | `Review` | ⛔ | 4 |
@@ -60,7 +60,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Coordination/*` | ⛔ | 4 |
 | `Payments` (StoreKit) | ⛔ | not applicable in browser; needs a different provider story |
 | `DesktopHandoffService` | ⛔ | not applicable |
-| `GPTVoiceTranscriptionManager` | ⛔ | 6 |
+| `GPTVoiceTranscriptionManager` | n/a | bridge owns the auth context + ChatGPT call; web client just sends the wav bytes |
 
 ## Models
 
@@ -104,6 +104,7 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | System-notice toasts | `components/shared/NoticeStack.tsx` + `state/notices-store.ts` | ✅ (auto-dismiss, severity-aware) |
 | Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |
 | Per-turn flag bar | `components/chat/TurnFlagBar.tsx` | ✅ (model, reasoning effort, plan mode, permission mode) |
+| Voice composer button | `components/chat/VoiceButton.tsx` + `state/voice-store.ts` + `lib/audio-encode.ts` | ✅ (record → resample → WAV → voice/transcribe; final transcript drops into composer draft) |
 | Settings | `components/settings/SettingsModal.tsx` + `state/account-store.ts` | ✅ (connection info, account status, trusted-Mac mgmt with forget) |
 | About | `components/settings/AboutModal.tsx` | ✅ (version, source link, license) |
 | Chat header (title + cwd + provider) | `components/chat/ChatHeader.tsx` | ✅ |

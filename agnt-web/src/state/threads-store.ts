@@ -24,6 +24,7 @@ import { useNoticesStore } from "./notices-store";
 import { fetchThreadTurnsPage } from "./pagination";
 import { buildStructuredInputServerRequestHandler, useStructuredInputStore } from "./structured-input-store";
 import { runPostHandshakeBootstrap, type ModelOption } from "./sync";
+import { useVoiceStore } from "./voice-store";
 import {
   applyAgentDelta,
   applyItemCompleted,
@@ -112,6 +113,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     useStructuredInputStore.getState().clearAll();
     useGitStore.getState().reset();
     useAccountStore.getState().bind(connection);
+    useVoiceStore.getState().bind(connection);
     activeConnection = connection;
     registerNotificationHandlers(connection, set, get);
     registerServerRequestHandlers(connection);

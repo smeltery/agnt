@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useVoiceStore } from "../../state/voice-store";
+import { VoiceButton } from "./VoiceButton";
 
 export interface ComposerProps {
   running: boolean;
@@ -8,6 +10,19 @@ export interface ComposerProps {
 
 export function Composer({ running, onSend, onStop }: ComposerProps) {
   const [draft, setDraft] = useState("");
+  // Voice transcript drains on completion: when the voice-store stamps a new
+  // transcript, append it (with a leading space if the draft already has text)
+  // and clear the pending value. The store is the source of truth for the
+  // arrival event so the composer doesn't double-apply a transcript.
+  const pendingTranscript = useVoiceStore((state) => state.pendingTranscript);
+  const consumeTranscript = useVoiceStore((state) => state.consumeTranscript);
+
+  useEffect(() => {
+    if (!pendingTranscript) return;
+    const transcript = consumeTranscript();
+    if (!transcript) return;
+    setDraft((current) => (current.trim() ? `${current.trimEnd()} ${transcript}` : transcript));
+  }, [pendingTranscript, consumeTranscript]);
 
   function submit() {
     const text = draft.trim();
@@ -40,6 +55,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         spellCheck={false}
       />
       <div className="agnt-composer-actions">
+        <VoiceButton />
         {running ? (
           <button type="button" className="agnt-button-danger" onClick={onStop}>
             Stop

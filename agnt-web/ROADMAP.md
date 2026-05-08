@@ -55,11 +55,13 @@ later session because the protocol and storage layers are already complete.
 - ✅ Code-block syntax highlighting via Prism core + curated language pack (bash/diff/go/json/jsx/python/rust/swift/tsx/typescript/yaml + aliases)
 - 🟡 Account login flow (Codex-only) read-only this session — full OAuth-style relay redirect deferred (needs cross-tab handoff design)
 
-## Session 6 — Voice
+## Session 6 — Voice ✅ DONE
 
-- Browser audio capture via `MediaRecorder`
-- `voice/transcribe` RPC wiring
-- Streaming partial transcripts UI
+- ✅ Browser audio capture via `MediaRecorder` (WebM/Opus, MP4, OGG fallbacks)
+- ✅ Web Audio `OfflineAudioContext` resample to 24 kHz mono + manual 16-bit PCM RIFF/WAV packer (no JS DSP libraries)
+- ✅ `voice/transcribe` RPC wiring with bridge-side auth (Codex-only — bridge enforces this)
+- ✅ Voice button in the composer with idle / recording (live timer + cancel) / transcribing / error states; final transcript appends to the draft
+- ⛔ Streaming partial transcripts intentionally not built — `voice/transcribe` is a single request/response at the protocol level. Web Speech API gives live transcripts but uses a different model + bypasses bridge auth, so we keep the bridge path
 
 ## Session 7 — Pets / payments / nice-to-haves
 
