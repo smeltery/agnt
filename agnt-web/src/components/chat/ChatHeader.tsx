@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
 import { formatStreamingStats, useStreamingStatsStore } from "../../state/streaming-stats-store";
 import { selectActiveTurnRunning, useThreadsStore } from "../../state/threads-store";
+import { FileBrowser } from "../files/FileBrowser";
 import { GitPanel } from "../git/GitPanel";
 
 interface ChatHeaderProps {
@@ -21,14 +22,21 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
   );
   const running = useThreadsStore(selectActiveTurnRunning);
   const stopTurn = useThreadsStore((state) => state.stopTurn);
+  const color = useThreadsStore((state) =>
+    selectedThreadId ? state.colorByThread[selectedThreadId] : undefined
+  );
   const [showGit, setShowGit] = useState(false);
+  const [showFiles, setShowFiles] = useState(false);
 
   if (!selectedThreadId || !thread) return null;
   const title = thread.name ?? thread.title ?? "Untitled";
 
   return (
-    <header className="agnt-chat-header">
+    <header className={"agnt-chat-header" + (color ? ` agnt-chat-header-color agnt-thread-color-${color}` : "")}>
       <div className="agnt-chat-header-titles">
+        {color && (
+          <span className="agnt-chat-header-color-dot" aria-label={`${color} tag`} title={`${color} tag`} />
+        )}
         <h1 className="agnt-chat-header-title">{title}</h1>
         {thread.cwd && <code className="agnt-chat-header-cwd">{thread.cwd}</code>}
         {thread.modelProvider && (
@@ -51,6 +59,16 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
           <button
             type="button"
             className="agnt-button-ghost"
+            onClick={() => setShowFiles((open) => !open)}
+            aria-expanded={showFiles}
+            disabled={!thread.cwd}
+            title={thread.cwd ? "Browse workspace files" : "Set a project (cwd) to browse files"}
+          >
+            {showFiles ? "Hide files" : "Files"}
+          </button>
+          <button
+            type="button"
+            className="agnt-button-ghost"
             onClick={() => setShowGit((open) => !open)}
             aria-expanded={showGit}
           >
@@ -58,6 +76,9 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
           </button>
         </div>
       </div>
+      {showFiles && thread.cwd && (
+        <FileBrowser threadId={selectedThreadId} cwd={thread.cwd} rpc={rpc} />
+      )}
       {showGit && <GitPanel threadId={selectedThreadId} rpc={rpc} />}
     </header>
   );

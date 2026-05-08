@@ -13,6 +13,7 @@ import {
 } from "../../lib/thread-export";
 import type { CodexThread } from "../../models";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
+import { THREAD_COLOR_VALUES, type ThreadColor } from "../../storage/prefs-store";
 
 interface Props {
   thread: CodexThread;
@@ -29,6 +30,8 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
   const compactThread = useThreadsStore((state) => state.compactThread);
   const togglePinThread = useThreadsStore((state) => state.togglePinThread);
   const markThreadUnread = useThreadsStore((state) => state.markThreadUnread);
+  const setThreadColor = useThreadsStore((state) => state.setThreadColor);
+  const currentColor = useThreadsStore((state) => state.colorByThread[thread.id]);
   const unread = useThreadsStore((state) => isThreadUnread(thread, state.lastVisitedByThread));
   const exportMessages = useThreadsStore(
     (state) => state.reducerStates[thread.id]?.messages ?? []
@@ -108,6 +111,32 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
           >
             {pinned ? "Unpin" : "Pin to top"}
           </button>
+          <div className="agnt-thread-menu-colors" role="group" aria-label="Color tag">
+            <span className="agnt-thread-menu-colors-label">Color</span>
+            {THREAD_COLOR_VALUES.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={
+                  "agnt-thread-color-swatch agnt-thread-color-" + color
+                  + (currentColor === color ? " agnt-thread-color-swatch-active" : "")
+                }
+                aria-label={`Tag with ${color}`}
+                aria-pressed={currentColor === color}
+                onClick={action(() => setThreadColor(thread.id, color as ThreadColor))}
+              />
+            ))}
+            <button
+              type="button"
+              className="agnt-thread-color-swatch agnt-thread-color-clear"
+              aria-label="Clear color tag"
+              aria-pressed={!currentColor}
+              onClick={action(() => setThreadColor(thread.id, null))}
+              title="Clear color"
+            >
+              ✕
+            </button>
+          </div>
           <button
             type="button"
             role="menuitem"

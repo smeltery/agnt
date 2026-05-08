@@ -11,6 +11,7 @@ import {
 } from "../protocol";
 import { loadOrCreatePhoneIdentity } from "../storage/identity-store";
 import { pairingStore, SavedRelayPairing } from "../storage/pairing-store";
+import { useLatencyStore } from "./latency-store";
 import { useThreadsStore } from "./threads-store";
 
 export interface ConnectionState {
@@ -80,6 +81,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   async forget() {
     get().connection?.close("forget");
+    useLatencyStore.getState().reset();
     await pairingStore.clearRelayPairing();
     set({ saved: null, connection: null, status: { kind: "idle" } });
   },
@@ -119,6 +121,9 @@ async function connect(
     },
     onBridgeOutboundSeq(seq) {
       void pairingStore.patchBridgeOutboundSeq(seq);
+    },
+    onLatencySample(_method, milliseconds) {
+      useLatencyStore.getState().record(milliseconds);
     },
   });
   set({ connection });

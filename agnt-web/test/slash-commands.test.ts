@@ -13,6 +13,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     runningThreadIds: new Set(),
     pinnedThreadIds: new Set(),
     lastVisitedByThread: {},
+    colorByThread: {},
     models: [],
     selectedThreadId: null,
     turnFlags: {},
@@ -36,6 +37,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     togglePinThread: async () => {},
     reorderPinnedThreads: async () => {},
     markThreadUnread: async () => {},
+    setThreadColor: async () => {},
     reset: () => {},
     ...overrides,
   };
