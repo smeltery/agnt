@@ -3,6 +3,7 @@
 // when other rows toggle.
 
 import { useBookmarksStore } from "../../../state/bookmarks-store";
+import { Star, StarFill } from "../../shared/Icon";
 
 interface BookmarkButtonProps {
   threadId: string | undefined;
@@ -27,7 +28,7 @@ export function BookmarkButton({ threadId, messageId }: BookmarkButtonProps) {
       aria-label={bookmarked ? "Remove bookmark" : "Bookmark this message"}
       title={bookmarked ? "Bookmarked — click to remove" : "Bookmark"}
     >
-      {bookmarked ? "★" : "☆"}
+      {bookmarked ? <StarFill /> : <Star />}
     </button>
   );
 }

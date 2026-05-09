@@ -6,6 +6,8 @@
 import { useEffect, useState } from "react";
 import { useConnectionStore } from "../../state/connection-store";
 import { useProjectStore } from "../../state/project-store";
+import { Xmark } from "../shared/Icon";
+import { Sheet } from "../shared/Sheet";
 
 interface ProjectPickerProps {
   onPick(path: string): void;
@@ -54,34 +56,23 @@ export function ProjectPicker({ onPick, onCancel }: ProjectPickerProps) {
     onPick(path);
   };
 
+  function dismiss() {
+    hide();
+    onCancel();
+  }
+
   return (
-    <div
-      className="agnt-modal-backdrop"
-      role="presentation"
-      onClick={() => {
-        hide();
-        onCancel();
-      }}
-    >
-      <div
-        className="agnt-modal agnt-project-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="agnt-project-title"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Sheet open onClose={dismiss} ariaLabel="Pick a project folder" maxWidth={720}>
+      <div className="agnt-project-modal">
         <header className="agnt-modal-header agnt-settings-header">
           <h2 id="agnt-project-title">Pick a project folder</h2>
           <button
             type="button"
             className="agnt-button-ghost"
-            onClick={() => {
-              hide();
-              onCancel();
-            }}
+            onClick={dismiss}
             aria-label="Close"
           >
-            ×
+            <Xmark />
           </button>
         </header>
 
@@ -193,6 +184,6 @@ export function ProjectPicker({ onPick, onCancel }: ProjectPickerProps) {
           </button>
         </footer>
       </div>
-    </div>
+    </Sheet>
   );
 }

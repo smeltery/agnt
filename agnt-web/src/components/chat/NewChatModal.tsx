@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useThreadsStore } from "../../state/threads-store";
+import { Sheet } from "../shared/Sheet";
 
 interface NewChatModalProps {
   onClose(): void;
@@ -37,13 +38,9 @@ export function NewChatModal({ onClose, onPickProject, initialCwd, initialPrompt
   // the in-thread path. Keep New Chat focused on prompt + cwd.
 
   return (
-    <div className="agnt-modal-backdrop" role="presentation" onClick={onClose}>
+    <Sheet open onClose={onClose} ariaLabel="New chat" maxWidth={640}>
       <form
-        className="agnt-modal agnt-newchat-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="agnt-newchat-title"
-        onClick={(event) => event.stopPropagation()}
+        className="agnt-newchat-modal"
         onSubmit={submit}
       >
         <header className="agnt-modal-header">
@@ -97,6 +94,6 @@ export function NewChatModal({ onClose, onPickProject, initialCwd, initialPrompt
           </button>
         </footer>
       </form>
-    </div>
+    </Sheet>
   );
 }

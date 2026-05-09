@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { copyText } from "../../../lib/clipboard";
 import { buildPermalink } from "../../../lib/hash-routing";
+import { Link as LinkIcon } from "../../shared/Icon";
 
 interface Props {
   threadId: string | undefined;
@@ -34,7 +35,7 @@ export function RowLinkButton({ threadId, messageId }: Props) {
       title="Copy a permalink to this message"
       aria-label={justCopied ? "Link copied" : "Copy permalink"}
     >
-      {justCopied ? "Linked" : "🔗"}
+      {justCopied ? "Linked" : <LinkIcon />}
     </button>
   );
 }

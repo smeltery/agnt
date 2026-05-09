@@ -20,6 +20,7 @@ import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
 import { useThemeStore } from "../../state/theme-store";
+import { Xmark } from "../shared/Icon";
 import {
   pairingStore,
   type TrustedMacRecord,
@@ -101,7 +102,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             aria-label="Filter settings"
           />
           <button type="button" className="agnt-button-ghost" onClick={onClose} aria-label="Close">
-            ×
+            <Xmark />
           </button>
         </header>
 

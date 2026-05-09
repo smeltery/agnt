@@ -26,6 +26,7 @@ import { HelpModal } from "../shared/HelpModal";
 import { Lightbox } from "../shared/Lightbox";
 import { NoticeStack } from "../shared/NoticeStack";
 import { ReconnectBanner } from "../shared/ReconnectBanner";
+import { Line3Horizontal } from "../shared/Icon";
 import { StatusPill } from "../shared/StatusPill";
 import { UndoToast } from "../shared/UndoToast";
 import { StructuredInputModal } from "../structured-input/StructuredInputModal";
@@ -210,7 +211,7 @@ export function Workspace() {
           aria-expanded={sidebarOpen}
           onClick={() => setSidebarOpen((open) => !open)}
         >
-          ☰
+          <Line3Horizontal />
         </button>
         <span className="agnt-brand">agnt</span>
         <StatusPill status={status} />

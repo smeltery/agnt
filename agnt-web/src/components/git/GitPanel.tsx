@@ -9,6 +9,7 @@ import { computeDiffStats, formatDiffStats, sumDiffStats } from "../../lib/git-d
 import { splitUnifiedDiff } from "../../lib/git-diff-parser";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
 import { useGitStore } from "../../state/git-store";
+import { ChevronDown, ChevronRight } from "../shared/Icon";
 import { DiffView } from "./DiffView";
 
 interface GitPanelProps {
@@ -146,7 +147,9 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
                       <span className="agnt-gitpanel-stat-del">−{statsByFile.get(file.path)!.deletions}</span>
                     </span>
                   )}
-                  <span className="agnt-gitpanel-file-chevron" aria-hidden>{expanded ? "▾" : "▸"}</span>
+                  <span className="agnt-gitpanel-file-chevron" aria-hidden>
+                    {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  </span>
                 </button>
                 {expanded && (
                   filePatch

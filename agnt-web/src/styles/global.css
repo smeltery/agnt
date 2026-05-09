@@ -2527,3 +2527,87 @@ button {
   font-family: var(--agnt-mono);
 }
 .agnt-settings-input-error { border-color: var(--agnt-danger); }
+
+/* Session 34 — SVG icon polish + iOS-style sheet presentation. */
+
+/* SVGs render aligned to the surrounding text baseline; vertical-align
+   helps when an icon is mixed inline with a label (e.g. `<Plus /> New`). */
+.agnt-button-ghost svg,
+.agnt-button-primary svg,
+.agnt-button-danger svg,
+.agnt-row-action svg,
+.agnt-row-action-meta svg,
+.agnt-sidebar-new svg,
+.agnt-sidebar-density-toggle svg,
+.agnt-thread-menu-trigger svg,
+.agnt-sidebar-pinned svg,
+.agnt-undo-toast-dismiss svg {
+  vertical-align: -2px;
+}
+.agnt-sidebar-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* iOS sheet presentation. Backdrop handles the dim; sheet anchors to the
+   bottom edge with rounded top corners only, slides in from below, and
+   exposes a small grabber handle at the top center. */
+.agnt-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* `background` is applied dynamically by the component so we can
+     animate the dim with the drag progress. */
+}
+.agnt-sheet {
+  background: var(--agnt-bg-elev);
+  border-radius: var(--agnt-radius-sheet) var(--agnt-radius-sheet) 0 0;
+  width: 100%;
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+  /* `transform` + `transition` are set inline by the component so it can
+     swap them in/out during a drag. */
+}
+[data-theme="light"] .agnt-sheet { box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.18); }
+.agnt-sheet-grabber-area {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.agnt-sheet-grabber-area:active { cursor: grabbing; }
+.agnt-sheet-grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--agnt-fg-tertiary);
+}
+.agnt-sheet-body {
+  padding: 4px 20px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  /* Wide viewports: float the sheet near the bottom but with breathing
+     room on the sides so it reads as a card instead of a phone tray. */
+  .agnt-sheet-backdrop {
+    align-items: center;
+    padding: 0 24px 24px;
+  }
+  .agnt-sheet {
+    border-radius: var(--agnt-radius-sheet);
+    max-height: calc(100vh - 80px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+  }
+}
