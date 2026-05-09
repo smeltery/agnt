@@ -2,7 +2,7 @@
 // Mirrors AgntMobile's split-view at the highest level — feature parity rolls
 // out inside each column over follow-up sessions.
 
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useDocumentTitle } from "../../lib/document-title";
 import { buildHashLocation, parseHashLocation } from "../../lib/hash-routing";
 import { useShortcut } from "../../lib/keyboard";
@@ -13,23 +13,47 @@ import { useConnectionStore } from "../../state/connection-store";
 import { useNewChatPrefillStore } from "../../state/new-chat-prefill-store";
 import { useProjectStore } from "../../state/project-store";
 import { useThreadsStore } from "../../state/threads-store";
-import { ApprovalModal } from "../approvals/ApprovalModal";
 import { ChatView } from "../chat/ChatView";
-import { NewChatModal } from "../chat/NewChatModal";
-import { RevertSheet } from "../checkpoints/RevertSheet";
-import { ProjectPicker } from "../project/ProjectPicker";
-import { AboutModal } from "../settings/AboutModal";
-import { SettingsModal } from "../settings/SettingsModal";
 import { Sidebar } from "../sidebar/Sidebar";
-import { CommandPalette } from "../shared/CommandPalette";
-import { HelpModal } from "../shared/HelpModal";
-import { Lightbox } from "../shared/Lightbox";
 import { NoticeStack } from "../shared/NoticeStack";
 import { ReconnectBanner } from "../shared/ReconnectBanner";
 import { Line3Horizontal } from "../shared/Icon";
 import { StatusPill } from "../shared/StatusPill";
 import { UndoToast } from "../shared/UndoToast";
-import { StructuredInputModal } from "../structured-input/StructuredInputModal";
+
+// Code-split the surfaces a typical first paint doesn't need. Each chunk
+// only fetches when the corresponding overlay/modal is summoned, dropping
+// the main bundle by the size of all of these put together.
+const ApprovalModal = lazy(() =>
+  import("../approvals/ApprovalModal").then((m) => ({ default: m.ApprovalModal }))
+);
+const NewChatModal = lazy(() =>
+  import("../chat/NewChatModal").then((m) => ({ default: m.NewChatModal }))
+);
+const RevertSheet = lazy(() =>
+  import("../checkpoints/RevertSheet").then((m) => ({ default: m.RevertSheet }))
+);
+const ProjectPicker = lazy(() =>
+  import("../project/ProjectPicker").then((m) => ({ default: m.ProjectPicker }))
+);
+const AboutModal = lazy(() =>
+  import("../settings/AboutModal").then((m) => ({ default: m.AboutModal }))
+);
+const SettingsModal = lazy(() =>
+  import("../settings/SettingsModal").then((m) => ({ default: m.SettingsModal }))
+);
+const CommandPalette = lazy(() =>
+  import("../shared/CommandPalette").then((m) => ({ default: m.CommandPalette }))
+);
+const HelpModal = lazy(() =>
+  import("../shared/HelpModal").then((m) => ({ default: m.HelpModal }))
+);
+const Lightbox = lazy(() =>
+  import("../shared/Lightbox").then((m) => ({ default: m.Lightbox }))
+);
+const StructuredInputModal = lazy(() =>
+  import("../structured-input/StructuredInputModal").then((m) => ({ default: m.StructuredInputModal }))
+);
 
 export function Workspace() {
   const status = useConnectionStore((state) => state.status);
@@ -257,36 +281,41 @@ export function Workspace() {
       </div>
       <NoticeStack />
       <UndoToast />
-      <ApprovalModal />
-      <StructuredInputModal />
-      <RevertSheet />
-      <Lightbox />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
-      {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
-      {overlay === "help" && <HelpModal onClose={() => setOverlay(null)} />}
-      {overlay === "newChat" && (
-        <NewChatModal
-          onClose={() => {
-            setOverlay(null);
-            // Clear any consumed prefill so the next plain "+ New" doesn't
-            // inherit a stale cwd/prompt from a duplicate-thread action.
-            setNewChatPrefill({});
-          }}
-          onPickProject={pickProject}
-          initialCwd={newChatPrefill.cwd}
-          initialPrompt={newChatPrefill.prompt}
-        />
-      )}
-      {projectPickerOpen && pickerCallback && (
-        <ProjectPicker
-          onPick={(path) => {
-            pickerCallback(path);
-            setPickerCallback(null);
-          }}
-          onCancel={() => setPickerCallback(null)}
-        />
-      )}
+      {/* All lazy-loaded surfaces share a null fallback — they're modals or
+          overlays, so showing nothing during the chunk fetch is the right
+          behavior (no jarring flash of placeholder UI). */}
+      <Suspense fallback={null}>
+        <ApprovalModal />
+        <StructuredInputModal />
+        <RevertSheet />
+        <Lightbox />
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
+        {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
+        {overlay === "help" && <HelpModal onClose={() => setOverlay(null)} />}
+        {overlay === "newChat" && (
+          <NewChatModal
+            onClose={() => {
+              setOverlay(null);
+              // Clear any consumed prefill so the next plain "+ New" doesn't
+              // inherit a stale cwd/prompt from a duplicate-thread action.
+              setNewChatPrefill({});
+            }}
+            onPickProject={pickProject}
+            initialCwd={newChatPrefill.cwd}
+            initialPrompt={newChatPrefill.prompt}
+          />
+        )}
+        {projectPickerOpen && pickerCallback && (
+          <ProjectPicker
+            onPick={(path) => {
+              pickerCallback(path);
+              setPickerCallback(null);
+            }}
+            onCancel={() => setPickerCallback(null)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

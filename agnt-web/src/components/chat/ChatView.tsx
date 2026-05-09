@@ -11,6 +11,8 @@ import {
   selectActiveTurnRunning,
   useThreadsStore,
 } from "../../state/threads-store";
+import { ArrowshapeTurnUpLeft, Star } from "../shared/Icon";
+import { EmptyState } from "../shared/Loading";
 import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
 import { MessageRow } from "./rows";
@@ -169,16 +171,25 @@ export function ChatView() {
       )}
       <div className="agnt-chat-scroll" ref={scrollRef}>
         {visibleMessages.length === 0 ? (
-          <div className="agnt-chat-empty">
-            <h2>
-              {starredOnly && messages.length > 0
+          <EmptyState
+            icon={starredOnly && messages.length > 0
+              ? <Star size={22} />
+              : <ArrowshapeTurnUpLeft size={22} />}
+            title={
+              starredOnly && messages.length > 0
                 ? "No starred messages in this thread"
                 : selectedThreadId
                   ? "No messages yet"
-                  : "Pick a thread or start a turn"}
-            </h2>
-            {!starredOnly && <p>Type below to send a turn to the bridge's active provider.</p>}
-          </div>
+                  : "Pick a thread or start a turn"
+            }
+            message={
+              starredOnly && messages.length > 0
+                ? undefined
+                : selectedThreadId
+                  ? "Type below to send a turn to the bridge's active provider."
+                  : "Open a thread from the sidebar, or tap + New."
+            }
+          />
         ) : (
           visibleMessages.map((message) => (
             <div

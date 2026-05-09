@@ -3,13 +3,25 @@
 // pointer events (covering touch + mouse + pen) so iPad-via-Tailscale users
 // get the same drag gesture as a desktop user with a trackpad.
 //
-// API mirrors the existing modal pattern (open/onClose) so callers can swap
-// in this component without restructuring their state. The trick is the
-// outer backdrop tracks `dragOffset` so it can dim less while the user is
-// pulling the sheet down — same affordance iOS gives.
+// Two presentations:
+//   - "sheet"  (default): bottom-anchored, slide-up, grabber, drag-dismiss.
+//                          Best for "tray" surfaces — pickers, forms.
+//   - "alert"          : centered card, fade-in, no grabber. Best for
+//                          safety-critical confirms (Revert, Approval) where
+//                          accidentally dragging the dialog away would do
+//                          the wrong thing.
+//
+// `closable` controls whether the user can dismiss the sheet (drag, backdrop
+// click, Esc). Set `closable={false}` for dialogs that *require* an explicit
+// button decision — the parent then calls `onClose` only when one of its
+// own buttons fires. Even when `closable` is false, Esc still triggers
+// `onClose` since it's a baseline accessibility expectation; the parent can
+// route Esc to a "cancel" decision if it has one.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { clampDragOffset, shouldDismiss, type SheetDragSample } from "../../lib/sheet-drag";
+
+export type SheetPresentation = "sheet" | "alert";
 
 interface SheetProps {
   open: boolean;
@@ -21,9 +33,22 @@ interface SheetProps {
    *  match the existing modal sizing. Sheets always span 100% width on
    *  narrow viewports regardless. */
   maxWidth?: number;
+  /** "sheet" (bottom-anchored, draggable) or "alert" (centered, no drag). */
+  presentation?: SheetPresentation;
+  /** When false, drag-dismiss + backdrop-click are disabled. Esc still
+   *  fires `onClose` so keyboard users always have an escape. */
+  closable?: boolean;
 }
 
-export function Sheet({ open, onClose, children, ariaLabel, maxWidth = 560 }: SheetProps) {
+export function Sheet({
+  open,
+  onClose,
+  children,
+  ariaLabel,
+  maxWidth = 560,
+  presentation = "sheet",
+  closable = true,
+}: SheetProps) {
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startY: number; startTime: number; samples: SheetDragSample[] } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -53,9 +78,10 @@ export function Sheet({ open, onClose, children, ariaLabel, maxWidth = 560 }: Sh
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const dragEnabled = closable && presentation === "sheet";
+
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    // Only the drag handle area initiates the gesture. The actual filter
-    // happens in the JSX (the <button> at the top has its own pointerdown).
+    if (!dragEnabled) return;
     if (event.button !== undefined && event.button !== 0) return;
     sheetRef.current?.setPointerCapture(event.pointerId);
     dragStateRef.current = {
@@ -65,7 +91,7 @@ export function Sheet({ open, onClose, children, ariaLabel, maxWidth = 560 }: Sh
       samples: [{ delta: 0, elapsedMs: 0 }],
     };
     setDragging(true);
-  }, []);
+  }, [dragEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const state = dragStateRef.current;
@@ -116,24 +142,29 @@ export function Sheet({ open, onClose, children, ariaLabel, maxWidth = 560 }: Sh
 
   if (!open) return null;
 
-  const translatePx = mounted ? dragOffset : "100%";
+  const isAlert = presentation === "alert";
+  const translateRest = isAlert ? 0 : "100%";
+  const translatePx = mounted ? dragOffset : translateRest;
   const sheetStyle: CSSProperties = {
     transform: typeof translatePx === "number" ? `translateY(${translatePx}px)` : `translateY(${translatePx})`,
-    transition: dragging ? "none" : "transform 280ms cubic-bezier(0.32, 0.72, 0, 1)",
+    opacity: isAlert && !mounted ? 0 : undefined,
+    transition: dragging ? "none" : isAlert
+      ? "opacity 200ms ease, transform 200ms ease"
+      : "transform 280ms cubic-bezier(0.32, 0.72, 0, 1)",
     maxWidth,
   };
   // Backdrop fades from clear→tinted as the sheet appears, and fades back
   // out as the user drags down. Cap at a reasonable opacity so the sheet
   // doesn't disappear into the page.
   const sheetHeight = sheetRef.current?.offsetHeight ?? 1;
-  const dragProgress = Math.max(0, Math.min(1, dragOffset / sheetHeight));
+  const dragProgress = isAlert ? 0 : Math.max(0, Math.min(1, dragOffset / sheetHeight));
   const backdropOpacity = mounted ? Math.max(0, 0.45 * (1 - dragProgress)) : 0;
 
   return (
     <div
-      className="agnt-sheet-backdrop"
+      className={"agnt-sheet-backdrop" + (isAlert ? " agnt-sheet-backdrop-alert" : "")}
       role="presentation"
-      onClick={onClose}
+      onClick={closable ? onClose : undefined}
       style={{
         background: `rgba(0, 0, 0, ${backdropOpacity.toFixed(3)})`,
         transition: dragging ? "none" : "background 280ms cubic-bezier(0.32, 0.72, 0, 1)",
@@ -141,25 +172,24 @@ export function Sheet({ open, onClose, children, ariaLabel, maxWidth = 560 }: Sh
     >
       <div
         ref={sheetRef}
-        className="agnt-sheet"
+        className={"agnt-sheet" + (isAlert ? " agnt-sheet-alert" : "")}
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
         style={sheetStyle}
         onClick={(event) => event.stopPropagation()}
       >
-        <div
-          className="agnt-sheet-grabber-area"
-          // The grabber is the pointer-event surface — the rest of the
-          // sheet stays scrollable. iOS sheets behave the same way: only
-          // the handle reliably initiates the dismiss gesture.
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-        >
-          <div className="agnt-sheet-grabber" aria-hidden />
-        </div>
+        {dragEnabled && (
+          <div
+            className="agnt-sheet-grabber-area"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+          >
+            <div className="agnt-sheet-grabber" aria-hidden />
+          </div>
+        )}
         <div className="agnt-sheet-body">{children}</div>
       </div>
     </div>

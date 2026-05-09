@@ -10,6 +10,7 @@ import {
   type StructuredInputPrompt,
   useStructuredInputStore,
 } from "../../state/structured-input-store";
+import { Sheet } from "../shared/Sheet";
 
 export function StructuredInputModal() {
   const queue = useStructuredInputStore((state) => state.queue);
@@ -48,8 +49,8 @@ function PromptForm({ prompt, onSubmit, onCancel }: PromptFormProps) {
   };
 
   return (
-    <div className="agnt-modal-backdrop" role="presentation">
-      <form className="agnt-modal" onSubmit={handleSubmit} aria-modal="true" role="dialog">
+    <Sheet open onClose={() => onCancel(prompt.id)} ariaLabel="Agent input requested">
+      <form onSubmit={handleSubmit}>
         <header className="agnt-modal-header">
           <span className="agnt-row-tag">Agent question</span>
           <h2>{prompt.questions.length === 1 ? prompt.questions[0].header ?? "Input requested" : "Input requested"}</h2>
@@ -118,6 +119,6 @@ function PromptForm({ prompt, onSubmit, onCancel }: PromptFormProps) {
           </button>
         </footer>
       </form>
-    </div>
+    </Sheet>
   );
 }
