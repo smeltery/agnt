@@ -15,6 +15,7 @@ import type { CodexThread } from "../../models";
 import { useNewChatPrefillStore } from "../../state/new-chat-prefill-store";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 import { THREAD_COLOR_VALUES, type ThreadColor } from "../../storage/prefs-store";
+import { Ellipsis } from "../shared/Icon";
 
 interface Props {
   thread: CodexThread;
@@ -83,7 +84,7 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
           setOpen((current) => !current);
         }}
       >
-        ⋯
+        <Ellipsis />
       </button>
       {open && (
         <div className="agnt-thread-menu-popover" role="menu">

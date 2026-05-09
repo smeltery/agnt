@@ -7,6 +7,7 @@ import { useComposerInboxStore } from "../../../state/composer-inbox-store";
 import { useConnectionStore } from "../../../state/connection-store";
 import { useThreadsStore } from "../../../state/threads-store";
 import { formatTurnDuration, useTurnTimingStore } from "../../../state/turn-timing-store";
+import { ArrowshapeTurnUpLeft, ArrowUturnLeft, Clock } from "../../shared/Icon";
 import { BookmarkButton } from "./BookmarkButton";
 import { RowLinkButton } from "./RowLinkButton";
 import { MarkdownContent } from "../MarkdownContent";
@@ -72,7 +73,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
               className="agnt-row-action-meta"
               title="Time from turn start to turn end (this session)"
             >
-              ⏱ {durationLabel}
+              <Clock /> {durationLabel}
             </span>
           )}
           <BookmarkButton threadId={message.threadId} messageId={message.id} />
@@ -83,7 +84,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
             onClick={handleReply}
             title="Quote this message into a new draft"
           >
-            ⤴ Reply
+            <ArrowshapeTurnUpLeft /> Reply
           </button>
           {canRevert && (
             <button
@@ -92,7 +93,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
               onClick={handleRevert}
               title="Roll the workspace back to before this turn"
             >
-              ↶ Revert
+              <ArrowUturnLeft /> Revert
             </button>
           )}
           <button

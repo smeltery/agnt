@@ -13,6 +13,7 @@ import { filterSlashCommands, type SlashCommand } from "../../state/slash-comman
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
 import { ComposerFindReplace } from "./ComposerFindReplace";
 import { MarkdownContent } from "./MarkdownContent";
+import { ClockArrowCirclepath, Eye, EyeSlash, Paperclip } from "../shared/Icon";
 import { useVoiceStore } from "../../state/voice-store";
 import { draftsStore } from "../../storage/drafts-store";
 import { VoiceButton } from "./VoiceButton";
@@ -705,8 +706,9 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
           className="agnt-button-ghost"
           onClick={() => fileInputRef.current?.click()}
           title="Attach images"
+          aria-label="Attach images"
         >
-          📎
+          <Paperclip />
         </button>
         <VoiceButton />
         <PromptHistoryDropdown
@@ -732,8 +734,9 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
           onClick={() => setPreviewOpen((open) => !open)}
           title={previewOpen ? "Hide markdown preview" : "Show markdown preview"}
           aria-pressed={previewOpen}
+          aria-label={previewOpen ? "Hide preview" : "Show preview"}
         >
-          👁
+          {previewOpen ? <EyeSlash /> : <Eye />}
         </button>
         {running ? (
           <button type="button" className="agnt-button-danger" onClick={onStop}>
@@ -792,9 +795,10 @@ function PromptHistoryDropdown({
         type="button"
         className="agnt-button-ghost agnt-button-ghost-disabled"
         title="No prompt history yet for this thread"
+        aria-label="Prompt history (empty)"
         disabled
       >
-        ↺
+        <ClockArrowCirclepath />
       </button>
     );
   }
@@ -812,8 +816,9 @@ function PromptHistoryDropdown({
         title={open ? "Close prompt history" : "Browse past prompts"}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-label="Prompt history"
       >
-        ↺
+        <ClockArrowCirclepath />
       </button>
       {open && (
         <div className="agnt-prompt-history-popover" role="listbox" aria-label="Prompt history">

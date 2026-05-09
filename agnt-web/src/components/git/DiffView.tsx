@@ -9,6 +9,7 @@
 import { useMemo, useState } from "react";
 import { groupDiffByHunks } from "../../lib/diff-hunk-grouper";
 import { diffWordTokens, type DiffWordToken } from "../../lib/diff-word-tokens";
+import { ChevronDown, ChevronRight } from "../shared/Icon";
 
 interface DiffViewProps {
   patch: string;
@@ -55,7 +56,9 @@ export function DiffView({ patch }: DiffViewProps) {
               aria-expanded={!collapsed}
               title={collapsed ? "Expand this hunk" : "Collapse this hunk"}
             >
-              <span className="agnt-diff-hunk-chevron" aria-hidden>{collapsed ? "▸" : "▾"}</span>
+              <span className="agnt-diff-hunk-chevron" aria-hidden>
+                {collapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
+              </span>
               {hunk.header}
               {collapsed && (insertions > 0 || deletions > 0) && (
                 <span className="agnt-diff-hunk-summary">

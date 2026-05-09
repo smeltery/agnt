@@ -3,6 +3,7 @@
 // auto-dismisses when the entry's window expires.
 
 import { useUndoStore } from "../../state/undo-store";
+import { Xmark } from "./Icon";
 
 export function UndoToast() {
   const entry = useUndoStore((state) => state.entry);
@@ -26,7 +27,7 @@ export function UndoToast() {
         aria-label="Dismiss"
         title="Dismiss"
       >
-        ×
+        <Xmark size={14} />
       </button>
     </div>
   );

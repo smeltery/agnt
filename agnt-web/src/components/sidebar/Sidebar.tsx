@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodexThread } from "../../models";
 import { useShortcuts } from "../../lib/keyboard";
 import {
+  ChevronDown,
+  ChevronRight,
+  Line3Horizontal,
+  Line3HorizontalDecrease,
+  PinFill,
+  Plus,
+} from "../shared/Icon";
+import {
   defaultExportFilename,
   downloadMarkdown,
   exportThreadsToMarkdown,
@@ -185,7 +193,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
             title={density === "compact" ? "Switch to comfortable density" : "Switch to compact density"}
             aria-label={density === "compact" ? "Comfortable density" : "Compact density"}
           >
-            {density === "compact" ? "≡" : "☰"}
+            {density === "compact" ? <Line3HorizontalDecrease /> : <Line3Horizontal />}
           </button>
         )}
         {!selectMode && (
@@ -198,8 +206,8 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
             Select
           </button>
         )}
-        <button type="button" className="agnt-sidebar-new" onClick={onNewChat} title="New chat">
-          + New
+        <button type="button" className="agnt-sidebar-new" onClick={onNewChat} title="New chat" aria-label="New chat">
+          <Plus /> New
         </button>
       </div>
       {selectMode && (
@@ -395,7 +403,9 @@ function SidebarGroup({
             aria-expanded={!collapsed}
             aria-controls={`agnt-sidebar-group-${group.id}`}
           >
-            <span className="agnt-sidebar-group-chevron" aria-hidden>{collapsed ? "▸" : "▾"}</span>
+            <span className="agnt-sidebar-group-chevron" aria-hidden>
+              {collapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
+            </span>
             <span>{group.label}</span>
             <span className="agnt-sidebar-group-count">{group.threads.length}</span>
           </button>
@@ -556,7 +566,7 @@ function SidebarRow({
           {running && <span className="agnt-sidebar-running-dot" aria-label="running" title="Running" />}
           {pinned && (
             <span className="agnt-sidebar-pinned" aria-label="pinned" title="Pinned">
-              ★
+              <PinFill size={10} />
             </span>
           )}
           {editing ? (
