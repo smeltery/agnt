@@ -2,10 +2,12 @@
 // stay dumb and don't need to know about saved-pairing hydration.
 
 import { useEffect } from "react";
+import { type LocaleId, SUPPORTED_LOCALES, useI18nStore } from "./lib/i18n";
 import { useBookmarksStore } from "./state/bookmarks-store";
 import { useConnectionStore } from "./state/connection-store";
 import { useCustomSlashCommandsStore } from "./state/custom-slash-commands-store";
 import { useThemeStore } from "./state/theme-store";
+import { prefsStore } from "./storage/prefs-store";
 import { PairingScreen } from "./components/pairing/PairingScreen";
 import { Workspace } from "./components/workspace/Workspace";
 import { ErrorBoundary } from "./components/shared/ErrorBoundary";
@@ -28,6 +30,13 @@ export function App() {
     // block the critical render path.
     void hydrateCustomSlash();
     void hydrateBookmarks();
+    // Locale: prefer the persisted pick over the browser default. Falls
+    // back to the navigator-derived initial state set by the i18n store.
+    void prefsStore.loadLocale().then((persisted) => {
+      if (!persisted) return;
+      const valid = SUPPORTED_LOCALES.find((option) => option.id === (persisted as LocaleId));
+      if (valid) useI18nStore.getState().setLocale(valid.id);
+    });
   }, [hydrate, hydrateTheme, hydrateCustomSlash, hydrateBookmarks]);
 
   useEffect(() => {

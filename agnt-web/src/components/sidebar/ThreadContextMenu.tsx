@@ -16,6 +16,7 @@ import { useNewChatPrefillStore } from "../../state/new-chat-prefill-store";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 import { THREAD_COLOR_VALUES, type ThreadColor } from "../../storage/prefs-store";
 import { Ellipsis } from "../shared/Icon";
+import { ThreadOverridesSheet } from "./ThreadOverridesSheet";
 
 interface Props {
   thread: CodexThread;
@@ -24,6 +25,7 @@ interface Props {
 
 export function ThreadContextMenu({ thread, pinned = false }: Props) {
   const [open, setOpen] = useState(false);
+  const [overridesOpen, setOverridesOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const renameThread = useThreadsStore((state) => state.renameThread);
   const archiveThread = useThreadsStore((state) => state.archiveThread);
@@ -159,6 +161,14 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
           <button
             type="button"
             role="menuitem"
+            onClick={action(() => setOverridesOpen(true))}
+            title="Pin a system prompt + model + reasoning effort for this thread"
+          >
+            Thread overrides…
+          </button>
+          <button
+            type="button"
+            role="menuitem"
             onClick={action(() => compactThread(thread.id))}
             title="Summarize older turns to free context window space"
           >
@@ -201,6 +211,9 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
             </button>
           )}
         </div>
+      )}
+      {overridesOpen && (
+        <ThreadOverridesSheet thread={thread} onClose={() => setOverridesOpen(false)} />
       )}
     </div>
   );

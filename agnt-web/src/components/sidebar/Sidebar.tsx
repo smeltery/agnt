@@ -564,6 +564,10 @@ function SidebarRow({
       <button
         type="button"
         className="agnt-sidebar-thread"
+        // Surface the full title + cwd as a hover tooltip — long names
+        // truncate via `text-overflow: ellipsis` and the user otherwise
+        // can't see what was clipped without selecting the row.
+        title={thread.cwd ? `${title}\n${thread.cwd}` : title}
         onClick={(event) => {
           // ⌘/Ctrl-click + middle-click open the thread in a new tab via
           // the existing hash deep-link route. This lets power users keep

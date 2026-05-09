@@ -49,7 +49,7 @@ import {
   type ThreadReducerState,
 } from "./turn-reducer";
 import { messagesStore } from "../storage/messages-store";
-import { prefsStore, type ThreadColor } from "../storage/prefs-store";
+import { prefsStore, type ThreadColor, type ThreadOverride } from "../storage/prefs-store";
 import { buildTurnInput } from "./turn-input";
 import type { ImageAttachment } from "../models";
 
@@ -86,6 +86,9 @@ export interface ThreadsState {
   lastVisitedByThread: Record<string, number>;
   /** Per-thread color tag (one of `THREAD_COLOR_VALUES`). Persisted. */
   colorByThread: Record<string, ThreadColor>;
+  /** Per-thread override of the global turn flags + an optional system
+   *  prompt prepended to every turn. Persisted via `prefs.threadOverrides`. */
+  overridesByThread: Record<string, ThreadOverride>;
   loading: boolean;
   error: string | null;
   hydrated: boolean;
@@ -112,6 +115,11 @@ export interface ThreadsState {
   markThreadUnread(threadId: string): Promise<void>;
   /** Set the thread color tag, or pass `null` to clear it. */
   setThreadColor(threadId: string, color: ThreadColor | null): Promise<void>;
+  /** Patch the per-thread override (system prompt / model / effort).
+   *  Pass `null` for any field to clear it; pass `null` for the whole entry
+   *  by patching `{ systemPrompt: undefined, model: undefined, ... }` —
+   *  empty entries are pruned on persist. */
+  setThreadOverride(threadId: string, patch: Partial<ThreadOverride>): Promise<void>;
   reset(): void;
 }
 
@@ -131,18 +139,20 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   pinnedThreadIds: new Set(),
   lastVisitedByThread: {},
   colorByThread: {},
+  overridesByThread: {},
   loading: false,
   error: null,
   hydrated: false,
 
   async hydrateFromDisk() {
     if (get().hydrated) return;
-    const [max, persistedFlags, pinnedIds, lastVisited, threadColors] = await Promise.all([
+    const [max, persistedFlags, pinnedIds, lastVisited, threadColors, threadOverrides] = await Promise.all([
       messagesStore.loadHighestOrderIndex(),
       prefsStore.loadTurnFlags(),
       prefsStore.loadPinnedThreadIds(),
       prefsStore.loadLastVisited(),
       prefsStore.loadThreadColors(),
+      prefsStore.loadThreadOverrides(),
     ]);
     orderCounter.seedFrom(max);
     // Cast through the looser persisted shape — anything malformed (an old
@@ -158,7 +168,23 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       pinnedThreadIds: new Set(pinnedIds),
       lastVisitedByThread: lastVisited,
       colorByThread: threadColors,
+      overridesByThread: threadOverrides,
     });
+  },
+
+  async setThreadOverride(threadId, patch) {
+    if (!threadId) return;
+    const current = get().overridesByThread[threadId] ?? {};
+    const merged: ThreadOverride = { ...current };
+    for (const [key, value] of Object.entries(patch) as Array<[keyof ThreadOverride, unknown]>) {
+      if (value === undefined || value === null || value === "") delete (merged as Record<string, unknown>)[key];
+      else (merged as Record<string, unknown>)[key] = value;
+    }
+    const next = { ...get().overridesByThread };
+    if (Object.keys(merged).length === 0) delete next[threadId];
+    else next[threadId] = merged;
+    set({ overridesByThread: next });
+    void prefsStore.saveThreadOverrides(next);
   },
 
   async togglePinThread(threadId) {
@@ -276,15 +302,21 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       applyLocalUserMessage(state, threadId, content, { attachments })
     );
     schedulePersist(threadId, get);
-    const input = buildTurnInput(content, attachments);
+    // Per-thread overrides win over the global flags, and (when present)
+    // prepend a system prompt to the turn so long-running threads can pin
+    // a behavior without re-typing it every turn.
+    const override = get().overridesByThread[threadId] ?? {};
+    const composed = override.systemPrompt
+      ? prependSystemPrompt(content, override.systemPrompt)
+      : content;
+    const input = buildTurnInput(composed, attachments);
     if (input.length === 0) return;
     const flags = get().turnFlags;
-    // Bridge translators read `params.input` exclusively. Keeping `content`
-    // alongside as a courtesy for any future provider that might want a
-    // pre-flattened string (no current provider does).
-    const params: Record<string, unknown> = { threadId, input, content };
-    if (flags.model) params.model = flags.model;
-    if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;
+    const params: Record<string, unknown> = { threadId, input, content: composed };
+    const model = override.model ?? flags.model;
+    const reasoningEffort = override.reasoningEffort ?? flags.reasoningEffort;
+    if (model) params.model = model;
+    if (reasoningEffort) params.reasoningEffort = reasoningEffort;
     if (flags.permissionMode) params.permissionMode = flags.permissionMode;
     if (flags.planMode) params.planMode = true;
     try {
@@ -307,12 +339,18 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     if (!userMessage) return false;
     const content = userMessage.text ?? "";
     const attachments = userMessage.attachments;
-    const input = buildTurnInput(content, attachments);
+    const override = get().overridesByThread[threadId] ?? {};
+    const composed = override.systemPrompt
+      ? prependSystemPrompt(content, override.systemPrompt)
+      : content;
+    const input = buildTurnInput(composed, attachments);
     if (input.length === 0) return false;
     const flags = get().turnFlags;
-    const params: Record<string, unknown> = { threadId, input, content };
-    if (flags.model) params.model = flags.model;
-    if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;
+    const params: Record<string, unknown> = { threadId, input, content: composed };
+    const model = override.model ?? flags.model;
+    const reasoningEffort = override.reasoningEffort ?? flags.reasoningEffort;
+    if (model) params.model = model;
+    if (reasoningEffort) params.reasoningEffort = reasoningEffort;
     if (flags.permissionMode) params.permissionMode = flags.permissionMode;
     if (flags.planMode) params.planMode = true;
     try {
@@ -1056,4 +1094,15 @@ function bumpVisitIfActive(
   const next = { ...get().lastVisitedByThread, [threadId]: Date.now() };
   set({ lastVisitedByThread: next });
   void prefsStore.saveLastVisited(next);
+}
+
+/** Compose the per-thread system prompt with the user's typed turn. We
+ *  send it as a single text item rather than two so providers without an
+ *  explicit "system" channel still receive the preface. The blank line
+ *  separator keeps the user's prose visually distinct in the bridge log. */
+export function prependSystemPrompt(content: string, systemPrompt: string): string {
+  const prompt = systemPrompt.trim();
+  if (!prompt) return content;
+  if (!content.trim()) return prompt;
+  return `${prompt}\n\n${content}`;
 }

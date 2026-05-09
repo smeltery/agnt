@@ -46,6 +46,17 @@ const BOOKMARKS_KEY = "prefs.bookmarksByThread";
 const THREAD_COLORS_KEY = "prefs.threadColors";
 const TURN_WEBHOOK_KEY = "prefs.turnWebhook";
 const SAVED_SEARCHES_KEY = "prefs.savedSearches";
+const RECENT_SEARCHES_KEY = "prefs.recentSearches";
+const THREAD_OVERRIDES_KEY = "prefs.threadOverrides";
+const LOCALE_KEY = "prefs.locale";
+
+/** Per-thread override of the global turn flags. Anything left undefined
+ *  falls back to the global pick from `state/threads-store:turnFlags`. */
+export interface ThreadOverride {
+  systemPrompt?: string;
+  model?: string;
+  reasoningEffort?: string;
+}
 
 export interface TurnWebhookPreference {
   /** Absolute https/http URL to POST to on turn end. Empty when unset. */
@@ -149,6 +160,39 @@ export const prefsStore = {
   },
   async saveSavedSearches(queries: string[]): Promise<void> {
     await idb.set(SAVED_SEARCHES_KEY, queries);
+  },
+  async loadRecentSearches(): Promise<string[]> {
+    const raw = await idb.get<string[]>(RECENT_SEARCHES_KEY);
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  },
+  async saveRecentSearches(queries: string[]): Promise<void> {
+    await idb.set(RECENT_SEARCHES_KEY, queries);
+  },
+  async loadThreadOverrides(): Promise<Record<string, ThreadOverride>> {
+    const raw = await idb.get<Record<string, ThreadOverride>>(THREAD_OVERRIDES_KEY);
+    if (!raw || typeof raw !== "object") return {};
+    const out: Record<string, ThreadOverride> = {};
+    for (const [threadId, override] of Object.entries(raw)) {
+      if (!override || typeof override !== "object") continue;
+      const cleaned: ThreadOverride = {};
+      if (typeof override.systemPrompt === "string") cleaned.systemPrompt = override.systemPrompt;
+      if (typeof override.model === "string") cleaned.model = override.model;
+      if (typeof override.reasoningEffort === "string") cleaned.reasoningEffort = override.reasoningEffort;
+      // Drop entries that ended up empty so saved blobs don't grow forever.
+      if (Object.keys(cleaned).length > 0) out[threadId] = cleaned;
+    }
+    return out;
+  },
+  async saveThreadOverrides(map: Record<string, ThreadOverride>): Promise<void> {
+    await idb.set(THREAD_OVERRIDES_KEY, map);
+  },
+  async loadLocale(): Promise<string | undefined> {
+    const raw = await idb.get<string>(LOCALE_KEY);
+    return typeof raw === "string" && raw.trim() ? raw : undefined;
+  },
+  async saveLocale(locale: string): Promise<void> {
+    await idb.set(LOCALE_KEY, locale);
   },
   async loadTurnWebhook(): Promise<TurnWebhookPreference> {
     const raw = await idb.get<TurnWebhookPreference>(TURN_WEBHOOK_KEY);
