@@ -143,7 +143,13 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Plan-mode rendering | `components/chat/rows/PlanRow.tsx` | ✅ (steps + streaming text + presentation transitions) |
 | Per-turn flag bar | `components/chat/TurnFlagBar.tsx` | ✅ (model, reasoning effort, plan mode, permission mode) |
 | Voice composer button | `components/chat/VoiceButton.tsx` + `state/voice-store.ts` + `lib/audio-encode.ts` | ✅ (record → resample → WAV → voice/transcribe; final transcript drops into composer draft) |
-| Settings | `components/settings/SettingsModal.tsx` + `state/account-store.ts` | ✅ (connection info, account status, trusted-Mac mgmt with forget; Session 31 adds a search-as-you-type filter that hides sections by keyword tags) |
+| Settings | `components/settings/SettingsModal.tsx` + `state/account-store.ts` | ✅ (connection info, account status, trusted-Mac mgmt with forget; Session 31 adds a search-as-you-type filter; Session 32 adds Turn-completion webhook + Diagnostic report sections) |
+| Long-thread virtualization | `components/chat/ChatView.tsx` + `agnt-msg-cv` CSS | ✅ (Session 32; CSS `content-visibility: auto` on each row wrapper skips off-screen layout + paint; `MessageRow` wrapped in `React.memo` so a parent re-render doesn't cascade) |
+| Undo destructive actions | `state/undo-store.ts` + `components/shared/UndoToast.tsx` | ✅ (Session 32; archive / unarchive / rename publish a 5-second reverse callback; UndoToast surfaces it bottom-center) |
+| Word-level intra-line diff | `lib/diff-word-tokens.ts` + `components/git/DiffView.tsx` | ✅ (Session 32; LCS over per-line tokens highlights only the differing tokens for adjacent `-` / `+` line pairs) |
+| Copy patch per file | `components/git/GitPanel.tsx:CopyPatchButton` | ✅ (Session 32; copies the active file's unified-diff slice for paste into `git apply` / PR comments) |
+| Diagnostic report export | `lib/diagnostic-report.ts` + Settings "Diagnostic report" section | ✅ (Session 32; JSON snapshot of connection / latency / notices / IDB key counts / browser info; thread contents excluded; pairing ids hashed via `shortHash`) |
+| Turn-completion webhook | `lib/turn-webhook.ts` + `storage/prefs-store.ts:loadTurnWebhook` + Settings section | ✅ (Session 32; fire-and-forget POST on `turn/completed` / `turn/failed`; http(s) URLs only; payload excludes message text) |
 | State backup / restore | `lib/state-backup.ts` + `storage/idb.ts:keys` + Settings "Backup & restore" section | ✅ (Session 30; exports `prefs.*` + `messages:*` keys to a versioned JSON file; identity + pairing keys hard-blocklisted; import overwrites matching keys + prompts a reload) |
 | Per-turn timing chip | `state/turn-timing-store.ts` + `components/chat/rows/AssistantRow.tsx` | ✅ (Session 30; records start/end ms by turnId; `⏱ N.Ns` chip on completed assistant rows; memory-only, retention capped at 200 turns/thread) |
 | About | `components/settings/AboutModal.tsx` | ✅ (version, source link, license) |

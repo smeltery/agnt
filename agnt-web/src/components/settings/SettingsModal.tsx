@@ -4,6 +4,11 @@
 // for the same reason as iOS — full OAuth handoff happens out-of-band.
 
 import { useEffect, useRef, useState } from "react";
+import {
+  buildDiagnosticReport,
+  defaultDiagnosticFilename,
+  downloadDiagnostic,
+} from "../../lib/diagnostic-report";
 import { permissionLabel, requestPermission } from "../../lib/notifications";
 import {
   applyStateBackup,
@@ -25,6 +30,7 @@ import {
   type CustomSlashCommand,
   type NotificationsPreference,
   type ThemePreference,
+  type TurnWebhookPreference,
 } from "../../storage/prefs-store";
 
 export function SettingsModal({ onClose }: { onClose(): void }) {
@@ -200,6 +206,10 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
         {matches(["Custom slash commands", "slash", "snippet", "command"]) && <CustomSlashCommandsSection />}
 
         {matches(["Backup", "Restore", "Export", "Import", "JSON"]) && <BackupRestoreSection />}
+
+        {matches(["Webhook", "Turn", "POST", "automation", "Slack"]) && <TurnWebhookSection />}
+
+        {matches(["Diagnostic", "Debug", "Bug report", "Support"]) && <DiagnosticSection />}
 
         {matches(["Trusted Macs", "pair", "forget", "fingerprint"]) && (
         <section className="agnt-settings-section">
@@ -425,6 +435,99 @@ function BackupRestoreSection() {
       {feedback && (
         <p className={feedback.kind === "ok" ? "agnt-settings-hint" : "agnt-settings-error"}>{feedback.message}</p>
       )}
+    </section>
+  );
+}
+
+function TurnWebhookSection() {
+  const [pref, setPref] = useState<TurnWebhookPreference>({ url: "", enabled: false });
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    void prefsStore.loadTurnWebhook().then(setPref);
+  }, []);
+
+  async function patch(next: TurnWebhookPreference) {
+    setPref(next);
+    await prefsStore.saveTurnWebhook(next);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1200);
+  }
+
+  // Reject obviously-wrong URLs at the boundary so the user gets immediate
+  // feedback instead of silent webhook misses. Empty is fine — it just
+  // means "no webhook configured yet".
+  const urlInvalid = pref.url.trim().length > 0 && !/^https?:\/\//i.test(pref.url.trim());
+
+  return (
+    <section className="agnt-settings-section">
+      <h3>Turn-completion webhook</h3>
+      <p className="agnt-settings-hint">
+        POST a JSON payload to this URL whenever a turn lands (`completed` or `failed`). Useful for Slack pings,
+        local automation, or ad-hoc logging. The payload includes the outcome, threadId, turnId, and timestamp —
+        but <strong>no message text</strong>, since sending model output to a third-party URL would be a data leak.
+      </p>
+      <div className="agnt-settings-row">
+        <label className="agnt-settings-row-label" htmlFor="agnt-webhook-url">URL</label>
+        <input
+          id="agnt-webhook-url"
+          type="url"
+          inputMode="url"
+          spellCheck={false}
+          value={pref.url}
+          placeholder="https://hooks.example/agnt"
+          className={"agnt-settings-input" + (urlInvalid ? " agnt-settings-input-error" : "")}
+          onChange={(event) => void patch({ ...pref, url: event.target.value })}
+        />
+      </div>
+      <div className="agnt-settings-row">
+        <label className="agnt-settings-row-label" htmlFor="agnt-webhook-enabled">Enabled</label>
+        <input
+          id="agnt-webhook-enabled"
+          type="checkbox"
+          checked={pref.enabled}
+          disabled={!pref.url.trim() || urlInvalid}
+          onChange={(event) => void patch({ ...pref, enabled: event.target.checked })}
+        />
+      </div>
+      {urlInvalid && <p className="agnt-settings-error">URL must start with http:// or https://.</p>}
+      {saved && <p className="agnt-settings-hint">Saved.</p>}
+    </section>
+  );
+}
+
+function DiagnosticSection() {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  async function exportReport() {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const report = await buildDiagnosticReport();
+      downloadDiagnostic(report, defaultDiagnosticFilename());
+      setFeedback(`Exported ${report.storage.totalKeys} key${report.storage.totalKeys === 1 ? "" : "s"} of context.`);
+    } catch (error) {
+      setFeedback((error as Error)?.message ?? "Export failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="agnt-settings-section">
+      <h3>Diagnostic report</h3>
+      <p className="agnt-settings-hint">
+        Download a JSON snapshot of the session: connection state, latency stats, recent notice titles, IndexedDB
+        key counts, and browser info. Pairing identifiers are hashed; thread contents and identity keys are
+        excluded. Attach the file when filing a bug report.
+      </p>
+      <div className="agnt-settings-backup-actions">
+        <button type="button" className="agnt-button-ghost" onClick={() => void exportReport()} disabled={busy}>
+          Export diagnostic
+        </button>
+      </div>
+      {feedback && <p className="agnt-settings-hint">{feedback}</p>}
     </section>
   );
 }

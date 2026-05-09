@@ -27,6 +27,7 @@ import { Lightbox } from "../shared/Lightbox";
 import { NoticeStack } from "../shared/NoticeStack";
 import { ReconnectBanner } from "../shared/ReconnectBanner";
 import { StatusPill } from "../shared/StatusPill";
+import { UndoToast } from "../shared/UndoToast";
 import { StructuredInputModal } from "../structured-input/StructuredInputModal";
 
 export function Workspace() {
@@ -254,6 +255,7 @@ export function Workspace() {
         <ChatView />
       </div>
       <NoticeStack />
+      <UndoToast />
       <ApprovalModal />
       <StructuredInputModal />
       <RevertSheet />

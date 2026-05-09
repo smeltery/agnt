@@ -4,6 +4,7 @@
 // diff is fetched once on first expand and reused across files).
 
 import { useEffect, useMemo, useState } from "react";
+import { copyText } from "../../lib/clipboard";
 import { computeDiffStats, formatDiffStats, sumDiffStats } from "../../lib/git-diff-stats";
 import { splitUnifiedDiff } from "../../lib/git-diff-parser";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
@@ -149,7 +150,10 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
                 </button>
                 {expanded && (
                   filePatch
-                    ? <DiffView patch={filePatch} />
+                    ? <>
+                        <CopyPatchButton patch={filePatch} />
+                        <DiffView patch={filePatch} />
+                      </>
                     : <div className="agnt-gitpanel-empty">{diff ? "No textual diff (binary or untracked)." : "Loading diff…"}</div>
                 )}
               </li>
@@ -316,5 +320,26 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
         </ul>
       )}
     </section>
+  );
+}
+
+function CopyPatchButton({ patch }: { patch: string }) {
+  const [justCopied, setJustCopied] = useState(false);
+  return (
+    <div className="agnt-gitpanel-file-actions">
+      <button
+        type="button"
+        className={"agnt-button-ghost" + (justCopied ? " agnt-button-ghost-active" : "")}
+        onClick={async () => {
+          const ok = await copyText(patch);
+          if (!ok) return;
+          setJustCopied(true);
+          window.setTimeout(() => setJustCopied(false), 1200);
+        }}
+        title="Copy this file's patch to the clipboard (paste into git apply / a PR comment / etc.)"
+      >
+        {justCopied ? "Copied" : "Copy patch"}
+      </button>
+    </div>
   );
 }
