@@ -22,6 +22,8 @@ import {
   type SidebarDensity,
   type SidebarTabPreference,
 } from "../../storage/prefs-store";
+import { EmptyState, SidebarSkeleton } from "../shared/Loading";
+import { MagnifyingGlass } from "../shared/Icon";
 import { ThreadContextMenu } from "./ThreadContextMenu";
 
 interface SidebarProps {
@@ -266,10 +268,29 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
           }}
         />
       </div>
-      {visible.length === 0 ? (
-        <div className="agnt-sidebar-empty">
-          {query ? "No threads match your search." : tab === "live" ? "No live threads yet." : "No archived threads."}
-        </div>
+      {/* Cold start: bridge `thread/list` is in flight and we have nothing
+          local to paint yet. Show shimmer rows instead of an empty card so
+          the user sees that something's happening. */}
+      {loading && visible.length === 0 && liveThreads.length === 0 && archivedThreads.length === 0 ? (
+        <SidebarSkeleton />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={<MagnifyingGlass size={22} />}
+          title={
+            query
+              ? "No threads match"
+              : tab === "live"
+                ? "No live threads yet"
+                : "No archived threads"
+          }
+          message={
+            query
+              ? "Try a different search."
+              : tab === "live"
+                ? "Tap + New to start a conversation."
+                : "Archived threads land here once you archive them."
+          }
+        />
       ) : (
         <div className="agnt-sidebar-groups">
           {groups.map((group) => {

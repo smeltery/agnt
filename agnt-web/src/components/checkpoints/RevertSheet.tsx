@@ -8,6 +8,7 @@
 import { useConnectionStore } from "../../state/connection-store";
 import { useCheckpointsStore } from "../../state/checkpoints-store";
 import { useNoticesStore } from "../../state/notices-store";
+import { Sheet } from "../shared/Sheet";
 
 export function RevertSheet() {
   const open = useCheckpointsStore((state) => state.open);
@@ -40,14 +41,19 @@ export function RevertSheet() {
   }
 
   return (
-    <div className="agnt-modal-backdrop" role="presentation" onClick={hide}>
-      <div
-        className="agnt-modal agnt-revert-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="agnt-revert-title"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Sheet
+      open
+      // The Cancel button is the user-visible escape; this onClose only fires
+      // from Esc since closable=false disables drag + backdrop dismissal.
+      // Esc-to-cancel is intentional — destructive operations should always
+      // honor a baseline keyboard escape.
+      onClose={() => { if (!applying) hide(); }}
+      ariaLabel="Revert workspace"
+      presentation="alert"
+      closable={false}
+      maxWidth={620}
+    >
+      <div className="agnt-revert-modal">
         <header className="agnt-modal-header">
           <span className="agnt-row-tag">Revert turn</span>
           <h2 id="agnt-revert-title">Roll the workspace back to before this turn?</h2>
@@ -132,7 +138,7 @@ export function RevertSheet() {
           </button>
         </footer>
       </div>
-    </div>
+    </Sheet>
   );
 }
 

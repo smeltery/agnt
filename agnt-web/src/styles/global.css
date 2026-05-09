@@ -2528,6 +2528,123 @@ button {
 }
 .agnt-settings-input-error { border-color: var(--agnt-danger); }
 
+/* Session 35 — accessibility floor + sheet presentation alert variant. */
+
+/* Global focus ring. We use `:focus-visible` (not `:focus`) so the ring
+   only paints for keyboard navigation, never for click/tap focus. The
+   2px outline + 2px offset keeps it visually distinct from any inner
+   element (radio dots, hover backgrounds). */
+:where(button, a, input, textarea, select, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--agnt-accent);
+  outline-offset: 2px;
+  border-radius: var(--agnt-radius-small);
+}
+/* Inputs already have their own focus shadow; suppress the global outline
+   so we don't render two competing rings. */
+.agnt-composer-input:focus-visible,
+.agnt-sidebar-search-input:focus-visible,
+.agnt-settings-input:focus-visible {
+  outline: none;
+}
+
+/* prefers-reduced-motion: drop transitions + animations across the board.
+   We keep the visual changes (color swaps, layout shifts) but the user
+   doesn't get the implied motion they explicitly asked us to suppress. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Alert-mode variant of the Sheet: centered card, fades in instead of
+   sliding up. Skips the grabber + drag handlers. Used for Approval +
+   Revert dialogs where an accidental drag or backdrop click would do the
+   wrong thing. */
+.agnt-sheet-backdrop-alert {
+  align-items: center;
+  padding: 24px;
+}
+.agnt-sheet-alert {
+  border-radius: var(--agnt-radius-sheet);
+  max-height: calc(100vh - 80px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+[data-theme="light"] .agnt-sheet-alert { box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18); }
+.agnt-sheet-alert .agnt-sheet-body { padding: 20px; }
+@media (min-width: 768px) {
+  .agnt-sheet-backdrop-alert { padding: 0 24px; }
+}
+
+/* Loading skeletons: subtle shimmer using a moving linear-gradient. We
+   keep the animation cheap (a 1.5s linear loop) and disable it entirely
+   under prefers-reduced-motion via the rule above. */
+.agnt-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--agnt-bg-elev-2) 0%,
+    color-mix(in srgb, var(--agnt-bg-elev-2) 70%, var(--agnt-bg-elev) 30%) 50%,
+    var(--agnt-bg-elev-2) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--agnt-radius-small);
+  animation: agnt-skeleton-shimmer 1.5s linear infinite;
+}
+@keyframes agnt-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.agnt-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--agnt-radius-control);
+}
+.agnt-skeleton-line { height: 11px; }
+.agnt-skeleton-line-short { width: 60%; }
+.agnt-skeleton-line-medium { width: 80%; }
+.agnt-skeleton-line-full { width: 100%; }
+
+/* Empty-state container: centers an icon + copy, gives the chrome a
+   moment to breathe, and makes the icon read as a soft visual rather than
+   a button. */
+.agnt-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--agnt-fg-dim);
+}
+.agnt-empty-state-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--agnt-bg-elev-2);
+  border-radius: 999px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-empty-state-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--agnt-fg);
+}
+.agnt-empty-state-message {
+  margin: 0;
+  font-size: 14px;
+  max-width: 320px;
+}
+
 /* Session 34 — SVG icon polish + iOS-style sheet presentation. */
 
 /* SVGs render aligned to the surrounding text baseline; vertical-align

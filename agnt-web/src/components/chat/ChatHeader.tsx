@@ -1,12 +1,19 @@
 // Sticky header that surfaces the active thread's title + cwd, plus a toggle
 // for the git panel. Visible only when a thread is selected.
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
 import { formatStreamingStats, useStreamingStatsStore } from "../../state/streaming-stats-store";
 import { selectActiveTurnRunning, useThreadsStore } from "../../state/threads-store";
-import { FileBrowser } from "../files/FileBrowser";
-import { GitPanel } from "../git/GitPanel";
+
+// Code-split: most chat sessions never open these panels, so the bundles
+// stay out of the first paint until the user clicks Files / Git.
+const FileBrowser = lazy(() =>
+  import("../files/FileBrowser").then((m) => ({ default: m.FileBrowser }))
+);
+const GitPanel = lazy(() =>
+  import("../git/GitPanel").then((m) => ({ default: m.GitPanel }))
+);
 
 interface ChatHeaderProps {
   rpc: JsonRpcClient | null;
@@ -81,10 +88,15 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
           </button>
         </div>
       </div>
-      {showFiles && thread.cwd && (
-        <FileBrowser threadId={selectedThreadId} cwd={thread.cwd} rpc={rpc} />
-      )}
-      {showGit && <GitPanel threadId={selectedThreadId} rpc={rpc} />}
+      {/* Lazy panels share a single Suspense boundary; the chunks fetch on
+          first toggle and reuse on later opens. Null fallback while loading
+          keeps the header from jumping. */}
+      <Suspense fallback={null}>
+        {showFiles && thread.cwd && (
+          <FileBrowser threadId={selectedThreadId} cwd={thread.cwd} rpc={rpc} />
+        )}
+        {showGit && <GitPanel threadId={selectedThreadId} rpc={rpc} />}
+      </Suspense>
     </header>
   );
 }
