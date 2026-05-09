@@ -1,51 +1,79 @@
-/* Theme tokens. The default :root values define the dark palette so anything
-   that ignores the [data-theme] attribute (e.g. an HTML preview) still looks
-   right. [data-theme="light"] overrides for the light palette. The Auto mode
-   in Settings just unsets [data-theme] and lets prefers-color-scheme:light
-   kick in via the @media block at the end. */
+/* Theme tokens — Session 33 retunes these to mirror UIKit semantic colors so
+   the web client reads as a continuation of AgntMobile's visual language.
+   Mapping (UIKit -> CSS var):
+     systemBackground          -> --agnt-bg
+     secondarySystemBackground -> --agnt-bg-elev (cards, modals, panels)
+     tertiarySystemFill (×0.8) -> --agnt-bg-elev-2 (selection, search field, user bubble)
+     separator                 -> --agnt-border
+     label                     -> --agnt-fg
+     secondaryLabel            -> --agnt-fg-dim
+     systemBlue                -> --agnt-accent
+     systemRed                 -> --agnt-danger
+     systemOrange              -> --agnt-warn
+     systemGreen               -> --agnt-ok
+   The radius scale matches iOS conventions: 22 (chat bubble), 18 (sheet/banner),
+   14 (sidebar selection + search field), 12 (card), 8 (small button). All use
+   the smoother continuous corner via the `--agnt-radius-*` family. */
 
 :root {
-  --agnt-bg: #0b0c0f;
-  --agnt-bg-elev: #14161b;
-  --agnt-bg-elev-2: #1c1f26;
-  --agnt-border: #232631;
-  --agnt-fg: #e7e9ee;
-  --agnt-fg-dim: #9aa0ad;
-  --agnt-accent: #6f8cff;
-  --agnt-danger: #ff6f7c;
-  --agnt-warn: #f4b860;
-  --agnt-ok: #5fd07a;
+  /* Dark palette (iOS dark mode UIKit colors). */
+  --agnt-bg: #000000;
+  --agnt-bg-elev: #1c1c1e;
+  --agnt-bg-elev-2: rgba(118, 118, 128, 0.24);
+  --agnt-border: rgba(84, 84, 88, 0.65);
+  --agnt-fg: #ffffff;
+  --agnt-fg-dim: rgba(235, 235, 245, 0.60);
+  --agnt-fg-tertiary: rgba(235, 235, 245, 0.30);
+  --agnt-accent: #0a84ff;
+  --agnt-danger: #ff453a;
+  --agnt-warn: #ff9f0a;
+  --agnt-ok: #30d158;
   --agnt-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --agnt-radius: 10px;
+  /* Spacing on a 4pt grid (iOS conventional). */
+  --agnt-space-1: 4px;
+  --agnt-space-2: 8px;
+  --agnt-space-3: 12px;
+  --agnt-space-4: 16px;
+  /* Radius scale — iOS bubble (22), sheet (18), card (12), control (14), small (8). */
+  --agnt-radius-bubble: 22px;
+  --agnt-radius-sheet: 18px;
+  --agnt-radius-control: 14px;
+  --agnt-radius-card: 12px;
+  --agnt-radius-small: 8px;
+  /* Legacy alias kept so existing rules keep working; points at the
+     mid-tier control radius which most pre-Session-33 surfaces meant. */
+  --agnt-radius: var(--agnt-radius-small);
   color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --agnt-bg: #f6f7fa;
-  --agnt-bg-elev: #ffffff;
-  --agnt-bg-elev-2: #eef0f5;
-  --agnt-border: #d3d7df;
-  --agnt-fg: #1b1d22;
-  --agnt-fg-dim: #5b6271;
-  --agnt-accent: #3257d6;
-  --agnt-danger: #c83142;
-  --agnt-warn: #b56b07;
-  --agnt-ok: #1d7c3c;
+  --agnt-bg: #ffffff;
+  --agnt-bg-elev: #f2f2f7;
+  --agnt-bg-elev-2: rgba(118, 118, 128, 0.12);
+  --agnt-border: rgba(60, 60, 67, 0.29);
+  --agnt-fg: #000000;
+  --agnt-fg-dim: rgba(60, 60, 67, 0.60);
+  --agnt-fg-tertiary: rgba(60, 60, 67, 0.30);
+  --agnt-accent: #007aff;
+  --agnt-danger: #ff3b30;
+  --agnt-warn: #ff9500;
+  --agnt-ok: #34c759;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --agnt-bg: #f6f7fa;
-    --agnt-bg-elev: #ffffff;
-    --agnt-bg-elev-2: #eef0f5;
-    --agnt-border: #d3d7df;
-    --agnt-fg: #1b1d22;
-    --agnt-fg-dim: #5b6271;
-    --agnt-accent: #3257d6;
-    --agnt-danger: #c83142;
-    --agnt-warn: #b56b07;
-    --agnt-ok: #1d7c3c;
+    --agnt-bg: #ffffff;
+    --agnt-bg-elev: #f2f2f7;
+    --agnt-bg-elev-2: rgba(118, 118, 128, 0.12);
+    --agnt-border: rgba(60, 60, 67, 0.29);
+    --agnt-fg: #000000;
+    --agnt-fg-dim: rgba(60, 60, 67, 0.60);
+    --agnt-fg-tertiary: rgba(60, 60, 67, 0.30);
+    --agnt-accent: #007aff;
+    --agnt-danger: #ff3b30;
+    --agnt-warn: #ff9500;
+    --agnt-ok: #34c759;
     color-scheme: light;
   }
 }
@@ -57,31 +85,59 @@ html, body, #root {
   margin: 0;
   background: var(--agnt-bg);
   color: var(--agnt-fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
+  /* Match iOS body type: SF Pro Text 15pt, regular weight. The system stack
+     resolves to SF on Apple platforms, Segoe UI on Windows, Roboto on
+     Android — same fallback chain as Apple's Web HIG. */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro",
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
 button {
   font: inherit;
   color: inherit;
   cursor: pointer;
-  border-radius: var(--agnt-radius);
+  border-radius: var(--agnt-radius-small);
   border: 1px solid transparent;
   padding: 6px 12px;
   background: transparent;
 }
 
+/* iOS `.borderedProminent`: solid accent bg, white text, no visible border. */
 .agnt-button-primary {
   background: var(--agnt-accent);
-  color: #0b0c0f;
-  border-color: var(--agnt-accent);
+  color: #ffffff;
+  border-color: transparent;
   font-weight: 600;
+  border-radius: var(--agnt-radius-control);
+  padding: 8px 14px;
+  transition: opacity 120ms ease;
 }
-.agnt-button-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.agnt-button-ghost { border-color: var(--agnt-border); }
+.agnt-button-primary:hover { opacity: 0.92; }
+.agnt-button-primary:active { opacity: 0.78; }
+.agnt-button-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+/* iOS `.bordered`: tinted accent text on a subtle fill, no hard border. */
+.agnt-button-ghost {
+  border-color: transparent;
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border-radius: var(--agnt-radius-control);
+  padding: 6px 12px;
+  transition: background 120ms ease;
+}
 .agnt-button-ghost:hover { background: var(--agnt-bg-elev); }
-.agnt-button-danger { color: var(--agnt-danger); border-color: var(--agnt-danger); }
+.agnt-button-danger {
+  color: var(--agnt-danger);
+  border-color: transparent;
+  background: var(--agnt-bg-elev-2);
+  border-radius: var(--agnt-radius-control);
+  padding: 6px 12px;
+}
+.agnt-button-danger:hover { background: var(--agnt-bg-elev); }
 
 .agnt-loading-screen {
   display: flex;
@@ -146,7 +202,7 @@ button {
   border-bottom: 1px solid var(--agnt-border);
   background: var(--agnt-bg-elev);
 }
-.agnt-brand { font-weight: 700; letter-spacing: 0.5px; }
+.agnt-brand { font-weight: 600; letter-spacing: -0.01em; font-size: 17px; }
 .agnt-workspace-actions { margin-left: auto; display: flex; gap: 8px; }
 .agnt-workspace-body { display: grid; grid-template-columns: 280px 1fr; flex: 1; min-height: 0; position: relative; }
 .agnt-workspace-menu { display: none; }
@@ -206,11 +262,15 @@ button {
 .agnt-sidebar-title { font-weight: 600; }
 .agnt-sidebar-empty { padding: 12px; color: var(--agnt-fg-dim); }
 .agnt-sidebar-list { list-style: none; padding: 4px; margin: 0; overflow-y: auto; }
+/* Sidebar row matches iOS: 12pt horizontal padding, 14px continuous corner
+   radius for the selection background, 15px body text. */
 .agnt-sidebar-thread {
   width: 100%;
   text-align: left;
-  padding: 8px 10px;
-  border-radius: var(--agnt-radius);
+  padding: 10px 12px;
+  border-radius: var(--agnt-radius-control);
+  font-size: 15px;
+  transition: background 100ms ease;
 }
 .agnt-sidebar-thread:hover { background: var(--agnt-bg-elev-2); }
 .agnt-sidebar-thread-selected { background: var(--agnt-bg-elev-2); }
@@ -229,15 +289,49 @@ button {
 }
 
 .agnt-row { margin: 12px 0; max-width: 720px; }
-.agnt-row-user { margin-left: auto; }
-.agnt-row-user .agnt-row-bubble { background: var(--agnt-accent); color: #0b0c0f; }
+/* iOS user bubble: right-aligned, tertiarySystemFill background, 22px
+   continuous corner radius, 12pt vertical / 16pt horizontal padding. The
+   right alignment is guaranteed by `margin-left: auto` plus the bubble
+   wrapping its content via `display: inline-block`. */
+.agnt-row-user {
+  margin-left: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+.agnt-row-user .agnt-row-bubble {
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border-radius: var(--agnt-radius-bubble);
+  padding: 12px 16px;
+  display: inline-block;
+  max-width: min(640px, 100%);
+}
+/* Assistant rows render as flowing prose without a visible bubble; the
+   ambient body background carries the read. */
+.agnt-row-assistant .agnt-row-bubble {
+  padding: 4px 0;
+  background: transparent;
+  border-radius: 0;
+}
 .agnt-row-bubble {
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--agnt-radius-card);
   white-space: pre-wrap;
   background: var(--agnt-bg-elev-2);
 }
-.agnt-row-tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--agnt-fg-dim); margin-bottom: 4px; }
+/* iOS-style pill: lowercase, no letter-spacing, sized like a SF caption2. */
+.agnt-row-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--agnt-fg-dim);
+  background: var(--agnt-bg-elev-2);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-bottom: 0;
+}
 .agnt-row-reasoning-text { color: var(--agnt-fg-dim); white-space: pre-wrap; font-style: italic; }
 .agnt-row-tool { padding: 8px 12px; border: 1px dashed var(--agnt-border); border-radius: var(--agnt-radius); }
 .agnt-row-tool-details { font-family: var(--agnt-mono); font-size: 12px; color: var(--agnt-fg-dim); }
@@ -245,24 +339,58 @@ button {
 .agnt-row-tool-status-completed { color: var(--agnt-ok); }
 .agnt-row-tool-status-failed { color: var(--agnt-danger); }
 
+/* Composer: 16pt horizontal padding mirrors iOS, the textarea uses the
+   tertiarySystemFill background with a smooth 18pt corner so it reads as
+   a card instead of an HTML input. */
 .agnt-composer {
   border-top: 1px solid var(--agnt-border);
-  padding: 12px;
-  background: var(--agnt-bg-elev);
+  padding: 12px 16px 16px;
+  background: var(--agnt-bg);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 .agnt-composer-input {
   background: var(--agnt-bg-elev-2);
-  border: 1px solid var(--agnt-border);
-  border-radius: var(--agnt-radius);
-  padding: 10px;
+  border: 0;
+  border-radius: var(--agnt-radius-sheet);
+  padding: 12px 14px;
   color: var(--agnt-fg);
   font-family: inherit;
-  resize: vertical;
+  font-size: 15px;
+  line-height: 1.4;
+  resize: none;
 }
-.agnt-composer-actions { display: flex; justify-content: flex-end; }
+.agnt-composer-input::placeholder { color: var(--agnt-fg-tertiary); }
+.agnt-composer-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--agnt-accent) 30%, transparent);
+}
+.agnt-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+/* Mirror iOS send button: small filled circle with the active foreground
+   on the system background. The Send affordance lives inside the actions
+   row alongside attach / voice ghost buttons. */
+.agnt-composer-actions .agnt-button-primary {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.agnt-composer-actions .agnt-button-danger {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 600;
+}
 
 .agnt-row-pending .agnt-row-bubble { opacity: 0.7; }
 .agnt-row-failed .agnt-row-bubble { border: 1px solid var(--agnt-danger); }
@@ -447,7 +575,12 @@ button {
   font-size: 11px;
 }
 .agnt-sidebar-tab:hover { color: var(--agnt-fg); }
-.agnt-sidebar-tab-active { background: var(--agnt-bg-elev-2); color: var(--agnt-fg); border-color: var(--agnt-accent); }
+.agnt-sidebar-tab-active {
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border-color: transparent;
+  border-radius: var(--agnt-radius-control);
+}
 .agnt-sidebar-loading { color: var(--agnt-fg-dim); font-size: 11px; }
 .agnt-sidebar-thread-cwd {
   display: block;
@@ -499,29 +632,34 @@ button {
 .agnt-flagbar-toggle { display: flex; gap: 6px; align-items: center; color: var(--agnt-fg-dim); cursor: pointer; }
 .agnt-flagbar-toggle input { cursor: pointer; }
 
+/* iOS sheet treatment: dimmed backdrop, secondarySystemBackground card,
+   18pt continuous corner radius, no visible 1px border (the elevation does
+   the work). Title3 medium for the header. */
 .agnt-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
   padding: 20px;
+  backdrop-filter: saturate(160%) blur(2px);
 }
 .agnt-modal {
   background: var(--agnt-bg-elev);
-  border: 1px solid var(--agnt-border);
-  border-radius: 12px;
+  border: 0;
+  border-radius: var(--agnt-radius-sheet);
   max-width: 560px;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 20px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
 }
-.agnt-modal-header h2 { margin: 4px 0 0; font-size: 18px; }
+[data-theme="light"] .agnt-modal { box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18); }
+.agnt-modal-header h2 { margin: 4px 0 0; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; }
 .agnt-modal-body { display: flex; flex-direction: column; gap: 8px; }
 .agnt-modal-command {
   margin: 0;
@@ -588,10 +726,12 @@ button {
 }
 .agnt-notice-close:hover { color: var(--agnt-fg); }
 
+/* iOS-style chat header: thin separator instead of a colored bar, the
+   primary navigation title sits at 17pt semibold, cwd renders monospace. */
 .agnt-chat-header {
   border-bottom: 1px solid var(--agnt-border);
-  background: var(--agnt-bg-elev);
-  padding: 8px 12px;
+  background: var(--agnt-bg);
+  padding: 10px 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -603,7 +743,12 @@ button {
   align-items: baseline;
   gap: 10px;
 }
-.agnt-chat-header-title { margin: 0; font-size: 15px; }
+.agnt-chat-header-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
 .agnt-chat-header-cwd {
   color: var(--agnt-fg-dim);
   font-family: var(--agnt-mono);
@@ -892,16 +1037,28 @@ button {
 
 .agnt-settings-modal { max-width: 640px; max-height: 90vh; overflow: auto; }
 .agnt-settings-header { display: flex; justify-content: space-between; align-items: center; }
+/* iOS Settings sections: each group is a card with its own
+   secondarySystemBackground, 12pt continuous radius, 16pt padding. The
+   header is a small uppercase grouping label rendered above the card,
+   matching the way iOS Settings labels its rows. */
 .agnt-settings-section {
-  border-top: 1px solid var(--agnt-border);
-  padding-top: 12px;
+  background: var(--agnt-bg-elev-2);
+  border-radius: var(--agnt-radius-card);
+  padding: 14px 16px;
   margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
-.agnt-settings-section:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
-.agnt-settings-section h3 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--agnt-fg-dim); }
+.agnt-settings-section:first-of-type { margin-top: 0; }
+.agnt-settings-section h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--agnt-fg);
+  text-transform: none;
+}
 .agnt-settings-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .agnt-settings-kv dt { color: var(--agnt-fg-dim); }
 .agnt-settings-kv dd { margin: 0; }
@@ -1023,20 +1180,23 @@ button {
   margin-left: 8px;
 }
 
-.agnt-sidebar-search { padding: 8px 10px; border-bottom: 1px solid var(--agnt-border); }
+.agnt-sidebar-search { padding: 8px 12px; border-bottom: 1px solid var(--agnt-border); }
+/* iOS search field: tertiarySystemFill background, 14px corner radius,
+   subheadline font, no visible 1px border. */
 .agnt-sidebar-search-input {
   width: 100%;
   background: var(--agnt-bg-elev-2);
-  border: 1px solid var(--agnt-border);
-  border-radius: 6px;
-  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--agnt-radius-control);
+  padding: 8px 12px;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--agnt-fg);
 }
+.agnt-sidebar-search-input::placeholder { color: var(--agnt-fg-tertiary); }
 .agnt-sidebar-search-input:focus {
   outline: none;
-  border-color: var(--agnt-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--agnt-accent) 35%, transparent);
 }
 
 .agnt-row-assistant { position: relative; }
