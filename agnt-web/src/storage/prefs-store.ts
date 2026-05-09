@@ -45,6 +45,7 @@ const CUSTOM_SLASH_KEY = "prefs.customSlashCommands";
 const BOOKMARKS_KEY = "prefs.bookmarksByThread";
 const THREAD_COLORS_KEY = "prefs.threadColors";
 const TURN_WEBHOOK_KEY = "prefs.turnWebhook";
+const SAVED_SEARCHES_KEY = "prefs.savedSearches";
 
 export interface TurnWebhookPreference {
   /** Absolute https/http URL to POST to on turn end. Empty when unset. */
@@ -140,6 +141,14 @@ export const prefsStore = {
   },
   async saveBookmarks(map: Record<string, string[]>): Promise<void> {
     await idb.set(BOOKMARKS_KEY, map);
+  },
+  async loadSavedSearches(): Promise<string[]> {
+    const raw = await idb.get<string[]>(SAVED_SEARCHES_KEY);
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  },
+  async saveSavedSearches(queries: string[]): Promise<void> {
+    await idb.set(SAVED_SEARCHES_KEY, queries);
   },
   async loadTurnWebhook(): Promise<TurnWebhookPreference> {
     const raw = await idb.get<TurnWebhookPreference>(TURN_WEBHOOK_KEY);

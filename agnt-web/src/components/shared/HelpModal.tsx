@@ -3,6 +3,8 @@
 // components and would need a registry; this is simpler and the shortcut
 // surface is small).
 
+import { Sheet } from "./Sheet";
+
 const SECTIONS: Array<{
   heading: string;
   rows: Array<{ keys: string[]; description: string }>;
@@ -51,18 +53,12 @@ const SECTIONS: Array<{
 
 export function HelpModal({ onClose }: { onClose(): void }) {
   return (
-    <div className="agnt-modal-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="agnt-modal agnt-help-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="agnt-help-title"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Sheet open onClose={onClose} ariaLabel="Keyboard shortcuts" maxWidth={620}>
+      <div className="agnt-help-modal">
         <header className="agnt-modal-header">
           <h2 id="agnt-help-title">Keyboard shortcuts</h2>
         </header>
-        <section className="agnt-modal-body agnt-help-body">
+        <section className="agnt-help-body">
           {SECTIONS.map((section) => (
             <div key={section.heading} className="agnt-help-section">
               <h3>{section.heading}</h3>
@@ -87,6 +83,6 @@ export function HelpModal({ onClose }: { onClose(): void }) {
           </button>
         </footer>
       </div>
-    </div>
+    </Sheet>
   );
 }

@@ -8,6 +8,7 @@ import { useCustomSlashCommandsStore } from "./state/custom-slash-commands-store
 import { useThemeStore } from "./state/theme-store";
 import { PairingScreen } from "./components/pairing/PairingScreen";
 import { Workspace } from "./components/workspace/Workspace";
+import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import { LoadingScreen } from "./components/shared/LoadingScreen";
 
 export function App() {
@@ -35,7 +36,17 @@ export function App() {
     }
   }, [bootstrapping, saved, status.kind, reconnect]);
 
-  if (bootstrapping) return <LoadingScreen label="Loading saved pairing…" />;
-  if (!saved) return <PairingScreen />;
-  return <Workspace />;
+  // ErrorBoundary wraps the whole tree so a render-time crash anywhere in
+  // a downstream component surfaces as a recoverable card instead of a
+  // blank page. Effects above keep firing because state survives — the
+  // user can hit "Try again" and the next render uses the new state.
+  return (
+    <ErrorBoundary>
+      {bootstrapping
+        ? <LoadingScreen label="Loading saved pairing…" />
+        : !saved
+          ? <PairingScreen />
+          : <Workspace />}
+    </ErrorBoundary>
+  );
 }

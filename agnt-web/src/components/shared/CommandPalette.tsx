@@ -12,6 +12,9 @@ import { searchableText } from "../chat/ThreadSearchBar";
 import type { CodexMessage } from "../../models";
 import { useBookmarksStore } from "../../state/bookmarks-store";
 import { useThreadsStore } from "../../state/threads-store";
+import { prefsStore } from "../../storage/prefs-store";
+import { Xmark } from "./Icon";
+import { Sheet } from "./Sheet";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -28,10 +31,13 @@ interface Hit {
 const MAX_HITS = 80;
 const SNIPPET_RADIUS = 60;
 
+const MAX_SAVED_SEARCHES = 8;
+
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const [starredOnly, setStarredOnly] = useState(false);
+  const [savedSearches, setSavedSearches] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const threads = useThreadsStore((state) => state.threads);
   const archived = useThreadsStore((state) => state.archivedThreads);
@@ -50,7 +56,27 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     setQuery("");
     setCursor(0);
     setStarredOnly(false);
+    void prefsStore.loadSavedSearches().then(setSavedSearches);
   }, [open]);
+
+  function persistSearches(next: string[]) {
+    setSavedSearches(next);
+    void prefsStore.saveSavedSearches(next);
+  }
+  function saveCurrent() {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    if (savedSearches.includes(trimmed)) return;
+    persistSearches([trimmed, ...savedSearches].slice(0, MAX_SAVED_SEARCHES));
+  }
+  function removeSearch(value: string) {
+    persistSearches(savedSearches.filter((entry) => entry !== value));
+  }
+  function applySaved(value: string) {
+    setQuery(value);
+    inputRef.current?.focus();
+  }
+  const canSave = query.trim().length > 0 && !savedSearches.includes(query.trim());
 
   const hits: Hit[] = useMemo(() => {
     if (!open) return [];
@@ -108,14 +134,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   if (!open) return null;
   return (
-    <div className="agnt-modal-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="agnt-modal agnt-command-palette"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Search across all threads"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Sheet open onClose={onClose} ariaLabel="Search across all threads" maxWidth={640}>
+      <div className="agnt-command-palette">
         <div className="agnt-command-palette-input-row">
           <input
             ref={inputRef}
@@ -142,6 +162,16 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           />
           <button
             type="button"
+            className="agnt-button-ghost"
+            onClick={saveCurrent}
+            disabled={!canSave}
+            title={canSave ? "Save this search" : "Already saved or empty"}
+            aria-label="Save current search"
+          >
+            Save
+          </button>
+          <button
+            type="button"
             className={"agnt-button-ghost" + (starredOnly ? " agnt-button-ghost-active" : "")}
             onClick={() => setStarredOnly((current) => !current)}
             disabled={!starredOnly && totalBookmarks === 0}
@@ -151,6 +181,31 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             {starredOnly ? "★ all" : `☆ ${totalBookmarks}`}
           </button>
         </div>
+        {savedSearches.length > 0 && (
+          <div className="agnt-command-palette-saved" aria-label="Saved searches">
+            {savedSearches.map((value) => (
+              <span key={value} className="agnt-command-palette-saved-chip">
+                <button
+                  type="button"
+                  className="agnt-command-palette-saved-apply"
+                  onClick={() => applySaved(value)}
+                  title={`Apply saved search: ${value}`}
+                >
+                  {value}
+                </button>
+                <button
+                  type="button"
+                  className="agnt-command-palette-saved-remove"
+                  onClick={() => removeSearch(value)}
+                  aria-label={`Forget saved search: ${value}`}
+                  title="Forget"
+                >
+                  <Xmark size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="agnt-command-palette-hits">
           {!query.trim() && !starredOnly ? (
             <div className="agnt-command-palette-empty">Type to search every cached thread.</div>
@@ -188,7 +243,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           <span className="agnt-command-palette-hint">↑↓ navigate · Enter open · Esc close</span>
         </div>
       </div>
-    </div>
+    </Sheet>
   );
 }
 

@@ -16,6 +16,7 @@ import {
 } from "../../lib/thread-export";
 import { filterThreads } from "../../state/thread-filter";
 import { groupThreadsByRecency, type ThreadGroup } from "../../state/thread-grouping";
+import { buildHashLocation } from "../../lib/hash-routing";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 import {
   prefsStore,
@@ -563,7 +564,30 @@ function SidebarRow({
       <button
         type="button"
         className="agnt-sidebar-thread"
-        onClick={onSelect}
+        onClick={(event) => {
+          // ⌘/Ctrl-click + middle-click open the thread in a new tab via
+          // the existing hash deep-link route. This lets power users keep
+          // a long-running thread in one tab while exploring others.
+          if (event.metaKey || event.ctrlKey || event.button === 1) {
+            event.preventDefault();
+            const url =
+              window.location.pathname +
+              window.location.search +
+              buildHashLocation({ threadId: thread.id });
+            window.open(url, "_blank", "noopener,noreferrer");
+            return;
+          }
+          onSelect();
+        }}
+        onAuxClick={(event) => {
+          if (event.button !== 1) return;
+          event.preventDefault();
+          const url =
+            window.location.pathname +
+            window.location.search +
+            buildHashLocation({ threadId: thread.id });
+          window.open(url, "_blank", "noopener,noreferrer");
+        }}
         onDoubleClick={(event) => {
           event.preventDefault();
           startEditing();

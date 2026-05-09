@@ -9,10 +9,12 @@
 //   - Relay HTTP endpoints (/v1/...) — these depend on the bridge being live
 //   - Cross-origin requests
 //
-// Update strategy: bump CACHE_VERSION on schema changes. The new worker
-// activates on next page load and purges old caches.
+// Update strategy: bump CACHE_VERSION on every visual/asset-shape change so
+// stale rules don't outlive a deploy. The new worker activates on the next
+// page load, purges old caches, and posts a "needs-reload" message to any
+// open client that cares to listen.
 
-const CACHE_VERSION = "agnt-web-v1";
+const CACHE_VERSION = "agnt-web-v3";
 const APP_SHELL = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
@@ -24,8 +26,19 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      await Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key)));
+      const purged = keys.filter((key) => key !== CACHE_VERSION);
+      await Promise.all(purged.map((key) => caches.delete(key)));
       await self.clients.claim();
+      // If we evicted older caches, ping any open clients so they can show
+      // a "new version available" affordance instead of silently serving a
+      // mix of old + new chunks. The web app subscribes via
+      // navigator.serviceWorker.addEventListener("message").
+      if (purged.length > 0) {
+        const clients = await self.clients.matchAll({ includeUncontrolled: true });
+        for (const client of clients) {
+          client.postMessage({ kind: "agnt-cache-evicted", version: CACHE_VERSION });
+        }
+      }
     })()
   );
 });
