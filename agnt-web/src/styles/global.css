@@ -783,6 +783,17 @@ button {
   font-size: 11px;
 }
 .agnt-chat-header-provider { text-transform: capitalize; }
+.agnt-chat-header-branch {
+  cursor: pointer;
+  border: 1px solid var(--agnt-border);
+  background: transparent;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  white-space: nowrap;
+}
+.agnt-chat-header-branch:hover { color: var(--agnt-fg); border-color: var(--agnt-fg-dim); }
+.agnt-chat-header-branch-dirty { color: var(--agnt-warn, #d3893b); border-color: var(--agnt-warn, #d3893b); }
 
 .agnt-sidebar-row { display: flex; align-items: stretch; gap: 4px; padding: 0; }
 .agnt-sidebar-row-selected { background: var(--agnt-bg-elev-2); }
@@ -1802,6 +1813,24 @@ button {
 .agnt-md-pre:hover .agnt-md-pre-copy { opacity: 1; }
 .agnt-md-pre-copy:hover { color: var(--agnt-fg); border-color: var(--agnt-accent); }
 .agnt-md-pre-copy-done { color: var(--agnt-ok); border-color: var(--agnt-ok); opacity: 1; }
+/* Language label sits in the top-left mirror-position of the copy button
+   and stays visible (no hover-only fade) so the language is always
+   discoverable. Lowercase + slightly muted so it reads as metadata, not
+   content. */
+.agnt-md-pre-lang {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-family: var(--agnt-mono);
+  font-size: 10px;
+  color: var(--agnt-fg-dim);
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  pointer-events: none;
+  text-transform: lowercase;
+}
 
 .agnt-command-palette {
   display: flex;
@@ -1814,6 +1843,66 @@ button {
   flex-wrap: wrap;
   gap: 6px;
 }
+.agnt-command-palette-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.agnt-command-palette-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.agnt-command-palette-filter-label {
+  color: var(--agnt-fg-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agnt-command-palette-segments {
+  display: inline-flex;
+  border: 1px solid var(--agnt-border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.agnt-command-palette-segment {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--agnt-fg-dim);
+  border: none;
+  border-right: 1px solid var(--agnt-border);
+  cursor: pointer;
+}
+.agnt-command-palette-segment:last-child { border-right: none; }
+.agnt-command-palette-segment:hover { color: var(--agnt-fg); }
+.agnt-command-palette-segment-active {
+  background: var(--agnt-accent);
+  color: var(--agnt-fg-inverse, var(--agnt-bg));
+}
+.agnt-command-palette-filter-select {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  border: 1px solid var(--agnt-border);
+  border-radius: 5px;
+}
+.agnt-command-palette-filter-reset {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--agnt-fg-dim);
+  border: 1px solid var(--agnt-border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.agnt-command-palette-filter-reset:hover { color: var(--agnt-fg); border-color: var(--agnt-fg-dim); }
 .agnt-command-palette-saved-chip {
   display: inline-flex;
   align-items: center;

@@ -9,6 +9,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fuzzyMatch } from "../../lib/fuzzy-match";
+import {
+  defaultFilters,
+  isFilterDefault,
+  passesFilters,
+  type SearchDateFilter,
+  type SearchFilters,
+  type SearchRoleFilter,
+} from "../../lib/search-filter";
 import { searchableText } from "../chat/ThreadSearchBar";
 import type { CodexMessage } from "../../models";
 import { useBookmarksStore } from "../../state/bookmarks-store";
@@ -41,6 +49,11 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const [starredOnly, setStarredOnly] = useState(false);
+  const [filters, setFilters] = useState<SearchFilters>(defaultFilters);
+  // The model list seeds the model filter chips. Empty when the bridge
+  // hasn't registered any (early-pairing case) — we hide the chip group
+  // entirely in that state rather than rendering a single "any" option.
+  const models = useThreadsStore((state) => state.models);
   const [savedSearches, setSavedSearches] = useState<string[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +74,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     setQuery("");
     setCursor(0);
     setStarredOnly(false);
+    setFilters(defaultFilters());
     void prefsStore.loadSavedSearches().then(setSavedSearches);
     void prefsStore.loadRecentSearches().then(setRecentSearches);
   }, [open]);
@@ -102,7 +116,13 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     const trimmed = query.trim().toLowerCase();
     // The "starred only" mode walks bookmarks even when the query is empty
     // — that's the whole point of the global star list view.
-    if (!trimmed && !starredOnly) return [];
+    const filtersActive = !isFilterDefault(filters);
+    // When all permissive filters are at default, fall through to the
+    // existing fast path (empty-trim + not starred = no hits). When the
+    // user has explicitly narrowed by role/date/model, treat the filter
+    // panel itself as a search even with an empty text query — otherwise
+    // the user can't browse "all my user messages from the last 24h".
+    if (!trimmed && !starredOnly && !filtersActive) return [];
     const labelByThread = new Map<string, string>();
     for (const thread of threads) labelByThread.set(thread.id, thread.name ?? thread.title ?? "Untitled");
     for (const thread of archived) labelByThread.set(thread.id, thread.name ?? thread.title ?? "Untitled (archived)");
@@ -116,6 +136,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       if (starredOnly && !threadBookmarks) continue;
       for (const message of reducer.messages) {
         if (starredOnly && !threadBookmarks?.has(message.id)) continue;
+        if (filtersActive && !passesFilters(message, filters)) continue;
         const haystack = searchableText(message);
         if (!haystack) continue;
         let snippetOffset = 0;
@@ -153,7 +174,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     }
     out.sort((a, b) => b.score - a.score);
     return out.length > MAX_HITS ? out.slice(0, MAX_HITS) : out;
-  }, [open, query, starredOnly, threads, archived, reducerStates, bookmarksByThread]);
+  }, [open, query, starredOnly, filters, threads, archived, reducerStates, bookmarksByThread]);
 
   // Clamp the cursor whenever the hit list shrinks; otherwise Enter could
   // run a stale selection.
@@ -217,6 +238,61 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             {starredOnly ? "★ all" : `☆ ${totalBookmarks}`}
           </button>
         </div>
+        {/* Filter row: role + date chips always render. Model only shows
+            when the bridge has registered models. Reset is a single click
+            so users don't have to click each segment back to "any". */}
+        <div className="agnt-command-palette-filters">
+          <SegmentedFilter
+            label="Role"
+            options={[
+              { value: "any", label: "Any" },
+              { value: "user", label: "You" },
+              { value: "assistant", label: "Agent" },
+            ] as const}
+            value={filters.role}
+            onChange={(value) => setFilters((f) => ({ ...f, role: value as SearchRoleFilter }))}
+          />
+          <SegmentedFilter
+            label="Date"
+            options={[
+              { value: "any", label: "Any" },
+              { value: "24h", label: "24h" },
+              { value: "7d", label: "7d" },
+              { value: "30d", label: "30d" },
+            ] as const}
+            value={filters.date}
+            onChange={(value) => setFilters((f) => ({ ...f, date: value as SearchDateFilter }))}
+          />
+          {models.length > 1 && (
+            <label className="agnt-command-palette-filter-group">
+              <span className="agnt-command-palette-filter-label">Model</span>
+              <select
+                className="agnt-command-palette-filter-select"
+                value={filters.model ?? ""}
+                onChange={(event) =>
+                  setFilters((f) => ({ ...f, model: event.target.value || null }))
+                }
+              >
+                <option value="">Any</option>
+                {models.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.displayName ?? option.name ?? option.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {!isFilterDefault(filters) && (
+            <button
+              type="button"
+              className="agnt-command-palette-filter-reset"
+              onClick={() => setFilters(defaultFilters())}
+              title="Clear all filters"
+            >
+              Reset
+            </button>
+          )}
+        </div>
         {savedSearches.length > 0 && (
           <div className="agnt-command-palette-saved" aria-label="Saved searches">
             {savedSearches.map((value) => (
@@ -243,7 +319,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           </div>
         )}
         <div className="agnt-command-palette-hits">
-          {!query.trim() && !starredOnly ? (
+          {!query.trim() && !starredOnly && isFilterDefault(filters) ? (
             recentSearches.length > 0 ? (
               <div className="agnt-command-palette-recent">
                 <div className="agnt-command-palette-recent-header">
@@ -309,6 +385,41 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** Tiny segmented control. Generic enough to drive the role + date
+ *  filters without a per-control component each — the value type is the
+ *  union of `option.value` strings, opaque to the helper. */
+function SegmentedFilter<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  value: T;
+  onChange(next: T): void;
+}) {
+  return (
+    <div className="agnt-command-palette-filter-group">
+      <span className="agnt-command-palette-filter-label">{label}</span>
+      <div className="agnt-command-palette-segments" role="radiogroup" aria-label={label}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={value === option.value}
+            className={"agnt-command-palette-segment" + (value === option.value ? " agnt-command-palette-segment-active" : "")}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

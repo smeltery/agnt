@@ -147,6 +147,16 @@ function CodeBlock({ language, body }: { language: string | null; body: string }
           dangerouslySetInnerHTML={{ __html: escapeHtml(body) }}
         />
       )}
+      {/* The language label is anchored beside the copy button so the
+          two corner-affordances share the same vertical alignment. We
+          show the canonical language (lowercase id Prism understands)
+          rather than the raw fence text so users see "typescript" not
+          "ts" when those alias to the same grammar. */}
+      {canonical && (
+        <span className="agnt-md-pre-lang" aria-hidden>
+          {canonical}
+        </span>
+      )}
       <button
         type="button"
         className={"agnt-md-pre-copy" + (justCopied ? " agnt-md-pre-copy-done" : "")}
