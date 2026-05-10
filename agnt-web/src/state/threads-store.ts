@@ -91,6 +91,10 @@ export interface ThreadsState {
   /** Per-thread override of the global turn flags + an optional system
    *  prompt prepended to every turn. Persisted via `prefs.threadOverrides`. */
   overridesByThread: Record<string, ThreadOverride>;
+  /** Thread ids the user has explicitly silenced. Layered ON TOP of the
+   *  global notifications pref — a muted thread skips desktop alerts even
+   *  when notifications are otherwise enabled. Persisted. */
+  mutedThreadIds: Set<string>;
   loading: boolean;
   error: string | null;
   hydrated: boolean;
@@ -130,6 +134,10 @@ export interface ThreadsState {
    *  by patching `{ systemPrompt: undefined, model: undefined, ... }` —
    *  empty entries are pruned on persist. */
   setThreadOverride(threadId: string, patch: Partial<ThreadOverride>): Promise<void>;
+  /** Toggle desktop notifications for a single thread. Layered on top of
+   *  the global `prefs.notifications` setting — a muted thread skips
+   *  alerts even when notifications are globally enabled. */
+  setThreadMuted(threadId: string, muted: boolean): Promise<void>;
   reset(): void;
 }
 
@@ -150,19 +158,21 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   lastVisitedByThread: {},
   colorByThread: {},
   overridesByThread: {},
+  mutedThreadIds: new Set(),
   loading: false,
   error: null,
   hydrated: false,
 
   async hydrateFromDisk() {
     if (get().hydrated) return;
-    const [max, persistedFlags, pinnedIds, lastVisited, threadColors, threadOverrides] = await Promise.all([
+    const [max, persistedFlags, pinnedIds, lastVisited, threadColors, threadOverrides, mutedIds] = await Promise.all([
       messagesStore.loadHighestOrderIndex(),
       prefsStore.loadTurnFlags(),
       prefsStore.loadPinnedThreadIds(),
       prefsStore.loadLastVisited(),
       prefsStore.loadThreadColors(),
       prefsStore.loadThreadOverrides(),
+      prefsStore.loadMutedThreadIds(),
     ]);
     orderCounter.seedFrom(max);
     // Cast through the looser persisted shape — anything malformed (an old
@@ -179,6 +189,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       lastVisitedByThread: lastVisited,
       colorByThread: threadColors,
       overridesByThread: threadOverrides,
+      mutedThreadIds: new Set(mutedIds),
     });
   },
 
@@ -195,6 +206,15 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     else next[threadId] = merged;
     set({ overridesByThread: next });
     void prefsStore.saveThreadOverrides(next);
+  },
+
+  async setThreadMuted(threadId, muted) {
+    if (!threadId) return;
+    const next = new Set(get().mutedThreadIds);
+    if (muted) next.add(threadId);
+    else next.delete(threadId);
+    set({ mutedThreadIds: next });
+    void prefsStore.saveMutedThreadIds([...next]);
   },
 
   async togglePinThread(threadId) {
@@ -894,6 +914,10 @@ async function notifyTurnFinished(
 ): Promise<void> {
   if (!(await shouldNotify())) return;
   const state = get();
+  // Per-thread mute layered on top of the global pref. We check the
+  // mute set BEFORE building the notification body so a chatty muted
+  // thread can't even cost the localized-string lookup.
+  if (state.mutedThreadIds.has(threadId)) return;
   const thread = state.threads.find((t) => t.id === threadId)
     ?? state.archivedThreads.find((t) => t.id === threadId);
   const threadName = thread?.name ?? thread?.title ?? "Untitled thread";

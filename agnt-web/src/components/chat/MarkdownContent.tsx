@@ -8,7 +8,7 @@
 // nested lists, or HTML inline tags — bundle stays small and the output
 // stays predictable.
 
-import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { copyText } from "../../lib/clipboard";
 import { useConnectionStore } from "../../state/connection-store";
 import { useLightboxStore } from "../../state/lightbox-store";
@@ -115,6 +115,16 @@ function CodeBlock({ language, body }: { language: string | null; body: string }
   const canonical = knownLanguage(language ?? undefined);
   const [ready, setReady] = useState(canonical ? isLanguageReady(canonical) : false);
   const [justCopied, setJustCopied] = useState(false);
+  const [showLineNumbers, setShowLineNumbers] = useState(false);
+
+  // Line count: split on `\n` and drop the trailing empty produced by a
+  // body that ends with a newline (every block does in practice).
+  const lineCount = useMemo(() => {
+    if (!body) return 0;
+    const lines = body.split("\n");
+    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+    return lines.length;
+  }, [body]);
 
   useEffect(() => {
     if (!canonical || ready) return;
@@ -135,7 +145,24 @@ function CodeBlock({ language, body }: { language: string | null; body: string }
   }
 
   return (
-    <pre className={"agnt-md-pre" + (canonical ? " agnt-md-lang-" + canonical : "")}>
+    <pre
+      className={
+        "agnt-md-pre"
+        + (canonical ? " agnt-md-lang-" + canonical : "")
+        + (showLineNumbers ? " agnt-md-pre-numbered" : "")
+      }
+    >
+      {/* Line-number gutter renders as a sibling so the highlighted code
+          can stay a single dangerously-set-innerHTML blob. Line height
+          on the gutter must match the `<code>` exactly (CSS handles it)
+          or a 200-line block will drift visibly toward the bottom. */}
+      {showLineNumbers && lineCount > 0 && (
+        <span className="agnt-md-pre-gutter" aria-hidden>
+          {Array.from({ length: lineCount }, (_, i) => (
+            <span key={i}>{i + 1}</span>
+          ))}
+        </span>
+      )}
       {canonical && ready ? (
         <code
           className={"language-" + canonical}
@@ -147,15 +174,23 @@ function CodeBlock({ language, body }: { language: string | null; body: string }
           dangerouslySetInnerHTML={{ __html: escapeHtml(body) }}
         />
       )}
-      {/* The language label is anchored beside the copy button so the
-          two corner-affordances share the same vertical alignment. We
-          show the canonical language (lowercase id Prism understands)
-          rather than the raw fence text so users see "typescript" not
-          "ts" when those alias to the same grammar. */}
       {canonical && (
         <span className="agnt-md-pre-lang" aria-hidden>
           {canonical}
         </span>
+      )}
+      {/* Line-numbers toggle only renders for blocks that have at least
+          two lines — toggling a one-liner adds noise without value. */}
+      {lineCount > 1 && (
+        <button
+          type="button"
+          className={"agnt-md-pre-lines" + (showLineNumbers ? " agnt-md-pre-lines-on" : "")}
+          onClick={() => setShowLineNumbers((open) => !open)}
+          aria-pressed={showLineNumbers}
+          title={showLineNumbers ? "Hide line numbers" : "Show line numbers"}
+        >
+          #
+        </button>
       )}
       <button
         type="button"

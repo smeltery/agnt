@@ -15,6 +15,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     lastVisitedByThread: {},
     colorByThread: {},
     overridesByThread: {},
+    mutedThreadIds: new Set(),
     models: [],
     selectedThreadId: null,
     turnFlags: {},
@@ -40,6 +41,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     markThreadUnread: async () => {},
     setThreadColor: async () => {},
     setThreadOverride: async () => {},
+    setThreadMuted: async () => {},
     reset: () => {},
     ...overrides,
   };

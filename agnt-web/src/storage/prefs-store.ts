@@ -49,6 +49,7 @@ const SAVED_SEARCHES_KEY = "prefs.savedSearches";
 const RECENT_SEARCHES_KEY = "prefs.recentSearches";
 const THREAD_OVERRIDES_KEY = "prefs.threadOverrides";
 const LOCALE_KEY = "prefs.locale";
+const MUTED_THREADS_KEY = "prefs.mutedThreadIds";
 
 /** Per-thread override of the global turn flags. Anything left undefined
  *  falls back to the global pick from `state/threads-store:turnFlags`. */
@@ -193,6 +194,18 @@ export const prefsStore = {
   },
   async saveLocale(locale: string): Promise<void> {
     await idb.set(LOCALE_KEY, locale);
+  },
+  async loadMutedThreadIds(): Promise<string[]> {
+    const raw = await idb.get<string[]>(MUTED_THREADS_KEY);
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  },
+  async saveMutedThreadIds(ids: string[]): Promise<void> {
+    // Dedup before persisting so a chatty toggle path can't grow the
+    // blob unbounded. Sort for cheap-equality comparisons in tests.
+    const unique = Array.from(new Set(ids.filter((id) => typeof id === "string" && id.trim().length > 0)));
+    unique.sort();
+    await idb.set(MUTED_THREADS_KEY, unique);
   },
   async loadTurnWebhook(): Promise<TurnWebhookPreference> {
     const raw = await idb.get<TurnWebhookPreference>(TURN_WEBHOOK_KEY);

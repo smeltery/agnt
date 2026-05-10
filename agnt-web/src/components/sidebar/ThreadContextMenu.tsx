@@ -35,6 +35,8 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
   const togglePinThread = useThreadsStore((state) => state.togglePinThread);
   const markThreadUnread = useThreadsStore((state) => state.markThreadUnread);
   const setThreadColor = useThreadsStore((state) => state.setThreadColor);
+  const setThreadMuted = useThreadsStore((state) => state.setThreadMuted);
+  const isMuted = useThreadsStore((state) => state.mutedThreadIds.has(thread.id));
   const currentColor = useThreadsStore((state) => state.colorByThread[thread.id]);
   const unread = useThreadsStore((state) => isThreadUnread(thread, state.lastVisitedByThread));
   const exportMessages = useThreadsStore(
@@ -165,6 +167,18 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
             title="Pin a system prompt + model + reasoning effort for this thread"
           >
             Thread overrides…
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={action(() => setThreadMuted(thread.id, !isMuted))}
+            title={
+              isMuted
+                ? "Unmute: desktop notifications fire on turn-complete"
+                : "Mute: skip desktop notifications for this thread (global pref still applies)"
+            }
+          >
+            {isMuted ? "Unmute notifications" : "Mute notifications"}
           </button>
           <button
             type="button"
