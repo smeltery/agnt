@@ -4,7 +4,8 @@
 // which reverse-applies it via `git apply -R`. Same safety checks as the
 // per-turn checkpoint flow (no staged files, no merge conflicts).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { splitUnifiedDiff } from "../../../lib/diff-split";
 import type { CodexMessage } from "../../../models";
 import { useConnectionStore } from "../../../state/connection-store";
 import { useThreadsStore } from "../../../state/threads-store";
@@ -20,8 +21,16 @@ type RevertState =
 
 export function FileChangeRow({ message }: { message: CodexMessage }) {
   const [expanded, setExpanded] = useState(false);
+  const [splitView, setSplitView] = useState(false);
   const [revert, setRevert] = useState<RevertState>({ phase: "idle" });
   const fileChange = message.fileChange;
+  // Parse the diff once when the row is expanded into split mode. The
+  // unified branch keeps using the raw string so we don't pay parse cost
+  // when nobody asks for split view.
+  const splitRows = useMemo(
+    () => (splitView && fileChange?.diff ? splitUnifiedDiff(fileChange.diff) : []),
+    [splitView, fileChange?.diff]
+  );
   const connection = useConnectionStore((state) => state.connection);
   const thread = useThreadsStore((state) => {
     if (!message.threadId) return undefined;
@@ -99,8 +108,46 @@ export function FileChangeRow({ message }: { message: CodexMessage }) {
       </button>
       {expanded && fileChange.diff && (
         <>
-          <pre className="agnt-row-filechange-diff">{fileChange.diff}</pre>
+          {splitView ? (
+            <div className="agnt-row-filechange-diff-split" role="table" aria-label="Side-by-side diff">
+              {splitRows.map((row, i) => (
+                <div className="agnt-row-filechange-diff-split-row" key={i} role="row">
+                  <div
+                    className={
+                      "agnt-row-filechange-diff-split-cell"
+                      + (row.left ? " agnt-diff-" + row.left.kind : " agnt-diff-blank")
+                    }
+                    role="cell"
+                  >
+                    <span className="agnt-diff-num">{row.left?.leftNumber ?? ""}</span>
+                    <span className="agnt-diff-text">{row.left?.text ?? ""}</span>
+                  </div>
+                  <div
+                    className={
+                      "agnt-row-filechange-diff-split-cell"
+                      + (row.right ? " agnt-diff-" + row.right.kind : " agnt-diff-blank")
+                    }
+                    role="cell"
+                  >
+                    <span className="agnt-diff-num">{row.right?.rightNumber ?? ""}</span>
+                    <span className="agnt-diff-text">{row.right?.text ?? ""}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <pre className="agnt-row-filechange-diff">{fileChange.diff}</pre>
+          )}
           <div className="agnt-row-filechange-actions">
+            <button
+              type="button"
+              className={"agnt-row-action" + (splitView ? " agnt-row-action-active" : "")}
+              onClick={() => setSplitView((open) => !open)}
+              title={splitView ? "Switch back to unified diff" : "Show this diff side-by-side"}
+              aria-pressed={splitView}
+            >
+              {splitView ? "Unified" : "Split"}
+            </button>
             {canRevert && (
               <button
                 type="button"
