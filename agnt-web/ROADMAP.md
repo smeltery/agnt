@@ -86,6 +86,15 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 44 — Model pill + Cmd+1..9 + color filter + KaTeX ✅ DONE
+
+- ✅ **Third clean recon pass.** All four claimed gaps verified missing before coding (file-content greps inline in the proposal: `ChatHeader.tsx` for model state, `lib/keyboard.ts` for digit shortcuts, `Sidebar.tsx` for color filtering, `MarkdownContent.tsx`/`markdown-blocks.ts` for math).
+- ✅ **Model name pill in ChatHeader.** New `agnt-chat-header-model` chip resolves the model the *next* turn would use (per-thread override → global flag → thread's last-known) and surfaces the source via the hover title. Sits next to the existing provider chip; hides when no model is resolvable.
+- ✅ **Cmd / Ctrl + 1..9 thread quick-switch.** Window-level keydown handler in `Sidebar.tsx` jumps to the Nth visible row. Bypasses the typing-target gate (Cmd+digit is unambiguously a global shortcut) and the select-mode gate (power users hopping mid-bulk-flow). Uses `event.code === "DigitN"` so non-QWERTY layouts still work. Documented in HelpModal.
+- ✅ **Sidebar color tag filter.** New transient `colorFilter` state — not persisted (lens, not view config). Strip of swatches renders only when threads have color tags; clicking a swatch narrows to that color, clicking again clears. Color filter intersects with text filter so "blue threads matching 'auth'" works. Hidden swatches drop out when no thread under the current tab has that color so the user can't zero out the list.
+- ✅ **KaTeX math rendering.** Block math `$$ … $$` (own-line fences) parsed in `markdown-blocks.ts`; inline `$ … $` and `$$ … $$` (mid-line) tokenized in `MarkdownContent.tsx`. False-positive guard: inline `$…$` requires a math-like character (`\^_{}` ) in the body so prose like `$5 and $10` stays untouched. Lazy-loaded same as Mermaid (~85 KB gzip JS + 29 KB CSS + on-demand fonts). Strict mode + `throwOnError: false` so a malformed formula renders inline-red rather than crashing the row.
+- 6 new vitest cases (block-math lexing: capture / multi-line / mid-paragraph rejection / dollar-amount false-positive guard / unterminated-block fallback / paragraph ordering). 507 / 507 pass; tsc clean; main bundle 409 → 411 KB raw, 131.98 → 132.67 KB gzip.
+
 ## Session 43 — Sound cue + high-contrast + starter prompts + mermaid ✅ DONE
 
 - ✅ **Second clean recon pass.** All four claimed gaps verified missing before coding (file-content grep against `Notifications` / `MarkdownContent.tsx` / `NewChatModal.tsx` / `playSound|new Audio|prefers-contrast`). Continuing the discipline that finally landed in Session 42.

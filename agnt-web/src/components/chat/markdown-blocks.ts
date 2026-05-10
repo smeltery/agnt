@@ -18,6 +18,7 @@
 
 export type MarkdownBlock =
   | { kind: "fence"; language: string | null; body: string }
+  | { kind: "math"; body: string }
   | { kind: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; text: string }
   | { kind: "listOrdered"; items: string[]; start: number }
   | { kind: "listBullet"; items: string[] }
@@ -34,6 +35,11 @@ export interface TaskListItem {
 
 const FENCE_OPEN = /^```(\w+)?\s*$/;
 const FENCE_CLOSE = /^```\s*$/;
+// Block math: `$$ ... $$` on its own line(s). Both fences must be on
+// their own line — the lexer only treats $$ as block math when it
+// stands alone, so an inline `$$E=mc^2$$` in a paragraph still routes
+// through the inline-math path.
+const MATH_FENCE = /^\$\$\s*$/;
 const HEADING = /^(#{1,6})\s+(.+?)\s*$/;
 const ORDERED_ITEM = /^(\s*)(\d+)[.)]\s+(.+)$/;
 const BULLET_ITEM = /^(\s*)[-*+]\s+(.+)$/;
@@ -71,6 +77,20 @@ export function lexMarkdownBlocks(source: string): MarkdownBlock[] {
       // Eat the closing fence if we hit one (otherwise the block runs to EOF).
       if (cursor < lines.length) cursor += 1;
       blocks.push({ kind: "fence", language, body: body.join("\n") });
+      continue;
+    }
+
+    // Block math: `$$\n…\n$$`. Same sticky behavior as fences — body
+    // lines are taken verbatim and the closing `$$` is consumed.
+    if (MATH_FENCE.test(line)) {
+      const body: string[] = [];
+      cursor += 1;
+      while (cursor < lines.length && !MATH_FENCE.test(lines[cursor])) {
+        body.push(lines[cursor]);
+        cursor += 1;
+      }
+      if (cursor < lines.length) cursor += 1;
+      blocks.push({ kind: "math", body: body.join("\n") });
       continue;
     }
 

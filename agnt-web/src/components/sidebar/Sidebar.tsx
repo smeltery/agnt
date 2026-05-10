@@ -21,8 +21,10 @@ import { buildHashLocation } from "../../lib/hash-routing";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 import {
   prefsStore,
+  THREAD_COLOR_VALUES,
   type SidebarDensity,
   type SidebarTabPreference,
+  type ThreadColor,
 } from "../../storage/prefs-store";
 import { EmptyState, SidebarSkeleton } from "../shared/Loading";
 import { MagnifyingGlass } from "../shared/Icon";
@@ -60,6 +62,11 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   // Export across the chosen set.
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  // null = no color filter (show every color). The strip below toggles
+  // a swatch on/off; toggling the same swatch twice clears the filter.
+  // Intentionally not persisted — color filter is a transient lens, not
+  // a long-lived view state.
+  const [colorFilter, setColorFilter] = useState<ThreadColor | null>(null);
   const hydratedRef = useRef(false);
 
   // Hydrate persisted prefs once; later changes to tab/query persist via the
@@ -106,7 +113,13 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   // while `groups` is the partitioned view we render. Both stay in sync via
   // the same filter + grouping pass.
   const { visible, groups } = useMemo(() => {
-    const filtered = filterThreads(tab === "live" ? liveThreads : archivedThreads, query);
+    let filtered = filterThreads(tab === "live" ? liveThreads : archivedThreads, query);
+    // Color filter intersects with the search filter — only threads that
+    // pass both end up in the visible list. `null` means "all colors";
+    // otherwise restrict to threads tagged with the picked color.
+    if (colorFilter) {
+      filtered = filtered.filter((thread) => colorByThread[thread.id] === colorFilter);
+    }
     if (tab !== "live") {
       const archivedGroup = { id: "earlier" as const, label: "Archived", threads: filtered };
       const visibleArchived = collapsedGroups.has(archivedGroup.id) ? [] : filtered;
@@ -117,7 +130,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
     // skipped by j/k navigation since they're not visible to the user.
     const flat = sectioned.flatMap((group) => (collapsedGroups.has(group.id) ? [] : group.threads));
     return { visible: flat, groups: sectioned };
-  }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds, collapsedGroups]);
+  }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds, collapsedGroups, colorFilter, colorByThread]);
 
   // j/k navigate the visible list, like Gmail/Linear. Wraps at the boundaries
   // so muscle memory works either direction. Disabled in multi-select mode so
@@ -126,6 +139,34 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
     j: () => !selectMode && stepSelection(visible, selectedThreadId, 1, selectThread),
     k: () => !selectMode && stepSelection(visible, selectedThreadId, -1, selectThread),
   });
+
+  // Cmd / Ctrl + 1..9 jumps to the Nth visible thread. Cmd+1 selects the
+  // first row in the current view (which is whatever's at the top after
+  // pinning + recency grouping); Cmd+9 selects the ninth. Different from
+  // j / k because:
+  //   - Bypasses the "skip when typing" check — Cmd+digit is unambiguously
+  //     a global shortcut, never text input.
+  //   - Skips selectMode gate — power users running bulk-archive still
+  //     want to hop to a different thread mid-flow.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey || event.altKey) return;
+      // `event.code` keeps "Digit1" stable across keyboard layouts; the
+      // `event.key` would surface localized digits or accented variants
+      // on some keyboards.
+      if (!event.code?.startsWith("Digit")) return;
+      const digit = Number(event.code.slice(5));
+      if (!digit || digit < 1 || digit > 9) return;
+      const target = visible[digit - 1];
+      if (!target) return;
+      event.preventDefault();
+      void selectThread(target.id);
+      onAfterSelect?.();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible, selectThread, onAfterSelect]);
 
   function handleRowSelect(thread: CodexThread) {
     if (selectMode) {
@@ -271,6 +312,44 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
           }}
         />
       </div>
+      {/* Color filter strip: only renders when at least one thread is
+          tagged. Otherwise the swatches are dead-clickable buttons that
+          just empty the visible list — confusing. The "All" affordance
+          is implicit: clicking the active swatch a second time clears
+          the filter. */}
+      {Object.keys(colorByThread).length > 0 && (
+        <div className="agnt-sidebar-color-filter" role="toolbar" aria-label="Filter by color tag">
+          {THREAD_COLOR_VALUES.map((color) => {
+            // Suppress swatches for colors that don't appear in the
+            // current tab's threads — clicking one would zero the list.
+            const present = visible.some((t) => colorByThread[t.id] === color)
+              || (colorFilter !== color && Object.values(colorByThread).includes(color));
+            if (!present) return null;
+            const active = colorFilter === color;
+            return (
+              <button
+                key={color}
+                type="button"
+                className={"agnt-thread-color-swatch agnt-thread-color-" + color
+                  + (active ? " agnt-thread-color-swatch-active" : "")}
+                onClick={() => setColorFilter(active ? null : color)}
+                aria-pressed={active}
+                title={active ? `Clear ${color} filter` : `Filter to ${color}-tagged threads`}
+              />
+            );
+          })}
+          {colorFilter && (
+            <button
+              type="button"
+              className="agnt-sidebar-color-filter-clear"
+              onClick={() => setColorFilter(null)}
+              title="Show all colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
       {/* Cold start: bridge `thread/list` is in flight and we have nothing
           local to paint yet. Show shimmer rows instead of an empty card so
           the user sees that something's happening. */}
