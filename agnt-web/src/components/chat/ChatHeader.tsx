@@ -3,6 +3,7 @@
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { JsonRpcClient } from "../../protocol/jsonrpc-client";
+import { useGitStore } from "../../state/git-store";
 import { formatStreamingStats, useStreamingStatsStore } from "../../state/streaming-stats-store";
 import { selectActiveTurnRunning, useThreadsStore } from "../../state/threads-store";
 
@@ -32,8 +33,28 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
   const color = useThreadsStore((state) =>
     selectedThreadId ? state.colorByThread[selectedThreadId] : undefined
   );
+  // Branch indicator: subscribe to whatever git-store has cached for this
+  // thread (it's populated by GitPanel's first refresh + later writes).
+  // We don't fetch on mount — that would be a status request per thread
+  // selection even when the user never opens the git panel.
+  const gitStatus = useGitStore((state) =>
+    selectedThreadId ? state.byThread[selectedThreadId] : undefined
+  );
+  const branchLabel = gitStatus?.currentBranch;
+  const isDirty = Boolean(gitStatus?.isDirty);
+  const refreshStatus = useGitStore((state) => state.refreshStatus);
   const [showGit, setShowGit] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
+
+  // Lazy first fetch of git status when a thread with cwd is selected,
+  // so the branch pill populates without forcing the user to open the
+  // git panel. Re-runs on cwd / threadId change but not on later status
+  // mutations (those write back into the store directly).
+  useEffect(() => {
+    if (!rpc || !selectedThreadId || !thread?.cwd) return;
+    if (gitStatus !== undefined) return; // already cached; let GitPanel manage refreshes.
+    void refreshStatus(selectedThreadId, rpc);
+  }, [rpc, selectedThreadId, thread?.cwd, gitStatus, refreshStatus]);
 
   if (!selectedThreadId || !thread) return null;
   const title = thread.name ?? thread.title ?? "Untitled";
@@ -78,6 +99,24 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
           >
             {showFiles ? "Hide files" : "Files"}
           </button>
+          {branchLabel && (
+            <button
+              type="button"
+              className={"agnt-row-tag agnt-chat-header-branch" + (isDirty ? " agnt-chat-header-branch-dirty" : "")}
+              onClick={() => setShowGit(true)}
+              title={
+                isDirty
+                  ? `On ${branchLabel} · uncommitted changes — click to open Git`
+                  : `On ${branchLabel} — click to open Git`
+              }
+            >
+              {/* The leading glyph is a Unicode branch icon, kept inline so
+                  we don't pull in a new icon-component dependency. The
+                  bullet on dirty branches mirrors what most IDE status
+                  bars do. */}
+              ⎇ {branchLabel}{isDirty ? " •" : ""}
+            </button>
+          )}
           <button
             type="button"
             className="agnt-button-ghost"
