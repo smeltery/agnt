@@ -24,6 +24,7 @@ const SECTIONS: Array<{
       { keys: ["p"], description: "Pin / unpin the active thread" },
       { keys: ["e"], description: "Export the active thread to Markdown" },
       { keys: ["r"], description: "Revert the last completed turn (workspace checkpoint)" },
+      { keys: ["⌘ / Ctrl", "1-9"], description: "Jump to the Nth visible thread in the sidebar" },
       { keys: ["?"], description: "Open this help" },
       { keys: ["Esc"], description: "Close any open modal" },
     ],

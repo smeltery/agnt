@@ -33,7 +33,24 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
   const color = useThreadsStore((state) =>
     selectedThreadId ? state.colorByThread[selectedThreadId] : undefined
   );
-  // Branch indicator: subscribe to whatever git-store has cached for this
+  // Resolve the model that the *next* turn would use. Per-thread override
+  // wins over the global flag; either wins over the thread's last-known
+  // model from the bridge. Falls back to undefined when none of those are
+  // set — we hide the chip rather than show "default" because the user
+  // gets that signal from the absence of a value already.
+  const overrideModel = useThreadsStore((state) =>
+    selectedThreadId ? state.overridesByThread[selectedThreadId]?.model : undefined
+  );
+  const flagModel = useThreadsStore((state) => state.turnFlags.model);
+  const activeModel = overrideModel ?? flagModel ?? thread?.model;
+  const modelSource: "override" | "flag" | "thread" | null = overrideModel
+    ? "override"
+    : flagModel
+      ? "flag"
+      : thread?.model
+        ? "thread"
+        : null;
+
   // thread (it's populated by GitPanel's first refresh + later writes).
   // We don't fetch on mount — that would be a status request per thread
   // selection even when the user never opens the git panel.
@@ -73,6 +90,20 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
             title={`Provider: ${thread.modelProvider}`}
           >
             {thread.modelProvider}
+          </span>
+        )}
+        {activeModel && (
+          <span
+            className="agnt-row-tag agnt-chat-header-model"
+            title={
+              modelSource === "override"
+                ? `Per-thread override: ${activeModel}`
+                : modelSource === "flag"
+                  ? `Global pick: ${activeModel}`
+                  : `Last seen on this thread: ${activeModel}`
+            }
+          >
+            {activeModel}
           </span>
         )}
         <div className="agnt-chat-header-actions">

@@ -202,6 +202,10 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | High-contrast theme variant | `state/contrast-store.ts` + `:root[data-contrast="high"]` CSS | ✅ (Session 43; orthogonal to theme; follows `prefers-contrast: more` when no explicit pick) |
 | NewChatModal starter prompts | `components/chat/NewChatModal.tsx:STARTER_PROMPTS` | ✅ (Session 43; 5 quick-start chips that prefill the textarea, hidden once typing starts) |
 | Mermaid diagrams in markdown | `components/chat/MermaidBlock.tsx` + lazy dispatch in `MarkdownContent.tsx:renderFence` | ✅ (Session 43; lazy-loaded; ~400 KB gzip across core+deps when triggered, zero cost otherwise) |
+| Model name pill in ChatHeader | `components/chat/ChatHeader.tsx` (`agnt-chat-header-model`) | ✅ (Session 44; resolves override → global flag → thread.model) |
+| Cmd / Ctrl + 1..9 thread quick-switch | `components/sidebar/Sidebar.tsx` window keydown handler | ✅ (Session 44; bypasses typing-target gate; uses `event.code` for layout-stable digit detection) |
+| Sidebar color tag filter | `components/sidebar/Sidebar.tsx` transient `colorFilter` + swatch strip | ✅ (Session 44; intersects with text filter; not persisted) |
+| KaTeX math rendering | `components/chat/MathBlock.tsx` + `markdown-blocks.ts` math block + inline tokenizer in `MarkdownContent.tsx` | ✅ (Session 44; lazy-loaded; ~85 KB gzip JS + 29 KB CSS + on-demand fonts; false-positive guard for prose dollar amounts) |
 | i18n scaffolding | `lib/i18n.ts` + Settings Language section | 🟡 (Session 37; locale picker, `Intl` date/number helpers, ICU-lite placeholders, English baseline. Non-English dictionaries are placeholders awaiting translation) |
 | Global ErrorBoundary | `components/shared/ErrorBoundary.tsx` (wraps `App.tsx`) | ✅ (Session 36; render-time crash surfaces a recoverable card with Try-again + Reload actions; inline-styled to survive CSS corruption) |
 | Service-worker cache notice | `public/sw.js` + `src/main.tsx` (postMessage listener) | ✅ (Session 36; new worker activation evicts old caches and posts `agnt-cache-evicted`; main.tsx surfaces "agnt-web updated — Reload to apply" via the existing notices-store) |

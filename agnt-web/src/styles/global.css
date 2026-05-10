@@ -827,6 +827,12 @@ button {
   font-size: 11px;
 }
 .agnt-chat-header-provider { text-transform: capitalize; }
+.agnt-chat-header-model {
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  white-space: nowrap;
+}
 .agnt-chat-header-branch {
   cursor: pointer;
   border: 1px solid var(--agnt-border);
@@ -1299,6 +1305,26 @@ button {
 }
 
 .agnt-sidebar-search { padding: 8px 12px; border-bottom: 1px solid var(--agnt-border); }
+.agnt-sidebar-color-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+  flex-wrap: wrap;
+}
+.agnt-sidebar-color-filter-clear {
+  font: inherit;
+  font-size: 11px;
+  margin-left: auto;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--agnt-border);
+  border-radius: 4px;
+  color: var(--agnt-fg-dim);
+  cursor: pointer;
+}
+.agnt-sidebar-color-filter-clear:hover { color: var(--agnt-fg); }
 /* iOS search field: tertiarySystemFill background, 14px corner radius,
    subheadline font, no visible 1px border. */
 .agnt-sidebar-search-input {
@@ -3209,4 +3235,60 @@ button {
   color: var(--agnt-fg-dim);
   white-space: pre-wrap;
   text-align: left;
+}
+
+/* ── Math (KaTeX) ───────────────────────────────────────────────────────
+   KaTeX ships its own stylesheet (loaded lazily alongside the lib), so
+   the structural styles here are just our chrome around it. Block math
+   gets a card treatment matching mermaid for visual consistency; inline
+   math sits flush in the paragraph. */
+.agnt-md-math {
+  margin: 8px 0;
+  padding: 12px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.agnt-md-math-inline {
+  /* Inline `$x^2$` should sit on the same line as surrounding text;
+     KaTeX's own CSS handles vertical alignment. */
+  display: inline;
+}
+.agnt-md-math-pending,
+.agnt-md-math-inline-pending {
+  display: inline-block;
+  background: var(--agnt-bg-elev-2);
+  border: 1px dashed var(--agnt-border);
+  border-radius: 4px;
+  min-width: 32px;
+  min-height: 1em;
+  vertical-align: middle;
+}
+.agnt-md-math-pending {
+  display: block;
+  min-height: 48px;
+}
+.agnt-md-math-error {
+  border-color: var(--agnt-error, #b35c00);
+}
+.agnt-md-math-error-message {
+  color: var(--agnt-error, #b35c00);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.agnt-md-math-source {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--agnt-bg);
+  border-radius: 4px;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+.agnt-md-math-inline-error {
+  background: rgba(248, 81, 73, 0.12);
+  color: var(--agnt-error, #b35c00);
+  padding: 0 4px;
+  border-radius: 3px;
 }

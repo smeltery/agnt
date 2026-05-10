@@ -19,6 +19,13 @@ import { selectImageState, useWorkspaceImageCache } from "../../state/workspace-
 const MermaidBlock = lazy(() =>
   import("./MermaidBlock").then((m) => ({ default: m.MermaidBlock }))
 );
+
+// KaTeX (and its CSS) lazy-load on first math block / inline use; same
+// pattern as Mermaid. Inline math goes through the same component with
+// `displayMode={false}` so we only need one lazy boundary.
+const MathBlock = lazy(() =>
+  import("./MathBlock").then((m) => ({ default: m.MathBlock }))
+);
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
 import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
 
@@ -59,6 +66,12 @@ function renderBlock(block: MarkdownBlock, cwd: string | undefined): ReactNode {
   switch (block.kind) {
     case "fence":
       return renderFence(block.language, block.body);
+    case "math":
+      return (
+        <Suspense fallback={<div className="agnt-md-math agnt-md-math-pending" aria-busy />}>
+          <MathBlock body={block.body} displayMode />
+        </Suspense>
+      );
     case "heading":
       return renderHeading(block.level, block.text, cwd);
     case "listOrdered":
@@ -283,6 +296,15 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
         return <strong key={index}>{token.value}</strong>;
       case "italic":
         return <em key={index}>{token.value}</em>;
+      case "math":
+        return (
+          <Suspense
+            key={index}
+            fallback={<span className="agnt-md-math-inline-pending" aria-busy />}
+          >
+            <MathBlock body={token.value} displayMode={token.displayMode} />
+          </Suspense>
+        );
       case "link":
         return (
           <a key={index} href={token.url} target="_blank" rel="noreferrer noopener" title={token.title}>
@@ -382,6 +404,7 @@ type InlineToken =
   | { kind: "code"; value: string }
   | { kind: "bold"; value: string }
   | { kind: "italic"; value: string }
+  | { kind: "math"; value: string; displayMode: boolean }
   | { kind: "link"; label: string; url: string; title?: string }
   | { kind: "image"; label: string; url: string; title?: string };
 
@@ -390,12 +413,22 @@ interface InlineHit {
   start: number;
   end: number;
   // Token-shape fields. `value` is used by the simple kinds; richer kinds
-  // populate label/url/title.
+  // populate label/url/title. `displayMode` is math-only.
   value?: string;
   label?: string;
   url?: string;
   title?: string;
+  displayMode?: boolean;
 }
+
+// Inline math heuristics:
+//   - `$$...$$` mid-paragraph → display-mode math (rare but supported)
+//   - `$...$` → inline math, but ONLY when the body contains a math-like
+//     character (\, ^, _, {, }) so prose like "$5 and $10" doesn't get
+//     pulled into the renderer.
+const DISPLAY_INLINE_MATH = /\$\$([^$\n]+?)\$\$/g;
+const INLINE_MATH = /(?<![\w$])\$([^$\n\s][^$\n]*?[^$\n\s]|[^$\n\s])\$(?![\w$])/g;
+const MATH_HINT = /[\\^_{}]/;
 
 const SAFE_LINK_SCHEMES = /^(https?:|mailto:|#)/i;
 const SAFE_IMAGE_SCHEMES = /^(https?:|data:image\/)/i;
@@ -461,6 +494,33 @@ function tokenizeInline(text: string): InlineToken[] {
       hits.push({ kind, start: match.index, end: match.index + match[0].length, value: match[1] });
     }
   }
+  // Math: display-form first ($$…$$) so its outer $-pair doesn't get
+  // mis-claimed by the inline `$…$` matcher.
+  DISPLAY_INLINE_MATH.lastIndex = 0;
+  for (const match of text.matchAll(DISPLAY_INLINE_MATH)) {
+    if (match.index === undefined) continue;
+    hits.push({
+      kind: "math",
+      start: match.index,
+      end: match.index + match[0].length,
+      value: match[1],
+      displayMode: true,
+    });
+  }
+  INLINE_MATH.lastIndex = 0;
+  for (const match of text.matchAll(INLINE_MATH)) {
+    if (match.index === undefined) continue;
+    // Skip dollar-amount false positives — only emit a math token when
+    // the body looks math-like.
+    if (!MATH_HINT.test(match[1])) continue;
+    hits.push({
+      kind: "math",
+      start: match.index,
+      end: match.index + match[0].length,
+      value: match[1],
+      displayMode: false,
+    });
+  }
   hits.sort((a, b) => a.start - b.start);
   const tokens: InlineToken[] = [];
   let cursor = 0;
@@ -469,6 +529,8 @@ function tokenizeInline(text: string): InlineToken[] {
     if (hit.start > cursor) tokens.push({ kind: "text", value: text.slice(cursor, hit.start) });
     if (hit.kind === "link" || hit.kind === "image") {
       tokens.push({ kind: hit.kind, label: hit.label ?? "", url: hit.url ?? "", title: hit.title });
+    } else if (hit.kind === "math") {
+      tokens.push({ kind: "math", value: hit.value ?? "", displayMode: hit.displayMode ?? false });
     } else {
       tokens.push({ kind: hit.kind, value: hit.value ?? "" } as InlineToken);
     }
