@@ -127,6 +127,70 @@ export function decodePreview(raw: Record<string, unknown>): CheckpointRestorePr
   };
 }
 
+// AI Change Sets: per-file revert. Reverse-applies a single file's
+// unified diff (the `forwardPatch`) via `git apply -R`. The bridge has
+// the same safety checks the per-turn checkpoint flow uses (no staged
+// files, no merge conflicts) and returns a structured preview before the
+// caller commits to the apply.
+
+export interface RevertPatchPreview {
+  canRevert: boolean;
+  affectedFiles: string[];
+  conflicts: Array<{ file?: string; reason?: string }>;
+  unsupportedReasons: string[];
+  stagedFiles: string[];
+}
+
+export interface RevertPatchResult {
+  success: boolean;
+  revertedFiles: string[];
+  conflicts: Array<{ file?: string; reason?: string }>;
+  unsupportedReasons: string[];
+  stagedFiles: string[];
+}
+
+export async function revertPatchPreview(
+  rpc: JsonRpcClient,
+  args: { cwd: string; forwardPatch: string }
+): Promise<RevertPatchPreview> {
+  const raw = await rpc.request<Record<string, unknown>>("workspace/revertPatchPreview", args);
+  return decodeRevertPreview(raw ?? {});
+}
+
+export async function revertPatchApply(
+  rpc: JsonRpcClient,
+  args: { cwd: string; forwardPatch: string }
+): Promise<RevertPatchResult> {
+  const raw = await rpc.request<Record<string, unknown>>("workspace/revertPatchApply", args);
+  return {
+    success: Boolean(raw?.success),
+    revertedFiles: stringArrayField(raw, "revertedFiles"),
+    conflicts: decodeConflicts(raw?.conflicts),
+    unsupportedReasons: stringArrayField(raw, "unsupportedReasons"),
+    stagedFiles: stringArrayField(raw, "stagedFiles"),
+  };
+}
+
+function decodeRevertPreview(raw: Record<string, unknown>): RevertPatchPreview {
+  return {
+    canRevert: Boolean(raw.canRevert),
+    affectedFiles: stringArrayField(raw, "affectedFiles"),
+    conflicts: decodeConflicts(raw.conflicts),
+    unsupportedReasons: stringArrayField(raw, "unsupportedReasons"),
+    stagedFiles: stringArrayField(raw, "stagedFiles"),
+  };
+}
+
+function decodeConflicts(raw: unknown): Array<{ file?: string; reason?: string }> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is Record<string, unknown> => entry !== null && typeof entry === "object")
+    .map((entry) => ({
+      file: typeof entry.file === "string" ? entry.file : undefined,
+      reason: typeof entry.reason === "string" ? entry.reason : undefined,
+    }));
+}
+
 function stringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" && value.trim() ? value : undefined;

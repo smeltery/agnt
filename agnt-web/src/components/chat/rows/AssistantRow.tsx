@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { copyText } from "../../../lib/clipboard";
 import { computeDiffStats, sumDiffStats } from "../../../lib/git-diff-stats";
 import { quoteAsMarkdown } from "../../../lib/quote";
+import { formatCostUsd, formatTokens, totalTokens } from "../../../lib/token-usage";
 import type { CodexMessage } from "../../../models";
 import { useCheckpointsStore } from "../../../state/checkpoints-store";
 import { useComposerInboxStore } from "../../../state/composer-inbox-store";
 import { useConnectionStore } from "../../../state/connection-store";
-import { selectActiveMessages, useThreadsStore } from "../../../state/threads-store";
+import { useThreadsStore } from "../../../state/threads-store";
 import { formatTurnDuration, useTurnTimingStore } from "../../../state/turn-timing-store";
+import { useTurnTokenUsageStore } from "../../../state/turn-token-usage-store";
 import { ArrowshapeTurnUpLeft, ArrowUturnLeft, Clock } from "../../shared/Icon";
 import { BookmarkButton } from "./BookmarkButton";
 import { RowLinkButton } from "./RowLinkButton";
@@ -25,23 +27,38 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
   });
   const timing = useTurnTimingStore((state) => (message.turnId ? state.byTurn[message.turnId] : undefined));
   const durationLabel = timing ? formatTurnDuration(timing) : null;
+  const tokenUsage = useTurnTokenUsageStore((state) => (message.turnId ? state.byTurn[message.turnId] : undefined));
 
-  // AI Change Sets (lite): aggregate the fileChange rows that share this
-  // turnId so the user sees at-a-glance how much surface this turn touched.
+  // AI Change Sets: aggregate the fileChange rows that share this turnId
+  // so the user sees at-a-glance how much surface this turn touched.
   // Clicking the chip scrolls to the first matching FileChange row so they
-  // can review individual diffs. Real per-message revert (the deferred AI
-  // Change Sets feature) needs bridge changes; this gives a useful preview
-  // of what that surface would look like.
-  const activeMessages = useThreadsStore(selectActiveMessages);
-  const turnChanges = useMemo(() => {
-    if (!message.turnId) return null;
-    const changes = activeMessages.filter(
-      (m) => m.turnId === message.turnId && m.kind === "fileChange" && m.fileChange?.diff
-    );
-    if (changes.length === 0) return null;
-    const totals = sumDiffStats(changes.map((m) => computeDiffStats(m.fileChange?.diff ?? "")));
-    return { count: changes.length, totals, firstId: changes[0].id };
-  }, [activeMessages, message.turnId]);
+  // can review individual diffs (and, since the bridge ships
+  // `workspace/revertPatchApply`, revert each one independently — see
+  // FileChangeRow).
+  //
+  // The selector aggregates by turnId before returning so a re-render only
+  // fires when this turn's chip would actually change. Subscribing to the
+  // raw messages array would re-run this on every reducer mutation
+  // anywhere in the thread.
+  const turnChanges = useThreadsStore((state) => {
+    if (!message.turnId || !message.threadId) return null;
+    const messages = state.reducerStates[message.threadId]?.messages;
+    if (!messages) return null;
+    let count = 0;
+    let firstId: string | null = null;
+    let insertions = 0;
+    let deletions = 0;
+    for (const m of messages) {
+      if (m.turnId !== message.turnId || m.kind !== "fileChange" || !m.fileChange?.diff) continue;
+      if (firstId === null) firstId = m.id;
+      count += 1;
+      const stats = computeDiffStats(m.fileChange.diff);
+      insertions += stats.insertions;
+      deletions += stats.deletions;
+    }
+    if (count === 0) return null;
+    return { count, firstId, totals: sumDiffStats([{ insertions, deletions }]) };
+  }, shallowTurnChangesEqual);
 
   function scrollToFirstChange() {
     if (!turnChanges?.firstId) return;
@@ -102,6 +119,15 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
               <Clock /> {durationLabel}
             </span>
           )}
+          {tokenUsage && (
+            <span
+              className="agnt-row-action-meta"
+              title={`Input ${tokenUsage.inputTokens.toLocaleString()} · Output ${tokenUsage.outputTokens.toLocaleString()}${tokenUsage.cachedInputTokens ? ` · Cached ${tokenUsage.cachedInputTokens.toLocaleString()}` : ""}${tokenUsage.totalCostUsd != null ? ` · Cost ${formatCostUsd(tokenUsage.totalCostUsd)}` : ""}`}
+            >
+              {formatTokens(totalTokens(tokenUsage))} tokens
+              {tokenUsage.totalCostUsd != null && tokenUsage.totalCostUsd > 0 ? ` · ${formatCostUsd(tokenUsage.totalCostUsd)}` : ""}
+            </span>
+          )}
           {turnChanges && (
             <button
               type="button"
@@ -152,4 +178,22 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
 function cssEscape(value: string): string {
   if (typeof CSS !== "undefined" && typeof CSS.escape === "function") return CSS.escape(value);
   return value.replace(/(["\\])/g, "\\$1");
+}
+
+// Custom equality for the turnChanges selector. Default zustand shallow
+// would walk every key including the nested `totals` and reject equal
+// objects with different references. This compares the only fields we
+// render so a re-render only happens when the chip would change visually.
+function shallowTurnChangesEqual(
+  a: { count: number; firstId: string | null; totals: { insertions: number; deletions: number } } | null,
+  b: { count: number; firstId: string | null; totals: { insertions: number; deletions: number } } | null
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.count === b.count &&
+    a.firstId === b.firstId &&
+    a.totals.insertions === b.totals.insertions &&
+    a.totals.deletions === b.totals.deletions
+  );
 }
