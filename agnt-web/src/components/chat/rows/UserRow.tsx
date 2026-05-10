@@ -1,3 +1,4 @@
+import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import type { CodexMessage } from "../../../models";
 import { useLightboxStore } from "../../../state/lightbox-store";
 import { BookmarkButton } from "./BookmarkButton";
@@ -17,7 +18,7 @@ export function UserRow({ message }: { message: CodexMessage }) {
     caption: attachment.fileName,
   }));
   return (
-    <div className={className} title={new Date(message.createdAt).toLocaleString()}>
+    <div className={className} title={formatRelativeWithAbsolute(message.createdAt)}>
       <div className="agnt-row-bubble">
         {attachments.length > 0 && (
           <div className="agnt-row-attachments">

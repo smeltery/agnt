@@ -17,6 +17,7 @@ import {
   downloadBackup,
 } from "../../lib/state-backup";
 import { type LocaleId, SUPPORTED_LOCALES, useI18nStore, useTranslator } from "../../lib/i18n";
+import { useInstallPromptStore } from "../../state/install-prompt-store";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
@@ -132,6 +133,8 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
           </div>
         </section>
         )}
+
+        {matches(["Install", "PWA", "App", "Standalone"]) && <InstallSection />}
 
         {matches(["Notifications", "Desktop alerts", "tab title", "permission"]) && (
         <section className="agnt-settings-section">
@@ -533,6 +536,37 @@ function DiagnosticSection() {
         </button>
       </div>
       {feedback && <p className="agnt-settings-hint">{feedback}</p>}
+    </section>
+  );
+}
+
+function InstallSection() {
+  // Subscribes to the install state so the section auto-hides once the
+  // user installs (Chrome fires `appinstalled`) or auto-appears when the
+  // browser later signals `beforeinstallprompt`. Standalone-mode users
+  // see the "already installed" affirmation so they understand why.
+  const state = useInstallPromptStore((s) => s.state);
+  const promptInstall = useInstallPromptStore((s) => s.promptInstall);
+  if (state === "unsupported") return null;
+  return (
+    <section className="agnt-settings-section">
+      <h3>Install</h3>
+      <p className="agnt-settings-hint">
+        Install agnt as a standalone app on this device. The browser tab gets its own dock / launcher icon and runs without
+        the browser chrome — useful for keeping a long-running thread visible while you work.
+      </p>
+      {state === "installed" ? (
+        <p className="agnt-settings-hint">Already installed on this device.</p>
+      ) : (
+        <button
+          type="button"
+          className="agnt-button-primary"
+          onClick={() => void promptInstall()}
+          disabled={state === "installing"}
+        >
+          {state === "installing" ? "Waiting for confirmation…" : "Install agnt"}
+        </button>
+      )}
     </section>
   );
 }

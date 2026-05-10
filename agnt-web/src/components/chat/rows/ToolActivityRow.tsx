@@ -1,9 +1,10 @@
+import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import type { CodexMessage } from "../../../models";
 
 export function ToolActivityRow({ message }: { message: CodexMessage }) {
   const status = message.isStreaming ? "running" : "completed";
   return (
-    <div className="agnt-row agnt-row-tool" title={new Date(message.createdAt).toLocaleString()}>
+    <div className="agnt-row agnt-row-tool" title={formatRelativeWithAbsolute(message.createdAt)}>
       <div className="agnt-row-tag">Tool</div>
       {message.text && <div className="agnt-row-tool-details">{message.text}</div>}
       <div className={"agnt-row-tool-status agnt-row-tool-status-" + status}>{status}</div>

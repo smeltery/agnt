@@ -1,0 +1,20 @@
+{
+  "name": "agnt",
+  "short_name": "agnt",
+  "description": "Browser client for the agnt bridge — chat with Codex, Claude Code, opencode, and Cursor agents from any tab.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0c0f",
+  "theme_color": "#0b0c0f",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

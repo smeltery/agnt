@@ -6,6 +6,7 @@ import { type LocaleId, SUPPORTED_LOCALES, useI18nStore } from "./lib/i18n";
 import { useBookmarksStore } from "./state/bookmarks-store";
 import { useConnectionStore } from "./state/connection-store";
 import { useCustomSlashCommandsStore } from "./state/custom-slash-commands-store";
+import { useInstallPromptStore } from "./state/install-prompt-store";
 import { useThemeStore } from "./state/theme-store";
 import { prefsStore } from "./storage/prefs-store";
 import { PairingScreen } from "./components/pairing/PairingScreen";
@@ -44,6 +45,14 @@ export function App() {
       void reconnect();
     }
   }, [bootstrapping, saved, status.kind, reconnect]);
+
+  // Bind the PWA install lifecycle once at the top level so the
+  // `beforeinstallprompt` event is captured even when Settings hasn't
+  // been opened yet. The cleanup detaches both listeners on unmount.
+  useEffect(() => {
+    const unbind = useInstallPromptStore.getState().bindToBrowser();
+    return unbind;
+  }, []);
 
   // ErrorBoundary wraps the whole tree so a render-time crash anywhere in
   // a downstream component surfaces as a recoverable card instead of a

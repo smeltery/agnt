@@ -6,6 +6,7 @@
 
 import { useMemo, useState } from "react";
 import { splitUnifiedDiff } from "../../../lib/diff-split";
+import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import type { CodexMessage } from "../../../models";
 import { useConnectionStore } from "../../../state/connection-store";
 import { useThreadsStore } from "../../../state/threads-store";
@@ -94,7 +95,7 @@ export function FileChangeRow({ message }: { message: CodexMessage }) {
   return (
     <div
       className="agnt-row agnt-row-filechange"
-      title={new Date(message.createdAt).toLocaleString()}
+      title={formatRelativeWithAbsolute(message.createdAt)}
       data-message-id={message.id}
     >
       <button
