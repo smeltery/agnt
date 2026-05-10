@@ -48,6 +48,8 @@ import {
   emptyThreadState,
   type ThreadReducerState,
 } from "./turn-reducer";
+import { extractTurnTokenUsage } from "../lib/token-usage";
+import { useTurnTokenUsageStore } from "./turn-token-usage-store";
 import { messagesStore } from "../storage/messages-store";
 import { prefsStore, type ThreadColor, type ThreadOverride } from "../storage/prefs-store";
 import { buildTurnInput } from "./turn-input";
@@ -694,8 +696,22 @@ function registerNotificationHandlers(
     const threadId = readString(params, "threadId");
     if (!threadId) return;
     const usage = extractContextWindowUsage(params);
-    if (!usage) return;
-    set({ contextUsageByThread: { ...get().contextUsageByThread, [threadId]: usage } });
+    if (usage) set({ contextUsageByThread: { ...get().contextUsageByThread, [threadId]: usage } });
+    // Per-turn token usage / cost: the bridge fires this notification right
+    // before `turn/completed` while the reducer's activeTurnId is still set,
+    // so we resolve the current turn here instead of stashing a side state.
+    // If no turn is active (history-load case) the most-recent assistant
+    // message's turnId is the right anchor.
+    const turnUsage = extractTurnTokenUsage(params);
+    if (turnUsage) {
+      const reducer = get().reducerStates[threadId];
+      const activeTurnId = reducer?.activeTurnId;
+      const fallbackTurnId = activeTurnId
+        ? null
+        : [...(reducer?.messages ?? [])].reverse().find((m) => m.role === "assistant" && m.turnId)?.turnId ?? null;
+      const turnId = activeTurnId ?? fallbackTurnId;
+      if (turnId) useTurnTokenUsageStore.getState().noteTurnUsage(threadId, turnId, turnUsage);
+    }
   });
 
   // Plan mode.

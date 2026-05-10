@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodexThread } from "../../models";
+import { useTranslator } from "../../lib/i18n";
 import { useShortcuts } from "../../lib/keyboard";
 import {
   ChevronDown,
@@ -36,6 +37,7 @@ interface SidebarProps {
 type SidebarTab = SidebarTabPreference;
 
 export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
+  const t = useTranslator();
   const liveThreads = useThreadsStore((state) => state.threads);
   const archivedThreads = useThreadsStore((state) => state.archivedThreads);
   const selectedThreadId = useThreadsStore((state) => state.selectedThreadId);
@@ -210,7 +212,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
           </button>
         )}
         <button type="button" className="agnt-sidebar-new" onClick={onNewChat} title="New chat" aria-label="New chat">
-          <Plus /> New
+          <Plus /> {t("sidebar.newChat")}
         </button>
       </div>
       {selectMode && (
@@ -258,7 +260,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
         <input
           type="search"
           className="agnt-sidebar-search-input"
-          placeholder="Search threads…"
+          placeholder={t("sidebar.search")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -279,10 +281,10 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
           icon={<MagnifyingGlass size={22} />}
           title={
             query
-              ? "No threads match"
+              ? t("sidebar.empty.search")
               : tab === "live"
-                ? "No live threads yet"
-                : "No archived threads"
+                ? t("sidebar.empty.live")
+                : t("sidebar.empty.archived")
           }
           message={
             query

@@ -509,6 +509,16 @@ button {
   max-height: 320px;
   overflow: auto;
 }
+.agnt-row-filechange-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.agnt-row-action-warning {
+  color: var(--agnt-error, #b35c00);
+}
 
 .agnt-md-paragraph { margin: 0; white-space: pre-wrap; }
 .agnt-md-paragraph + .agnt-md-paragraph,

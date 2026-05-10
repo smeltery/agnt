@@ -16,7 +16,7 @@ import {
   defaultBackupFilename,
   downloadBackup,
 } from "../../lib/state-backup";
-import { type LocaleId, SUPPORTED_LOCALES, useI18nStore } from "../../lib/i18n";
+import { type LocaleId, SUPPORTED_LOCALES, useI18nStore, useTranslator } from "../../lib/i18n";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
@@ -36,6 +36,7 @@ import {
 } from "../../storage/prefs-store";
 
 export function SettingsModal({ onClose }: { onClose(): void }) {
+  const t = useTranslator();
   const status = useConnectionStore((state) => state.status);
   const saved = useConnectionStore((state) => state.saved);
   const forgetCurrent = useConnectionStore((state) => state.forget);
@@ -93,7 +94,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
         onClick={(event) => event.stopPropagation()}
       >
         <header className="agnt-modal-header agnt-settings-header">
-          <h2 id="agnt-settings-title">Settings</h2>
+          <h2 id="agnt-settings-title">{t("settings.title")}</h2>
           <input
             type="search"
             className="agnt-settings-search"
@@ -111,7 +112,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
         {matches(["Appearance", "Theme", "Light", "Dark", "Auto"]) && (
         <section className="agnt-settings-section">
-          <h3>Appearance</h3>
+          <h3>{t("settings.section.appearance")}</h3>
           <div className="agnt-settings-row">
             <span>Theme</span>
             <div className="agnt-settings-segments" role="radiogroup" aria-label="Theme">
@@ -134,7 +135,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
         {matches(["Notifications", "Desktop alerts", "tab title", "permission"]) && (
         <section className="agnt-settings-section">
-          <h3>Notifications</h3>
+          <h3>{t("settings.section.notifications")}</h3>
           <div className="agnt-settings-row">
             <span>Desktop alerts on turn completion</span>
             <div className="agnt-settings-segments" role="radiogroup" aria-label="Desktop notifications">
@@ -166,7 +167,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
         {matches(["Connection", "Status", "Relay", "Session", "Mac", "pairing"]) && (
         <section className="agnt-settings-section">
-          <h3>Connection</h3>
+          <h3>{t("settings.section.connection")}</h3>
           <dl className="agnt-settings-kv">
             <dt>Status</dt>
             <dd>{status.kind}</dd>
@@ -186,7 +187,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
         {matches(["Account", "Provider", "Logged in", "auth", "login"]) && (
         <section className="agnt-settings-section">
-          <h3>Account</h3>
+          <h3>{t("settings.section.account")}</h3>
           {!account ? (
             <p className="agnt-settings-hint">Connect to read account status.</p>
           ) : (
@@ -537,6 +538,7 @@ function DiagnosticSection() {
 }
 
 function LocaleSection() {
+  const t = useTranslator();
   const locale = useI18nStore((state) => state.locale);
   const setLocale = useI18nStore((state) => state.setLocale);
   async function pick(next: LocaleId) {
@@ -545,11 +547,8 @@ function LocaleSection() {
   }
   return (
     <section className="agnt-settings-section">
-      <h3>Language</h3>
-      <p className="agnt-settings-hint">
-        Pick the language for the agnt-web UI. Translations are early-stage; missing strings fall back to English.
-        Date / time / number formatting follows the locale via the browser's <code>Intl</code>.
-      </p>
+      <h3>{t("settings.section.locale")}</h3>
+      <p className="agnt-settings-hint">{t("settings.locale.hint")}</p>
       <div className="agnt-settings-row">
         <label className="agnt-settings-row-label" htmlFor="agnt-locale-select">Locale</label>
         <select
