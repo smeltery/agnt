@@ -1762,6 +1762,7 @@ button {
 .agnt-slash-item:hover { background: var(--agnt-bg-elev-2); }
 .agnt-slash-item-active { background: var(--agnt-bg-elev-2); box-shadow: inset 2px 0 0 var(--agnt-accent); }
 .agnt-slash-item-name { font-family: var(--agnt-mono); color: var(--agnt-accent); min-width: 96px; }
+.agnt-slash-item-args { color: var(--agnt-text-muted, #888); font-style: italic; margin-left: 4px; }
 .agnt-slash-item-description { color: var(--agnt-fg-dim); font-size: 12px; }
 .agnt-slash-empty {
   margin: 0 8px 6px;
@@ -2133,6 +2134,23 @@ button {
 .agnt-sidebar-row-unread .agnt-sidebar-thread-title { font-weight: 600; }
 
 .agnt-row-system-error-retry { margin-left: auto; }
+.agnt-row-system-error-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  width: 100%;
+}
+.agnt-row-system-error-picker-item {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--agnt-border);
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.agnt-row-system-error-picker-item:hover { background: var(--agnt-hover, var(--agnt-bg-soft)); }
 
 .agnt-settings-slash-list {
   list-style: none;
@@ -2849,5 +2867,57 @@ button {
     border-radius: var(--agnt-radius-sheet);
     max-height: calc(100vh - 80px);
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+  }
+}
+
+/* Phone-viewport sweep. Targets: dialog-shaped modals (Settings, NewChat,
+   ThreadOverridesSheet, RevertSheet) need viewport-fit + internal scroll;
+   chat-header overflow on narrow widths; row-action chips need bigger
+   touch targets. */
+@media (max-width: 600px) {
+  .agnt-modal-backdrop { padding: 12px; }
+  .agnt-modal {
+    /* 87vh keeps a thumb-reach gap below the dialog so iOS Safari's
+       bottom toolbar doesn't overlap the footer buttons. The flex
+       column already gives `.agnt-modal-body` the leftover height; the
+       `min-height: 0` is the standard fix that lets it actually scroll. */
+    max-height: 87vh;
+    padding: 16px;
+  }
+  .agnt-modal-body {
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  .agnt-modal-footer {
+    /* Footer buttons stack instead of wrapping mid-row — easier to tap
+       and avoids two half-cut rows on Pixel-class viewports. */
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .agnt-modal-footer > button { width: 100%; }
+  /* Row actions: the 11px chip text + ~6px vertical padding is fine on
+     desktop but below Apple HIG / Material on touch. Bump them. */
+  .agnt-row-action {
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+  /* Chat header is a horizontal toolbar of model/effort/permission
+     pills — let it scroll horizontally instead of wrapping into a
+     three-row stack that eats the chat column. */
+  .agnt-chat-header {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .agnt-chat-header::-webkit-scrollbar { display: none; }
+  .agnt-chat-header > * { flex-shrink: 0; width: auto; }
+  /* Composer: composing on a phone is painful when the textarea is
+     squished by the row of attachment / send buttons. Stack vertically
+     so the textarea gets full-width and the actions land below it. */
+  .agnt-composer-actions {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 }

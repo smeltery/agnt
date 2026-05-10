@@ -30,6 +30,7 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
   const createBranch = useGitStore((state) => state.createBranch);
   const createWorktree = useGitStore((state) => state.createWorktree);
   const commit = useGitStore((state) => state.commit);
+  const generateCommitMessage = useGitStore((state) => state.generateCommitMessage);
   const push = useGitStore((state) => state.push);
   const pull = useGitStore((state) => state.pull);
   const stash = useGitStore((state) => state.stash);
@@ -174,6 +175,21 @@ export function GitPanel({ threadId, rpc }: GitPanelProps) {
           onChange={(event) => setCommitMessage(event.target.value)}
           disabled={loading}
         />
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={async () => {
+            const drafted = await generateCommitMessage(threadId, rpc);
+            if (drafted) setCommitMessage(drafted);
+          }}
+          // The bridge endpoint is Codex-only; we still try optimistically
+          // and surface a polite error from the store on other providers
+          // rather than gating the button on a stale provider snapshot.
+          disabled={loading || !status.isDirty}
+          title="Ask the active Codex agent to draft a commit message from the staged diff"
+        >
+          Draft
+        </button>
         <button
           type="button"
           className="agnt-button-primary"

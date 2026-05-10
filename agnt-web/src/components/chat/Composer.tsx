@@ -9,6 +9,7 @@ import type { ProjectDirectoryEntry } from "../../protocol/project";
 import { useConnectionStore } from "../../state/connection-store";
 import { useComposerInboxStore } from "../../state/composer-inbox-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
+import { describeBodyArgs, parseSlashArgs } from "../../lib/slash-variables";
 import { filterSlashCommands, type SlashCommand } from "../../state/slash-commands";
 import { selectActiveMessages, useThreadsStore } from "../../state/threads-store";
 import { ComposerFindReplace } from "./ComposerFindReplace";
@@ -148,15 +149,24 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [draft, selectedThreadId]);
 
-  // Slash-menu surface. Matches when the draft starts with "/" and contains
-  // no whitespace yet — that's the typing window we own. Once the user adds
-  // a space the draft is just a normal prompt that happens to start with a
-  // slash, which we intentionally do NOT intercept.
-  const slashQuery = useMemo(() => {
+  // Slash-menu surface. Matches when the draft starts with "/". The typed
+  // text after "/" splits at the first whitespace into a command name + a
+  // raw arg string; the menu filters on the name and the run path passes
+  // the parsed args into the slash-variable expander so bodies with
+  // `{1}` / `$ARGUMENTS` placeholders can interpolate them.
+  //
+  // We still want the menu to dismiss when the draft contains a newline —
+  // that means the user has switched intents from "running a command" to
+  // "typing a multi-line prompt that happens to start with a slash."
+  const slashState = useMemo(() => {
     if (!draft.startsWith("/")) return null;
-    if (/\s/.test(draft)) return null;
-    return draft.slice(1);
+    if (draft.includes("\n")) return null;
+    const rest = draft.slice(1);
+    const firstSpace = rest.search(/\s/);
+    if (firstSpace < 0) return { name: rest, rawArgs: "" };
+    return { name: rest.slice(0, firstSpace), rawArgs: rest.slice(firstSpace + 1) };
   }, [draft]);
+  const slashQuery = slashState?.name ?? null;
   // We need the snapshot at run-time, not on every render; subscribing the
   // whole component to threads-store would re-render on every streaming
   // delta. Instead grab the snapshot lazily inside the action handler.
@@ -280,6 +290,10 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     const selection = ta && ta.selectionStart !== ta.selectionEnd
       ? ta.value.slice(ta.selectionStart, ta.selectionEnd)
       : "";
+    // Argv-style positional args feed `{1}`, `{2}`, … and `$ARGUMENTS`
+    // placeholders in user-defined bodies. The raw arg string lives on
+    // `slashState.rawArgs`; the parser handles quoted runs.
+    const args = slashState ? parseSlashArgs(slashState.rawArgs) : [];
     const context = {
       threadId: selectedThreadId ?? "",
       threads: useThreadsStore.getState(),
@@ -287,6 +301,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         cwd: activeThread?.cwd,
         threadTitle: activeThread?.name ?? activeThread?.title,
         selection,
+        args,
       },
     };
     // Custom commands expand into the draft so the user can review/edit before
@@ -594,24 +609,37 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
       {attachError && <div className="agnt-composer-attach-error">{attachError}</div>}
       {slashQuery !== null && slashMatches.length > 0 && (
         <div className="agnt-slash-menu" role="listbox" aria-label="Slash commands">
-          {slashMatches.map((command, index) => (
-            <button
-              key={command.name}
-              type="button"
-              role="option"
-              aria-selected={index === slashCursor}
-              className={"agnt-slash-item" + (index === slashCursor ? " agnt-slash-item-active" : "")}
-              // onMouseDown beats the textarea's onBlur — clicking should run
-              // the command, not steal focus mid-cycle.
-              onMouseDown={(event) => {
-                event.preventDefault();
-                runSlashCommand(command);
-              }}
-            >
-              <code className="agnt-slash-item-name">/{command.name}</code>
-              <span className="agnt-slash-item-description">{command.description}</span>
-            </button>
-          ))}
+          {slashMatches.map((command, index) => {
+            // Argument hint: introspect the body of user-defined commands
+            // so the user can see "this expects 2 args" without clicking
+            // through. Built-ins don't have bodies — the hint stays empty.
+            const custom = customSlashCommands.find((c) => c.name === command.name);
+            const argShape = custom ? describeBodyArgs(custom.body) : { positional: 0, arguments: false };
+            const hint = argShape.arguments
+              ? "<args…>"
+              : argShape.positional > 0
+                ? Array.from({ length: argShape.positional }, (_, i) => `<${i + 1}>`).join(" ")
+                : "";
+            return (
+              <button
+                key={command.name}
+                type="button"
+                role="option"
+                aria-selected={index === slashCursor}
+                className={"agnt-slash-item" + (index === slashCursor ? " agnt-slash-item-active" : "")}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  runSlashCommand(command);
+                }}
+              >
+                <code className="agnt-slash-item-name">
+                  /{command.name}
+                  {hint && <span className="agnt-slash-item-args"> {hint}</span>}
+                </code>
+                <span className="agnt-slash-item-description">{command.description}</span>
+              </button>
+            );
+          })}
         </div>
       )}
       {slashQuery !== null && slashMatches.length === 0 && (

@@ -13,16 +13,69 @@ export interface SlashVariableContext {
   selection?: string;
   /** Reference timestamp — pass a fixed value in tests. */
   now?: Date;
+  /** Positional arguments parsed from the user's input after the slash trigger.
+   *  `/foo a b c` → `["a", "b", "c"]`. Body bodies that reference `{1}`,
+   *  `{2}`, etc. expand to the matching index (1-based to match Cursor's
+   *  convention; index 0 would be the slash command itself). Missing
+   *  positions expand to the empty string so a partial-arg invocation
+   *  doesn't litter the prompt with `{2}`. */
+  args?: readonly string[];
 }
 
-const TOKEN_RE = /\{([a-z][a-z0-9_]*)\}/gi;
+const TOKEN_RE = /\{([a-z][a-z0-9_]*|[0-9]+)\}/gi;
+const ARGUMENTS_RE = /\$ARGUMENTS\b/g;
 
 export function expandSlashVariables(body: string, context: SlashVariableContext): string {
-  return body.replace(TOKEN_RE, (match, rawName: string) => {
-    const name = rawName.toLowerCase();
-    const value = resolve(name, context);
+  // `$ARGUMENTS` (Claude Code convention) expands to the joined positional
+  // args. Done first so a body using `$ARGUMENTS` still gets `{1}` etc.
+  // resolved on the same pass below.
+  const args = context.args ?? [];
+  let expanded = body.replace(ARGUMENTS_RE, args.join(" "));
+  expanded = expanded.replace(TOKEN_RE, (match, rawName: string) => {
+    if (/^[0-9]+$/.test(rawName)) {
+      const index = Number(rawName);
+      if (index <= 0 || !Number.isFinite(index)) return match;
+      const value = args[index - 1];
+      // Empty string for missing positions: keeps `{1} hello` clean if the
+      // user invokes with no args. Leaves the literal `{0}` alone since
+      // 1-based indexing has no zeroth slot.
+      return value ?? "";
+    }
+    const value = resolve(rawName.toLowerCase(), context);
     return value === undefined ? match : value;
   });
+  return expanded;
+}
+
+/** Parse the raw text the user typed after a slash command into argv-like
+ *  positional args. Whitespace is the separator; quoted runs (`"foo bar"`
+ *  or `'foo bar'`) preserve embedded spaces. Surplus args beyond `{N}`
+ *  are kept intact for `$ARGUMENTS` to use. */
+export function parseSlashArgs(input: string): string[] {
+  const out: string[] = [];
+  const trimmed = input.trim();
+  if (!trimmed) return out;
+  const re = /"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|(\S+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(trimmed)) !== null) {
+    out.push(match[1] ?? match[2] ?? match[3] ?? "");
+  }
+  return out;
+}
+
+/** Pull the argument tokens a body references so the composer can warn
+ *  the user before they submit a half-filled command. Returns the highest
+ *  positional index (or 0 if none) and whether `$ARGUMENTS` is referenced. */
+export function describeBodyArgs(body: string): { positional: number; arguments: boolean } {
+  let positional = 0;
+  for (const match of body.matchAll(TOKEN_RE)) {
+    const raw = match[1];
+    if (/^[0-9]+$/.test(raw)) {
+      const n = Number(raw);
+      if (n > positional) positional = n;
+    }
+  }
+  return { positional, arguments: ARGUMENTS_RE.test(body) };
 }
 
 function resolve(name: string, context: SlashVariableContext): string | undefined {
