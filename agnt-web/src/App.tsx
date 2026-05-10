@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { type LocaleId, SUPPORTED_LOCALES, useI18nStore } from "./lib/i18n";
 import { useBookmarksStore } from "./state/bookmarks-store";
 import { useConnectionStore } from "./state/connection-store";
+import { useContrastStore } from "./state/contrast-store";
 import { useCustomSlashCommandsStore } from "./state/custom-slash-commands-store";
 import { useInstallPromptStore } from "./state/install-prompt-store";
 import { useThemeStore } from "./state/theme-store";
@@ -20,6 +21,7 @@ export function App() {
   const status = useConnectionStore((state) => state.status);
   const hydrate = useConnectionStore((state) => state.hydrate);
   const hydrateTheme = useThemeStore((state) => state.hydrate);
+  const hydrateContrast = useContrastStore((state) => state.hydrate);
   const hydrateCustomSlash = useCustomSlashCommandsStore((state) => state.hydrate);
   const hydrateBookmarks = useBookmarksStore((state) => state.hydrate);
   const reconnect = useConnectionStore((state) => state.reconnect);
@@ -27,6 +29,9 @@ export function App() {
   useEffect(() => {
     // Theme hydrates first to avoid a flash of wrong palette.
     void hydrateTheme().then(() => hydrate());
+    // Contrast is independent of theme — fire-and-forget; the
+    // applyHighContrastToDocument call inside `hydrate()` paints first.
+    void hydrateContrast();
     // Background prefs load whenever idb gets around to it — they don't
     // block the critical render path.
     void hydrateCustomSlash();
@@ -38,7 +43,7 @@ export function App() {
       const valid = SUPPORTED_LOCALES.find((option) => option.id === (persisted as LocaleId));
       if (valid) useI18nStore.getState().setLocale(valid.id);
     });
-  }, [hydrate, hydrateTheme, hydrateCustomSlash, hydrateBookmarks]);
+  }, [hydrate, hydrateTheme, hydrateContrast, hydrateCustomSlash, hydrateBookmarks]);
 
   useEffect(() => {
     if (!bootstrapping && saved && status.kind === "idle") {

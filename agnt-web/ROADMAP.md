@@ -86,6 +86,15 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 43 — Sound cue + high-contrast + starter prompts + mermaid ✅ DONE
+
+- ✅ **Second clean recon pass.** All four claimed gaps verified missing before coding (file-content grep against `Notifications` / `MarkdownContent.tsx` / `NewChatModal.tsx` / `playSound|new Audio|prefers-contrast`). Continuing the discipline that finally landed in Session 42.
+- ✅ **Sound cue on turn complete.** New `lib/sound-cue.ts` synthesizes two-tone WebAudio beeps (major-third for completed, minor-second for failed) — no audio asset shipped. Off by default (`prefs.soundVolume` defaults to 0); Settings → Notifications → "Sound cue on turn complete" slider. Cue fires independently of desktop notification permission so unmuted-tab users still get the audible signal. Per-thread mute already gates both.
+- ✅ **High-contrast theme variant.** New `state/contrast-store.ts` orthogonal to theme — light + high-contrast and dark + high-contrast both work. Follows `prefers-contrast: more` system query when no explicit pick; toggle in Settings → Appearance. CSS layered via `:root[data-contrast="high"]` overrides bumping border weight to 2px, dimming-text → full text, and focus-ring outline to 3px.
+- ✅ **NewChatModal starter prompts.** 5 quick-start chips (Explain the codebase / Review my changes / Write tests / Find a bug / Refactor a function) that drop a tested prompt into the textarea. Chips only render when the textarea is empty so they don't get in the way of typing.
+- ✅ **Mermaid diagrams.** `mermaid` v11 added as a dep, lazy-loaded via React.lazy + dynamic import so the main bundle stays unchanged. New `MermaidBlock` renders `\`\`\`mermaid` fences as SVG via `mermaid.render` with `securityLevel: "strict"` (assistant-authored source isn't trusted to inject HTML). Errors surface a red panel with the source preserved. **Bundle cost honesty**: my pre-install estimate was ~150 KB gzip. Reality is ~400 KB gzip across `mermaid.core` + `cytoscape` + `wardley` deps — only loads when a diagram fence appears, but it's heavier than I initially claimed.
+- 3 new vitest cases (sound cue: silent at volume 0, distinguishable tone shapes for completed / failed). 501 / 501 pass; tsc clean; main bundle 406 → 409 KB raw, 131.07 → 131.98 KB gzip.
+
 ## Session 42 — Relative timestamps + Sheet focus trap + PWA manifest + Lightbox zoom ✅ DONE
 
 - ✅ **First clean recon pass.** All four claimed gaps verified missing before coding (sharper grep this time, against actual file contents not just symbol names): no manifest in `public/`, no `beforeinstallprompt` handler, no `formatRelative` / `timeAgo` in `lib/state`, no `focus`/`tabIndex` in `Sheet.tsx`, no `scale`/`wheel`/`pointermove` in `Lightbox.tsx`. Five sessions of recon misses ended with this one — the discipline of grepping the containing file, not just symbol names, paid off.

@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { flashTitle } from "../lib/document-title";
 import { makeLogger } from "../lib/log";
 import { showNotification, shouldNotify } from "../lib/notifications";
+import { playTurnCue } from "../lib/sound-cue";
 import {
   type CodexMessage,
   type CodexThread,
@@ -912,12 +913,16 @@ async function notifyTurnFinished(
   outcome: "completed" | "failed",
   errorText?: string
 ): Promise<void> {
-  if (!(await shouldNotify())) return;
   const state = get();
-  // Per-thread mute layered on top of the global pref. We check the
-  // mute set BEFORE building the notification body so a chatty muted
-  // thread can't even cost the localized-string lookup.
+  // Per-thread mute is checked first so a muted thread skips both the
+  // sound cue AND the notification — same gate, two effects.
   if (state.mutedThreadIds.has(threadId)) return;
+  // Sound cue runs independently of the desktop notification permission:
+  // a user in an unmuted tab who never granted notification access still
+  // gets the audible signal. The cue itself respects the volume pref
+  // (default 0 = silent) so this is opt-in either way.
+  void playTurnCue(outcome);
+  if (!(await shouldNotify())) return;
   const thread = state.threads.find((t) => t.id === threadId)
     ?? state.archivedThreads.find((t) => t.id === threadId);
   const threadName = thread?.name ?? thread?.title ?? "Untitled thread";

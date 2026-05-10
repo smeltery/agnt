@@ -8,11 +8,17 @@
 // nested lists, or HTML inline tags — bundle stays small and the output
 // stays predictable.
 
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
+import { Fragment, lazy, Suspense, type ReactNode, useEffect, useMemo, useState } from "react";
 import { copyText } from "../../lib/clipboard";
 import { useConnectionStore } from "../../state/connection-store";
 import { useLightboxStore } from "../../state/lightbox-store";
 import { selectImageState, useWorkspaceImageCache } from "../../state/workspace-image-cache";
+
+// Mermaid lives in its own chunk via React.lazy so the mermaid library
+// (~150 KB gzip) only downloads when a diagram actually appears.
+const MermaidBlock = lazy(() =>
+  import("./MermaidBlock").then((m) => ({ default: m.MermaidBlock }))
+);
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
 import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
 
@@ -103,6 +109,16 @@ function renderBlock(block: MarkdownBlock, cwd: string | undefined): ReactNode {
 }
 
 function renderFence(language: string | null, body: string): ReactNode {
+  // ```mermaid fences render as a diagram. The MermaidBlock module
+  // lazy-loads the mermaid library on first use so the cost only lands
+  // when a diagram actually appears in chat.
+  if (language && language.toLowerCase() === "mermaid") {
+    return (
+      <Suspense fallback={<div className="agnt-md-mermaid agnt-md-mermaid-pending" aria-busy />}>
+        <MermaidBlock source={body} />
+      </Suspense>
+    );
+  }
   return <CodeBlock language={language} body={body} />;
 }
 
