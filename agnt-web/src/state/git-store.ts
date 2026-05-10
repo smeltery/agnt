@@ -58,6 +58,11 @@ export interface GitState {
     params: { branch: string; baseBranch?: string }
   ): Promise<string | null>;
   commit(threadId: string, rpc: JsonRpcClient, message: string): Promise<void>;
+  /** AI-drafted commit message (Codex-only on the bridge). Returns the
+   *  fullMessage string ready to drop into the commit textarea, or null
+   *  when the bridge errors (other providers, no diff to summarize, etc.).
+   *  Surface the error via `setError` for diagnostics either way. */
+  generateCommitMessage(threadId: string, rpc: JsonRpcClient): Promise<string | null>;
   push(threadId: string, rpc: JsonRpcClient): Promise<void>;
   pull(threadId: string, rpc: JsonRpcClient): Promise<void>;
   /** `git stash push --include-untracked`. Saves the entire working tree
@@ -178,6 +183,33 @@ export const useGitStore = create<GitState>((set, get) => ({
       await get().refreshDiff(threadId, rpc);
     } catch (error) {
       setError(set, get, threadId, (error as Error).message);
+    } finally {
+      setLoading(set, threadId, false);
+    }
+  },
+
+  async generateCommitMessage(threadId, rpc) {
+    setLoading(set, threadId, true);
+    try {
+      // Bridge response: { subject, body, fullMessage }. We surface
+      // fullMessage because the textarea is one input — callers that want
+      // subject-only can split on the first blank line.
+      const result = await rpc.request<{ fullMessage?: string; subject?: string }>(
+        "git/generateCommitMessage",
+        { threadId }
+      );
+      const drafted = typeof result?.fullMessage === "string" && result.fullMessage.trim()
+        ? result.fullMessage.trim()
+        : typeof result?.subject === "string" && result.subject.trim()
+          ? result.subject.trim()
+          : null;
+      return drafted;
+    } catch (error) {
+      // Most likely path: non-Codex provider returns
+      // "managed externally" or the staged diff is empty. Surface either
+      // way so the user gets a hint instead of a silent failure.
+      setError(set, get, threadId, (error as Error).message);
+      return null;
     } finally {
       setLoading(set, threadId, false);
     }

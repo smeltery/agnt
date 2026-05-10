@@ -101,7 +101,15 @@ export interface ThreadsState {
   loadOlderTurns(threadId: string): Promise<void>;
   sendTurn(threadId: string, content: string, attachments?: ImageAttachment[]): Promise<void>;
   /** Re-issues turn/start with the inputs of a failed turn. Returns whether a retry actually fired. */
-  retryFailedTurn(threadId: string, failedTurnId: string): Promise<boolean>;
+  /** Re-issue a failed turn. When `options.modelOverride` is set, that
+   *  model wins over both the per-thread override and the global flag —
+   *  used by the SystemErrorRow's "Retry with…" picker so a flake on one
+   *  model can be retried on a different one without changing global state. */
+  retryFailedTurn(
+    threadId: string,
+    failedTurnId: string,
+    options?: { modelOverride?: string }
+  ): Promise<boolean>;
   startNewThread(input: { content: string; cwd?: string; attachments?: ImageAttachment[] }): Promise<string | null>;
   stopTurn(): Promise<void>;
   patchTurnFlags(patch: Partial<TurnFlags>): void;
@@ -328,7 +336,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     }
   },
 
-  async retryFailedTurn(threadId, failedTurnId) {
+  async retryFailedTurn(threadId, failedTurnId, options) {
     if (!activeConnection?.rpc) return false;
     // Recover the original user input from the message log. The local-insert
     // path that powers sendTurn already preserved the user row with the same
@@ -349,7 +357,11 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     if (input.length === 0) return false;
     const flags = get().turnFlags;
     const params: Record<string, unknown> = { threadId, input, content: composed };
-    const model = override.model ?? flags.model;
+    // Retry-time `modelOverride` wins over per-thread + global picks so the
+    // user can flip models for one retry without disturbing their preferred
+    // default. `null` would explicitly clear the field — we don't surface
+    // that today; undefined is "don't override".
+    const model = options?.modelOverride ?? override.model ?? flags.model;
     const reasoningEffort = override.reasoningEffort ?? flags.reasoningEffort;
     if (model) params.model = model;
     if (reasoningEffort) params.reasoningEffort = reasoningEffort;
