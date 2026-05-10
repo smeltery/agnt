@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import type { CodexMessage } from "../../../models";
 
 export function CommandExecutionRow({ message }: { message: CodexMessage }) {
@@ -8,7 +9,7 @@ export function CommandExecutionRow({ message }: { message: CodexMessage }) {
   const status = message.isStreaming ? "running" : command.exitCode === 0 ? "completed" : command.exitCode !== undefined ? "failed" : "completed";
   const summary = command.fullCommand || message.text || "shell command";
   return (
-    <div className="agnt-row agnt-row-command" title={new Date(message.createdAt).toLocaleString()}>
+    <div className="agnt-row agnt-row-command" title={formatRelativeWithAbsolute(message.createdAt)}>
       <button
         type="button"
         className="agnt-row-command-summary"

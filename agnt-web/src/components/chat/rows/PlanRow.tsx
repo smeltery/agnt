@@ -1,3 +1,4 @@
+import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import type { CodexMessage, PlanStep } from "../../../models";
 import { useThreadsStore } from "../../../state/threads-store";
 import { MarkdownContent } from "../MarkdownContent";
@@ -28,7 +29,7 @@ export function PlanRow({ message }: { message: CodexMessage }) {
           ? "Plan · ready"
           : "Plan · closed";
   return (
-    <div className="agnt-row agnt-row-plan" title={new Date(message.createdAt).toLocaleString()}>
+    <div className="agnt-row agnt-row-plan" title={formatRelativeWithAbsolute(message.createdAt)}>
       <div className="agnt-row-tag">{presentationLabel}</div>
       {plan.explanation && <p className="agnt-row-plan-explanation">{plan.explanation}</p>}
       {plan.steps.length > 0 && (

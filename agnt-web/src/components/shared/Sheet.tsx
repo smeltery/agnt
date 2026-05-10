@@ -78,6 +78,76 @@ export function Sheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Focus management: while the sheet is open, capture Tab / Shift+Tab so
+  // keyboard users can't escape the dialog into the underlying chat. We
+  // also restore focus to whatever was focused before opening so closing
+  // a settings sheet via Esc returns the user to the gear button.
+  useEffect(() => {
+    if (!open) return;
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    function focusable(): HTMLElement[] {
+      // Standard "is focusable" set. We exclude `[tabindex="-1"]` because
+      // those are programmatic-focus targets only — landing on them with
+      // Tab usually produces dead-end behavior.
+      const nodes = sheet!.querySelectorAll<HTMLElement>(
+        'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), audio[controls], video[controls], [contenteditable="true"]'
+      );
+      return Array.from(nodes).filter((el) => !el.hasAttribute("inert"));
+    }
+
+    // Initial focus: prefer the first focusable inside the sheet so screen
+    // readers announce the dialog content first. Falls back to the sheet
+    // element itself with `tabindex=-1` so focus has somewhere to land.
+    const candidates = focusable();
+    if (candidates.length > 0) {
+      candidates[0].focus();
+    } else {
+      sheet.tabIndex = -1;
+      sheet.focus();
+    }
+
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const list = focusable();
+      if (list.length === 0) {
+        // Pin focus to the sheet itself so Tab can't bleed out.
+        event.preventDefault();
+        sheet!.focus();
+        return;
+      }
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      // Wrap the cycle: Shift+Tab from the first focuses the last;
+      // Tab from the last focuses the first. If focus is somehow outside
+      // the sheet, slam it back to the first.
+      if (event.shiftKey) {
+        if (active === first || !sheet!.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last || !sheet!.contains(active)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    sheet.addEventListener("keydown", onKey);
+    return () => {
+      sheet.removeEventListener("keydown", onKey);
+      // Restore focus to the trigger when the dialog closes. Guard against
+      // a stale ref (the element was removed while the sheet was open).
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
+    };
+  }, [open]);
+
   const dragEnabled = closable && presentation === "sheet";
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {

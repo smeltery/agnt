@@ -1677,6 +1677,17 @@ button {
   gap: 12px;
 }
 .agnt-lightbox-counter { color: var(--agnt-fg-dim); }
+.agnt-lightbox-zoom-indicator { color: var(--agnt-fg-dim); }
+/* When zoomed, suppress the `max-*` constraints so the transform-driven
+   scale isn't fighting the contain-fit logic. The image already lives
+   inside `overflow: hidden` on the backdrop. */
+.agnt-lightbox-zoomed .agnt-lightbox-image {
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.agnt-lightbox-backdrop { overflow: hidden; }
 
 .agnt-lightbox-nav {
   position: absolute;

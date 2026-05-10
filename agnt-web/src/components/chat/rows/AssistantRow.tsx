@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { copyText } from "../../../lib/clipboard";
 import { computeDiffStats, sumDiffStats } from "../../../lib/git-diff-stats";
+import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import { quoteAsMarkdown } from "../../../lib/quote";
 import { formatCostUsd, formatTokens, totalTokens } from "../../../lib/token-usage";
 import type { CodexMessage } from "../../../models";
@@ -103,7 +104,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
   return (
     <div
       className={"agnt-row agnt-row-assistant" + (message.isStreaming ? " agnt-row-streaming" : "")}
-      title={new Date(message.createdAt).toLocaleString()}
+      title={formatRelativeWithAbsolute(message.createdAt)}
     >
       <div className="agnt-row-bubble">
         <MarkdownContent text={message.text} cwd={thread?.cwd} />

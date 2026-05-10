@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import type { CodexMessage } from "../../../models";
 
 // Reasoning rows can get long; collapse by default and let the user expand.
@@ -7,7 +8,7 @@ export function ReasoningRow({ message }: { message: CodexMessage }) {
   const [expanded, setExpanded] = useState(message.isStreaming);
   const showText = expanded || message.isStreaming;
   return (
-    <div className="agnt-row agnt-row-reasoning" title={new Date(message.createdAt).toLocaleString()}>
+    <div className="agnt-row agnt-row-reasoning" title={formatRelativeWithAbsolute(message.createdAt)}>
       <button
         className="agnt-row-tag agnt-row-reasoning-toggle"
         onClick={() => setExpanded((open) => !open)}
