@@ -50,6 +50,8 @@ const RECENT_SEARCHES_KEY = "prefs.recentSearches";
 const THREAD_OVERRIDES_KEY = "prefs.threadOverrides";
 const LOCALE_KEY = "prefs.locale";
 const MUTED_THREADS_KEY = "prefs.mutedThreadIds";
+const SOUND_VOLUME_KEY = "prefs.soundVolume";
+const HIGH_CONTRAST_KEY = "prefs.highContrast";
 
 /** Per-thread override of the global turn flags. Anything left undefined
  *  falls back to the global pick from `state/threads-store:turnFlags`. */
@@ -207,6 +209,24 @@ export const prefsStore = {
     unique.sort();
     await idb.set(MUTED_THREADS_KEY, unique);
   },
+  async loadSoundVolume(): Promise<number> {
+    // 0..1 scalar applied to the WebAudio gain envelope. 0 = silent
+    // (the default — users opt in via Settings); ~0.3 is a comfortable
+    // chime level that won't startle headphone users.
+    const raw = await idb.get<number>(SOUND_VOLUME_KEY);
+    if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+    return Math.max(0, Math.min(1, raw));
+  },
+  async saveSoundVolume(volume: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(1, volume));
+    await idb.set(SOUND_VOLUME_KEY, clamped);
+  },
+  async loadHighContrast(): Promise<boolean> {
+    return Boolean(await idb.get<boolean>(HIGH_CONTRAST_KEY));
+  },
+  async saveHighContrast(enabled: boolean): Promise<void> {
+    await idb.set(HIGH_CONTRAST_KEY, Boolean(enabled));
+  },
   async loadTurnWebhook(): Promise<TurnWebhookPreference> {
     const raw = await idb.get<TurnWebhookPreference>(TURN_WEBHOOK_KEY);
     if (!raw || typeof raw !== "object") return { url: "", enabled: false };
@@ -242,4 +262,14 @@ export function applyThemeToDocument(theme: ThemePreference): void {
     return;
   }
   document.documentElement.dataset.theme = theme;
+}
+
+/** Toggle the `data-contrast="high"` attribute. The CSS layers
+ *  high-contrast overrides on top of the active light/dark theme so
+ *  the user gets bumped border weights + text contrast in either
+ *  palette. Removing the attribute returns to the default contrast. */
+export function applyHighContrastToDocument(enabled: boolean): void {
+  if (typeof document === "undefined") return;
+  if (enabled) document.documentElement.dataset.contrast = "high";
+  else document.documentElement.removeAttribute("data-contrast");
 }

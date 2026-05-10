@@ -1447,6 +1447,26 @@ button {
   font-size: 13px;
   resize: vertical;
 }
+.agnt-newchat-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.agnt-newchat-starter {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--agnt-fg-dim);
+  border: 1px solid var(--agnt-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.agnt-newchat-starter:hover {
+  color: var(--agnt-fg);
+  border-color: var(--agnt-fg-dim);
+}
 
 .agnt-project-modal { max-width: 720px; max-height: 80vh; display: flex; flex-direction: column; }
 .agnt-project-body {
@@ -3115,4 +3135,78 @@ button {
     flex-wrap: wrap;
     gap: 6px;
   }
+}
+
+/* ── High contrast overrides ────────────────────────────────────────────
+   Layered on top of the active light/dark palette via
+   `[data-contrast="high"]` (set by `applyHighContrastToDocument` in
+   prefs-store). The variables here bump border weight and dim-text
+   contrast without changing the palette identity, so a user on dark +
+   high-contrast still sees a dark UI — just with sharper edges and
+   readable secondary text. */
+:root[data-contrast="high"] {
+  --agnt-border: var(--agnt-fg);
+  --agnt-fg-dim: var(--agnt-fg);
+  --agnt-fg-tertiary: var(--agnt-fg);
+  --agnt-bg-elev-2: var(--agnt-bg);
+}
+:root[data-contrast="high"] .agnt-row,
+:root[data-contrast="high"] .agnt-button-ghost,
+:root[data-contrast="high"] .agnt-row-action,
+:root[data-contrast="high"] .agnt-sidebar-thread,
+:root[data-contrast="high"] .agnt-row-tag {
+  border-width: 2px;
+}
+/* Focus rings are already accent-colored; bump their weight too so
+   keyboard users tracking focus through a dialog see them clearly. */
+:root[data-contrast="high"] :focus-visible {
+  outline-width: 3px;
+  outline-offset: 2px;
+}
+
+/* ── Mermaid diagrams ───────────────────────────────────────────────────
+   The library inlines its own SVG with neutral colors that mostly use
+   currentColor. Wrap it in a card so the diagram doesn't visually
+   collide with the surrounding chat bubble; keep horizontal scrolling
+   for diagrams wider than the viewport instead of stretching them. */
+.agnt-md-mermaid {
+  margin: 8px 0;
+  padding: 12px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  overflow-x: auto;
+  text-align: center;
+  color: var(--agnt-fg);
+}
+.agnt-md-mermaid-pending {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--agnt-fg-dim);
+  font-size: 12px;
+}
+.agnt-md-mermaid-pending::before {
+  content: "Rendering diagram…";
+}
+.agnt-md-mermaid-error {
+  text-align: left;
+  border-color: var(--agnt-error, #b35c00);
+}
+.agnt-md-mermaid-error-message {
+  color: var(--agnt-error, #b35c00);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.agnt-md-mermaid-source {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--agnt-bg);
+  border-radius: 4px;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  white-space: pre-wrap;
+  text-align: left;
 }

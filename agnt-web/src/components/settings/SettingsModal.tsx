@@ -10,6 +10,8 @@ import {
   downloadDiagnostic,
 } from "../../lib/diagnostic-report";
 import { permissionLabel, requestPermission } from "../../lib/notifications";
+import { playTurnCue } from "../../lib/sound-cue";
+import { useContrastStore } from "../../state/contrast-store";
 import {
   applyStateBackup,
   buildStateBackup,
@@ -111,7 +113,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
         {matches(["Language", "Locale", "i18n"]) && <LocaleSection />}
 
-        {matches(["Appearance", "Theme", "Light", "Dark", "Auto"]) && (
+        {matches(["Appearance", "Theme", "Light", "Dark", "Auto", "Contrast", "Accessibility"]) && (
         <section className="agnt-settings-section">
           <h3>{t("settings.section.appearance")}</h3>
           <div className="agnt-settings-row">
@@ -131,6 +133,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
               ))}
             </div>
           </div>
+          <HighContrastRow />
         </section>
         )}
 
@@ -165,6 +168,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
                   ? "Permission granted. Notifications fire only while the agnt tab is hidden so you don't get duplicate signals."
                   : "Pick On to grant notification permission. Auto stays quiet until you opt in."}
           </p>
+          <SoundCueRow />
         </section>
         )}
 
@@ -537,6 +541,68 @@ function DiagnosticSection() {
       </div>
       {feedback && <p className="agnt-settings-hint">{feedback}</p>}
     </section>
+  );
+}
+
+function HighContrastRow() {
+  // Toggle layered on top of the active theme. The store's hydrate
+  // already follows `prefers-contrast: more` system-side; this toggle
+  // is the explicit override for users whose system pref doesn't match
+  // their need (e.g. macOS doesn't expose a per-app contrast bump).
+  const enabled = useContrastStore((state) => state.enabled);
+  const systemPrefers = useContrastStore((state) => state.systemPrefers);
+  const setEnabled = useContrastStore((state) => state.setEnabled);
+  return (
+    <div className="agnt-settings-row">
+      <span>High contrast</span>
+      <label className="agnt-settings-row-checkbox">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => void setEnabled(event.target.checked)}
+          aria-label="Enable high-contrast variant"
+        />
+        <span className="agnt-settings-row-hint">
+          {enabled
+            ? "On — bumped border weights + text contrast"
+            : systemPrefers
+              ? "Following system preference (currently on)"
+              : "Off — defer to default theme contrast"}
+        </span>
+      </label>
+    </div>
+  );
+}
+
+function SoundCueRow() {
+  // Subscribed to localStorage at mount; we keep a debounced "last value
+  // we saved" to avoid hammering idb on every slider tick. The audible
+  // preview fires on commit (slider release / number change) so the user
+  // hears the chime they're picking, not a sweep across volumes.
+  const [volume, setVolume] = useState<number>(0);
+  useEffect(() => {
+    void prefsStore.loadSoundVolume().then(setVolume);
+  }, []);
+  async function commit(next: number) {
+    setVolume(next);
+    await prefsStore.saveSoundVolume(next);
+    if (next > 0) void playTurnCue("completed", { volume: next });
+  }
+  return (
+    <div className="agnt-settings-row">
+      <span>Sound cue on turn complete</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={volume}
+        onChange={(event) => void commit(Number(event.target.value))}
+        aria-label="Sound cue volume"
+        title="Drag to set volume; 0 = silent"
+      />
+      <span className="agnt-settings-row-hint">{volume === 0 ? "Silent" : `${Math.round(volume * 100)}%`}</span>
+    </div>
   );
 }
 

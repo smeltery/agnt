@@ -17,6 +17,36 @@ interface NewChatModalProps {
   initialPrompt?: string;
 }
 
+/** Quick-start chips that drop a tested prompt into the textarea. Kept
+ *  as a flat list rather than a category tree — agnt is for engineering
+ *  work, not a general-purpose chat product, so 4-6 chips covering the
+ *  common day-1 tasks beats a "browse templates" sub-modal.
+ *
+ *  We deliberately keep the bodies terse and outcome-shaped: the user
+ *  finishes the prompt with their specific repo / file / question. */
+const STARTER_PROMPTS: ReadonlyArray<{ label: string; body: string }> = [
+  {
+    label: "Explain the codebase",
+    body: "Give me a tour of this repo: top-level layout, the main entry points, how requests flow end-to-end, and where I'd start reading if I had to ship a small change.",
+  },
+  {
+    label: "Review my changes",
+    body: "Look at the unstaged changes in this repo. Flag bugs, missing edge cases, and anything that would surprise a future reader. Keep the review concise; reference file:line for each call-out.",
+  },
+  {
+    label: "Write tests",
+    body: "Add tests for the most recently edited file. Cover the happy path, the obvious edge cases, and any branch the existing tests miss.",
+  },
+  {
+    label: "Find a bug",
+    body: "I'm seeing this issue: <describe>. Check the relevant module(s), confirm the root cause, and propose the smallest fix that doesn't regress the existing behavior.",
+  },
+  {
+    label: "Refactor a function",
+    body: "Refactor the most recently edited function for readability. Don't change behavior; keep the same public signature unless I confirm a rename.",
+  },
+];
+
 export function NewChatModal({ onClose, onPickProject, initialCwd, initialPrompt }: NewChatModalProps) {
   const startNewThread = useThreadsStore((state) => state.startNewThread);
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
@@ -83,6 +113,25 @@ export function NewChatModal({ onClose, onPickProject, initialCwd, initialPrompt
               autoFocus
               spellCheck={false}
             />
+            {/* Starter chips: only render when the user hasn't typed
+                anything yet so they don't get in the way of editing.
+                Clicking one drops the prompt into the textarea — the
+                user can still tweak before submitting. */}
+            {!prompt.trim() && (
+              <div className="agnt-newchat-starters" role="group" aria-label="Starter prompts">
+                {STARTER_PROMPTS.map((starter) => (
+                  <button
+                    key={starter.label}
+                    type="button"
+                    className="agnt-newchat-starter"
+                    onClick={() => setPrompt(starter.body)}
+                    title={starter.body}
+                  >
+                    {starter.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </label>
         </section>
         <footer className="agnt-modal-footer">
