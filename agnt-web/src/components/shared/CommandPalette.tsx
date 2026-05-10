@@ -8,6 +8,7 @@
 // to settings, etc.) without needing a rename.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { fuzzyMatch } from "../../lib/fuzzy-match";
 import { searchableText } from "../chat/ThreadSearchBar";
 import type { CodexMessage } from "../../models";
 import { useBookmarksStore } from "../../state/bookmarks-store";
@@ -26,6 +27,9 @@ interface Hit {
   threadLabel: string;
   message: CodexMessage;
   snippet: string;
+  /** Higher = better. Used to sort hits across threads so fuzzy / substring
+   *  scores can intermingle in a sensible order. */
+  score: number;
 }
 
 const MAX_HITS = 80;
@@ -38,6 +42,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [cursor, setCursor] = useState(0);
   const [starredOnly, setStarredOnly] = useState(false);
   const [savedSearches, setSavedSearches] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const threads = useThreadsStore((state) => state.threads);
   const archived = useThreadsStore((state) => state.archivedThreads);
@@ -57,7 +62,21 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     setCursor(0);
     setStarredOnly(false);
     void prefsStore.loadSavedSearches().then(setSavedSearches);
+    void prefsStore.loadRecentSearches().then(setRecentSearches);
   }, [open]);
+
+  const MAX_RECENT = 8;
+  function recordRecent(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const next = [trimmed, ...recentSearches.filter((entry) => entry !== trimmed)].slice(0, MAX_RECENT);
+    setRecentSearches(next);
+    void prefsStore.saveRecentSearches(next);
+  }
+  function clearRecent() {
+    setRecentSearches([]);
+    void prefsStore.saveRecentSearches([]);
+  }
 
   function persistSearches(next: string[]) {
     setSavedSearches(next);
@@ -101,23 +120,39 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         if (!haystack) continue;
         let snippetOffset = 0;
         let snippetLength = Math.min(haystack.length, 80);
+        let score = 0;
         if (trimmed) {
+          // Substring match wins on score (it's the most precise) but we
+          // fall back to fuzzy subsequence so typos / partial recall still
+          // surface results. Both produce a snippet anchored at the match.
           const lowerHaystack = haystack.toLowerCase();
           const offset = lowerHaystack.indexOf(trimmed);
-          if (offset < 0) continue;
-          snippetOffset = offset;
-          snippetLength = trimmed.length;
+          if (offset >= 0) {
+            snippetOffset = offset;
+            snippetLength = trimmed.length;
+            // Substring matches get a flat high score so they always sort
+            // above fuzzy hits (substring is a strict superset of fuzzy).
+            score = 10_000 + (haystack.length - offset);
+          } else {
+            const fuzzy = fuzzyMatch(trimmed, haystack);
+            if (!fuzzy) continue;
+            snippetOffset = fuzzy.indexes[0] ?? 0;
+            snippetLength = (fuzzy.indexes[fuzzy.indexes.length - 1] ?? 0) - snippetOffset + 1;
+            score = fuzzy.score;
+          }
         }
         out.push({
           threadId,
           threadLabel: label,
           message,
           snippet: extractSnippet(haystack, snippetOffset, snippetLength),
+          score,
         });
-        if (out.length >= MAX_HITS) return out;
+        if (out.length >= MAX_HITS) break;
       }
     }
-    return out;
+    out.sort((a, b) => b.score - a.score);
+    return out.length > MAX_HITS ? out.slice(0, MAX_HITS) : out;
   }, [open, query, starredOnly, threads, archived, reducerStates, bookmarksByThread]);
 
   // Clamp the cursor whenever the hit list shrinks; otherwise Enter could
@@ -128,6 +163,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   }, [hits.length]);
 
   function commit(hit: Hit) {
+    recordRecent(query);
     onClose();
     void selectThread(hit.threadId);
   }
@@ -208,7 +244,36 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         )}
         <div className="agnt-command-palette-hits">
           {!query.trim() && !starredOnly ? (
-            <div className="agnt-command-palette-empty">Type to search every cached thread.</div>
+            recentSearches.length > 0 ? (
+              <div className="agnt-command-palette-recent">
+                <div className="agnt-command-palette-recent-header">
+                  <span>Recent</span>
+                  <button
+                    type="button"
+                    className="agnt-command-palette-recent-clear"
+                    onClick={clearRecent}
+                    aria-label="Clear recent searches"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {recentSearches.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="agnt-command-palette-recent-item"
+                    onClick={() => {
+                      setQuery(value);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="agnt-command-palette-empty">Type to search every cached thread.</div>
+            )
           ) : hits.length === 0 ? (
             <div className="agnt-command-palette-empty">
               {starredOnly

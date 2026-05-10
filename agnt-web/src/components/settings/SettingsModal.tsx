@@ -16,6 +16,7 @@ import {
   defaultBackupFilename,
   downloadBackup,
 } from "../../lib/state-backup";
+import { type LocaleId, SUPPORTED_LOCALES, useI18nStore } from "../../lib/i18n";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useCustomSlashCommandsStore } from "../../state/custom-slash-commands-store";
@@ -105,6 +106,8 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             <Xmark />
           </button>
         </header>
+
+        {matches(["Language", "Locale", "i18n"]) && <LocaleSection />}
 
         {matches(["Appearance", "Theme", "Light", "Dark", "Auto"]) && (
         <section className="agnt-settings-section">
@@ -529,6 +532,37 @@ function DiagnosticSection() {
         </button>
       </div>
       {feedback && <p className="agnt-settings-hint">{feedback}</p>}
+    </section>
+  );
+}
+
+function LocaleSection() {
+  const locale = useI18nStore((state) => state.locale);
+  const setLocale = useI18nStore((state) => state.setLocale);
+  async function pick(next: LocaleId) {
+    setLocale(next);
+    await prefsStore.saveLocale(next);
+  }
+  return (
+    <section className="agnt-settings-section">
+      <h3>Language</h3>
+      <p className="agnt-settings-hint">
+        Pick the language for the agnt-web UI. Translations are early-stage; missing strings fall back to English.
+        Date / time / number formatting follows the locale via the browser's <code>Intl</code>.
+      </p>
+      <div className="agnt-settings-row">
+        <label className="agnt-settings-row-label" htmlFor="agnt-locale-select">Locale</label>
+        <select
+          id="agnt-locale-select"
+          className="agnt-settings-input"
+          value={locale}
+          onChange={(event) => void pick(event.target.value as LocaleId)}
+        >
+          {SUPPORTED_LOCALES.map((option) => (
+            <option key={option.id} value={option.id}>{option.label}</option>
+          ))}
+        </select>
+      </div>
     </section>
   );
 }
