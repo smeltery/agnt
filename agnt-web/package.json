@@ -14,7 +14,8 @@
     "preview": "vite preview --port 4173",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit -p tsconfig.json"
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "size": "size-limit"
   },
   "dependencies": {
     "@noble/ciphers": "^1.0.0",
@@ -29,11 +30,13 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@size-limit/file": "^12.1.0",
     "@types/node": "^25.6.2",
     "@types/prismjs": "^1.26.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5",
+    "size-limit": "^12.1.0",
     "typescript": "^5.6.3",
     "vite": "^7",
     "vitest": "^3"

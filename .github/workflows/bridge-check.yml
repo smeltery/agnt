@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Node is still the runtime — bridge code uses `require()` + Node's
       # built-in test runner, and the published package is consumed via
@@ -38,6 +38,17 @@ jobs:
         # --frozen-lockfile mirrors `npm ci`: fail rather than auto-update
         # the lockfile when there's a drift between package.json and bun.lock.
         run: bun install --frozen-lockfile
+
+      # Surface dependency advisories on every PR. Non-fatal — agnt-bridge
+      # has runtime deps (qrcode-terminal, ws) and ships as a globally-
+      # installed CLI, so audit signal matters more than for the web build;
+      # we still keep the step non-blocking so a freshly-disclosed CVE on a
+      # transitive dep doesn't gate unrelated PRs. Dependabot handles the
+      # remediation side.
+      - name: Audit dependencies
+        working-directory: agnt-bridge
+        continue-on-error: true
+        run: bun audit
 
       - name: Verify bridge entrypoints load
         working-directory: agnt-bridge

@@ -1,10 +1,11 @@
 # agnt
 
-[![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE) [![Built with Blacksmith](https://img.shields.io/badge/Built%20with-Blacksmith-2f2f2f?logo=github&logoColor=white)](https://blacksmith.sh)
+
 [![Bridge Check](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml)
 [![Web Check](https://github.com/dotbrains/agnt/actions/workflows/agnt-web-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/agnt-web-check.yml)
+[![Relay Check](https://github.com/dotbrains/agnt/actions/workflows/relay-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/relay-check.yml)
 [![Build Unsigned IPA](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml)
-[![Built with Blacksmith](https://img.shields.io/badge/Built%20with-Blacksmith-2f2f2f?logo=github&logoColor=white)](https://blacksmith.sh)
 
 **Drive coding-agent CLIs from your iPhone or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac or Linux box and proxies an end-to-end encrypted session to your iOS app or to a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
 
