@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShortcut } from "../../lib/keyboard";
 import { useStickyScroll } from "../../lib/sticky-scroll";
 import type { CodexMessage } from "../../models";
@@ -28,6 +28,13 @@ export function ChatView() {
   const sendTurn = useThreadsStore((state) => state.sendTurn);
   const stopTurn = useThreadsStore((state) => state.stopTurn);
   const error = useThreadsStore((state) => state.error);
+  // Arrival ts: when did the user previously view this thread? We draw
+  // a "new since you were last here" divider above the first message
+  // whose createdAt exceeds this. `0` (never visited / fresh thread)
+  // naturally suppresses the divider since nothing is older than 0.
+  const arrivalTs = useThreadsStore((state) =>
+    selectedThreadId ? state.arrivalVisitedByThread[selectedThreadId] ?? 0 : 0
+  );
   const usage = useThreadsStore((state) =>
     selectedThreadId ? state.contextUsageByThread[selectedThreadId] : undefined
   );
@@ -47,6 +54,18 @@ export function ChatView() {
     if (!bookmarks || bookmarks.size === 0) return [];
     return messages.filter((message) => bookmarks.has(message.id));
   }, [messages, starredOnly, bookmarks]);
+
+  // First message id with a createdAt newer than the prior visit. Null
+  // when the user has nothing new (or the threshold is 0). We anchor on
+  // an id (not an index) so streaming-driven re-orders don't shift the
+  // divider mid-paint.
+  const firstNewMessageId = useMemo<string | null>(() => {
+    if (arrivalTs <= 0) return null;
+    for (const message of visibleMessages) {
+      if (message.createdAt > arrivalTs) return message.id;
+    }
+    return null;
+  }, [visibleMessages, arrivalTs]);
 
   const { scrollRef, showJumpButton, jumpToBottom } = useStickyScroll([visibleMessages, running]);
 
@@ -192,21 +211,27 @@ export function ChatView() {
           />
         ) : (
           visibleMessages.map((message) => (
-            <div
-              key={message.id}
-              data-message-id={message.id}
-              // `agnt-msg-cv` opts each row into CSS `content-visibility:
-              // auto`, so off-screen rows skip layout + paint entirely.
-              // Browser-native virtualization — no JS overhead, no library,
-              // no scroll-position math. The intrinsic-size hint keeps
-              // scroll height stable while rows are skipped.
-              className={
-                "agnt-msg-cv"
-                + (highlightedMessageId === message.id ? " agnt-row-highlight" : "")
-              }
-            >
-              <MessageRow message={message} />
-            </div>
+            <Fragment key={message.id}>
+              {firstNewMessageId === message.id && (
+                <div className="agnt-chat-new-divider" role="separator" aria-label="New messages">
+                  <span>New since you were last here</span>
+                </div>
+              )}
+              <div
+                data-message-id={message.id}
+                // `agnt-msg-cv` opts each row into CSS `content-visibility:
+                // auto`, so off-screen rows skip layout + paint entirely.
+                // Browser-native virtualization — no JS overhead, no library,
+                // no scroll-position math. The intrinsic-size hint keeps
+                // scroll height stable while rows are skipped.
+                className={
+                  "agnt-msg-cv"
+                  + (highlightedMessageId === message.id ? " agnt-row-highlight" : "")
+                }
+              >
+                <MessageRow message={message} />
+              </div>
+            </Fragment>
           ))
         )}
         {error && <div className="agnt-chat-error">{error}</div>}

@@ -13,6 +13,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     runningThreadIds: new Set(),
     pinnedThreadIds: new Set(),
     lastVisitedByThread: {},
+    arrivalVisitedByThread: {},
     colorByThread: {},
     overridesByThread: {},
     mutedThreadIds: new Set(),
