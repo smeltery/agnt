@@ -3,8 +3,12 @@
 // and CodexService+SecureTransport.swift secureWireText / handleEncryptedEnvelopeText.
 
 import { gcm } from "@noble/ciphers/aes";
-import { hkdf } from "@noble/hashes/hkdf";
-import { sha256 } from "@noble/hashes/sha256";
+// @noble/hashes 2.x requires the `.js` extension on subpath imports
+// (their package `exports` map only registers `./hkdf.js`, `./sha2.js`,
+// …) and consolidated `sha256` into the `sha2` module alongside its
+// SHA-2 siblings. The runtime sha256 export still has the same shape.
+import { hkdf } from "@noble/hashes/hkdf.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { base64ToBytes, bytesToBase64, utf8ToBytes } from "./encoding";
 import { HANDSHAKE_TAG, SECURE_PROTOCOL_VERSION } from "./transcript";
 
