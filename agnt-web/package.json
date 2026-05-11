@@ -39,6 +39,6 @@
     "size-limit": "^12.1.0",
     "typescript": "^5.6.3",
     "vite": "^7",
-    "vitest": "^3"
+    "vitest": "^4"
   }
 }
