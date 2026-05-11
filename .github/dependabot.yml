@@ -1,0 +1,60 @@
+# Dependabot config. The three Node packages are on `bun.lock` after the
+# migration in PR #20; dependabot's `npm` ecosystem handles `bun.lock`
+# natively (and writes back to it on each update PR). Schedule is weekly
+# to keep transitive-dep PR volume manageable — bump to daily later if
+# noise turns out to be a feature, not a bug.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/agnt-web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "agnt-web"
+    # Group minor/patch bumps so a single PR covers a week's worth of
+    # transitive churn rather than fanning out per-package.
+    groups:
+      agnt-web-minor:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/agnt-bridge"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "agnt-bridge"
+    groups:
+      agnt-bridge-minor:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/relay"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "relay"
+    groups:
+      relay-minor:
+        update-types: ["minor", "patch"]
+
+  # Keep GitHub Actions versions current too (setup-bun, actions/checkout,
+  # actions/setup-node, etc.). Lower noise because actions move slower.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"

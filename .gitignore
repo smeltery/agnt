@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# Bun debug artifacts (written on install / runtime errors, never source)
+.bun-debug.log
+bun-debug.log
+.bun-cache/
+
 # macOS
 .DS_Store
 **/.DS_Store
