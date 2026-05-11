@@ -43,3 +43,12 @@ jobs:
         working-directory: agnt-bridge
         run: |
           node -e "const mod = require('./src'); const names = ['startBridge', 'openLastActiveThread', 'watchThreadRollout']; for (const name of names) { if (typeof mod[name] !== 'function') { throw new Error('Missing export: ' + name); } }"
+
+      # Node's built-in test runner picks up `test/*.test.js`. Runs on the
+      # same Blacksmith Ubuntu runner so Linux-only paths (systemd-user
+      # service install, ImageMagick fallback, systemd-inhibit wake
+      # assertion) stay covered on every PR. macOS-only tests inside the
+      # suite self-skip with `{ skip: process.platform !== "darwin" }`.
+      - name: Run bridge unit tests
+        working-directory: agnt-bridge
+        run: bun run test
