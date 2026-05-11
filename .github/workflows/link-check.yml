@@ -5,6 +5,13 @@ name: Link Check
 #   - weekly on Monday (one slow-burn "what needs maintenance?" window
 #     that aligns with dependabot's cadence)
 #   - on PRs that touch markdown files (so new docs land with verified links)
+#
+# We invoke lychee directly rather than through lycheeverse/lychee-action
+# because the action's report-handling produced a stub "see actions
+# output" pointer (auth-walled) instead of the actual broken-link list,
+# which made the workflow undebuggable. Running the CLI ourselves lets
+# us write a real markdown report and echo it to both the job log and
+# a PR comment.
 
 on:
   workflow_dispatch:
@@ -22,39 +29,57 @@ jobs:
 
     permissions:
       contents: read
+      # Needed by the "Post lychee report as PR comment" step.
       pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Run lychee against repo markdown
-        id: lychee
-        uses: lycheeverse/lychee-action@v2
-        with:
-          # Pass `--format markdown --output ./lychee-report.md`
-          # directly through args so the report file gets the actual
-          # broken-link details (the action's own `output:` input was
-          # writing a stub "see actions output" pointer instead of the
-          # detailed report).
-          # `--exclude-path` skips the `agnt-bridge/README.md` symlink
-          # — following it resolves intra-repo refs against
-          # `agnt-bridge/` instead of the repo root, so every link
-          # falsely reads as broken.
-          args: |
-            --no-progress
-            --max-redirects 5
-            --timeout 20
-            --max-retries 2
-            --exclude-path agnt-bridge/README.md
-            --format markdown
-            --output ./lychee-report.md
-            './**/*.md'
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fail: false
+      - name: Install lychee
+        run: |
+          # `latest` redirects to the most recent stable release asset.
+          # Pin to a version if reproducibility becomes important.
+          curl -fsSL \
+            "https://github.com/lycheeverse/lychee/releases/latest/download/lychee-x86_64-unknown-linux-gnu.tar.gz" \
+            -o /tmp/lychee.tar.gz
+          tar -xzf /tmp/lychee.tar.gz -C /tmp/
+          sudo mv /tmp/lychee /usr/local/bin/lychee
+          lychee --version
 
-      # Make the failure observable via PR comment so I can read the
-      # detail through the GitHub API without auth-walled run pages.
+      - name: Run lychee
+        id: lychee
+        env:
+          # GITHUB_TOKEN authenticates github.com requests so lychee can
+          # see the dotbrains/agnt self-links instead of 404ing them.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          # `--exclude-path agnt-bridge/README.md` skips the symlink to
+          # the top README. When lychee follows the symlink it resolves
+          # intra-repo refs against `agnt-bridge/` rather than the repo
+          # root, so every link falsely reads as broken.
+          # `--format markdown --output ./lychee-report.md` writes a
+          # markdown report that we can paste into a PR comment.
+          lychee \
+            --no-progress \
+            --max-redirects 5 \
+            --timeout 20 \
+            --max-retries 2 \
+            --exclude-path agnt-bridge/README.md \
+            --format markdown \
+            --output ./lychee-report.md \
+            './**/*.md'
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          # Echo to the job log for anyone reviewing the run directly.
+          echo "=== lychee report (exit $code) ==="
+          cat ./lychee-report.md || echo "(no report file written)"
+          echo "==================================="
+          # Don't fail this step — the "Fail job" step below controls
+          # the workflow's final outcome after the PR comment lands.
+          exit 0
+
       - name: Post lychee report as PR comment
         if: github.event_name == 'pull_request' && steps.lychee.outputs.exit_code != '0'
         uses: peter-evans/create-or-update-comment@v4
