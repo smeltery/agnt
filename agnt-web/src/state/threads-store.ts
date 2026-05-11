@@ -87,6 +87,12 @@ export interface ThreadsState {
   /** Per-thread last-visit timestamp. A thread shows an unread dot when its
    *  `updatedAt` exceeds this. Persisted via `prefsStore.saveLastVisited`. */
   lastVisitedByThread: Record<string, number>;
+  /** Snapshot of the prior `lastVisitedByThread[threadId]` taken at the
+   *  moment `selectThread` was called — i.e. when did the user PREVIOUSLY
+   *  view this thread? Used by ChatView to draw a "new since you were
+   *  here" divider that stays stable while the user is reading. Stays
+   *  put until the next selectThread for the same id. */
+  arrivalVisitedByThread: Record<string, number>;
   /** Per-thread color tag (one of `THREAD_COLOR_VALUES`). Persisted. */
   colorByThread: Record<string, ThreadColor>;
   /** Per-thread override of the global turn flags + an optional system
@@ -157,6 +163,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
   runningThreadIds: new Set(),
   pinnedThreadIds: new Set(),
   lastVisitedByThread: {},
+  arrivalVisitedByThread: {},
   colorByThread: {},
   overridesByThread: {},
   mutedThreadIds: new Set(),
@@ -295,8 +302,21 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     // Stamp the visit so the unread dot disappears. We bump the timestamp to
     // *now* rather than thread.updatedAt — a turn that completes while we're
     // already viewing the thread shouldn't immediately re-mark it unread.
+    const priorVisited = get().lastVisitedByThread[threadId];
     const nextVisited = { ...get().lastVisitedByThread, [threadId]: Date.now() };
-    set({ selectedThreadId: threadId, lastVisitedByThread: nextVisited });
+    // Capture the prior visit ts BEFORE overwriting it so ChatView can
+    // anchor a "new since you were last here" divider that doesn't move
+    // as the user reads. `undefined` (first-ever visit) becomes 0 so the
+    // divider naturally suppresses (no messages older than 0).
+    const nextArrival = {
+      ...get().arrivalVisitedByThread,
+      [threadId]: priorVisited ?? 0,
+    };
+    set({
+      selectedThreadId: threadId,
+      lastVisitedByThread: nextVisited,
+      arrivalVisitedByThread: nextArrival,
+    });
     void prefsStore.saveLastVisited(nextVisited);
     // Hydrate from disk first so the timeline paints instantly.
     const cached = await messagesStore.load(threadId);

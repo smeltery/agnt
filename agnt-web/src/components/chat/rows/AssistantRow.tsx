@@ -2,6 +2,7 @@ import { useState } from "react";
 import { copyText } from "../../../lib/clipboard";
 import { computeDiffStats, sumDiffStats } from "../../../lib/git-diff-stats";
 import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
+import { isSpeaking, isTtsSupported, speak, stop as stopSpeaking } from "../../../lib/tts";
 import { quoteAsMarkdown } from "../../../lib/quote";
 import { formatCostUsd, formatTokens, totalTokens } from "../../../lib/token-usage";
 import type { CodexMessage } from "../../../models";
@@ -18,6 +19,7 @@ import { MarkdownContent } from "../MarkdownContent";
 
 export function AssistantRow({ message }: { message: CodexMessage }) {
   const [justCopied, setJustCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const showCheckpoints = useCheckpointsStore((state) => state.show);
   const connection = useConnectionStore((state) => state.connection);
   const thread = useThreadsStore((state) => {
@@ -67,6 +69,26 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
     if (node instanceof HTMLElement) {
       node.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  }
+
+  function handleSpeak() {
+    if (speaking) {
+      stopSpeaking();
+      setSpeaking(false);
+      return;
+    }
+    speak(message.text);
+    setSpeaking(true);
+    // Poll once a second to flip the icon back when the platform
+    // finishes speaking. SpeechSynthesis doesn't expose a "completed"
+    // event in a way that survives all browsers; polling avoids a
+    // listener-leak from cancel races.
+    const poll = window.setInterval(() => {
+      if (!isSpeaking()) {
+        setSpeaking(false);
+        window.clearInterval(poll);
+      }
+    }, 1000);
   }
 
   async function handleCopy() {
@@ -160,6 +182,18 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
               title="Roll the workspace back to before this turn"
             >
               <ArrowUturnLeft /> Revert
+            </button>
+          )}
+          {isTtsSupported() && (
+            <button
+              type="button"
+              className={"agnt-row-action" + (speaking ? " agnt-row-action-active" : "")}
+              onClick={handleSpeak}
+              aria-label={speaking ? "Stop speaking" : "Read aloud"}
+              aria-pressed={speaking}
+              title={speaking ? "Stop reading" : "Read this message aloud (Web Speech API)"}
+            >
+              {speaking ? "Stop" : "Speak"}
             </button>
           )}
           <button

@@ -30,6 +30,24 @@ export interface ComposerProps {
 export function Composer({ running, onSend, onStop }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  // Drag-reorder state. We track the source + target ids so the dropped
+  // tile renders a "dragging" treatment while the hovered tile shows
+  // a drop-indicator border. Refs are unsuitable because both need to
+  // re-render their tile when the values change.
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  function reorderAttachments(sourceId: string, targetId: string) {
+    setAttachments((current) => {
+      const from = current.findIndex((entry) => entry.id === sourceId);
+      const to = current.findIndex((entry) => entry.id === targetId);
+      if (from < 0 || to < 0 || from === to) return current;
+      const next = current.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
   const [attachError, setAttachError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
@@ -611,7 +629,37 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
       {attachments.length > 0 && (
         <div className="agnt-composer-attachments">
           {attachments.map((attachment) => (
-            <div key={attachment.id} className="agnt-composer-attachment">
+            <div
+              key={attachment.id}
+              className={
+                "agnt-composer-attachment"
+                + (dragSourceId === attachment.id ? " agnt-composer-attachment-dragging" : "")
+                + (dropTargetId === attachment.id && dragSourceId !== attachment.id ? " agnt-composer-attachment-droptarget" : "")
+              }
+              draggable={attachments.length > 1}
+              onDragStart={() => setDragSourceId(attachment.id)}
+              onDragEnd={() => {
+                setDragSourceId(null);
+                setDropTargetId(null);
+              }}
+              onDragEnter={(event) => {
+                if (!dragSourceId) return;
+                event.preventDefault();
+                if (dropTargetId !== attachment.id) setDropTargetId(attachment.id);
+              }}
+              onDragOver={(event) => {
+                // dragover must `preventDefault` to permit the drop event.
+                if (dragSourceId) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                if (!dragSourceId || dragSourceId === attachment.id) return;
+                event.preventDefault();
+                reorderAttachments(dragSourceId, attachment.id);
+                setDragSourceId(null);
+                setDropTargetId(null);
+              }}
+              title={attachments.length > 1 ? "Drag to reorder" : undefined}
+            >
               <img src={attachment.thumbnailDataUrl} alt={attachment.fileName ?? "Attachment"} />
               <button
                 type="button"

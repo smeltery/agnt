@@ -86,6 +86,15 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 46 — Help search + new-since-last-view + attachment reorder + TTS ✅ DONE
+
+- ✅ **Fifth clean recon pass.** All four claimed gaps verified missing before coding (file-content greps inline: `filter|search|query` on `HelpModal.tsx`, `sinceLastView|agnt-row-new` workspace-wide, `reorderAttachment|attachmentDrag` on `Composer.tsx`, `speechSynthesis|readAloud` workspace-wide).
+- ✅ **Help modal search filter.** Top-of-modal search input filters rows by description + keys, AND-combined across whitespace tokens (so "ctrl k" finds the command palette and "rev" finds Revert). Empty-state copy when no shortcut matches.
+- ✅ **New-since-last-view divider.** New `arrivalVisitedByThread` snapshot in threads-store captures the prior `lastVisitedByThread[threadId]` at the moment `selectThread` overwrites it — so ChatView can anchor a "New since you were last here" divider on the first message newer than the prior visit. Stays put while the user reads (anchored on message id, not index); naturally suppresses when the prior visit is 0 (first-ever).
+- ✅ **Composer attachment drag-reorder.** Each attachment tile is `draggable` when there's more than one; drag highlights the source as semi-transparent and the drop-target with an accent outline. New `reorderAttachments(sourceId, targetId)` splices in place.
+- ✅ **TTS / read-aloud.** New `lib/tts.ts` wraps `SpeechSynthesisUtterance` with a `prepareTextForSpeech` filter that collapses code fences to "[code block]" stubs + strips markdown markers (bold/italic/inline-code/links) so the reader hears prose, not syntax. `Speak` button on `AssistantRow` flips to `Stop` while speaking; polled state guard handles platform variance around the "ended" event.
+- 8 new vitest cases (TTS prep: plain prose / code-fence stub / inline-code unwrap / bold + italic strip / link-label-only / whitespace condense / trim / chained). 522 / 522 pass; tsc clean; main bundle 415 → 417 KB raw, 133.58 → 134.39 KB gzip.
+
 ## Session 45 — Sidebar previews + composer expand + reading mode + group-by-project ✅ DONE
 
 - ✅ **Fourth clean recon pass.** All four claimed gaps verified missing via file-content grep (sidebar / composer / workspace) — `lastMessage|preview|snippet` on `Sidebar.tsx`, `rows={` on `Composer.tsx`, `focusMode|readingMode` workspace-wide, `groupByCwd|byProject` on sidebar. Discipline holding.

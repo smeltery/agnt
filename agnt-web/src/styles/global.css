@@ -975,8 +975,20 @@ button {
   overflow: hidden;
   border: 1px solid var(--agnt-border);
   background: var(--agnt-bg-elev-2);
+  /* Multi-attachment rows get a grab cursor so the affordance is
+     discoverable. Single attachments aren't draggable; CSS leaves them
+     at default. */
+  cursor: grab;
 }
 .agnt-composer-attachment img { width: 100%; height: 100%; object-fit: cover; }
+.agnt-composer-attachment-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.agnt-composer-attachment-droptarget {
+  outline: 2px solid var(--agnt-accent);
+  outline-offset: 1px;
+}
 .agnt-composer-attachment-remove {
   position: absolute;
   top: 1px;
@@ -2156,6 +2168,23 @@ button {
 
 .agnt-help-modal { max-width: 540px; }
 .agnt-help-body { display: flex; flex-direction: column; gap: 16px; }
+.agnt-help-search {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  color: var(--agnt-fg);
+  font: inherit;
+  font-size: 13px;
+}
+.agnt-help-empty {
+  padding: 16px 0;
+  color: var(--agnt-fg-dim);
+  font-size: 13px;
+  text-align: center;
+}
 .agnt-help-section h3 {
   margin: 0 0 6px;
   font-size: 12px;
@@ -3392,4 +3421,27 @@ button {
 .agnt-workspace-reading .agnt-chat-scroller {
   max-width: 880px;
   margin: 0 auto;
+}
+
+/* ── "New since you were last here" divider ────────────────────────────
+   Anchored on the first message id newer than the user's prior visit
+   so it stays put while they read. Subtle accent stripe — strong enough
+   to spot when skimming, quiet enough to ignore once acknowledged. */
+.agnt-chat-new-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  color: var(--agnt-accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agnt-chat-new-divider::before,
+.agnt-chat-new-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--agnt-accent);
+  opacity: 0.5;
 }

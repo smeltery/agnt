@@ -210,6 +210,10 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Composer expand-to-fullscreen | `components/chat/Composer.tsx` (`expandedOpen` overlay) | ✅ (Session 45; second textarea bound to the same `draft`; Cmd/Ctrl+Enter sends + dismisses) |
 | Reading / focus mode | `components/workspace/Workspace.tsx` `readingMode` + `agnt-workspace-reading` CSS + `z` shortcut | ✅ (Session 45; hides sidebar + composer; chat scroller caps at 880px for document reading) |
 | Sidebar group-by-project | `state/thread-grouping.ts:groupThreadsByProject` + `prefs.sidebar.groupBy` | ✅ (Session 45; cwd-bucketed alongside the existing recency grouping; toggle chip in the sidebar header) |
+| Help modal search filter | `components/shared/HelpModal.tsx` (token AND-search) | ✅ (Session 46; filters rows by description + keys; "ctrl k" finds the palette) |
+| "New since you were last here" divider | `state/threads-store.ts:arrivalVisitedByThread` + ChatView anchor | ✅ (Session 46; anchored on message id so it stays put while reading) |
+| Composer attachment drag-reorder | `components/chat/Composer.tsx` (`reorderAttachments`) | ✅ (Session 46; drag-source semi-transparent + drop-target accent outline) |
+| TTS / read-aloud assistant messages | `lib/tts.ts` + `components/chat/rows/AssistantRow.tsx` Speak button | ✅ (Session 46; Web Speech API, no dep; `prepareTextForSpeech` strips code/markdown so the reader hears prose) |
 | i18n scaffolding | `lib/i18n.ts` + Settings Language section | 🟡 (Session 37; locale picker, `Intl` date/number helpers, ICU-lite placeholders, English baseline. Non-English dictionaries are placeholders awaiting translation) |
 | Global ErrorBoundary | `components/shared/ErrorBoundary.tsx` (wraps `App.tsx`) | ✅ (Session 36; render-time crash surfaces a recoverable card with Try-again + Reload actions; inline-styled to survive CSS corruption) |
 | Service-worker cache notice | `public/sw.js` + `src/main.tsx` (postMessage listener) | ✅ (Session 36; new worker activation evicts old caches and posts `agnt-cache-evicted`; main.tsx surfaces "agnt-web updated — Reload to apply" via the existing notices-store) |
