@@ -34,6 +34,25 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Expand-to-fullscreen: open a viewport-tall editor for long drafts.
+  // Renders a second textarea in an overlay sheet; both write through to
+  // the same `draft` state so closing returns the user's text intact.
+  const [expandedOpen, setExpandedOpen] = useState(false);
+  const expandedTextareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!expandedOpen) return;
+    // Focus the expanded textarea on open + place the caret at the end
+    // so a continuation-style draft keeps typing where the user left off.
+    expandedTextareaRef.current?.focus();
+    const end = draft.length;
+    expandedTextareaRef.current?.setSelectionRange(end, end);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpandedOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedOpen]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -766,6 +785,15 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         >
           {previewOpen ? <EyeSlash /> : <Eye />}
         </button>
+        <button
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => setExpandedOpen(true)}
+          title="Expand to a viewport-tall editor (Esc to close)"
+          aria-label="Expand composer"
+        >
+          ⤢
+        </button>
         {running ? (
           <button type="button" className="agnt-button-danger" onClick={onStop}>
             Stop
@@ -780,6 +808,54 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
           </button>
         )}
       </div>
+      {expandedOpen && (
+        <div
+          className="agnt-composer-expanded-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Expanded composer"
+          onClick={(event) => {
+            // Click the backdrop to close, but stop the click inside the
+            // editor card from bubbling up so the user can drag-select
+            // text without dismissing.
+            if (event.target === event.currentTarget) setExpandedOpen(false);
+          }}
+        >
+          <div className="agnt-composer-expanded">
+            <header className="agnt-composer-expanded-header">
+              <span>Expanded composer · Esc to close</span>
+              <button
+                type="button"
+                className="agnt-button-ghost"
+                onClick={() => setExpandedOpen(false)}
+                aria-label="Close expanded composer"
+              >
+                Close
+              </button>
+            </header>
+            <textarea
+              ref={expandedTextareaRef}
+              className="agnt-composer-expanded-input"
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value)}
+              onKeyDown={(event) => {
+                // Cmd/Ctrl+Enter sends and dismisses the overlay so the
+                // user gets the same shipping shortcut as the inline editor.
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  if (draft.trim() || attachments.length > 0) {
+                    onSend(draft, attachments);
+                    onDraftChange("");
+                    setExpandedOpen(false);
+                  }
+                }
+              }}
+              placeholder="Drafting a long prompt…"
+              spellCheck={false}
+            />
+          </div>
+        </div>
+      )}
     </form>
   );
 }

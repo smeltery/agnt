@@ -21,6 +21,8 @@ export type SidebarTabPreference = "live" | "archived";
 
 export type SidebarDensity = "comfortable" | "compact";
 
+export type SidebarGroupMode = "recency" | "project";
+
 export interface SidebarPreferences {
   tab?: SidebarTabPreference;
   query?: string;
@@ -29,6 +31,10 @@ export interface SidebarPreferences {
   collapsedGroups?: string[];
   /** Row density. `compact` shrinks padding + font for users with many threads. */
   density?: SidebarDensity;
+  /** Grouping axis. `recency` (default) uses Today / Yesterday / …; `project`
+   *  buckets by `thread.cwd` so users working across many repos can scan one
+   *  codebase at a time. */
+  groupBy?: SidebarGroupMode;
 }
 
 /** "auto" = follow platform permission; "on" = always notify when granted;
