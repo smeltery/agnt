@@ -236,6 +236,20 @@ module.exports = defineProvider({
 
 **Set capabilities to false until you actually implement them.** `false` is always safe; `true` requires real logic.
 
+### Optional provider hooks
+
+The skeleton above covers the required surface. A few more hooks let you opt into bridge features that would otherwise no-op or fall back to a generic default:
+
+| Hook | When to implement | What `bridge.js` does with it |
+|---|---|---|
+| `isInstalled({env, platform})` | If your CLI has a deterministic on-disk presence check (binary on PATH, app bundle, etc.). | Skips this provider during auto-detect when it returns `false`. Without this hook your provider only runs via explicit `--provider <id>` or `AGNT_PROVIDER`. |
+| `desktopBundle({env}) → {id, appPath}` | If your CLI ships a macOS companion app (like `Codex.app`) that the bridge should be able to launch / detect / pull a bundled CLI fallback from. | Plumbs the bundle id + path through to `handleDesktopRequest`, `handleGitRequest` (bundled-CLI fallback), and your own `createDesktopRefresher` if you set `capabilities.desktopRefresher`. Omit on Linux-only / CLI-only providers. |
+| `generatedImagesDir() → string\|null` | If your CLI writes generated images to a known on-disk root (Codex uses `~/.codex/generated_images`). | `workspace/readImage` adds that root to its allowlist so the iOS app can preview generated images outside the bound repo. Omit if your CLI doesn't generate image files locally. |
+| `createDesktopRefresher({...})` (paired with `capabilities.desktopRefresher: true`) | If your companion app needs a nudge to pick up phone-authored changes. | Bridge invokes the refresher whenever inbound/outbound events suggest a refresh is needed. |
+| `parseRolloutLine(line)` (paired with `capabilities.rolloutMirror: true`) | If your CLI exposes on-disk session/rollout files in JSONL and you want desktop-mirror parity (Codex-only today). | Bridge tails the rollout and pipes parsed lines to the desktop-companion mirror. |
+
+All optional hooks are pure functions on the provider module. The bridge calls them with `({env: process.env})` once during startup, then passes the resolved values through to the relevant handlers — so there's no per-request cost.
+
 ## Step 5: register
 
 Edit `agnt-bridge/src/providers/index.js`:
