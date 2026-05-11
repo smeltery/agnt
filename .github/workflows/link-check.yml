@@ -9,8 +9,6 @@ name: Link Check
 on:
   workflow_dispatch:
   schedule:
-    # 06:00 UTC Monday — early enough to land before maintainers wake up
-    # in Americas timezones, after Europe is already awake to action it.
     - cron: "0 6 * * 1"
   pull_request:
     paths:
@@ -22,6 +20,11 @@ jobs:
   link-check:
     runs-on: blacksmith-4vcpu-ubuntu-2404
 
+    permissions:
+      contents: read
+      # Needed for the "post failure as PR comment" step below.
+      pull-requests: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -30,18 +33,10 @@ jobs:
         id: lychee
         uses: lycheeverse/lychee-action@v2
         with:
-          # Walk every .md file in the repo. Exclude paths defined in
-          # .lycheeignore (build artifacts, vendored content, etc.).
-          # `--accept` widens the set of "ok" responses past lychee's
-          # default 2xx to include 403 (cloudflare-style bot blocks on
-          # otherwise-valid pages like openai.com/index/codex/) and 429
-          # (rate-limited but reachable).
-          # `--exclude-path agnt-bridge/README.md` skips the symlink
-          # to the top README. When lychee follows the symlink it
-          # resolves intra-repo refs (e.g. `docs/...`) relative to
-          # `agnt-bridge/` instead of the repo root, so every link
-          # falsely reads as broken. The top README itself is still
-          # scanned via the un-symlinked `./README.md`.
+          # `--accept` widens lychee's default 2xx to include 403 (bot-
+          # block) and 429 (rate-limited). `--exclude-path` skips the
+          # `agnt-bridge/README.md` symlink — following it resolves
+          # intra-repo refs against `agnt-bridge/` instead of repo root.
           args: |
             --no-progress
             --max-redirects 5
@@ -50,15 +45,32 @@ jobs:
             --accept 200..=299,403,429
             --exclude-path agnt-bridge/README.md
             './**/*.md'
-          # `token:` passes GITHUB_TOKEN through to lychee so authenticated
-          # `https://github.com/...` lookups succeed against this repo +
-          # any other private repos referenced. Without it lychee gets
-          # 404 on every dotbrains/agnt self-link because GitHub treats
-          # unauthenticated reads to access-controlled repos as nonexistent.
           token: ${{ secrets.GITHUB_TOKEN }}
-          # `jobSummary: true` (default) writes the report into the
-          # workflow run's Summary tab — visible without downloading
-          # artifacts. We don't need a separate output file or an issue-
-          # filing step for v1; that overhead can land later if scheduled
-          # runs actually find rot in practice.
-          fail: true
+          # `fail: false` keeps the action itself green; we control the
+          # final outcome below so we can post the report to the PR
+          # before failing. The output file gives us something readable
+          # to attach.
+          fail: false
+          output: ./lychee-report.md
+
+      # Make the failure observable. Without this, the only signal on
+      # a failed run is "exit code != 0" inside the action — useless
+      # to anyone reviewing the PR from outside the GHA UI. This step
+      # mirrors what lychee writes to the job summary, into a PR
+      # comment that the reviewer (or an agent like Claude Code on the
+      # web) can actually read via the GitHub API.
+      - name: Post lychee report as PR comment
+        if: github.event_name == 'pull_request' && steps.lychee.outputs.exit_code != '0'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: ./lychee-report.md
+          # Always create a new comment rather than editing — keeps a
+          # historical record across pushes so we can see whether
+          # iterating on the workflow narrowed the failure set.
+
+      - name: Fail job when broken links were found
+        if: steps.lychee.outputs.exit_code != '0'
+        run: |
+          echo "::error::lychee reported broken links — see the comment on the PR or the run summary."
+          exit 1
