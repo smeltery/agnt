@@ -89,6 +89,19 @@ Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. Short version: small focused PR
 
 Bridge tests live under `agnt-bridge/test/` (400 unit tests, run with `(cd agnt-bridge && bun run test)`). The CI badges above run on every push.
 
+### Note for bun users installing the bridge globally
+
+Bun blocks `postinstall` scripts from running on globally-installed packages by default (security model mirrors pnpm). If you install with `bun install -g @dotbrains/agnt`, the bin entries (`agnt`, `agnt-jsonl-diagnose`) register correctly, but the bridge's `bootstrap-provider.js` won't run on its own — that's the script that warms the active provider's bootstrap and surfaces the cached iOS-app-compatibility warning.
+
+The bootstrap is non-essential (the bridge tolerates an unbootstrapped install), but to opt in run:
+
+```sh
+bun install -g @dotbrains/agnt
+bun pm trust -g @dotbrains/agnt   # one-time; runs the blocked postinstall
+```
+
+Or stick with `npm install -g @dotbrains/agnt` if you prefer the automatic flow.
+
 ## License
 
 [PolyForm Shield 1.0.0](LICENSE) — source-available with a non-compete: you may use, copy, modify, and distribute the software, but not to provide a product or service that competes with agnt or with anything dotbrains offers that includes it. Upstream Remodex code retains its original Apache-2.0 grant. See [`legal/TERMS_OF_USE.md`](legal/TERMS_OF_USE.md) for the human-readable summary; `LICENSE` is authoritative.

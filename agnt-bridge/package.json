@@ -11,6 +11,10 @@
     "bin/",
     "src/"
   ],
+  "packageManager": "bun@1.3.11",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node ./bin/agnt.js up",
     "test": "node --test ./test/*.test.js",
