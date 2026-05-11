@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Node is the runtime — the relay uses `require()` and Node's built-in
       # test runner. Bun is just the installer.
