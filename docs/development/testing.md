@@ -102,7 +102,7 @@ Honest list:
 The bridge-check workflow:
 
 ```yaml
-- run: npm ci
+- run: bun install --frozen-lockfile
 - run: |
     node -e "
     const mod = require('./src');
@@ -111,4 +111,4 @@ The bridge-check workflow:
     }"
 ```
 
-Note that the CI currently only verifies the bridge entrypoints **load** — it doesn't run the test suite. If you want full test coverage in CI, add `npm test` to the workflow. (Open question: that would catch behavioral regressions, but the entrypoint check is faster and catches the most common breakage — broken imports.)
+Note that the CI currently only verifies the bridge entrypoints **load** — it doesn't run the test suite. If you want full test coverage in CI, add `bun run test` to the workflow. (Open question: that would catch behavioral regressions, but the entrypoint check is faster and catches the most common breakage — broken imports.)

@@ -42,8 +42,8 @@ which forwards opaque ciphertext to your **bridge** (your Mac).
 
 # Terminal 2 — web client dev server
 cd agnt-web
-npm install
-npm run dev   # http://localhost:5173
+bun install
+bun run dev   # http://localhost:5173
 ```
 
 Pair by pasting the JSON payload your bridge prints under the QR. After the first
@@ -52,7 +52,7 @@ via `/v1/trusted/session/resolve`, so a bridge restart doesn't need a fresh QR.
 
 ## Deployment
 
-agnt-web is a static build (`npm run build` → `dist/`). Three common shapes:
+agnt-web is a static build (`bun run build` → `dist/`). Three common shapes:
 
 ### Tailscale + your laptop
 
@@ -63,7 +63,7 @@ can pair and connect; nothing is exposed to the public internet.
 ```bash
 # Mac
 ./scripts/run-local-agnt.sh                           # relay + bridge
-cd agnt-web && npm run build && npx serve dist        # static site
+cd agnt-web && bun run build && bunx serve dist       # static site
 tailscale serve https://<machine>/ proxy 5173         # or however you front it
 ```
 
@@ -128,10 +128,12 @@ payload points to, so the static origin and the relay don't have to match.
 ## Development
 
 ```bash
-npm run dev      # vite dev server
-npm test         # vitest cross-checked against the bridge's secure-transport.js
-npm run lint     # tsc --noEmit
-npm run build    # static dist/ for deployment
+bun run dev      # vite dev server
+bun run test     # vitest cross-checked against the bridge's secure-transport.js
+                 # (use `bun run test`, not `bun test` — the latter invokes
+                 # bun's own runner instead of vitest)
+bun run lint     # tsc --noEmit
+bun run build    # static dist/ for deployment
 ```
 
 Tests import the sibling `agnt-bridge/src/secure-transport.js` to keep the wire
