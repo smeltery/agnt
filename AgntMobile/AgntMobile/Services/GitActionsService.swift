@@ -55,7 +55,7 @@ enum GitActionsError: LocalizedError {
         case "stash_pop_conflict": return "Stash pop failed due to conflicts."
         case "missing_local_repo": return "Run `agnt up` from an existing local directory first."
         case "missing_working_directory":
-            return fallback ?? "The selected local folder is not available on this Mac."
+            return fallback ?? "The selected local folder is not available on this computer."
         case "cannot_remove_local_checkout":
             return fallback ?? "Cannot remove the main local checkout."
         case "unmanaged_worktree":
@@ -69,9 +69,9 @@ enum GitActionsError: LocalizedError {
         case "handoff_transfer_failed":
             return fallback ?? "Could not move local changes into the handoff destination."
         case "missing_handoff_source":
-            return fallback ?? "The current handoff source is no longer available on this Mac."
+            return fallback ?? "The current handoff source is no longer available on this computer."
         case "missing_handoff_target":
-            return fallback ?? "The handoff destination is no longer available on this Mac."
+            return fallback ?? "The handoff destination is no longer available on this computer."
         default: return fallback ?? "Git operation failed."
         }
     }
@@ -282,7 +282,7 @@ final class GitActionsService {
         guard let workingDirectory else {
             throw GitActionsError.bridgeError(
                 code: "missing_working_directory",
-                message: "The selected local folder is not available on this Mac."
+                message: "The selected local folder is not available on this computer."
             )
         }
 

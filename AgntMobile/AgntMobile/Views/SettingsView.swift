@@ -826,7 +826,7 @@ private struct SettingsBridgeVersionCard: View {
             return "A newer agnt package is available on npm."
         }
 
-        return "This Mac is running a different build than the current npm latest."
+        return "The paired computer is running a different build than the current npm latest."
     }
 
     private var versionStatusLabel: String {
@@ -935,7 +935,7 @@ private struct SettingsAboutCard: View {
 
     var body: some View {
         SettingsCard(title: "About") {
-            Text("Chats are End-to-end encrypted between your iPhone and Mac. The relay only sees ciphertext and connection metadata after the secure handshake completes.")
+            Text("Chats are End-to-end encrypted between your iPhone and your computer. The relay only sees ciphertext and connection metadata after the secure handshake completes.")
                 .font(AppFont.caption())
                 .foregroundStyle(.secondary)
 

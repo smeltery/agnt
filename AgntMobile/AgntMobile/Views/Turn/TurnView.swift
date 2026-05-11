@@ -1571,7 +1571,7 @@ struct TurnView: View {
             return VoiceRecoveryPresentation(
                 snapshot: ConnectionRecoverySnapshot(
                     title: "Voice Mode",
-                    summary: "Reconnect to your Mac to use voice mode.",
+                    summary: "Reconnect to your computer to use voice mode.",
                     detail: "Keep the agnt bridge running on your paired computer, then try the microphone again.",
                     status: .interrupted,
                     trailingStyle: .action("Reconnect")
@@ -1615,7 +1615,7 @@ struct TurnView: View {
             return VoiceRecoveryPresentation(
                 snapshot: ConnectionRecoverySnapshot(
                     title: "Voice Mode",
-                    summary: "Voice mode is still syncing from your Mac.",
+                    summary: "Voice mode is still syncing from your computer.",
                     detail: "Keep the bridge connected for a moment, then try again.",
                     status: .syncing,
                     trailingStyle: .progress

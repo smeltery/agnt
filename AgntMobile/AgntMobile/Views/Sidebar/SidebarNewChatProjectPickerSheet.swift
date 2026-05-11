@@ -29,7 +29,7 @@ struct SidebarNewChatProjectPickerSheet: View {
                                     .foregroundStyle(.secondary)
                             ),
                             title: "Add Local Folder",
-                            subtitle: "Browse or create a folder on your Mac."
+                            subtitle: "Browse or create a folder on your computer."
                         )
                     }
                     .buttonStyle(.plain)

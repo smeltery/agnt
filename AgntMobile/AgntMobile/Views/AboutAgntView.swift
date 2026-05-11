@@ -97,8 +97,8 @@ struct AboutAgntView: View {
             sectionTitle("Architecture")
 
             VStack(spacing: 0) {
-                diagramStep(from: "agnt iOS", to: "Bridge (Mac)", via: "WebSocket")
-                diagramStep(from: "Bridge (Mac)", to: "codex app-server", via: "JSON-RPC")
+                diagramStep(from: "agnt iOS", to: "Bridge", via: "WebSocket")
+                diagramStep(from: "Bridge", to: "codex app-server", via: "JSON-RPC")
                 diagramStep(from: "codex app-server", to: "~/.codex/sessions", via: "JSONL rollout", isLast: true)
             }
             .padding(16)
@@ -232,7 +232,7 @@ struct AboutAgntView: View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle("Git & Workspace")
 
-            bodyText("The bridge handles **git commands** from your phone locally on the Mac:")
+            bodyText("The bridge handles **git commands** from your phone locally on your computer:")
 
             HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 6) {
