@@ -126,9 +126,9 @@ struct OnboardingStepPage: View {
             stepNumber: 2,
             icon: "link",
             title: "Install the Bridge",
-            description: "A lightweight relay that securely connects your Mac to your iPhone.",
+            description: "A lightweight relay that securely connects your computer to your iPhone.",
             command: "npm install -g @dotbrains/agnt@latest",
-            commandCaption: "agnt can keep your Mac awake with macOS caffeinate while the bridge is running, but it starts disabled by default. You can enable it later in Settings if you want."
+            commandCaption: "agnt can keep your computer awake while the bridge is running, but it starts disabled by default. You can enable it later in Settings if you want."
         )
     }
     .preferredColorScheme(.dark)

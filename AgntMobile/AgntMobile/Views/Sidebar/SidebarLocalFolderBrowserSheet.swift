@@ -91,7 +91,7 @@ struct SidebarLocalFolderBrowserSheet: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Create this folder on your Mac and start a chat there.")
+            Text("Create this folder on your computer and start a chat there.")
         }
     }
 
