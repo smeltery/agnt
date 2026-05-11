@@ -68,6 +68,15 @@ const PROVIDER_CAPABILITY_KEYS = Object.freeze([
  * @property {(line: string) => object|null} [parseRolloutLine]  — provider-specific JSONL parsing
  * @property {() => Promise<void>} [bootstrap] — postinstall hook
  * @property {(opts: object) => object} [createDesktopRefresher]
+ * @property {(opts: {env: NodeJS.ProcessEnv}) => {id: string, appPath: string}} [desktopBundle]
+ *   — macOS bundle metadata for providers that ship a companion desktop app
+ *     (handoff, bundled CLI fallback, refresh nudges). Codex returns
+ *     `{ id: "com.openai.codex", appPath: "/Applications/Codex.app" }`. Other
+ *     providers omit this; desktop RPCs degrade gracefully when absent.
+ * @property {() => string|null} [generatedImagesDir]
+ *   — optional root directory the provider writes generated images to.
+ *     workspace/readImage uses this to allowlist provider-generated previews
+ *     beyond the bound repo and the host temp dirs.
  * @property {ProviderTranslator} [translate]
  *   — static translator (no per-connection state). Use createTranslator instead
  *     when state is needed.
