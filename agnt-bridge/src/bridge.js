@@ -125,6 +125,12 @@ function startBridge({
   const bridgeWakeAssertion = createMacOSBridgeWakeAssertion({
     enabled: config.keepMacAwakeEnabled,
   });
+  // Static desktop-bundle metadata for the active provider (Codex.app today,
+  // null for Claude / opencode / Cursor). Provider-agnostic handlers consume
+  // this instead of reaching into Codex-named config fields.
+  const desktopBundle = typeof activeProvider.desktopBundle === "function"
+    ? activeProvider.desktopBundle({ env: process.env }) || { id: "", appPath: "" }
+    : { id: "", appPath: "" };
   const relayBaseUrl = config.relayUrl.replace(/\/+$/, "");
   if (!relayBaseUrl) {
     console.error("[agnt] No relay URL configured.");
@@ -155,8 +161,8 @@ function startBridge({
       enabled: config.refreshEnabled,
       debounceMs: config.refreshDebounceMs,
       refreshCommand: config.refreshCommand,
-      bundleId: config.codexBundleId,
-      appPath: config.codexAppPath,
+      bundleId: desktopBundle.id,
+      appPath: desktopBundle.appPath,
     })
     : createNoopDesktopRefresher();
   const pushServiceClient = createPushNotificationServiceClient({
@@ -248,7 +254,7 @@ function startBridge({
     activeProvider.createTransport({
       endpoint: config.codexEndpoint,
       env: process.env,
-      appPath: config.codexAppPath,
+      appPath: desktopBundle.appPath,
       logPrefix: "[agnt]",
     }),
     activeProvider,
@@ -575,7 +581,14 @@ function startBridge({
     if (handleThreadContextRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
-    if (handleWorkspaceRequest(rawMessage, sendApplicationResponse)) {
+    if (handleWorkspaceRequest(rawMessage, sendApplicationResponse, {
+      // Forward whatever the active provider considers its generated-image root.
+      // Codex returns `~/.codex/generated_images`; other providers return null
+      // (or omit the hook entirely), which drops that allowlist branch.
+      generatedImagesDir: typeof activeProvider.generatedImagesDir === "function"
+        ? () => activeProvider.generatedImagesDir() || null
+        : () => null,
+    })) {
       return;
     }
     if (handleProjectRequest(rawMessage, sendApplicationResponse)) {
@@ -588,15 +601,15 @@ function startBridge({
       return;
     }
     if (handleDesktopRequest(rawMessage, sendApplicationResponse, {
-      bundleId: config.codexBundleId,
-      appPath: config.codexAppPath,
+      bundleId: desktopBundle.id,
+      appPath: desktopBundle.appPath,
       readBridgePreferences,
       updateBridgePreferences,
     })) {
       return;
     }
     if (handleGitRequest(rawMessage, sendApplicationResponse, {
-      codexAppPath: config.codexAppPath,
+      codexAppPath: desktopBundle.appPath,
       onThreadNameSet: sendThreadNameUpdatedNotification,
       // Only the Codex CLI exposes the structured-JSON title-drafting flow.
       // Other providers handle thread/generateTitle in their own translator.

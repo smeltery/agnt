@@ -2,14 +2,14 @@
 // Purpose: Executes workspace-scoped reverse patch previews/applies without touching unrelated repo changes.
 // Layer: Bridge handler
 // Exports: handleWorkspaceRequest
-// Depends on: child_process, fs, os, path, ./providers/codex/home, ./git-handler
+// Depends on: child_process, fs, os, path, ./providers, ./git-handler
 
 const { execFile } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { promisify } = require("util");
-const { resolveCodexGeneratedImagesRoot } = require("./providers/codex/home");
+const { resolveActiveProvider } = require("./providers");
 const { gitStatus } = require("./git-handler");
 const {
   workspaceCheckpointCapture,
@@ -41,7 +41,7 @@ const IMAGE_MIME_TYPES_BY_EXTENSION = new Map([
 ]);
 const repoMutationLocks = new Map();
 
-function handleWorkspaceRequest(rawMessage, sendResponse) {
+function handleWorkspaceRequest(rawMessage, sendResponse, options = {}) {
   let parsed;
   try {
     parsed = JSON.parse(rawMessage);
@@ -57,7 +57,7 @@ function handleWorkspaceRequest(rawMessage, sendResponse) {
   const id = parsed.id;
   const params = parsed.params || {};
 
-  handleWorkspaceMethod(method, params)
+  handleWorkspaceMethod(method, params, options)
     .then((result) => {
       sendResponse(JSON.stringify({ id, result }));
     })
@@ -79,9 +79,9 @@ function handleWorkspaceRequest(rawMessage, sendResponse) {
   return true;
 }
 
-async function handleWorkspaceMethod(method, params) {
+async function handleWorkspaceMethod(method, params, options = {}) {
   if (method === "workspace/readImage") {
-    return workspaceReadImage(params);
+    return workspaceReadImage(params, options);
   }
 
   const cwd = await resolveWorkspaceCwd(params);
@@ -111,8 +111,9 @@ async function handleWorkspaceMethod(method, params) {
   }
 }
 
-// Reads recognized local image files from the bound repo, Codex image cache, or host temp screenshot folders.
-async function workspaceReadImage(params) {
+// Reads recognized local image files from the bound repo, the active provider's
+// generated-image cache (if any), or host temp screenshot folders.
+async function workspaceReadImage(params, options = {}) {
   const requestedPath = firstNonEmptyString([params.path, params.filePath, params.localPath]);
   if (!requestedPath) {
     throw workspaceError("missing_image_path", "The request must include an image path.");
@@ -132,10 +133,10 @@ async function workspaceReadImage(params) {
 
   const [realImagePath, realGeneratedImagesRoot] = await Promise.all([
     realpathOrNull(imagePath),
-    realpathOrNull(resolveCodexGeneratedImagesRoot()),
+    realpathOrNull(resolveProviderGeneratedImagesDir(options)),
   ]);
   if (!realImagePath) {
-    throw workspaceError("image_not_found", "The image file no longer exists on this Mac.");
+    throw workspaceError("image_not_found", "The image file no longer exists on this computer.");
   }
 
   const [realWorkspaceRoot, realTempRoots] = await Promise.all([
@@ -147,7 +148,7 @@ async function workspaceReadImage(params) {
     || (realGeneratedImagesRoot && isPathInside(realImagePath, realGeneratedImagesRoot))
     || realTempRoots.some((tempRoot) => isPathInside(realImagePath, tempRoot));
   if (!isAllowed) {
-    throw workspaceError("image_path_not_allowed", "Only images in this workspace, Codex generated images, or temporary screenshot files can be previewed.");
+    throw workspaceError("image_path_not_allowed", "Only images in this workspace, the active agent's generated images, or temporary screenshot files can be previewed.");
   }
 
   const stat = await fs.promises.stat(realImagePath);
@@ -200,6 +201,27 @@ function normalizedPreviewPixelDimension(params) {
     MAX_IMAGE_PREVIEW_PIXEL_DIMENSION,
     Math.max(MIN_IMAGE_PREVIEW_PIXEL_DIMENSION, Math.round(requested))
   );
+}
+
+// Resolves the active provider's generated-images directory. bridge.js passes
+// an explicit thunk; direct callers of handleWorkspaceMethod (tests, scripts)
+// fall back to the registry-resolved active provider so existing behavior is
+// preserved when no option is supplied.
+function resolveProviderGeneratedImagesDir(options = {}) {
+  if (typeof options.generatedImagesDir === "function") {
+    try {
+      return options.generatedImagesDir() || null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const { provider } = resolveActiveProvider();
+    if (typeof provider?.generatedImagesDir === "function") {
+      return provider.generatedImagesDir() || null;
+    }
+  } catch {}
+  return null;
 }
 
 async function realTemporaryImageRoots() {

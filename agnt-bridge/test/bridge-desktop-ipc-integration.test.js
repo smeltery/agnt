@@ -90,8 +90,6 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
       keepMacAwakeEnabled: false,
       codexEndpoint: "",
       refreshCommand: "",
-      codexBundleId: "",
-      codexAppPath: "",
       desktopIpcSocketPath: ipcSocketPath,
     },
   });

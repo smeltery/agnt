@@ -10,11 +10,6 @@ const fs = require("fs");
 const path = require("path");
 const { readDaemonConfig } = require("./daemon-state");
 
-// Codex desktop defaults are still produced here so existing callers (bridge
-// core, macOS launchd helpers) keep their config shape. Provider-specific
-// runtime knobs will move into provider modules in a later refactor.
-const DEFAULT_BUNDLE_ID = "com.openai.codex";
-const DEFAULT_APP_PATH = "/Applications/Codex.app";
 const DEFAULT_DEBOUNCE_MS = 1200;
 
 function readBridgeConfig({
@@ -83,8 +78,6 @@ function readBridgeConfig({
     codexEndpoint,
     desktopIpcSocketPath: readFirstDefinedEnv(["AGNT_DESKTOP_IPC_SOCKET"], "", env),
     refreshCommand,
-    codexBundleId: readFirstDefinedEnv(["AGNT_CODEX_BUNDLE_ID"], DEFAULT_BUNDLE_ID, env),
-    codexAppPath: DEFAULT_APP_PATH,
     providerId: typeof daemonConfig.providerId === "string" ? daemonConfig.providerId : "",
   };
 }

@@ -13,6 +13,9 @@ const { ensureCodexCLI, shouldSkipCodexBootstrap } = require("./cli-bootstrap");
 const { isCodexInstalled } = require("./detect");
 const path = require("path");
 
+const DEFAULT_BUNDLE_ID = "com.openai.codex";
+const DEFAULT_APP_PATH = "/Applications/Codex.app";
+
 module.exports = defineProvider({
   id: "codex",
   displayName: "Codex",
@@ -32,6 +35,18 @@ module.exports = defineProvider({
     return path.join(resolveCodexHome(), "sessions");
   },
   generatedImagesDir: resolveCodexGeneratedImagesRoot,
+  // Bundle metadata used by bridge.js to wire desktop handoff, the bundled-CLI
+  // fallback in git-handler, and refresh nudges. `AGNT_CODEX_BUNDLE_ID` keeps
+  // working as an override for non-default Codex builds.
+  desktopBundle({ env = process.env } = {}) {
+    const overrideId = typeof env.AGNT_CODEX_BUNDLE_ID === "string"
+      ? env.AGNT_CODEX_BUNDLE_ID.trim()
+      : "";
+    return {
+      id: overrideId || DEFAULT_BUNDLE_ID,
+      appPath: DEFAULT_APP_PATH,
+    };
+  },
   // Without this hook the auto-detect step in resolveActiveProvider falls
   // through to the "first registered" branch (Codex) on Linux boxes that
   // have only Claude / opencode / Cursor installed, leading to an `ENOENT`
