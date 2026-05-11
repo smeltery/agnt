@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE)
 [![Bridge Check](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml)
+[![Web Check](https://github.com/dotbrains/agnt/actions/workflows/agnt-web-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/agnt-web-check.yml)
 [![Build Unsigned IPA](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml)
 [![Built with Blacksmith](https://img.shields.io/badge/Built%20with-Blacksmith-2f2f2f?logo=github&logoColor=white)](https://blacksmith.sh)
 
