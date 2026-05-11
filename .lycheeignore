@@ -1,0 +1,50 @@
+# .lycheeignore — regex patterns matched against URLs lychee finds
+# in scanned markdown. Each line is a Rust-flavor regex; lines starting
+# with `#` are comments.
+#
+# NB: this file is for URL-regex exclusions only. To skip filesystem
+# PATHS from being scanned, use lychee's `--exclude-path` CLI flag
+# instead (the workflow does that for `agnt-bridge/README.md`). Glob
+# patterns like `**/node_modules/` don't belong here — they don't parse
+# as regex (the leading `**` is invalid) and they wouldn't match URLs
+# anyway.
+
+# Repo self-links. The README has ~8 of these (badge SVGs + workflow
+# URLs); GitHub generates them server-side so they only break when the
+# repo is renamed, at which point every other self-reference breaks
+# too — link rot isn't the right tool to catch that. External github.com
+# URLs (other repos, gists, etc.) are still checked.
+^https?://github\.com/dotbrains/agnt(?:/|\.git|$)
+
+# Localhost / private network refs in docs are fine — they're meant to be
+# user-local (Tailscale, LAN, dev server). Verifying them in CI would be
+# noise + flakes.
+^https?://(127\.0\.0\.1|localhost|0\.0\.0\.0)
+^wss?://(127\.0\.0\.1|localhost|0\.0\.0\.0)
+^https?://[^/]*\.local(/|$)
+^https?://[^/]*\.tailnet\.ts\.net
+
+# Docker-compose / k8s service names used as example hostnames in
+# self-hosting docs (e.g. `http://agnt_relay`). They never resolve in
+# DNS — they're documentation-only.
+^https?://agnt_relay
+^https?://[a-z_]+:\d+(/|$)
+
+# Anchor links inside the same repo (lychee can't always validate without
+# a full markdown parse). Cross-file repo links are still checked.
+^#
+
+# Known transient hosts that randomly return 503/429 even when up.
+^https://x\.com/
+^https://twitter\.com/
+
+# openai.com Cloudflare-bot-blocks GET requests with 403 even though
+# the URLs resolve correctly for human browsers. Two refs at the
+# moment: an `openai.com/index/codex/` reference + an `openai.com/privacy`
+# reference. lychee verified 92 / 92 other links pass, so this is the
+# only place we have to defer.
+^https?://openai\.com/
+
+# Example placeholders in self-hosting docs — these aren't meant to resolve.
+^https?://relay\.example\.com
+^https?://api\.example\.com

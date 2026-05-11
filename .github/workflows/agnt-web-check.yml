@@ -57,3 +57,13 @@ jobs:
       - name: Build production bundle
         working-directory: agnt-web
         run: bun run build
+
+      # Bundle size guard. Budgets live in `agnt-web/.size-limit.json`;
+      # current main bundle is ~135 KB gzip / 12 KB gzip CSS, so the
+      # limits (150 / 18) give ~10% headroom. Lazy chunks (mermaid,
+      # katex, etc.) are NOT in the budget — they only download on
+      # demand. A PR that pushes the entry past the budget fails CI
+      # so a casual dep add can't silently grow the critical path.
+      - name: Check bundle size
+        working-directory: agnt-web
+        run: bun run size
