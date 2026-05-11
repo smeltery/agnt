@@ -5,13 +5,6 @@ name: Link Check
 #   - weekly on Monday (one slow-burn "what needs maintenance?" window
 #     that aligns with dependabot's cadence)
 #   - on PRs that touch markdown files (so new docs land with verified links)
-#
-# We invoke lychee directly rather than through lycheeverse/lychee-action
-# because the action's report-handling produced a stub "see actions
-# output" pointer (auth-walled) instead of the actual broken-link list,
-# which made the workflow undebuggable. Running the CLI ourselves lets
-# us write a real markdown report and echo it to both the job log and
-# a PR comment.
 
 on:
   workflow_dispatch:
@@ -29,39 +22,41 @@ jobs:
 
     permissions:
       contents: read
-      # Needed by the "Post lychee report as PR comment" step.
+      # gh pr comment writes to the PR conversation.
       pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Install lychee
-        run: |
-          # `latest` redirects to the most recent stable release asset.
-          # Pin to a version if reproducibility becomes important.
-          curl -fsSL \
-            "https://github.com/lycheeverse/lychee/releases/latest/download/lychee-x86_64-unknown-linux-gnu.tar.gz" \
-            -o /tmp/lychee.tar.gz
-          tar -xzf /tmp/lychee.tar.gz -C /tmp/
-          sudo mv /tmp/lychee /usr/local/bin/lychee
-          lychee --version
-
-      - name: Run lychee
+      # One bash step for everything so we have full control over:
+      #   * lychee binary (Docker image — known good, no release-asset
+      #     guessing)
+      #   * report file (lychee writes; we cat to job log + post as
+      #     PR comment)
+      #   * PR comment (gh CLI, preinstalled on GHA runners — no
+      #     third-party-action footgun)
+      #   * step diagnostics (every command's exit code printed)
+      #
+      # Earlier iterations hit a wall because the action wrappers
+      # produced stub output or silently failed. This is verbose but
+      # debuggable end-to-end from the job log alone.
+      - name: Run lychee + post report
         id: lychee
         env:
-          # GITHUB_TOKEN authenticates github.com requests so lychee can
-          # see the dotbrains/agnt self-links instead of 404ing them.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          set +e
-          # `--exclude-path agnt-bridge/README.md` skips the symlink to
-          # the top README. When lychee follows the symlink it resolves
-          # intra-repo refs against `agnt-bridge/` rather than the repo
-          # root, so every link falsely reads as broken.
-          # `--format markdown --output ./lychee-report.md` writes a
-          # markdown report that we can paste into a PR comment.
-          lychee \
+          set +e  # we want to inspect failures, not abort on them
+
+          echo "::group::lychee docker run"
+          docker run --rm \
+            -v "$PWD:/workdir" \
+            -w /workdir \
+            -e GITHUB_TOKEN \
+            lycheeverse/lychee:latest \
             --no-progress \
             --max-redirects 5 \
             --timeout 20 \
@@ -71,24 +66,30 @@ jobs:
             --output ./lychee-report.md \
             './**/*.md'
           code=$?
+          echo "::endgroup::"
+          echo "lychee exit code: $code"
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          # Echo to the job log for anyone reviewing the run directly.
-          echo "=== lychee report (exit $code) ==="
-          cat ./lychee-report.md || echo "(no report file written)"
-          echo "==================================="
-          # Don't fail this step — the "Fail job" step below controls
-          # the workflow's final outcome after the PR comment lands.
-          exit 0
 
-      - name: Post lychee report as PR comment
-        if: github.event_name == 'pull_request' && steps.lychee.outputs.exit_code != '0'
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body-path: ./lychee-report.md
+          echo "::group::report contents"
+          if [ -f ./lychee-report.md ]; then
+            cat ./lychee-report.md
+          else
+            echo "(lychee did not write a report file)"
+          fi
+          echo "::endgroup::"
 
-      - name: Fail job when broken links were found
-        if: steps.lychee.outputs.exit_code != '0'
-        run: |
-          echo "::error::lychee reported broken links — see the comment on the PR."
-          exit 1
+          # Post a comment on the PR so the failure is observable
+          # without needing the run page (which requires auth). Falls
+          # back to a synthetic message if the report file is missing.
+          if [ "$code" -ne 0 ] && [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "::group::posting PR comment"
+            if [ -f ./lychee-report.md ] && [ -s ./lychee-report.md ]; then
+              gh pr comment "$PR_NUMBER" --body-file ./lychee-report.md
+            else
+              gh pr comment "$PR_NUMBER" \
+                --body "Link check failed with exit code $code, but lychee did not write a report file. Investigate the workflow run."
+            fi
+            echo "::endgroup::"
+          fi
+
+          exit "$code"
