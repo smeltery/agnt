@@ -36,12 +36,19 @@ jobs:
           # default 2xx to include 403 (cloudflare-style bot blocks on
           # otherwise-valid pages like openai.com/index/codex/) and 429
           # (rate-limited but reachable).
+          # `--exclude-path agnt-bridge/README.md` skips the symlink
+          # to the top README. When lychee follows the symlink it
+          # resolves intra-repo refs (e.g. `docs/...`) relative to
+          # `agnt-bridge/` instead of the repo root, so every link
+          # falsely reads as broken. The top README itself is still
+          # scanned via the un-symlinked `./README.md`.
           args: |
             --no-progress
             --max-redirects 5
             --timeout 20
             --max-retries 2
             --accept 200..=299,403,429
+            --exclude-path agnt-bridge/README.md
             './**/*.md'
           # `token:` passes GITHUB_TOKEN through to lychee so authenticated
           # `https://github.com/...` lookups succeed against this repo +
