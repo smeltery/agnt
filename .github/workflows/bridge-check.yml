@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Node is still the runtime — bridge code uses `require()` + Node's
       # built-in test runner, and the published package is consumed via

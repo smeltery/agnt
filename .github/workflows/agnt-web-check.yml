@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # agnt-web is a Vite + React + Vitest project. Bun runs the install, the
       # vitest suite, the type check, and the production build. Node is not
