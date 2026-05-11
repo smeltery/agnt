@@ -5,6 +5,16 @@ node_modules/
 **/build/
 **/DerivedData/
 
+# Repo self-links. The README has ~8 of these (badge SVGs + workflow
+# URLs); GitHub generates them server-side so they only break when the
+# repo is renamed, at which point every other self-reference breaks
+# too — link rot isn't the right tool to catch that. We tried passing
+# `token:` to lychee to authenticate these reads, but the action's
+# behavior with auth varies; ignoring is more robust than relying on
+# token-plumbing to keep working. External github.com URLs (other
+# repos, gists, etc.) are still checked.
+^https?://github\.com/dotbrains/agnt(?:/|\.git|$)
+
 # Localhost / private network refs in docs are fine — they're meant to be
 # user-local (Tailscale, LAN, dev server). Verifying them in CI would be
 # noise + flakes.
