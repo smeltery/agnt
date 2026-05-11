@@ -24,7 +24,7 @@ jobs:
       # to bun, which preserves npm-style behavior with a faster install
       # and a diff-friendly text lockfile (bun.lock).
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
