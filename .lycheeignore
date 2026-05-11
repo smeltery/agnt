@@ -1,0 +1,26 @@
+# Build artifacts / vendored content — never source-of-truth.
+node_modules/
+**/node_modules/
+**/dist/
+**/build/
+**/DerivedData/
+
+# Localhost / private network refs in docs are fine — they're meant to be
+# user-local (Tailscale, LAN, dev server). Verifying them in CI would be
+# noise + flakes.
+^https?://(127\.0\.0\.1|localhost|0\.0\.0\.0)
+^wss?://(127\.0\.0\.1|localhost|0\.0\.0\.0)
+^https?://[^/]*\.local(/|$)
+^https?://[^/]*\.tailnet\.ts\.net
+
+# Anchor links inside the same repo (lychee can't always validate without
+# a full markdown parse). Cross-file repo links are still checked.
+^#
+
+# Known transient hosts that randomly return 503/429 even when up.
+^https://x\.com/
+^https://twitter\.com/
+
+# Example placeholders in self-hosting docs — these aren't meant to resolve.
+^https?://relay\.example\.com
+^https?://api\.example\.com
