@@ -10,6 +10,7 @@ const { createCodexTransport } = require("./transport");
 const { resolveCodexHome, resolveCodexGeneratedImagesRoot } = require("./home");
 const { CodexDesktopRefresher } = require("./desktop-refresher");
 const { ensureCodexCLI, shouldSkipCodexBootstrap } = require("./cli-bootstrap");
+const { isCodexInstalled } = require("./detect");
 const path = require("path");
 
 module.exports = defineProvider({
@@ -31,6 +32,13 @@ module.exports = defineProvider({
     return path.join(resolveCodexHome(), "sessions");
   },
   generatedImagesDir: resolveCodexGeneratedImagesRoot,
+  // Without this hook the auto-detect step in resolveActiveProvider falls
+  // through to the "first registered" branch (Codex) on Linux boxes that
+  // have only Claude / opencode / Cursor installed, leading to an `ENOENT`
+  // when bridge.js tries to spawn `codex`.
+  isInstalled({ env = process.env, platform = process.platform } = {}) {
+    return isCodexInstalled({ env, platform });
+  },
   createTransport(opts) {
     return createCodexTransport(opts);
   },
