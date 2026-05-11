@@ -13,6 +13,12 @@ node_modules/
 ^https?://[^/]*\.local(/|$)
 ^https?://[^/]*\.tailnet\.ts\.net
 
+# Docker-compose / k8s service names used as example hostnames in
+# self-hosting docs (e.g. `http://agnt_relay`). They never resolve in
+# DNS — they're documentation-only.
+^https?://agnt_relay
+^https?://[a-z_]+:\d+(/|$)
+
 # Anchor links inside the same repo (lychee can't always validate without
 # a full markdown parse). Cross-file repo links are still checked.
 ^#

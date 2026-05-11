@@ -2,12 +2,9 @@ name: Link Check
 
 # Catches link rot in markdown across the repo. Runs:
 #   - on a manual dispatch (so maintainers can verify before a release)
-#   - weekly on Monday (matches dependabot's cadence — one slow-burn
-#     "what needs maintenance?" notification window)
-#   - on PRs that touch markdown files (so a new doc lands with verified links)
-#
-# Non-blocking on the schedule (issue-based reporting), blocking on PRs
-# only when the diff actually touched markdown (paths-filter below).
+#   - weekly on Monday (one slow-burn "what needs maintenance?" window
+#     that aligns with dependabot's cadence)
+#   - on PRs that touch markdown files (so new docs land with verified links)
 
 on:
   workflow_dispatch:
@@ -25,12 +22,6 @@ jobs:
   link-check:
     runs-on: blacksmith-4vcpu-ubuntu-2404
 
-    permissions:
-      # Needed so the scheduled run can file/update a tracking issue
-      # listing dead links instead of just failing silently.
-      contents: read
-      issues: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -41,6 +32,10 @@ jobs:
         with:
           # Walk every .md file in the repo. Exclude paths defined in
           # .lycheeignore (build artifacts, vendored content, etc.).
+          # `--accept` widens the set of "ok" responses past lychee's
+          # default 2xx to include 403 (cloudflare-style bot blocks on
+          # otherwise-valid pages like openai.com/index/codex/) and 429
+          # (rate-limited but reachable).
           args: |
             --no-progress
             --max-redirects 5
@@ -48,25 +43,15 @@ jobs:
             --max-retries 2
             --accept 200..=299,403,429
             './**/*.md'
-          fail: false
-          # Only generate a github-issue body when there ARE failures.
-          output: ./lychee/out.md
-
-      - name: Create / update tracking issue when scheduled and links broken
-        if: github.event_name == 'schedule' && steps.lychee.outputs.exit_code != '0'
-        uses: peter-evans/create-issue-from-file@v5
-        with:
-          title: "Link rot detected by lychee"
-          content-filepath: ./lychee/out.md
-          labels: |
-            documentation
-            link-check
-
-      # PR runs fail loudly on broken links rather than filing an issue.
-      # The above `fail: false` keeps the action itself green so this
-      # condition controls the final outcome.
-      - name: Fail PR if broken links were touched
-        if: github.event_name == 'pull_request' && steps.lychee.outputs.exit_code != '0'
-        run: |
-          echo "::error::Broken links detected. See the 'Run lychee' step output for details."
-          exit 1
+          # `token:` passes GITHUB_TOKEN through to lychee so authenticated
+          # `https://github.com/...` lookups succeed against this repo +
+          # any other private repos referenced. Without it lychee gets
+          # 404 on every dotbrains/agnt self-link because GitHub treats
+          # unauthenticated reads to access-controlled repos as nonexistent.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # `jobSummary: true` (default) writes the report into the
+          # workflow run's Summary tab — visible without downloading
+          # artifacts. We don't need a separate output file or an issue-
+          # filing step for v1; that overhead can land later if scheduled
+          # runs actually find rot in practice.
+          fail: true
