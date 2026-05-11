@@ -4,6 +4,10 @@
   "description": "Browser client for the agnt local-first coding-agent bridge.",
   "type": "module",
   "private": true,
+  "packageManager": "bun@1.3.11",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
