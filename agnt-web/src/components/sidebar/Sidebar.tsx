@@ -16,13 +16,18 @@ import {
   exportThreadsToMarkdown,
 } from "../../lib/thread-export";
 import { filterThreads } from "../../state/thread-filter";
-import { groupThreadsByRecency, type ThreadGroup } from "../../state/thread-grouping";
+import {
+  groupThreadsByProject,
+  groupThreadsByRecency,
+  type ThreadGroup,
+} from "../../state/thread-grouping";
 import { buildHashLocation } from "../../lib/hash-routing";
 import { isThreadUnread, useThreadsStore } from "../../state/threads-store";
 import {
   prefsStore,
   THREAD_COLOR_VALUES,
   type SidebarDensity,
+  type SidebarGroupMode,
   type SidebarTabPreference,
   type ThreadColor,
 } from "../../storage/prefs-store";
@@ -57,6 +62,11 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   const [query, setQuery] = useState("");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const [density, setDensity] = useState<SidebarDensity>("comfortable");
+  // Grouping axis: recency (Today / Yesterday / …) or project (cwd
+  // buckets). Persisted so it survives reload — once a user decides
+  // they want a project-organized sidebar they don't want to flip back
+  // every session.
+  const [groupBy, setGroupBy] = useState<SidebarGroupMode>("recency");
   // Multi-select mode: when on, row clicks toggle selection instead of
   // navigating. The action bar at the top performs Archive / Unarchive /
   // Export across the chosen set.
@@ -79,6 +89,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
       if (typeof prefs.query === "string") setQuery(prefs.query);
       if (Array.isArray(prefs.collapsedGroups)) setCollapsedGroups(new Set(prefs.collapsedGroups));
       if (prefs.density === "compact" || prefs.density === "comfortable") setDensity(prefs.density);
+      if (prefs.groupBy === "recency" || prefs.groupBy === "project") setGroupBy(prefs.groupBy);
       hydratedRef.current = true;
     });
   }, []);
@@ -91,8 +102,9 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
       query,
       collapsedGroups: [...collapsedGroups],
       density,
+      groupBy,
     });
-  }, [tab, query, collapsedGroups, density]);
+  }, [tab, query, collapsedGroups, density, groupBy]);
 
   function toggleGroupCollapse(groupId: string) {
     setCollapsedGroups((current) => {
@@ -125,12 +137,38 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
       const visibleArchived = collapsedGroups.has(archivedGroup.id) ? [] : filtered;
       return { visible: visibleArchived, groups: [archivedGroup] };
     }
-    const sectioned = groupThreadsByRecency(filtered, { pinnedIds: pinnedThreadIds });
+    const sectioned = groupBy === "project"
+      ? groupThreadsByProject(filtered, { pinnedIds: pinnedThreadIds })
+      : groupThreadsByRecency(filtered, { pinnedIds: pinnedThreadIds });
     // Threads in collapsed groups stay rendered as a header-only row but are
     // skipped by j/k navigation since they're not visible to the user.
     const flat = sectioned.flatMap((group) => (collapsedGroups.has(group.id) ? [] : group.threads));
     return { visible: flat, groups: sectioned };
-  }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds, collapsedGroups, colorFilter, colorByThread]);
+  }, [tab, liveThreads, archivedThreads, query, pinnedThreadIds, collapsedGroups, colorFilter, colorByThread, groupBy]);
+
+  // Last-message preview snippet per thread. Computed once per
+  // reducerStates change (instead of one selector per row), so a streaming
+  // delta in the active thread re-renders one row, not the whole sidebar.
+  // We pick the most recent user-or-assistant message with non-empty text
+  // — tool / file-change / reasoning rows aren't useful at-a-glance.
+  const previewByThread = useMemo<Record<string, string>>(() => {
+    const out: Record<string, string> = {};
+    for (const [threadId, reducer] of Object.entries(reducerStates)) {
+      const messages = reducer?.messages;
+      if (!messages || messages.length === 0) continue;
+      for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const message = messages[i];
+        if (message.role !== "user" && message.role !== "assistant") continue;
+        const text = (message.text ?? "").trim();
+        if (!text) continue;
+        // Condense whitespace and cap so the row stays single-line.
+        const condensed = text.replace(/\s+/g, " ");
+        out[threadId] = condensed.length > 100 ? `${condensed.slice(0, 99)}…` : condensed;
+        break;
+      }
+    }
+    return out;
+  }, [reducerStates]);
 
   // j/k navigate the visible list, like Gmail/Linear. Wraps at the boundaries
   // so muscle memory works either direction. Disabled in multi-select mode so
@@ -250,6 +288,21 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
             title="Select multiple threads"
           >
             Select
+          </button>
+        )}
+        {!selectMode && (
+          <button
+            type="button"
+            className="agnt-sidebar-groupby-toggle"
+            onClick={() => setGroupBy((mode) => (mode === "project" ? "recency" : "project"))}
+            title={
+              groupBy === "project"
+                ? "Group by recency (Today / Yesterday / …)"
+                : "Group by project (cwd buckets)"
+            }
+            aria-pressed={groupBy === "project"}
+          >
+            {groupBy === "project" ? "By project" : "By date"}
           </button>
         )}
         <button type="button" className="agnt-sidebar-new" onClick={onNewChat} title="New chat" aria-label="New chat">
@@ -392,6 +445,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
                 pinnedThreadIds={pinnedThreadIds}
                 lastVisitedByThread={lastVisitedByThread}
                 colorByThread={colorByThread}
+                previewByThread={previewByThread}
                 selectMode={selectMode}
                 selectedIds={selectedIds}
                 onSelect={handleRowSelect}
@@ -460,6 +514,7 @@ function SidebarGroup({
   pinnedThreadIds,
   lastVisitedByThread,
   colorByThread,
+  previewByThread,
   selectMode,
   selectedIds,
   onSelect,
@@ -474,6 +529,9 @@ function SidebarGroup({
   pinnedThreadIds: Set<string>;
   lastVisitedByThread: Record<string, number>;
   colorByThread: Record<string, string>;
+  /** threadId → most-recent-message snippet, computed at the top-level
+   *  Sidebar so a streaming delta doesn't re-render every group. */
+  previewByThread: Record<string, string>;
   selectMode: boolean;
   selectedIds: Set<string>;
   onSelect: (thread: CodexThread) => void;
@@ -527,6 +585,7 @@ function SidebarGroup({
             pinned={pinnedThreadIds.has(thread.id)}
             unread={isThreadUnread(thread, lastVisitedByThread) && thread.id !== selectedThreadId}
             color={colorByThread[thread.id]}
+            preview={previewByThread[thread.id]}
             selectMode={selectMode}
             checked={selectedIds.has(thread.id)}
             onSelect={() => onSelect(thread)}
@@ -561,6 +620,7 @@ function SidebarRow({
   pinned,
   unread,
   color,
+  preview,
   selectMode,
   checked,
   onSelect,
@@ -578,6 +638,11 @@ function SidebarRow({
   pinned: boolean;
   unread: boolean;
   color?: string;
+  /** Single-line snippet of the most recent visible message — populated
+   *  by the parent so the row doesn't need its own reducer subscription
+   *  (a per-row subscription would re-render every row on every
+   *  streaming delta in the active thread). */
+  preview?: string;
   selectMode: boolean;
   checked: boolean;
   onSelect: () => void;
@@ -724,6 +789,7 @@ function SidebarRow({
           )}
         </span>
         {thread.cwd && <span className="agnt-sidebar-thread-cwd">{thread.cwd}</span>}
+        {preview && <span className="agnt-sidebar-thread-preview">{preview}</span>}
       </button>
       {!selectMode && <ThreadContextMenu thread={thread} pinned={pinned} />}
     </li>

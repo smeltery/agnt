@@ -86,6 +86,15 @@ later session because the protocol and storage layers are already complete.
 - ✅ Persist `turnFlags` (model / reasoning / permission / planMode) to IndexedDB so picks survive reload
 - ✅ Proactive `thread/contextWindow/read` on thread switch so the token bar paints before the next turn fires the push notification
 
+## Session 45 — Sidebar previews + composer expand + reading mode + group-by-project ✅ DONE
+
+- ✅ **Fourth clean recon pass.** All four claimed gaps verified missing via file-content grep (sidebar / composer / workspace) — `lastMessage|preview|snippet` on `Sidebar.tsx`, `rows={` on `Composer.tsx`, `focusMode|readingMode` workspace-wide, `groupByCwd|byProject` on sidebar. Discipline holding.
+- ✅ **Sidebar thread preview snippets.** New `previewByThread` computed once at the top-level Sidebar (instead of per-row selectors that would re-render on every streaming delta). Walks each thread's reducer messages backward, picks the most recent user-or-assistant text, condenses whitespace, caps at 100 chars with ellipsis. Renders as a third row under title + cwd.
+- ✅ **Composer expand-to-fullscreen.** New `⤢` button + overlay editor; second textarea bound to the same `draft` so closing the overlay preserves typing. `Cmd/Ctrl+Enter` sends + dismisses; `Esc` closes without sending. Useful for drafting a long prompt without the 3-row inline editor cramping.
+- ✅ **Reading / focus mode.** New `Read` button in workspace header + `z` keyboard shortcut. Applies `agnt-workspace-reading` class that hides sidebar + composer via CSS — pure layout change, fully reversible. Chat scroller centers and caps at 880px for document-like reading. Documented in HelpModal.
+- ✅ **Sidebar group-by-project.** New `groupThreadsByProject` alongside the existing `groupThreadsByRecency`; pinned bucket stays first, project groups sort by their newest thread, no-cwd threads cluster in an "Other" bucket last. Project ids are prefixed with `project:` so they can't collide with the recency bucket ids when state outlives a mode switch. New `groupBy` pref (persisted via `prefs.sidebar.groupBy`); toggle chip in the sidebar header labelled "By date" / "By project".
+- 7 new vitest cases (project grouping: empty / cwd bucketing / project sort by newest / pin coexistence / no-cwd cluster / id-prefix collision guard / label derivation). 514 / 514 pass; tsc clean; main bundle 411 → 415 KB raw, 132.67 → 133.58 KB gzip.
+
 ## Session 44 — Model pill + Cmd+1..9 + color filter + KaTeX ✅ DONE
 
 - ✅ **Third clean recon pass.** All four claimed gaps verified missing before coding (file-content greps inline in the proposal: `ChatHeader.tsx` for model state, `lib/keyboard.ts` for digit shortcuts, `Sidebar.tsx` for color filtering, `MarkdownContent.tsx`/`markdown-blocks.ts` for math).

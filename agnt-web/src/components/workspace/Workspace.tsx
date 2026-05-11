@@ -87,6 +87,11 @@ export function Workspace() {
   // The drawer toggle only matters on narrow viewports — on wide ones the
   // sidebar is always visible regardless of this flag, courtesy of CSS.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Reading / focus mode: hides sidebar + composer + header chrome so a
+  // long thread reads like a document. Toggled via the eye button in the
+  // header and the `z` keyboard shortcut. Not persisted — it's a
+  // session-only lens.
+  const [readingMode, setReadingMode] = useState(false);
   // The picker can be invoked either from a "Change project" affordance or
   // from the "New Chat" flow. We track who asked so we can route the result.
   const [pickerCallback, setPickerCallback] = useState<((path: string) => void) | null>(null);
@@ -161,6 +166,12 @@ export function Workspace() {
     setOverlay("newChat");
   });
 
+  // `z` toggles reading mode. Matches the Read button label-mnemonic
+  // poorly (`r` is taken by Revert) but `z` is unclaimed and easy to hit.
+  useShortcut("z", () => {
+    setReadingMode((open) => !open);
+  });
+
   // `p` toggles pin on the active thread. Skipped when nothing's selected so
   // we don't surprise users with a "what just happened" no-op.
   useShortcut("p", () => {
@@ -226,7 +237,7 @@ export function Workspace() {
   }
 
   return (
-    <div className="agnt-workspace">
+    <div className={"agnt-workspace" + (readingMode ? " agnt-workspace-reading" : "")}>
       <header className="agnt-workspace-header">
         <button
           type="button"
@@ -252,6 +263,15 @@ export function Workspace() {
             aria-label="Keyboard shortcuts"
           >
             ?
+          </button>
+          <button
+            className={"agnt-button-ghost" + (readingMode ? " agnt-button-ghost-active" : "")}
+            onClick={() => setReadingMode((open) => !open)}
+            title={readingMode ? "Exit reading mode (z)" : "Reading mode — hide sidebar + composer (z)"}
+            aria-pressed={readingMode}
+            aria-label="Toggle reading mode"
+          >
+            Read
           </button>
           <button className="agnt-button-ghost" onClick={() => setOverlay("settings")}>
             Settings
