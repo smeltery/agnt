@@ -120,8 +120,8 @@ Push is disabled by default. Enable it only when you are ready to wire APNs and 
 
 ```sh
 cd relay
-npm install
-npm start
+bun install
+bun run start
 ```
 
 `server.js` exports `createRelayServer()`, and `relay.js` exports the lower-level `setupRelay(wss)` transport primitive if you want to embed the relay in your own server.

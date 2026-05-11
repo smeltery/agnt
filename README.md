@@ -41,7 +41,7 @@ That spins up a local relay + the bridge in the foreground and prints a QR code,
 Pair from either client:
 
 - **iOS app** — install [agnt](https://github.com/dotbrains/agnt), scan the QR. The phone reconnects automatically afterward.
-- **Browser** — `cd agnt-web && npm install && npm run dev`, open `http://localhost:5173`, then paste the JSON, type the short code, or scan the QR with your camera. Same E2EE handshake. See [`agnt-web/README.md`](agnt-web/README.md) for static-build deployment (Tailscale, VPS, S3+CloudFront, …).
+- **Browser** — `cd agnt-web && bun install && bun run dev`, open `http://localhost:5173`, then paste the JSON, type the short code, or scan the QR with your camera. Same E2EE handshake. See [`agnt-web/README.md`](agnt-web/README.md) for static-build deployment (Tailscale, VPS, S3+CloudFront, …).
 
 For self-hosting (Tailscale, public VPS, etc.) see [`docs/operations/self-hosting.md`](docs/operations/self-hosting.md).
 
@@ -85,7 +85,7 @@ The full set (push notifications, APNs, desktop refresher tuning, test overrides
 
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. Short version: small focused PRs welcome, contributions ship under [PolyForm Shield 1.0.0](LICENSE) (the same license as the rest of the project), and the playbook for adding a new provider is at [`docs/development/adding-a-provider.md`](docs/development/adding-a-provider.md).
 
-Bridge tests live under `agnt-bridge/test/` (386 unit tests, run with `npm test --prefix agnt-bridge`). The CI badges above run on every push.
+Bridge tests live under `agnt-bridge/test/` (400 unit tests, run with `(cd agnt-bridge && bun run test)`). The CI badges above run on every push.
 
 ## License
 

@@ -80,8 +80,8 @@ If you only want the bridge process:
 
 ```sh
 cd agnt-bridge
-npm install
-AGNT_RELAY="ws://localhost:9000/relay" npm start
+bun install
+AGNT_RELAY="ws://localhost:9000/relay" bun run start
 ```
 
 That runs `agnt up`, which:

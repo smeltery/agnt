@@ -236,7 +236,7 @@ ensure_package_dependencies() {
   fi
 
   log "Installing dependencies in ${package_dir}"
-  (cd "${package_dir}" && npm install)
+  (cd "${package_dir}" && bun install)
 }
 
 ensure_port_available() {

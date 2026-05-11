@@ -116,8 +116,8 @@ From the public repo:
 ```sh
 git clone https://github.com/dotbrains/agnt.git
 cd agnt/relay
-npm install
-npm start
+bun install
+bun run start
 ```
 
 By default the relay listens on port `9000`.
@@ -159,8 +159,8 @@ Or, if you are running from source:
 
 ```sh
 cd agnt-bridge
-npm install
-AGNT_RELAY="wss://relay.example.com/relay" npm start
+bun install
+AGNT_RELAY="wss://relay.example.com/relay" bun run start
 ```
 
 The bridge will print a QR code the first time you trust that Mac, or later if you intentionally reset trust.
