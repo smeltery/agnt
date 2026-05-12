@@ -92,6 +92,12 @@ const {
   shutdown,
 } = require("./lifecycle");
 const {
+  createBridgeManagedCodexClient,
+} = require("./bridge-managed-codex-client");
+const {
+  createRelayReconnectScheduler,
+} = require("./relay-reconnect-scheduler");
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -194,13 +200,14 @@ function startBridge({
   // Keep the local Codex runtime alive across transient relay disconnects.
   let socket = null;
   let isShuttingDown = false;
-  let reconnectAttempt = 0;
-  let reconnectTimer = null;
   const heartbeat = createBridgeRelayHeartbeat();
+  const reconnectScheduler = createRelayReconnectScheduler();
   let lastPublishedBridgeStatus = null;
   let lastConnectionStatus = null;
   let codexLaunchState = config.codexEndpoint ? "connected" : "starting";
-  const bridgeManagedCodexRequestWaiters = new Map();
+  const bridgeManagedCodex = createBridgeManagedCodexClient({
+    send: (payload) => codex.send(payload),
+  });
   const forwardedRequestTracker = createForwardedRequestTracker({
     parseJson: safeParseJSON,
   });
@@ -259,12 +266,12 @@ function startBridge({
     activeProvider,
   );
   const voiceHandler = createVoiceHandler({
-    sendCodexRequest,
+    sendCodexRequest: bridgeManagedCodex.sendRequest,
     logPrefix: "[agnt]",
   });
   const accountHandler = createAccountHandler({
     activeProvider,
-    sendCodexRequest,
+    sendCodexRequest: bridgeManagedCodex.sendRequest,
     readBridgePackageVersionStatus,
     codexMode: codex.mode,
     tracker: forwardedRequestTracker,
@@ -308,12 +315,7 @@ function startBridge({
   });
 
   function clearReconnectTimer() {
-    if (!reconnectTimer) {
-      return;
-    }
-
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
+    reconnectScheduler.clear();
   }
 
   // Periodically rewrites the latest bridge snapshot so CLI status does not stay frozen.
@@ -399,17 +401,14 @@ function startBridge({
       return;
     }
 
-    if (reconnectTimer) {
+    if (reconnectScheduler.isPending()) {
       return;
     }
 
-    reconnectAttempt += 1;
-    const delayMs = Math.min(1_000 * reconnectAttempt, 5_000);
     logConnectionStatus("connecting");
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
+    reconnectScheduler.schedule(() => {
       connectRelay();
-    }, delayMs);
+    });
   }
 
   function connectRelay() {
@@ -431,7 +430,7 @@ function startBridge({
     nextSocket.on("open", () => {
       markRelayActivity();
       clearReconnectTimer();
-      reconnectAttempt = 0;
+      reconnectScheduler.resetAttempt();
       startRelayWatchdog(nextSocket);
       logConnectionStatus("connected");
       secureTransport.bindLiveSendWireMessage(sendRelayWireMessage);
@@ -499,7 +498,7 @@ function startBridge({
   connectRelay();
 
   codex.onMessage((message) => {
-    if (handleBridgeManagedCodexResponse(message)) {
+    if (bridgeManagedCodex.handleResponse(message)) {
       return;
     }
     accountHandler.updatePendingAuthLoginFromCodexMessage(message);
@@ -530,7 +529,7 @@ function startBridge({
     rolloutLiveMirror?.stopAll();
     desktopIpcActionFollower?.stopAll();
     desktopRefresher.handleTransportReset();
-    failBridgeManagedCodexRequests(new Error("Codex transport closed before the bridge request completed."));
+    bridgeManagedCodex.failAll(new Error("Codex transport closed before the bridge request completed."));
     forwardedRequestTracker.clear();
     if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
       socket.close();
@@ -628,7 +627,7 @@ function startBridge({
     (async () => {
       try {
         const response = await fetchAdaptiveThreadTurnsListForRelay(request, {
-          fetchPage: (params) => sendCodexRequest("thread/turns/list", params),
+          fetchPage: (params) => bridgeManagedCodex.sendRequest("thread/turns/list", params),
           sanitizeForRelay: sanitizeThreadHistoryImagesForRelay,
         });
         const fallbackResponse = maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, response);
@@ -675,7 +674,7 @@ function startBridge({
 
   // Seeds the desktop IPC follower when it receives patches before a full snapshot.
   async function readDesktopConversationState(threadId) {
-    const result = await sendCodexRequest("thread/read", {
+    const result = await bridgeManagedCodex.sendRequest("thread/read", {
       threadId,
       includeTurns: true,
     });
@@ -726,94 +725,6 @@ function startBridge({
     }
   }
 
-  // Runs bridge-private JSON-RPC calls against the local app-server so token-bearing responses
-  // can power bridge features like transcription without ever reaching the phone.
-  function sendCodexRequest(method, params) {
-    const requestId = `bridge-managed-${randomBytes(12).toString("hex")}`;
-    const payload = JSON.stringify({
-      id: requestId,
-      method,
-      params,
-    });
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        bridgeManagedCodexRequestWaiters.delete(requestId);
-        reject(new Error(`Codex request timed out: ${method}`));
-      }, 20_000);
-
-      bridgeManagedCodexRequestWaiters.set(requestId, {
-        method,
-        resolve,
-        reject,
-        timeout,
-      });
-
-      try {
-        codex.send(payload);
-      } catch (error) {
-        clearTimeout(timeout);
-        bridgeManagedCodexRequestWaiters.delete(requestId);
-        reject(error);
-      }
-    });
-  }
-
-  // Intercepts responses for bridge-private requests so only user-visible app-server traffic
-  // is forwarded back through secure transport.
-  function handleBridgeManagedCodexResponse(rawMessage) {
-    let parsed = null;
-    try {
-      parsed = JSON.parse(rawMessage);
-    } catch {
-      return false;
-    }
-
-    const responseId = typeof parsed?.id === "string" ? parsed.id : null;
-    if (!responseId) {
-      return false;
-    }
-
-    const waiter = bridgeManagedCodexRequestWaiters.get(responseId);
-    if (!waiter) {
-      return false;
-    }
-
-    bridgeManagedCodexRequestWaiters.delete(responseId);
-    clearTimeout(waiter.timeout);
-
-    if (parsed.error) {
-      const error = new Error(parsed.error.message || `Codex request failed: ${waiter.method}`);
-      error.code = parsed.error.code;
-      error.data = parsed.error.data;
-      waiter.reject(error);
-      return true;
-    }
-
-    waiter.resolve(readBridgeManagedSuccessPayload(parsed));
-    return true;
-  }
-
-  // Normalizes private app-server responses before the bridge re-wraps them for iOS.
-  // Codex's app-server occasionally hands back `{payload}` instead of `{result}`;
-  // non-Codex providers always return `{result}`, so this is a no-op for them.
-  function readBridgeManagedSuccessPayload(parsed) {
-    if (Object.prototype.hasOwnProperty.call(parsed, "result")) {
-      return parsed.result ?? null;
-    }
-    if (Object.prototype.hasOwnProperty.call(parsed, "payload")) {
-      return parsed.payload ?? null;
-    }
-    return null;
-  }
-
-  function failBridgeManagedCodexRequests(error) {
-    for (const waiter of bridgeManagedCodexRequestWaiters.values()) {
-      clearTimeout(waiter.timeout);
-      waiter.reject(error);
-    }
-    bridgeManagedCodexRequestWaiters.clear();
-  }
 
   function publishBridgeStatus(status) {
     const nextStatus = {
