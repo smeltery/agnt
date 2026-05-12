@@ -4,7 +4,7 @@
 //          --input-format stream-json --verbose` CLI without changes.
 // Layer: provider plugin (claude)
 // Exports: createClaudeTranslator
-// Depends on: crypto, fs, path
+// Depends on: fs, path, os, ../_shared/translator-utils
 //
 // Design notes:
 //   - The bridge speaks Codex JSON-RPC. The Claude CLI speaks stream-json:
@@ -31,14 +31,26 @@
 //     threadId, then map that threadId to whatever session_id Claude reports
 //     in the `system.init` line of the next turn.
 
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
+const {
+  buildTurnOverlapError,
+  createFrameEmitter,
+  generateItemId,
+  generateThreadId,
+  generateTurnId,
+  numberOr,
+  readString,
+  safeParseJson,
+} = require("../_shared/translator-utils");
+
 const PROTO_VERSION = "1.0.0-claude-shim";
 
 function createClaudeTranslator({ injectInbound, transport, env = process.env } = {}) {
+  const { emitNotification, injectResponse, respondError } = createFrameEmitter(injectInbound);
+
   // ── per-connection state ───────────────────────────────────────────────
   /** Synthetic threadId surfaced to the iOS app. */
   let threadId = "";
@@ -280,7 +292,8 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     // generally disables Send while a turn runs; this is a backstop for
     // pathological clients (and a clean error if it ever fires).
     if (activeTurnId) {
-      respondError(request?.id, -32003, "A turn is already in flight on this thread");
+      const err = buildTurnOverlapError();
+      respondError(request?.id, err.code, err.message);
       return null;
     }
 
@@ -1275,30 +1288,6 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     blocksByIndex.clear();
   }
 
-  function generateThreadId() {
-    return `thr_${crypto.randomBytes(12).toString("hex")}`;
-  }
-
-  function generateTurnId() {
-    return `turn_${crypto.randomBytes(12).toString("hex")}`;
-  }
-
-  function generateItemId(kind) {
-    return `${kind}_${crypto.randomBytes(10).toString("hex")}`;
-  }
-
-  function emitNotification(method, params) {
-    injectInbound(JSON.stringify({ method, params }));
-  }
-
-  function injectResponse(id, result) {
-    injectInbound(JSON.stringify({ id, result }));
-  }
-
-  function respondError(id, code, message) {
-    if (id == null) return;
-    injectInbound(JSON.stringify({ id, error: { code, message } }));
-  }
 }
 
 function mergeUsage(prev, next) {
@@ -1311,23 +1300,6 @@ function mergeUsage(prev, next) {
     cache_read_input_tokens: numberOr(next.cache_read_input_tokens, prev.cache_read_input_tokens),
     cache_creation_input_tokens: numberOr(next.cache_creation_input_tokens, prev.cache_creation_input_tokens),
   };
-}
-
-function safeParseJson(line) {
-  if (typeof line !== "string") return null;
-  try {
-    return JSON.parse(line);
-  } catch {
-    return null;
-  }
-}
-
-function readString(value) {
-  return typeof value === "string" && value ? value : "";
-}
-
-function numberOr(value, fallback) {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 module.exports = {
