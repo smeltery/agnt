@@ -39,13 +39,13 @@ const { createForwardedRequestTracker } = require("./forwarded-request-tracker")
 const { createMacOSBridgeWakeAssertion } = require("./wake-assertion");
 const { createBridgePreferences, persistBridgePreferences } = require("./bridge-preferences");
 const { createContextUsageWatcher } = require("./context-usage-watcher");
+const { createHandshakeHandler } = require("./handshake-handler");
 const { createBridgePackageVersionStatusReader } = require("./package-version-status");
 const { createPushNotificationServiceClient } = require("./push-notification-service-client");
 const { createPushNotificationTracker } = require("./push-notification-tracker");
 const { resolveCodexGeneratedImagesRoot } = require("./providers/codex/home");
 const {
   loadOrCreateBridgeDeviceState,
-  rememberLastSeenPhoneAppVersion,
   resolveBridgeRelaySession,
 } = require("./secure-device-state");
 const { createBridgeSecureTransport } = require("./secure-transport");
@@ -55,12 +55,7 @@ const {
   seedConversationStateFromThreadRead,
 } = require("./desktop-ipc-action-follower");
 const { version: bridgePackageVersion = "" } = require("../package.json");
-const {
-  MINIMUM_SUPPORTED_IOS_APP_VERSION,
-  buildCachedIOSAppCompatibilityWarning,
-  buildIOSAppCompatibilitySnapshot,
-  normalizeVersionString,
-} = require("./ios-app-compatibility");
+const { buildCachedIOSAppCompatibilityWarning } = require("./ios-app-compatibility");
 const { createShortPairingCode, SHORT_PAIRING_CODE_LENGTH } = require("./qr");
 
 const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
@@ -151,12 +146,10 @@ function startBridge({
   }
   const relaySession = resolveBridgeRelaySession(deviceState);
   deviceState = relaySession.deviceState;
-  let lastIOSAppCompatibilityWarning = "";
   const cachedIOSAppCompatibilityWarning = buildCachedIOSAppCompatibilityWarning({
     bridgeVersion: bridgePackageVersion,
     iosAppVersion: deviceState.lastSeenPhoneAppVersion,
   });
-  logIOSAppCompatibilityWarning(cachedIOSAppCompatibilityWarning);
   const sessionId = relaySession.sessionId;
   const relaySessionUrl = `${relayBaseUrl}/${sessionId}`;
   const notificationSecret = randomBytes(24).toString("hex");
@@ -195,12 +188,18 @@ function startBridge({
   let lastPublishedBridgeStatus = null;
   let lastConnectionStatus = null;
   let codexLaunchState = config.codexEndpoint ? "connected" : "starting";
-  let codexHandshakeState = config.codexEndpoint ? "warm" : "cold";
-  const forwardedInitializeRequestIds = new Set();
   const bridgeManagedCodexRequestWaiters = new Map();
   const forwardedRequestTracker = createForwardedRequestTracker({
     parseJson: safeParseJSON,
   });
+  const handshakeHandler = createHandshakeHandler({
+    sendApplicationResponse,
+    bridgePackageVersion,
+    initialHandshakeWarm: Boolean(config.codexEndpoint),
+    getDeviceState: () => deviceState,
+    setDeviceState: (next) => { deviceState = next; },
+  });
+  handshakeHandler.logCompatibilityWarning(cachedIOSAppCompatibilityWarning);
   const secureTransport = createBridgeSecureTransport({
     sessionId,
     relayUrl: relayBaseUrl,
@@ -512,7 +511,7 @@ function startBridge({
       return;
     }
     accountHandler.updatePendingAuthLoginFromCodexMessage(message);
-    trackCodexHandshakeState(message);
+    handshakeHandler.observeCodexResponse(message);
     desktopRefresher.handleOutbound(message);
     pushNotificationTracker.handleOutbound(message);
     rememberThreadFromMessage("codex", message);
@@ -563,7 +562,7 @@ function startBridge({
 
   // Routes decrypted app payloads through the same bridge handlers as before.
   function handleApplicationMessage(rawMessage) {
-    if (handleBridgeManagedHandshakeMessage(rawMessage)) {
+    if (handshakeHandler.handlePhoneMessage(rawMessage)) {
       return;
     }
     if (accountHandler.handleBridgeManagedAccountRequest(rawMessage, sendApplicationResponse)) {
@@ -731,137 +730,6 @@ function startBridge({
     rememberActiveThread(context.threadId, source);
     if (shouldStartContextUsageWatcher(context)) {
       contextUsageWatcher.ensure(context);
-    }
-  }
-
-  // The spawned/shared Codex app-server stays warm across phone reconnects.
-  // When iPhone reconnects it sends initialize again, but forwarding that to the
-  // already-initialized Codex transport only produces "Already initialized".
-  function handleBridgeManagedHandshakeMessage(rawMessage) {
-    let parsed = null;
-    try {
-      parsed = JSON.parse(rawMessage);
-    } catch {
-      return false;
-    }
-
-    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-    if (!method) {
-      return false;
-    }
-
-    if (method === "initialize" && parsed.id != null) {
-      const compatibilityError = bridgeManagedInitializeCompatibilityError(parsed.params || {});
-      if (compatibilityError) {
-        sendApplicationResponse(JSON.stringify({
-          id: parsed.id,
-          error: compatibilityError,
-        }));
-        return true;
-      }
-
-      if (codexHandshakeState !== "warm") {
-        forwardedInitializeRequestIds.add(String(parsed.id));
-        return false;
-      }
-
-      sendApplicationResponse(JSON.stringify({
-        id: parsed.id,
-        result: {
-          bridgeManaged: true,
-        },
-      }));
-      return true;
-    }
-
-    if (method === "initialized") {
-      return codexHandshakeState === "warm";
-    }
-
-    return false;
-  }
-
-  // Blocks bridge/app version skew before the phone starts calling newer bridge APIs.
-  function bridgeManagedInitializeCompatibilityError(params) {
-    const clientInfo = params && typeof params === "object" ? params.clientInfo : null;
-    const clientName = normalizeNonEmptyString(clientInfo?.name);
-    if (clientName !== "codexmobile_ios") {
-      return null;
-    }
-
-    const clientVersion = normalizeVersionString(clientInfo?.version);
-    if (clientVersion) {
-      deviceState = rememberLastSeenPhoneAppVersion(deviceState, clientVersion);
-    }
-
-    const compatibility = buildIOSAppCompatibilitySnapshot({
-      bridgeVersion: bridgePackageVersion,
-      iosAppVersion: clientVersion,
-    });
-    if (!compatibility.requiresAppUpdate) {
-      return null;
-    }
-
-    logIOSAppCompatibilityWarning(buildCachedIOSAppCompatibilityWarning({
-      bridgeVersion: bridgePackageVersion,
-      iosAppVersion: clientVersion,
-    }));
-
-    return {
-      code: -32001,
-      message: compatibility.message,
-      data: {
-        errorCode: "ios_app_update_required",
-        minimumSupportedAppVersion: MINIMUM_SUPPORTED_IOS_APP_VERSION,
-        bridgeVersion: normalizeVersionString(bridgePackageVersion) || null,
-        clientVersion,
-        compatibleBridgeVersion: compatibility.legacyBridgeVersion,
-        downgradeCommand: compatibility.downgradeCommand,
-      },
-    };
-  }
-
-  function logIOSAppCompatibilityWarning(warning) {
-    const normalizedWarning = typeof warning === "string" ? warning.trim() : "";
-    if (!normalizedWarning || normalizedWarning === lastIOSAppCompatibilityWarning) {
-      return;
-    }
-
-    lastIOSAppCompatibilityWarning = normalizedWarning;
-    console.warn(normalizedWarning);
-  }
-
-  // Learns whether the underlying Codex transport has already completed its own MCP handshake.
-  function trackCodexHandshakeState(rawMessage) {
-    let parsed = null;
-    try {
-      parsed = JSON.parse(rawMessage);
-    } catch {
-      return;
-    }
-
-    const responseId = parsed?.id;
-    if (responseId == null) {
-      return;
-    }
-
-    const responseKey = String(responseId);
-    if (!forwardedInitializeRequestIds.has(responseKey)) {
-      return;
-    }
-
-    forwardedInitializeRequestIds.delete(responseKey);
-
-    if (parsed?.result != null) {
-      codexHandshakeState = "warm";
-      return;
-    }
-
-    const errorMessage = typeof parsed?.error?.message === "string"
-      ? parsed.error.message.toLowerCase()
-      : "";
-    if (errorMessage.includes("already initialized")) {
-      codexHandshakeState = "warm";
     }
   }
 
