@@ -80,6 +80,10 @@ const {
   sanitizeRelayHistoryTurn,
 } = require("./relay-payload-pipeline");
 const {
+  extractBridgeMessageContext,
+  shouldStartContextUsageWatcher,
+} = require("./message-context");
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -874,81 +878,6 @@ function shutdown(codex, getSocket, beforeExit = () => {}) {
   setTimeout(() => process.exit(0), 100);
 }
 
-function extractBridgeMessageContext(rawMessage) {
-  let parsed = null;
-  try {
-    parsed = JSON.parse(rawMessage);
-  } catch {
-    return { method: "", threadId: null, turnId: null };
-  }
-
-  const method = parsed?.method;
-  const params = parsed?.params;
-  const threadId = extractThreadId(method, params);
-  const turnId = extractTurnId(method, params);
-
-  return {
-    method: typeof method === "string" ? method : "",
-    threadId,
-    turnId,
-  };
-}
-
-function shouldStartContextUsageWatcher(context) {
-  if (!context?.threadId) {
-    return false;
-  }
-
-  return context.method === "turn/start"
-    || context.method === "turn/started";
-}
-
-function extractThreadId(method, params) {
-  if (method === "turn/start" || method === "turn/started") {
-    return (
-      readString(params?.threadId)
-      || readString(params?.thread_id)
-      || readString(params?.turn?.threadId)
-      || readString(params?.turn?.thread_id)
-    );
-  }
-
-  if (method === "thread/start" || method === "thread/started") {
-    return (
-      readString(params?.threadId)
-      || readString(params?.thread_id)
-      || readString(params?.thread?.id)
-      || readString(params?.thread?.threadId)
-      || readString(params?.thread?.thread_id)
-    );
-  }
-
-  if (method === "turn/completed") {
-    return (
-      readString(params?.threadId)
-      || readString(params?.thread_id)
-      || readString(params?.turn?.threadId)
-      || readString(params?.turn?.thread_id)
-    );
-  }
-
-  return null;
-}
-
-function extractTurnId(method, params) {
-  if (method === "turn/started" || method === "turn/completed") {
-    return (
-      readString(params?.turnId)
-      || readString(params?.turn_id)
-      || readString(params?.id)
-      || readString(params?.turn?.id)
-      || readString(params?.turn?.turnId)
-      || readString(params?.turn?.turn_id)
-    );
-  }
-
-  return null;
-}
 
 function readString(value) {
   return typeof value === "string" && value ? value : null;
