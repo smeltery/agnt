@@ -31,6 +31,7 @@ const {
 const { createPullRequestActions } = require("./pr-creation");
 const { createGitOps, normalizeBranchListEntry } = require("./git-ops");
 const { createWorktreeActions } = require("./worktree-actions");
+const { createDraftActions } = require("./draft-actions");
 
 const worktreeHandoff = createWorktreeHandoff({
   git: (cwd, ...args) => git(cwd, ...args),
@@ -132,28 +133,39 @@ const {
   gitRemoveWorktree,
 } = worktreeActions;
 
+const draftActions = createDraftActions({
+  git: (cwd, ...args) => git(cwd, ...args),
+  gitError: (errorCode, userMessage) => gitError(errorCode, userMessage),
+  // Wrap the swap-able impl so tests can keep injecting via the __test
+  // setRunStructuredCodexJsonImplementation hook.
+  runStructuredCodexJson: (opts) => runStructuredCodexJsonImpl(opts),
+  gitStatus: (cwd) => gitStatus(cwd),
+  gitBranches: (cwd) => gitBranches(cwd),
+  resolveRepoRoot: (cwd) => resolveRepoRoot(cwd),
+  refExists: (cwd, ref) => refExists(cwd, ref),
+  diffPatchForUntrackedFiles: (cwd, filePaths) => diffPatchForUntrackedFiles(cwd, filePaths),
+  parseNumstatTotals: (output) => parseNumstatTotals(output),
+  resolveBaseBranchName: (raw, fallback) => resolveBaseBranchName(raw, fallback),
+  normalizeNonEmptyMultilineString: (raw) => normalizeNonEmptyMultilineString(raw),
+  normalizeExistingPath: (raw) => normalizeExistingPath(raw),
+  isExistingDirectory: (raw) => isExistingDirectory(raw),
+});
+const {
+  gitGenerateCommitMessage,
+  gitGeneratePullRequestDraft,
+  threadGenerateTitle,
+} = draftActions;
+
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
 // Node defaults maxBuffer to 1 MiB; large repo diffs trip "stdout maxBuffer length exceeded".
 const GIT_EXEC_MAX_BUFFER_BYTES = 50 * 1024 * 1024;
 const GITHUB_CLI_TIMEOUT_MS = 120_000;
 const EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-const DEFAULT_GIT_WRITER_MODEL = "gpt-5.4-mini";
 
 let runStructuredCodexJsonImpl = runStructuredCodexJson;
 let runGitHubCliImpl = runGitHubCli;
 
-function resolveGitWriterModel(rawModel) {
-  const trimmed = typeof rawModel === "string" ? rawModel.trim() : "";
-  return trimmed || DEFAULT_GIT_WRITER_MODEL;
-}
-
-/**
- * Intercepts git/* JSON-RPC methods and executes git commands locally.
- * @param {string} rawMessage - Raw WebSocket message
- * @param {(response: string) => void} sendResponse - Callback to send response back
- * @returns {boolean} true if message was handled, false if it should pass through
- */
 function handleGitRequest(rawMessage, sendResponse, options = {}) {
   let parsed;
   try {
@@ -292,206 +304,6 @@ function threadNameSet(params) {
 
 // ─── Git Status ───────────────────────────────────────────────
 
-async function gitGenerateCommitMessage(cwd, params, options = {}) {
-  const model = resolveGitWriterModel(params.model);
-
-  try {
-    const context = await buildCommitDraftContext(cwd);
-    const prompt = buildCommitDraftPrompt(context);
-    const schema = {
-      type: "object",
-      properties: {
-        subject: { type: "string" },
-        body: { type: "string" },
-        fullMessage: { type: "string" },
-      },
-      required: ["subject", "body", "fullMessage"],
-      additionalProperties: false,
-    };
-    const draft = await runStructuredCodexJsonImpl({
-      cwd,
-      model,
-      prompt,
-      schema,
-      codexAppPath: options.codexAppPath,
-    });
-
-    return normalizeCommitDraft(draft);
-  } catch (error) {
-    if (error?.errorCode) {
-      throw error;
-    }
-    throw wrapDraftGenerationError(error, "commit");
-  }
-}
-
-async function gitGeneratePullRequestDraft(cwd, params, options = {}) {
-  const model = resolveGitWriterModel(params.model);
-
-  try {
-    const context = await buildPullRequestDraftContext(cwd, params);
-    const prompt = buildPullRequestDraftPrompt(context);
-    const schema = {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        body: { type: "string" },
-      },
-      required: ["title", "body"],
-      additionalProperties: false,
-    };
-    const draft = await runStructuredCodexJsonImpl({
-      cwd,
-      model,
-      prompt,
-      schema,
-      codexAppPath: options.codexAppPath,
-    });
-
-    return normalizePullRequestDraft(draft);
-  } catch (error) {
-    if (error?.errorCode) {
-      throw error;
-    }
-    throw wrapDraftGenerationError(error, "pull_request");
-  }
-}
-
-async function threadGenerateTitle(params, options = {}) {
-  const model = resolveGitWriterModel(params.model);
-  const message = normalizeNonEmptyMultilineString(params.message || params.prompt);
-  if (!message) {
-    throw gitError("missing_thread_title_message", "A first message is required to generate a thread title.");
-  }
-
-  try {
-    const cwd = resolveThreadTitleCwd(params.cwd || params.workingDirectory);
-    const prompt = buildThreadTitlePrompt({
-      message,
-      attachmentCount: normalizeNonNegativeInteger(params.attachmentCount),
-    });
-    const schema = {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-      },
-      required: ["title"],
-      additionalProperties: false,
-    };
-    const draft = await runStructuredCodexJsonImpl({
-      cwd,
-      model,
-      prompt,
-      schema,
-      codexAppPath: options.codexAppPath,
-      skipGitRepoCheck: true,
-      sandboxMode: "read-only",
-    });
-
-    return normalizeThreadTitleDraft(draft, message);
-  } catch (error) {
-    if (error?.errorCode) {
-      throw error;
-    }
-    throw wrapDraftGenerationError(error, "thread_title");
-  }
-}
-
-// ─── Git Push ─────────────────────────────────────────────────
-
-async function buildCommitDraftContext(cwd) {
-  const [statusResult, repoRoot] = await Promise.all([
-    gitStatus(cwd),
-    resolveRepoRoot(cwd).catch(() => cwd),
-  ]);
-
-  if (!statusResult.dirty) {
-    throw gitError("nothing_to_commit", "Nothing to commit.");
-  }
-
-  const trackedBase = await refExists(cwd, "HEAD") ? "HEAD" : EMPTY_TREE_HASH;
-  const trackedPatch = await git(cwd, "diff", "--binary", "--find-renames", trackedBase);
-  const untrackedPaths = statusResult.files
-    .filter((file) => file.status === "??")
-    .map((file) => file.path)
-    .filter(Boolean);
-  const untrackedPatch = await diffPatchForUntrackedFiles(cwd, untrackedPaths);
-  const patch = truncateDraftPatch(
-    [trackedPatch.trim(), untrackedPatch.trim()].filter(Boolean).join("\n\n").trim()
-  );
-
-  if (!patch) {
-    throw gitError("nothing_to_commit", "Nothing to commit.");
-  }
-
-  return {
-    repoRoot,
-    branch: statusResult.branch || "HEAD",
-    files: statusResult.files,
-    diff: statusResult.diff || { additions: 0, deletions: 0, binaryFiles: 0 },
-    patch,
-  };
-}
-
-async function buildPullRequestDraftContext(cwd, params) {
-  const branchResult = await gitBranches(cwd);
-  const currentBranch = (branchResult.current || "").trim();
-  const baseBranch = resolveBaseBranchName(params.baseBranch, branchResult.default || branchResult.defaultBranch);
-
-  if (!currentBranch) {
-    throw gitError("no_branch", "No current branch found.");
-  }
-
-  if (!baseBranch) {
-    throw gitError("no_default_branch", "Could not determine the repository default branch.");
-  }
-
-  const baseRef = await resolvePullRequestBaseRef(cwd, baseBranch);
-  const mergeBase = (await git(cwd, "merge-base", "HEAD", baseRef)).trim();
-  const patch = truncateDraftPatch(
-    (await git(cwd, "diff", "--binary", "--find-renames", `${mergeBase}..HEAD`)).trim()
-  );
-  const numstatOutput = await git(cwd, "diff", "--numstat", `${mergeBase}..HEAD`);
-  const diff = parseNumstatTotals(numstatOutput);
-  const commitList = (
-    await git(cwd, "log", "--format=%h %s", `${mergeBase}..HEAD`)
-  )
-    .trim()
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 40);
-
-  if (!patch && commitList.length === 0) {
-    throw gitError("nothing_to_compare", "No branch changes are available for a pull request.");
-  }
-
-  return {
-    repoRoot: await resolveRepoRoot(cwd).catch(() => cwd),
-    currentBranch,
-    baseBranch,
-    mergeBase,
-    diff,
-    commitList,
-    patch,
-  };
-}
-
-// PRs compare against the remote base when possible, matching GitHub's base branch.
-async function resolvePullRequestBaseRef(cwd, branchName) {
-  const localRef = `refs/heads/${branchName}`;
-  const remoteRef = `refs/remotes/origin/${branchName}`;
-
-  if (await refExists(cwd, remoteRef)) {
-    return remoteRef;
-  }
-  if (await refExists(cwd, localRef)) {
-    return localRef;
-  }
-
-  return branchName;
-}
-
 async function refExists(cwd, refName) {
   try {
     await git(cwd, "show-ref", "--verify", "--quiet", refName);
@@ -516,19 +328,6 @@ function normalizeNonEmptyMultilineString(rawValue) {
   const trimmed = rawValue.trim();
   return trimmed || "";
 }
-
-function normalizeNonNegativeInteger(value) {
-  return Number.isSafeInteger(value) && value > 0 ? value : 0;
-}
-
-function resolveThreadTitleCwd(rawCwd) {
-  const normalized = normalizeExistingPath(typeof rawCwd === "string" ? rawCwd : "");
-  if (normalized && isExistingDirectory(normalized)) {
-    return normalized;
-  }
-  return process.cwd();
-}
-
 
 async function gitWorktreePathByBranch(cwd, options = {}) {
   const output = await git(cwd, "worktree", "list", "--porcelain");
