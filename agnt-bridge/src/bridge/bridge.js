@@ -104,6 +104,16 @@ const {
   createRelayOutboundPipeline,
 } = require("./relay-outbound-pipeline");
 const {
+  createRelaySocketLoop,
+} = require("./relay-socket-loop");
+
+// Close codes used by the relay to signal "this pairing is rejected; don't
+// loop". Anything else triggers the bridge's normal reconnect schedule.
+const RELAY_TERMINAL_CLOSE_CODES = new Set([4000, 4001]);
+function shouldShutdownOnRelayCloseCode(code) {
+  return RELAY_TERMINAL_CLOSE_CODES.has(code);
+}
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -204,7 +214,6 @@ function startBridge({
   const readBridgePackageVersionStatus = createBridgePackageVersionStatusReader();
 
   // Keep the local Codex runtime alive across transient relay disconnects.
-  let socket = null;
   let isShuttingDown = false;
   const heartbeat = createBridgeRelayHeartbeat();
   const reconnectScheduler = createRelayReconnectScheduler();
@@ -237,11 +246,12 @@ function startBridge({
   // Keeps one stable sender identity across reconnects so buffered replay state
   // reflects what actually made it onto the current relay socket.
   function sendRelayWireMessage(wireMessage) {
-    if (socket?.readyState !== WebSocket.OPEN) {
+    const live = socketLoop.getSocket();
+    if (live?.readyState !== WebSocket.OPEN) {
       return false;
     }
 
-    socket.send(wireMessage);
+    live.send(wireMessage);
     return true;
   }
   // Only the spawned local runtime needs rollout mirroring; a real endpoint
@@ -349,7 +359,7 @@ function startBridge({
 
   function startRelayWatchdog(trackedSocket) {
     heartbeat.startWatchdog(({ isStale }) => {
-      if (isShuttingDown || socket !== trackedSocket) {
+      if (isShuttingDown || socketLoop.getSocket() !== trackedSocket) {
         heartbeat.clearWatchdog();
         return;
       }
@@ -389,107 +399,50 @@ function startBridge({
     console.log(`[agnt] ${status}`);
   }
 
-  // Retries the relay socket while preserving the active Codex process and session id.
-  function scheduleRelayReconnect(closeCode) {
-    if (isShuttingDown) {
-      return;
-    }
-
-    if (closeCode === 4000 || closeCode === 4001) {
-      logConnectionStatus("disconnected");
-      shutdown(codex, () => socket, () => {
+  // The relay socket lifecycle (connect → open → message → close → reconnect)
+  // and its close-code policy live in relay-socket-loop. bridge.js still owns
+  // the per-event side effects (status logging, watchdog, watcher teardown,
+  // secure-transport binding, push registration) by passing callbacks.
+  const socketLoop = createRelaySocketLoop({
+    WebSocketCtor: WebSocket,
+    relaySessionUrl: () => relaySessionUrl,
+    buildHeaders: () => ({
+      // The relay uses this per-session secret to authenticate the first push registration.
+      "x-role": "mac",
+      "x-notification-secret": notificationSecret,
+      ...buildMacRegistrationHeaders(deviceState, pairingSession),
+    }),
+    isShuttingDown: () => isShuttingDown,
+    reconnectScheduler,
+    shouldShutdownOnClose: shouldShutdownOnRelayCloseCode,
+    onShutdown: () => {
+      shutdown(codex, () => socketLoop.getSocket(), () => {
         isShuttingDown = true;
         bridgeWakeAssertion.stop();
         clearReconnectTimer();
         clearRelayWatchdog();
         clearBridgeStatusHeartbeat();
       });
-      return;
-    }
-
-    if (reconnectScheduler.isPending()) {
-      return;
-    }
-
-    logConnectionStatus("connecting");
-    reconnectScheduler.schedule(() => {
-      connectRelay();
-    });
-  }
-
-  function connectRelay() {
-    if (isShuttingDown) {
-      return;
-    }
-
-    logConnectionStatus("connecting");
-    const nextSocket = new WebSocket(relaySessionUrl, {
-      // The relay uses this per-session secret to authenticate the first push registration.
-      headers: {
-        "x-role": "mac",
-        "x-notification-secret": notificationSecret,
-        ...buildMacRegistrationHeaders(deviceState, pairingSession),
-      },
-    });
-    socket = nextSocket;
-
-    nextSocket.on("open", () => {
-      markRelayActivity();
-      clearReconnectTimer();
-      reconnectScheduler.resetAttempt();
-      startRelayWatchdog(nextSocket);
-      logConnectionStatus("connected");
+    },
+    onStatus: logConnectionStatus,
+    markActivity: markRelayActivity,
+    startWatchdog: startRelayWatchdog,
+    clearWatchdog: clearRelayWatchdog,
+    onOpen: () => {
       secureTransport.bindLiveSendWireMessage(sendRelayWireMessage);
       sendRelayRegistrationUpdate(deviceState);
-    });
-
-    nextSocket.on("message", (data) => {
-      markRelayActivity();
-      const message = typeof data === "string" ? data : data.toString("utf8");
-      if (secureTransport.handleIncomingWireMessage(message, {
-        sendControlMessage(controlMessage) {
-          if (nextSocket.readyState === WebSocket.OPEN) {
-            nextSocket.send(JSON.stringify(controlMessage));
-          }
-        },
-        onApplicationMessage(plaintextMessage) {
-          handleApplicationMessage(plaintextMessage);
-        },
-      })) {
-        return;
-      }
-    });
-
-    nextSocket.on("ping", () => {
-      markRelayActivity();
-    });
-
-    nextSocket.on("pong", () => {
-      markRelayActivity();
-    });
-
-    nextSocket.on("close", (code) => {
-      if (socket === nextSocket) {
-        clearRelayWatchdog();
-      }
-      logConnectionStatus("disconnected");
-      if (socket === nextSocket) {
-        socket = null;
-      }
+    },
+    onTeardown: () => {
       contextUsageWatcher.stop();
       rolloutLiveMirror?.stopAll();
       desktopIpcActionFollower?.stopAll();
       desktopRefresher.handleTransportReset();
-      scheduleRelayReconnect(code);
-    });
-
-    nextSocket.on("error", () => {
-      if (socket === nextSocket) {
-        clearRelayWatchdog();
-      }
-      logConnectionStatus("disconnected");
-    });
-  }
+    },
+    handleIncomingWireMessage: (message, ctx) => secureTransport.handleIncomingWireMessage(message, ctx),
+    onApplicationMessage: (plaintextMessage) => {
+      handleApplicationMessage(plaintextMessage);
+    },
+  });
 
   const pairingPayload = secureTransport.createPairingPayload();
   const pairingSession = {
@@ -501,7 +454,7 @@ function startBridge({
     printQR(pairingSession);
   }
   pushServiceClient.logUnavailable();
-  connectRelay();
+  socketLoop.connect();
 
   codex.onMessage(createRelayOutboundPipeline({
     shortCircuit: (msg) => bridgeManagedCodex.handleResponse(msg),
@@ -535,19 +488,20 @@ function startBridge({
     desktopRefresher.handleTransportReset();
     bridgeManagedCodex.failAll(new Error("Codex transport closed before the bridge request completed."));
     forwardedRequestTracker.clear();
-    if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
-      socket.close();
+    const live = socketLoop.getSocket();
+    if (live?.readyState === WebSocket.OPEN || live?.readyState === WebSocket.CONNECTING) {
+      live.close();
     }
   });
 
-  process.on("SIGINT", () => shutdown(codex, () => socket, () => {
+  process.on("SIGINT", () => shutdown(codex, () => socketLoop.getSocket(), () => {
     isShuttingDown = true;
     bridgeWakeAssertion.stop();
     clearReconnectTimer();
     clearRelayWatchdog();
     clearBridgeStatusHeartbeat();
   }));
-  process.on("SIGTERM", () => shutdown(codex, () => socket, () => {
+  process.on("SIGTERM", () => shutdown(codex, () => socketLoop.getSocket(), () => {
     isShuttingDown = true;
     bridgeWakeAssertion.stop();
     clearReconnectTimer();
@@ -724,11 +678,12 @@ function startBridge({
   // Refreshes the relay's trusted-mac index after the QR bootstrap locks in a phone identity.
   function sendRelayRegistrationUpdate(nextDeviceState) {
     deviceState = nextDeviceState;
-    if (socket?.readyState !== WebSocket.OPEN) {
+    const live = socketLoop.getSocket();
+    if (live?.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    socket.send(JSON.stringify({
+    live.send(JSON.stringify({
       kind: "relayMacRegistration",
       registration: buildMacRegistration(nextDeviceState, pairingSession),
     }));
