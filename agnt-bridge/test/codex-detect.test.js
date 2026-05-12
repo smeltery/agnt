@@ -103,6 +103,10 @@ test("resolveActiveProvider skips Codex on Linux when only claude is installed",
   //    `which` fallback can still spawn (PATH=just-fake-bin would make spawnSync
   //    fail to even find /usr/bin/which and short-circuit detection to false).
   //  - CODEX_CLI_PATH is empty so detect.js cannot short-circuit to Codex.
+  //  - `platform: "linux"` is passed explicitly so codex detection does not
+  //    fall back to /Applications/Codex.app on a macOS developer's machine
+  //    (that bundle exists on the dev host and would otherwise win
+  //    auto-detect, contradicting the test's premise).
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-resolve-home-"));
   const fakeBinDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-resolve-bin-"));
   const fakeClaude = path.join(fakeBinDir, "claude");
@@ -117,6 +121,7 @@ test("resolveActiveProvider skips Codex on Linux when only claude is installed",
         CODEX_CLI_PATH: "",
         AGNT_CODEX_CLI_PATH: "",
       },
+      platform: "linux",
     });
 
     assert.equal(provider?.id, "claude");
