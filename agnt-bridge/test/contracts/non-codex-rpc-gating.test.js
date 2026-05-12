@@ -4,7 +4,7 @@
 //          providers, so the iOS auth UI never hangs on a never-coming reply.
 // Layer: Contract test
 // Exports: node:test suite
-// Depends on: node:test, node:assert/strict, ../../src/bridge, ../../src/providers
+// Depends on: node:test, node:assert/strict, ../../src/account-handler, ../../src/providers
 //
 // This is a contract test — it asserts the *shape* of the response the bridge
 // emits on behalf of providers that don't implement ChatGPT-style account
@@ -19,7 +19,7 @@ const assert = require("node:assert/strict");
 const {
   buildNonCodexAccountResponse,
   buildNonCodexVoiceTranscribeError,
-} = require("../../src/bridge");
+} = require("../../src/account-handler");
 const { getProvider } = require("../../src/providers");
 
 const NON_CODEX_PROVIDER_IDS = ["claude", "opencode", "cursor"];

@@ -6,10 +6,9 @@
 
 const WebSocket = require("ws");
 const { randomBytes } = require("crypto");
-const { execFile, spawn } = require("child_process");
+const { spawn } = require("child_process");
 const path = require("path");
 const os = require("os");
-const { promisify } = require("util");
 const { readBridgeConfig } = require("./bridge-config");
 const { resolveActiveProvider } = require("./providers");
 const { withTranslator } = require("./providers/types");
@@ -35,6 +34,8 @@ const { createVoiceHandler, resolveVoiceAuth } = require("./voice-handler");
 const {
   composeSanitizedAuthStatusFromSettledResults,
 } = require("./account-status");
+const { createAccountHandler, createJsonRpcErrorResponse } = require("./account-handler");
+const { createForwardedRequestTracker } = require("./forwarded-request-tracker");
 const { createBridgePackageVersionStatusReader } = require("./package-version-status");
 const { createPushNotificationServiceClient } = require("./push-notification-service-client");
 const { createPushNotificationTracker } = require("./push-notification-tracker");
@@ -59,7 +60,6 @@ const {
 } = require("./ios-app-compatibility");
 const { createShortPairingCode, SHORT_PAIRING_CODE_LENGTH } = require("./qr");
 
-const execFileAsync = promisify(execFile);
 const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
 // Keep the watchdog above the relay heartbeat cadence so quiet healthy sockets survive idle gaps.
 const RELAY_WATCHDOG_STALE_AFTER_MS = 70_000;
@@ -194,26 +194,9 @@ function startBridge({
   let codexHandshakeState = config.codexEndpoint ? "warm" : "cold";
   const forwardedInitializeRequestIds = new Set();
   const bridgeManagedCodexRequestWaiters = new Map();
-  const forwardedRequestMethodsById = new Map();
-  const relaySanitizedResponseMethodsById = new Map();
-  const trackedForwardedRequestMethods = new Set([
-    "account/login/start",
-    "account/login/cancel",
-    "account/logout",
-  ]);
-  const relaySanitizedRequestMethods = new Set([
-    "thread/read",
-    "thread/resume",
-    "thread/turns/list",
-    "thread/list",
-  ]);
-  const forwardedRequestMethodTTLms = 2 * 60_000;
-  const pendingAuthLogin = {
-    loginId: null,
-    authUrl: null,
-    requestId: null,
-    startedAt: 0,
-  };
+  const forwardedRequestTracker = createForwardedRequestTracker({
+    parseJson: safeParseJSON,
+  });
   const secureTransport = createBridgeSecureTransport({
     sessionId,
     relayUrl: relayBaseUrl,
@@ -262,6 +245,15 @@ function startBridge({
   const voiceHandler = createVoiceHandler({
     sendCodexRequest,
     logPrefix: "[agnt]",
+  });
+  const accountHandler = createAccountHandler({
+    activeProvider,
+    sendCodexRequest,
+    readBridgePackageVersionStatus,
+    codexMode: codex.mode,
+    tracker: forwardedRequestTracker,
+    composeSanitizedAuthStatusFromSettledResults,
+    resolveVoiceAuth,
   });
   startBridgeStatusHeartbeat();
   publishBridgeStatus({
@@ -514,7 +506,7 @@ function startBridge({
     if (handleBridgeManagedCodexResponse(message)) {
       return;
     }
-    updatePendingAuthLoginFromCodexMessage(message);
+    accountHandler.updatePendingAuthLoginFromCodexMessage(message);
     trackCodexHandshakeState(message);
     desktopRefresher.handleOutbound(message);
     pushNotificationTracker.handleOutbound(message);
@@ -543,7 +535,7 @@ function startBridge({
     desktopIpcActionFollower?.stopAll();
     desktopRefresher.handleTransportReset();
     failBridgeManagedCodexRequests(new Error("Codex transport closed before the bridge request completed."));
-    forwardedRequestMethodsById.clear();
+    forwardedRequestTracker.clear();
     if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
       socket.close();
     }
@@ -569,10 +561,10 @@ function startBridge({
     if (handleBridgeManagedHandshakeMessage(rawMessage)) {
       return;
     }
-    if (handleBridgeManagedAccountRequest(rawMessage, sendApplicationResponse)) {
+    if (accountHandler.handleBridgeManagedAccountRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
-    if (handleNonCodexVoiceRequest(rawMessage, sendApplicationResponse)) {
+    if (accountHandler.handleNonCodexVoiceRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
     if (voiceHandler.handleVoiceRequest(rawMessage, sendApplicationResponse)) {
@@ -625,7 +617,7 @@ function startBridge({
     if (handleBridgeManagedThreadTurnsListRequest(rawMessage)) {
       return;
     }
-    rememberForwardedRequestMethod(rawMessage);
+    forwardedRequestTracker.rememberRequest(rawMessage);
     rememberThreadFromMessage("phone", rawMessage);
     codex.send(rawMessage);
   }
@@ -643,10 +635,7 @@ function startBridge({
           fetchPage: (params) => sendCodexRequest("thread/turns/list", params),
         });
         const fallbackResponse = maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, response);
-        relaySanitizedResponseMethodsById.set(String(request.id), {
-          method: "thread/turns/list",
-          createdAt: Date.now(),
-        });
+        forwardedRequestTracker.markSanitizedResponse(request.id, "thread/turns/list");
         sendApplicationResponse(JSON.stringify(fallbackResponse ?? response));
       } catch (error) {
         sendApplicationResponse(createJsonRpcErrorResponse(
@@ -696,293 +685,28 @@ function startBridge({
     return seedConversationStateFromThreadRead(result);
   }
 
-  // ─── Bridge-owned auth snapshot ─────────────────────────────
-
-  // Handles the bridge-owned auth status wrappers without exposing tokens to the phone.
-  // This dispatcher stays synchronous so non-account messages can continue down the normal routing chain.
-  function handleBridgeManagedAccountRequest(rawMessage, sendResponse) {
-    let parsed = null;
-    try {
-      parsed = JSON.parse(rawMessage);
-    } catch {
-      return false;
-    }
-
-    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-    const isCodexBridgeManaged = method === "account/status/read"
-      || method === "getAuthStatus"
-      || method === "account/login/openOnMac"
-      || method === "voice/resolveAuth";
-    const isCodexLoginForward = method === "account/login/start"
-      || method === "account/login/cancel"
-      || method === "account/logout";
-
-    if (!isCodexBridgeManaged && !isCodexLoginForward) {
-      return false;
-    }
-
-    const requestId = parsed.id;
-    const shouldRespond = requestId != null;
-
-    // Codex is the only provider that implements ChatGPT-style account
-    // RPCs. For any other provider, answer locally so the iOS app's auth
-    // screen renders a "managed externally" state instead of hanging on a
-    // request that would never reach a handler.
-    if (activeProvider.id !== "codex") {
-      const result = buildNonCodexAccountResponse(method, activeProvider);
-      if (shouldRespond) {
-        if (result.error) {
-          sendResponse(createJsonRpcErrorResponse(requestId, result.error, result.error.errorCode || "not_supported"));
-        } else {
-          sendResponse(JSON.stringify({ id: requestId, result: result.value }));
-        }
-      }
-      return true;
-    }
-
-    // For Codex, only the bridge-managed methods are answered locally. The
-    // login/start/cancel/logout family is forwarded to the codex transport
-    // so the existing forwardedRequestMethodsById bookkeeping still applies.
-    if (isCodexLoginForward) {
-      return false;
-    }
-
-    readBridgeManagedAccountResult(method, parsed.params || {})
-      .then((result) => {
-        if (shouldRespond) {
-          sendResponse(JSON.stringify({ id: requestId, result }));
-        }
-      })
-      .catch((error) => {
-        if (shouldRespond) {
-          sendResponse(createJsonRpcErrorResponse(requestId, error, "auth_status_failed"));
-        }
-      });
-
-    return true;
-  }
-
-  // Voice transcription proxies through ChatGPT's transcribe endpoint with a
-  // ChatGPT-only auth token sourced from the local Codex runtime. For other
-  // providers we short-circuit with a clean error so the iOS mic UI can show
-  // a "not supported" state instead of waiting for a never-coming response.
-  function handleNonCodexVoiceRequest(rawMessage, sendResponse) {
-    if (activeProvider.id === "codex") return false;
-    let parsed = null;
-    try { parsed = JSON.parse(rawMessage); } catch { return false; }
-    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-    if (method !== "voice/transcribe") return false;
-    if (parsed.id == null) return true;
-    sendResponse(JSON.stringify({
-      id: parsed.id,
-      ...buildNonCodexVoiceTranscribeError(activeProvider),
-    }));
-    return true;
-  }
-
-  // Resolves bridge-owned account helpers like status reads and Mac-side browser opening.
-  async function readBridgeManagedAccountResult(method, params) {
-    switch (method) {
-      case "account/status/read":
-      case "getAuthStatus":
-        return readSanitizedAuthStatus();
-      case "account/login/openOnMac":
-        return openPendingAuthLoginOnMac(params);
-      case "voice/resolveAuth":
-        return resolveVoiceAuth(sendCodexRequest);
-      default:
-        throw new Error(`Unsupported bridge-managed account method: ${method}`);
-    }
-  }
-
-  // Combines account/read + getAuthStatus into one safe snapshot for the phone UI.
-  // The two RPCs are settled independently so one transient failure does not hide the other.
-  async function readSanitizedAuthStatus() {
-    const [accountReadResult, authStatusResult, bridgeVersionInfoResult] = await Promise.allSettled([
-      sendCodexRequest("account/read", {
-        refreshToken: false,
-      }),
-      sendCodexRequest("getAuthStatus", {
-        includeToken: true,
-        refreshToken: true,
-      }),
-      readBridgePackageVersionStatus(),
-    ]);
-
-    return composeSanitizedAuthStatusFromSettledResults({
-      accountReadResult: accountReadResult.status === "fulfilled"
-        ? {
-          status: "fulfilled",
-          value: normalizeAccountRead(accountReadResult.value),
-        }
-        : accountReadResult,
-      authStatusResult,
-      loginInFlight: Boolean(pendingAuthLogin.loginId),
-      bridgeVersionInfo: bridgeVersionInfoResult.status === "fulfilled"
-        ? bridgeVersionInfoResult.value
-        : null,
-      transportMode: codex.mode,
-      hostPlatform: process.platform,
-    });
-  }
-
-  // Opens the ChatGPT sign-in URL in the default browser on the bridge Mac.
-  async function openPendingAuthLoginOnMac(params) {
-    if (process.platform !== "darwin") {
-      const error = new Error("Opening ChatGPT sign-in on the bridge is only supported on macOS.");
-      error.errorCode = "unsupported_platform";
-      throw error;
-    }
-
-    const authUrl = readString(params?.authUrl) || pendingAuthLogin.authUrl;
-    if (!authUrl) {
-      const error = new Error("No pending ChatGPT sign-in URL is available on this bridge.");
-      error.errorCode = "missing_auth_url";
-      throw error;
-    }
-
-    await execFileAsync("open", [authUrl], { timeout: 15_000 });
-    return {
-      success: true,
-      openedOnMac: true,
-    };
-  }
-
-  function normalizeAccountRead(payload) {
-    if (!payload || typeof payload !== "object") {
-      return {
-        account: null,
-        requiresOpenaiAuth: true,
-      };
-    }
-
-    return {
-      account: payload.account && typeof payload.account === "object" ? payload.account : null,
-      requiresOpenaiAuth: Boolean(payload.requiresOpenaiAuth),
-    };
-  }
-
-  function createJsonRpcErrorResponse(requestId, error, defaultErrorCode) {
-    return JSON.stringify({
-      id: requestId,
-      error: {
-        code: -32000,
-        message: error?.userMessage || error?.message || "Bridge request failed.",
-        data: {
-          errorCode: error?.errorCode || defaultErrorCode,
-        },
-      },
-    });
-  }
-
-  function rememberForwardedRequestMethod(rawMessage) {
-    const parsed = safeParseJSON(rawMessage);
-    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-    const requestId = parsed?.id;
-    if (!method || requestId == null) {
-      return;
-    }
-
-    pruneExpiredForwardedRequestMethods();
-    if (trackedForwardedRequestMethods.has(method)) {
-      forwardedRequestMethodsById.set(String(requestId), {
-        method,
-        createdAt: Date.now(),
-      });
-    }
-    if (relaySanitizedRequestMethods.has(method)) {
-      relaySanitizedResponseMethodsById.set(String(requestId), {
-        method,
-        createdAt: Date.now(),
-      });
-    }
-  }
-
-  // Replaces huge inline desktop-history images with lightweight references before relay encryption.
+  // Replaces huge inline desktop-history images with lightweight references
+  // before relay encryption. Delegates the request-id ↔ method bookkeeping to
+  // the forwarded-request tracker so the bridge's relay loop doesn't have to
+  // manage TTL'd Maps directly.
   function sanitizeRelayBoundCodexMessage(rawMessage) {
-    pruneExpiredForwardedRequestMethods();
+    forwardedRequestTracker.pruneExpired();
     const normalizedMessage = normalizeRelayBoundJsonRpcMessage(rawMessage, {
-      pendingRequestMethodsById: relaySanitizedResponseMethodsById,
+      pendingRequestMethodsById: forwardedRequestTracker.getSanitizedResponseMap(),
     });
     if (!normalizedMessage) {
       return null;
     }
-
     const parsed = safeParseJSON(normalizedMessage);
     const responseId = parsed?.id;
     if (responseId == null) {
       return sanitizeLiveGeneratedImageMessageForRelay(normalizedMessage);
     }
-
-    const trackedRequest = relaySanitizedResponseMethodsById.get(String(responseId));
+    const trackedRequest = forwardedRequestTracker.consumeSanitizedResponse(responseId);
     if (!trackedRequest) {
       return normalizedMessage;
     }
-    relaySanitizedResponseMethodsById.delete(String(responseId));
-
     return sanitizeThreadHistoryImagesForRelay(normalizedMessage, trackedRequest.method);
-  }
-
-  function updatePendingAuthLoginFromCodexMessage(rawMessage) {
-    pruneExpiredForwardedRequestMethods();
-    const parsed = safeParseJSON(rawMessage);
-    const responseId = parsed?.id;
-    if (responseId != null) {
-      const trackedRequest = forwardedRequestMethodsById.get(String(responseId));
-      if (trackedRequest) {
-        forwardedRequestMethodsById.delete(String(responseId));
-        const requestMethod = trackedRequest.method;
-
-        if (requestMethod === "account/login/start") {
-          const loginId = readString(parsed?.result?.loginId);
-          const authUrl = readString(parsed?.result?.authUrl);
-          if (!loginId || !authUrl) {
-            clearPendingAuthLogin();
-            return;
-          }
-          pendingAuthLogin.loginId = loginId || null;
-          pendingAuthLogin.authUrl = authUrl || null;
-          pendingAuthLogin.requestId = String(responseId);
-          pendingAuthLogin.startedAt = Date.now();
-          return;
-        }
-
-        if (requestMethod === "account/login/cancel" || requestMethod === "account/logout") {
-          clearPendingAuthLogin();
-          return;
-        }
-      }
-    }
-
-    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-    if (method === "account/login/completed") {
-      clearPendingAuthLogin();
-      return;
-    }
-
-    if (method === "account/updated") {
-      clearPendingAuthLogin();
-    }
-  }
-
-  function clearPendingAuthLogin() {
-    pendingAuthLogin.loginId = null;
-    pendingAuthLogin.authUrl = null;
-    pendingAuthLogin.requestId = null;
-    pendingAuthLogin.startedAt = 0;
-  }
-
-  function pruneExpiredForwardedRequestMethods(now = Date.now()) {
-    for (const [requestId, trackedRequest] of forwardedRequestMethodsById.entries()) {
-      if (!trackedRequest || (now - trackedRequest.createdAt) >= forwardedRequestMethodTTLms) {
-        forwardedRequestMethodsById.delete(requestId);
-      }
-    }
-    for (const [requestId, trackedRequest] of relaySanitizedResponseMethodsById.entries()) {
-      if (!trackedRequest || (now - trackedRequest.createdAt) >= forwardedRequestMethodTTLms) {
-        relaySanitizedResponseMethodsById.delete(requestId);
-      }
-    }
   }
 
   function safeParseJSON(value) {
@@ -3000,59 +2724,11 @@ function createNoopDesktopRefresher() {
   };
 }
 
-// Pure response builder for non-Codex account RPCs. Codex is the only provider
-// that implements ChatGPT-style account/login/voice-auth flows; for other
-// providers the bridge answers locally so the iOS auth UI renders a "managed
-// externally" state instead of hanging on a request that would never reach a
-// handler. Hoisted to module scope so contract tests can exercise the
-// response shape directly without spinning up a full bridge.
-function buildNonCodexAccountResponse(method, provider) {
-  if (method === "account/status/read" || method === "getAuthStatus") {
-    return {
-      value: {
-        loggedIn: false,
-        supportsLogin: false,
-        provider: provider.id,
-        providerName: provider.displayName,
-        authMethod: "external",
-        message: `${provider.displayName} manages authentication outside of agnt.`,
-      },
-    };
-  }
-  if (method === "voice/resolveAuth") {
-    return { value: { token: "", supported: false } };
-  }
-  if (method === "account/login/start"
-    || method === "account/login/cancel"
-    || method === "account/login/openOnMac"
-    || method === "account/logout") {
-    const err = new Error(`${provider.displayName} does not support agnt-managed sign-in.`);
-    err.errorCode = "not_supported";
-    return { error: err };
-  }
-  return { value: null };
-}
-
-// Pure JSON-RPC error shape for voice/transcribe when the active provider is
-// not Codex. Exported so the gating contract is testable without a real
-// transport.
-function buildNonCodexVoiceTranscribeError(provider) {
-  return {
-    error: {
-      code: -32601,
-      message: `Voice transcription is not supported with ${provider.displayName}.`,
-      data: { errorCode: "not_supported", provider: provider.id },
-    },
-  };
-}
-
 module.exports = {
   buildEmergencySingleTurnResponse,
   buildEmptyTurnsListResponse,
   buildHeartbeatBridgeStatus,
   buildLargestSafeTurnsListResponse,
-  buildNonCodexAccountResponse,
-  buildNonCodexVoiceTranscribeError,
   compactEmergencySingleTurnForRelay,
   createMacOSBridgeWakeAssertion,
   createNoopDesktopRefresher,
