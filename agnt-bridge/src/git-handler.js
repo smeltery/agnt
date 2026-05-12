@@ -21,6 +21,30 @@ const {
   truncateDraftPatch,
   wrapDraftGenerationError,
 } = require("./git-draft-helpers");
+const {
+  createWorktreeHandoff,
+  ensureTrailingNewline,
+  gitPathspecArgs,
+  normalizeGitPathspec,
+  resolveWorktreeChangeTransfer,
+} = require("./worktree-handoff");
+
+const worktreeHandoff = createWorktreeHandoff({
+  git: (cwd, ...args) => git(cwd, ...args),
+  gitError: (errorCode, userMessage) => gitError(errorCode, userMessage),
+  diffPatchForUntrackedFiles: (cwd, filePaths) => diffPatchForUntrackedFiles(cwd, filePaths),
+});
+const {
+  applyCopiedLocalChangesToWorktree,
+  applyWorktreeHandoffStash,
+  captureLocalChangesPatch,
+  cleanupManagedWorktree,
+  findStashRefByLabel,
+  restoreWorktreeHandoffStash,
+  rollbackFailedHandoffTransfer,
+  scopedProjectChanges,
+  stashChangesForWorktreeHandoff,
+} = worktreeHandoff;
 
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
@@ -1465,154 +1489,6 @@ async function gitWorktreePathByBranch(cwd, options = {}) {
   return parseWorktreePathByBranch(output, options);
 }
 
-async function stashChangesForWorktreeHandoff(cwd, pathspecArgs = []) {
-  const stashLabel = `agnt-worktree-handoff-${randomBytes(6).toString("hex")}`;
-  const output = await git(
-    cwd,
-    "stash",
-    "push",
-    "--include-untracked",
-    "--message",
-    stashLabel,
-    ...pathspecArgs
-  );
-  if (output.includes("No local changes")) {
-    return null;
-  }
-
-  const stashRef = await findStashRefByLabel(cwd, stashLabel);
-  if (!stashRef) {
-    throw gitError("create_worktree_failed", "Could not prepare local changes for the worktree handoff.");
-  }
-
-  return stashRef;
-}
-
-async function captureLocalChangesPatch(cwd, pathspecArgs = []) {
-  const trackedPatch = await git(cwd, "diff", "--binary", "--find-renames", "HEAD", ...pathspecArgs);
-  const porcelain = await git(cwd, "status", "--porcelain=v1", ...pathspecArgs);
-  const untrackedPaths = porcelain
-    .trim()
-    .split("\n")
-    .filter((line) => line.startsWith("?? "))
-    .map((line) => line.substring(3).trim())
-    .filter(Boolean);
-  const untrackedPatch = await diffPatchForUntrackedFiles(cwd, untrackedPaths);
-  return [trackedPatch, untrackedPatch]
-    .filter((patch) => typeof patch === "string" && patch.trim())
-    .map(ensureTrailingNewline)
-    .join("\n");
-}
-
-async function findStashRefByLabel(cwd, stashLabel) {
-  const output = await git(cwd, "stash", "list", "--format=%gd%x00%s");
-  const records = output
-    .trim()
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  for (const record of records) {
-    const [ref, summary] = record.split("\0");
-    if (ref && summary?.includes(stashLabel)) {
-      return ref.trim();
-    }
-  }
-
-  return null;
-}
-
-async function applyWorktreeHandoffStash(cwd, stashRef, options = {}) {
-  const dropAfterApply = options.dropAfterApply === true;
-  try {
-    if (dropAfterApply) {
-      await git(cwd, "stash", "apply", stashRef);
-      await git(cwd, "stash", "drop", stashRef);
-    } else {
-      await git(cwd, "stash", "pop", stashRef);
-    }
-  } catch (err) {
-    throw gitError(
-      "create_worktree_failed",
-      err.message || "Could not apply local changes in the new worktree."
-    );
-  }
-}
-
-async function applyCopiedLocalChangesToWorktree(cwd, patch) {
-  if (!patch.trim()) {
-    return;
-  }
-
-  const patchFilePath = path.join(os.tmpdir(), `agnt-worktree-copy-${randomBytes(6).toString("hex")}.patch`);
-  fs.writeFileSync(patchFilePath, ensureTrailingNewline(patch), "utf8");
-
-  try {
-    await git(cwd, "apply", "--binary", "--whitespace=nowarn", patchFilePath);
-  } catch (err) {
-    throw gitError(
-      "create_worktree_failed",
-      err.message || "Could not copy local changes into the new worktree."
-    );
-  } finally {
-    fs.rmSync(patchFilePath, { force: true });
-  }
-}
-
-async function restoreWorktreeHandoffStash(cwd, stashRef) {
-  try {
-    await git(cwd, "stash", "pop", stashRef);
-  } catch {
-    // Best effort: if restore fails we prefer surfacing the original worktree error without masking it.
-  }
-}
-
-async function rollbackFailedHandoffTransfer(cwd, pathspecArgs = []) {
-  if (pathspecArgs.length > 0) {
-    try {
-      await git(cwd, "restore", "--source=HEAD", "--staged", "--worktree", ...pathspecArgs);
-    } catch {
-      // Best effort: leave the original transfer error as the primary failure.
-    }
-
-    try {
-      await git(cwd, "clean", "-fd", ...pathspecArgs);
-    } catch {
-      // Best effort: leave the original transfer error as the primary failure.
-    }
-    return;
-  }
-
-  try {
-    await git(cwd, "reset", "--hard", "HEAD");
-  } catch {
-    // Best effort: leave the original transfer error as the primary failure.
-  }
-
-  try {
-    await git(cwd, "clean", "-fd");
-  } catch {
-    // Best effort: leave the original transfer error as the primary failure.
-  }
-}
-
-async function cleanupManagedWorktree(repoRoot, worktreeRootPath, branchName = null) {
-  try {
-    await git(repoRoot, "worktree", "remove", "--force", worktreeRootPath);
-  } catch {
-    // Fall back to directory cleanup below.
-  }
-
-  if (branchName) {
-    try {
-      await git(repoRoot, "branch", "-D", branchName);
-    } catch {
-      // Best effort: leave the branch around if Git refuses deletion for any reason.
-    }
-  }
-
-  fs.rmSync(path.dirname(worktreeRootPath), { recursive: true, force: true });
-}
 
 function parseWorktreePathByBranch(output, options = {}) {
   const worktreePathByBranch = {};
@@ -1979,57 +1855,6 @@ function parseNumstatTotals(output) {
     );
 }
 
-function resolveWorktreeChangeTransfer(rawValue) {
-  const normalizedValue = typeof rawValue === "string" ? rawValue.trim().toLowerCase() : "";
-  if (normalizedValue === "copy") {
-    return "copy";
-  }
-  if (normalizedValue === "none") {
-    return "none";
-  }
-  return "move";
-}
-
-async function scopedProjectChanges(repoRoot, projectRelativePath) {
-  const pathspecArgs = gitPathspecArgs(projectRelativePath);
-  const porcelain = await git(repoRoot, "status", "--porcelain=v1", ...pathspecArgs);
-  const fileLines = porcelain
-    .trim()
-    .split("\n")
-    .filter(Boolean);
-
-  return {
-    dirty: fileLines.length > 0,
-    fileLines,
-    pathspecArgs,
-  };
-}
-
-function gitPathspecArgs(projectRelativePath) {
-  const normalizedPath = normalizeGitPathspec(projectRelativePath);
-  if (!normalizedPath) {
-    return [];
-  }
-
-  return ["--", normalizedPath];
-}
-
-function normalizeGitPathspec(projectRelativePath) {
-  if (typeof projectRelativePath !== "string") {
-    return "";
-  }
-
-  const trimmedPath = projectRelativePath.trim();
-  if (!trimmedPath) {
-    return "";
-  }
-
-  return trimmedPath.split(path.sep).join("/");
-}
-
-function ensureTrailingNewline(value) {
-  return value.endsWith("\n") ? value : `${value}\n`;
-}
 
 async function gitDiffNoIndexNumstat(cwd, filePath) {
   try {
