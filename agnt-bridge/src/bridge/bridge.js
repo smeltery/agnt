@@ -88,6 +88,10 @@ const {
   buildMacRegistrationHeaders,
 } = require("./mac-registration");
 const {
+  createNoopDesktopRefresher,
+  shutdown,
+} = require("./lifecycle");
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -836,48 +840,10 @@ function startBridge({
 }
 
 
-function shutdown(codex, getSocket, beforeExit = () => {}) {
-  beforeExit();
-
-  const socket = getSocket();
-  if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
-    socket.close();
-  }
-
-  codex.shutdown();
-
-  setTimeout(() => process.exit(0), 100);
-}
-
-
 function readString(value) {
   return typeof value === "string" && value ? value : null;
 }
 
-function normalizeNonEmptyString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-
-function parseBridgeJSON(value) {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-
-
-
-
-function createNoopDesktopRefresher() {
-  return {
-    handleInbound() {},
-    handleOutbound() {},
-    handleTransportReset() {},
-  };
-}
 
 module.exports = {
   buildEmergencySingleTurnResponse,
