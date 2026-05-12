@@ -69,6 +69,11 @@ const {
   isRelayBoundServerRequestMethod,
 } = require("./jsonrpc-normalizer");
 const {
+  hasRelayConnectionGoneStale,
+  buildHeartbeatBridgeStatus,
+  createBridgeRelayHeartbeat,
+} = require("./relay-heartbeat");
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -81,12 +86,6 @@ const {
 const { version: bridgePackageVersion = "" } = require("../../package.json");
 const { buildCachedIOSAppCompatibilityWarning } = require("./ios-app-compatibility");
 const { createShortPairingCode, SHORT_PAIRING_CODE_LENGTH } = require("../transport/qr");
-
-const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
-// Keep the watchdog above the relay heartbeat cadence so quiet healthy sockets survive idle gaps.
-const RELAY_WATCHDOG_STALE_AFTER_MS = 70_000;
-const BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS = 5_000;
-const STALE_RELAY_STATUS_MESSAGE = "Relay heartbeat stalled; reconnect pending.";
 
 function startBridge({
   config: explicitConfig = null,
@@ -179,9 +178,7 @@ function startBridge({
   let isShuttingDown = false;
   let reconnectAttempt = 0;
   let reconnectTimer = null;
-  let relayWatchdogTimer = null;
-  let statusHeartbeatTimer = null;
-  let lastRelayActivityAt = 0;
+  const heartbeat = createBridgeRelayHeartbeat();
   let lastPublishedBridgeStatus = null;
   let lastConnectionStatus = null;
   let codexLaunchState = config.codexEndpoint ? "connected" : "starting";
@@ -303,50 +300,31 @@ function startBridge({
 
   // Periodically rewrites the latest bridge snapshot so CLI status does not stay frozen.
   function startBridgeStatusHeartbeat() {
-    if (statusHeartbeatTimer) {
-      return;
-    }
-
-    statusHeartbeatTimer = setInterval(() => {
+    heartbeat.startStatusHeartbeat(({ wrapStatus }) => {
       if (!lastPublishedBridgeStatus || isShuttingDown) {
         return;
       }
-
-      onBridgeStatus?.(buildHeartbeatBridgeStatus(lastPublishedBridgeStatus, lastRelayActivityAt));
-    }, BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS);
-    statusHeartbeatTimer.unref?.();
+      onBridgeStatus?.(wrapStatus(lastPublishedBridgeStatus));
+    });
   }
 
   function clearBridgeStatusHeartbeat() {
-    if (!statusHeartbeatTimer) {
-      return;
-    }
-
-    clearInterval(statusHeartbeatTimer);
-    statusHeartbeatTimer = null;
+    heartbeat.clearStatusHeartbeat();
   }
 
   // Tracks relay liveness locally so sleep/wake zombie sockets can be force-reconnected.
   function markRelayActivity() {
-    lastRelayActivityAt = Date.now();
+    heartbeat.markActivity();
   }
 
   function clearRelayWatchdog() {
-    if (!relayWatchdogTimer) {
-      return;
-    }
-
-    clearInterval(relayWatchdogTimer);
-    relayWatchdogTimer = null;
+    heartbeat.clearWatchdog();
   }
 
   function startRelayWatchdog(trackedSocket) {
-    clearRelayWatchdog();
-    markRelayActivity();
-
-    relayWatchdogTimer = setInterval(() => {
+    heartbeat.startWatchdog(({ isStale }) => {
       if (isShuttingDown || socket !== trackedSocket) {
-        clearRelayWatchdog();
+        heartbeat.clearWatchdog();
         return;
       }
 
@@ -354,7 +332,7 @@ function startBridge({
         return;
       }
 
-      if (hasRelayConnectionGoneStale(lastRelayActivityAt)) {
+      if (isStale) {
         console.warn("[agnt] relay heartbeat stalled; forcing reconnect");
         logConnectionStatus("disconnected");
         trackedSocket.terminate();
@@ -366,8 +344,7 @@ function startBridge({
       } catch {
         trackedSocket.terminate();
       }
-    }, RELAY_WATCHDOG_PING_INTERVAL_MS);
-    relayWatchdogTimer.unref?.();
+    });
   }
 
   // Keeps npm start output compact by emitting only high-signal connection states.
@@ -1130,47 +1107,6 @@ function parseBridgeJSON(value) {
 
 
 
-// Treats silent relay sockets as stale so the daemon can self-heal after sleep/wake.
-function hasRelayConnectionGoneStale(
-  lastActivityAt,
-  {
-    now = Date.now(),
-    staleAfterMs = RELAY_WATCHDOG_STALE_AFTER_MS,
-  } = {}
-) {
-  return Number.isFinite(lastActivityAt)
-    && Number.isFinite(now)
-    && now - lastActivityAt >= staleAfterMs;
-}
-
-// Keeps persisted daemon status honest by downgrading stale "connected" snapshots.
-function buildHeartbeatBridgeStatus(
-  status,
-  lastActivityAt,
-  {
-    now = Date.now(),
-    staleAfterMs = RELAY_WATCHDOG_STALE_AFTER_MS,
-    staleMessage = STALE_RELAY_STATUS_MESSAGE,
-  } = {}
-) {
-  if (!status || typeof status !== "object") {
-    return status;
-  }
-
-  if (status.connectionStatus !== "connected") {
-    return status;
-  }
-
-  if (!hasRelayConnectionGoneStale(lastActivityAt, { now, staleAfterMs })) {
-    return status;
-  }
-
-  return {
-    ...status,
-    connectionStatus: "disconnected",
-    lastError: staleMessage,
-  };
-}
 
 function createNoopDesktopRefresher() {
   return {
