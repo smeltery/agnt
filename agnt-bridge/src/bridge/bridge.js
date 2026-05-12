@@ -98,6 +98,9 @@ const {
   createRelayReconnectScheduler,
 } = require("./relay-reconnect-scheduler");
 const {
+  createApplicationMessageRouter,
+} = require("./application-message-router");
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -552,70 +555,52 @@ function startBridge({
   }));
 
   // Routes decrypted app payloads through the same bridge handlers as before.
-  function handleApplicationMessage(rawMessage) {
-    if (handshakeHandler.handlePhoneMessage(rawMessage)) {
-      return;
-    }
-    if (accountHandler.handleBridgeManagedAccountRequest(rawMessage, sendApplicationResponse)) {
-      return;
-    }
-    if (accountHandler.handleNonCodexVoiceRequest(rawMessage, sendApplicationResponse)) {
-      return;
-    }
-    if (voiceHandler.handleVoiceRequest(rawMessage, sendApplicationResponse)) {
-      return;
-    }
-    if (handleThreadContextRequest(rawMessage, sendApplicationResponse)) {
-      return;
-    }
-    if (handleWorkspaceRequest(rawMessage, sendApplicationResponse, {
-      // Forward whatever the active provider considers its generated-image root.
-      // Codex returns `~/.codex/generated_images`; other providers return null
-      // (or omit the hook entirely), which drops that allowlist branch.
-      generatedImagesDir: typeof activeProvider.generatedImagesDir === "function"
-        ? () => activeProvider.generatedImagesDir() || null
-        : () => null,
-    })) {
-      return;
-    }
-    if (handleProjectRequest(rawMessage, sendApplicationResponse)) {
-      return;
-    }
-    if (handlePetRequest(rawMessage, sendApplicationResponse)) {
-      return;
-    }
-    if (notificationsHandler.handleNotificationsRequest(rawMessage, sendApplicationResponse)) {
-      return;
-    }
-    if (handleDesktopRequest(rawMessage, sendApplicationResponse, {
-      bundleId: desktopBundle.id,
-      appPath: desktopBundle.appPath,
-      readBridgePreferences: bridgePreferences.read,
-      updateBridgePreferences: bridgePreferences.update,
-    })) {
-      return;
-    }
-    if (handleGitRequest(rawMessage, sendApplicationResponse, {
-      codexAppPath: desktopBundle.appPath,
-      onThreadNameSet: sendThreadNameUpdatedNotification,
-      // Only the Codex CLI exposes the structured-JSON title-drafting flow.
-      // Other providers handle thread/generateTitle in their own translator.
-      codexTitleGeneration: activeProvider.id === "codex",
-    })) {
-      return;
-    }
-    desktopRefresher.handleInbound(rawMessage);
-    rolloutLiveMirror?.observeInbound(rawMessage);
-    if (desktopIpcActionFollower?.observeInbound(rawMessage)) {
-      return;
-    }
-    if (handleBridgeManagedThreadTurnsListRequest(rawMessage)) {
-      return;
-    }
-    forwardedRequestTracker.rememberRequest(rawMessage);
-    rememberThreadFromMessage("phone", rawMessage);
-    codex.send(rawMessage);
-  }
+  // Stages run top-to-bottom; the first one that returns truthy claims the
+  // message. Observation-only stages (desktopRefresher, rolloutLiveMirror)
+  // do their work and return false so the walk continues.
+  const handleApplicationMessage = createApplicationMessageRouter({
+    stages: [
+      (msg) => handshakeHandler.handlePhoneMessage(msg),
+      (msg) => accountHandler.handleBridgeManagedAccountRequest(msg, sendApplicationResponse),
+      (msg) => accountHandler.handleNonCodexVoiceRequest(msg, sendApplicationResponse),
+      (msg) => voiceHandler.handleVoiceRequest(msg, sendApplicationResponse),
+      (msg) => handleThreadContextRequest(msg, sendApplicationResponse),
+      (msg) => handleWorkspaceRequest(msg, sendApplicationResponse, {
+        // Forward whatever the active provider considers its generated-image root.
+        // Codex returns `~/.codex/generated_images`; other providers return null
+        // (or omit the hook entirely), which drops that allowlist branch.
+        generatedImagesDir: typeof activeProvider.generatedImagesDir === "function"
+          ? () => activeProvider.generatedImagesDir() || null
+          : () => null,
+      }),
+      (msg) => handleProjectRequest(msg, sendApplicationResponse),
+      (msg) => handlePetRequest(msg, sendApplicationResponse),
+      (msg) => notificationsHandler.handleNotificationsRequest(msg, sendApplicationResponse),
+      (msg) => handleDesktopRequest(msg, sendApplicationResponse, {
+        bundleId: desktopBundle.id,
+        appPath: desktopBundle.appPath,
+        readBridgePreferences: bridgePreferences.read,
+        updateBridgePreferences: bridgePreferences.update,
+      }),
+      (msg) => handleGitRequest(msg, sendApplicationResponse, {
+        codexAppPath: desktopBundle.appPath,
+        onThreadNameSet: sendThreadNameUpdatedNotification,
+        // Only the Codex CLI exposes the structured-JSON title-drafting flow.
+        // Other providers handle thread/generateTitle in their own translator.
+        codexTitleGeneration: activeProvider.id === "codex",
+      }),
+      // Observation-only — never claim the message.
+      (msg) => { desktopRefresher.handleInbound(msg); return false; },
+      (msg) => { rolloutLiveMirror?.observeInbound(msg); return false; },
+      (msg) => desktopIpcActionFollower?.observeInbound(msg),
+      (msg) => handleBridgeManagedThreadTurnsListRequest(msg),
+    ],
+    fallback: (msg) => {
+      forwardedRequestTracker.rememberRequest(msg);
+      rememberThreadFromMessage("phone", msg);
+      codex.send(msg);
+    },
+  });
 
   function handleBridgeManagedThreadTurnsListRequest(rawMessage) {
     const request = parseAdaptiveThreadTurnsListRequest(rawMessage);
