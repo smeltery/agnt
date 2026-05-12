@@ -1,0 +1,50 @@
+name: Android Check
+
+on:
+  push:
+    paths:
+      - ".github/workflows/android-check.yml"
+      - "AgntAndroid/**"
+  pull_request:
+    paths:
+      - ".github/workflows/android-check.yml"
+      - "AgntAndroid/**"
+
+jobs:
+  android-check:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Caches ~/.gradle/caches and ~/.gradle/wrapper across runs. The Android
+      # SDK is provisioned by android-actions/setup-android below, which the
+      # Gradle plugin discovers via $ANDROID_HOME.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Sets up $ANDROID_HOME + cmdline-tools and pre-accepts SDK licenses.
+      # The platform (android-36) and matching build-tools are auto-installed
+      # by AGP via sdkmanager on the first ./gradlew run — pinning them here
+      # is brittle because build-tools versions can lag the platform release.
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Run unit tests
+        working-directory: AgntAndroid
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      # `assembleDebug` is the cheapest signal that the Kotlin compile, the
+      # resources, and the build script all hang together. We don't upload the
+      # artifact — for that there's a separate signed-build workflow once
+      # release signing is set up.
+      - name: Assemble debug
+        working-directory: AgntAndroid
+        run: ./gradlew :app:assembleDebug --no-daemon
