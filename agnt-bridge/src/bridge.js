@@ -36,6 +36,9 @@ const {
 } = require("./account-status");
 const { createAccountHandler, createJsonRpcErrorResponse } = require("./account-handler");
 const { createForwardedRequestTracker } = require("./forwarded-request-tracker");
+const { createMacOSBridgeWakeAssertion } = require("./wake-assertion");
+const { createBridgePreferences, persistBridgePreferences } = require("./bridge-preferences");
+const { createContextUsageWatcher } = require("./context-usage-watcher");
 const { createBridgePackageVersionStatusReader } = require("./package-version-status");
 const { createPushNotificationServiceClient } = require("./push-notification-service-client");
 const { createPushNotificationTracker } = require("./push-notification-tracker");
@@ -125,6 +128,7 @@ function startBridge({
   const bridgeWakeAssertion = createMacOSBridgeWakeAssertion({
     enabled: config.keepMacAwakeEnabled,
   });
+  const bridgePreferences = createBridgePreferences({ config, bridgeWakeAssertion });
   // Static desktop-bundle metadata for the active provider (Codex.app today,
   // null for Claude / opencode / Cursor). Provider-agnostic handlers consume
   // this instead of reaching into Codex-named config fields.
@@ -230,8 +234,9 @@ function startBridge({
       socketPath: config.desktopIpcSocketPath || undefined,
     })
     : null;
-  let contextUsageWatcher = null;
-  let watchedContextUsageKey = null;
+  const contextUsageWatcher = createContextUsageWatcher({
+    sendApplicationResponse,
+  });
 
   const codex = withTranslator(
     activeProvider.createTransport({
@@ -475,7 +480,7 @@ function startBridge({
       if (socket === nextSocket) {
         socket = null;
       }
-      stopContextUsageWatcher();
+      contextUsageWatcher.stop();
       rolloutLiveMirror?.stopAll();
       desktopIpcActionFollower?.stopAll();
       desktopRefresher.handleTransportReset();
@@ -530,7 +535,7 @@ function startBridge({
     isShuttingDown = true;
     bridgeWakeAssertion.stop();
     clearReconnectTimer();
-    stopContextUsageWatcher();
+    contextUsageWatcher.stop();
     rolloutLiveMirror?.stopAll();
     desktopIpcActionFollower?.stopAll();
     desktopRefresher.handleTransportReset();
@@ -595,8 +600,8 @@ function startBridge({
     if (handleDesktopRequest(rawMessage, sendApplicationResponse, {
       bundleId: desktopBundle.id,
       appPath: desktopBundle.appPath,
-      readBridgePreferences,
-      updateBridgePreferences,
+      readBridgePreferences: bridgePreferences.read,
+      updateBridgePreferences: bridgePreferences.update,
     })) {
       return;
     }
@@ -725,71 +730,8 @@ function startBridge({
 
     rememberActiveThread(context.threadId, source);
     if (shouldStartContextUsageWatcher(context)) {
-      ensureContextUsageWatcher(context);
+      contextUsageWatcher.ensure(context);
     }
-  }
-
-  // Mirrors CodexMonitor's persisted token_count fallback so the phone keeps
-  // receiving context-window usage even when the runtime omits live thread usage.
-  function ensureContextUsageWatcher({ threadId, turnId }) {
-    const normalizedThreadId = readString(threadId);
-    const normalizedTurnId = readString(turnId);
-    if (!normalizedThreadId) {
-      return;
-    }
-
-    const nextWatcherKey = `${normalizedThreadId}|${normalizedTurnId || "pending-turn"}`;
-    if (watchedContextUsageKey === nextWatcherKey && contextUsageWatcher) {
-      return;
-    }
-
-    stopContextUsageWatcher();
-    watchedContextUsageKey = nextWatcherKey;
-    contextUsageWatcher = createThreadRolloutActivityWatcher({
-      threadId: normalizedThreadId,
-      turnId: normalizedTurnId,
-      onUsage: ({ threadId: usageThreadId, usage }) => {
-        sendContextUsageNotification(usageThreadId, usage);
-      },
-      onIdle: () => {
-        if (watchedContextUsageKey === nextWatcherKey) {
-          stopContextUsageWatcher();
-        }
-      },
-      onTimeout: () => {
-        if (watchedContextUsageKey === nextWatcherKey) {
-          stopContextUsageWatcher();
-        }
-      },
-      onError: () => {
-        if (watchedContextUsageKey === nextWatcherKey) {
-          stopContextUsageWatcher();
-        }
-      },
-    });
-  }
-
-  function stopContextUsageWatcher() {
-    if (contextUsageWatcher) {
-      contextUsageWatcher.stop();
-    }
-
-    contextUsageWatcher = null;
-    watchedContextUsageKey = null;
-  }
-
-  function sendContextUsageNotification(threadId, usage) {
-    if (!threadId || !usage) {
-      return;
-    }
-
-    sendApplicationResponse(JSON.stringify({
-      method: "thread/tokenUsage/updated",
-      params: {
-        threadId,
-        usage,
-      },
-    }));
   }
 
   // The spawned/shared Codex app-server stays warm across phone reconnects.
@@ -1034,179 +976,6 @@ function startBridge({
     }));
   }
 
-  function readBridgePreferences() {
-    return {
-      success: true,
-      preferences: {
-        keepMacAwake: config.keepMacAwakeEnabled !== false,
-      },
-      applied: bridgeWakeAssertion.active,
-    };
-  }
-
-  function updateBridgePreferences(preferences = {}) {
-    const nextKeepMacAwakeEnabled = preferences.keepMacAwake !== false;
-    config.keepMacAwakeEnabled = nextKeepMacAwakeEnabled;
-    bridgeWakeAssertion.setEnabled?.(nextKeepMacAwakeEnabled);
-
-    try {
-      persistBridgePreferences({
-        keepMacAwakeEnabled: nextKeepMacAwakeEnabled,
-      });
-    } catch (error) {
-      const nextError = new Error("Could not save the bridge preference on this Mac.");
-      nextError.errorCode = "bridge_preferences_persist_failed";
-      nextError.userMessage = nextError.message;
-      nextError.cause = error;
-      throw nextError;
-    }
-
-    return readBridgePreferences();
-  }
-}
-
-// Holds a single host idle-sleep assertion for as long as the bridge process stays alive.
-// macOS uses `caffeinate -i -w <pid>`; Linux uses `systemd-inhibit --what=idle:sleep` if available.
-function createMacOSBridgeWakeAssertion({
-  platform = process.platform,
-  pid = process.pid,
-  spawnImpl = spawn,
-  consoleImpl = console,
-  enabled = true,
-  envImpl = process.env,
-} = {}) {
-  const command = resolveWakeAssertionCommand({ platform, pid, envImpl });
-  if (!command) {
-    return {
-      active: false,
-      enabled: false,
-      setEnabled() {
-        return { active: false, enabled: false };
-      },
-      stop() {},
-    };
-  }
-
-  let desiredEnabled = Boolean(enabled);
-  let child = null;
-
-  function stop() {
-    if (!child || child.killed || typeof child.kill !== "function") {
-      child = null;
-      return;
-    }
-
-    try {
-      child.kill();
-    } catch {}
-    child = null;
-  }
-
-  function start() {
-    if (!desiredEnabled || child) {
-      return;
-    }
-
-    try {
-      const nextChild = spawnImpl(command.bin, command.args, {
-        stdio: "ignore",
-      });
-
-      nextChild.on?.("error", (error) => {
-        consoleImpl.warn(`[agnt] Failed to hold the host awake while the bridge is active: ${error.message}`);
-      });
-      nextChild.on?.("exit", () => {
-        if (child === nextChild) {
-          child = null;
-        }
-      });
-      nextChild.unref?.();
-      child = nextChild;
-    } catch (error) {
-      consoleImpl.warn(
-        `[agnt] Failed to start the bridge wake assertion: ${(error && error.message) || "unknown error"}`
-      );
-      child = null;
-    }
-  }
-
-  function setEnabled(nextEnabled) {
-    desiredEnabled = Boolean(nextEnabled);
-    if (desiredEnabled) {
-      start();
-    } else {
-      stop();
-    }
-
-    return {
-      active: Boolean(child && !child.killed),
-      enabled: desiredEnabled,
-    };
-  }
-
-  start();
-
-  return {
-    get active() {
-      return Boolean(child && !child.killed);
-    },
-    get enabled() {
-      return desiredEnabled;
-    },
-    setEnabled,
-    stop,
-  };
-}
-
-function resolveWakeAssertionCommand({ platform, pid, envImpl }) {
-  if (platform === "darwin") {
-    return {
-      bin: "/usr/bin/caffeinate",
-      args: ["-i", "-w", String(pid)],
-    };
-  }
-  if (platform === "linux" && hasSystemdInhibit({ envImpl })) {
-    // `--who/--why` are advisory labels surfaced by `systemd-inhibit --list`.
-    // `sleep infinity` keeps the inhibitor alive until the bridge exits and reaps the child.
-    return {
-      bin: "systemd-inhibit",
-      args: [
-        "--what=idle:sleep",
-        "--who=agnt",
-        "--why=agnt bridge keeps the host reachable while paired",
-        "--mode=block",
-        "sleep",
-        "infinity",
-      ],
-    };
-  }
-  return null;
-}
-
-function hasSystemdInhibit({ envImpl = process.env } = {}) {
-  const path = typeof envImpl?.PATH === "string" ? envImpl.PATH : process.env.PATH || "";
-  if (!path) {
-    return false;
-  }
-  // Only consider the inhibitor available when a user/system D-Bus session is reachable;
-  // otherwise the spawn would just print "Failed to inhibit" and exit immediately.
-  if (!envImpl?.XDG_RUNTIME_DIR && !envImpl?.DBUS_SESSION_BUS_ADDRESS) {
-    return false;
-  }
-  // Inexpensive PATH probe — avoids spawning when systemd is not installed.
-  try {
-    const fsModule = require("fs");
-    for (const segment of path.split(":")) {
-      if (!segment) {
-        continue;
-      }
-      const candidate = require("path").join(segment, "systemd-inhibit");
-      if (fsModule.existsSync(candidate)) {
-        return true;
-      }
-    }
-  } catch {}
-  return false;
 }
 
 // Registers the canonical Mac identity and the one trusted iPhone allowed for auto-resolve.
@@ -2701,21 +2470,6 @@ function buildHeartbeatBridgeStatus(
   };
 }
 
-function persistBridgePreferences(
-  {
-    keepMacAwakeEnabled,
-  },
-  {
-    readDaemonConfigImpl = readDaemonConfig,
-    writeDaemonConfigImpl = writeDaemonConfig,
-  } = {}
-) {
-  writeDaemonConfigImpl({
-    ...(readDaemonConfigImpl() || {}),
-    keepMacAwakeEnabled,
-  });
-}
-
 function createNoopDesktopRefresher() {
   return {
     handleInbound() {},
@@ -2730,7 +2484,6 @@ module.exports = {
   buildHeartbeatBridgeStatus,
   buildLargestSafeTurnsListResponse,
   compactEmergencySingleTurnForRelay,
-  createMacOSBridgeWakeAssertion,
   createNoopDesktopRefresher,
   fetchAdaptiveThreadTurnsListForRelay,
   hasRelayConnectionGoneStale,

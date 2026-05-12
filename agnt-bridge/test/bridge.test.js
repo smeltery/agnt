@@ -11,12 +11,12 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   buildHeartbeatBridgeStatus,
-  createMacOSBridgeWakeAssertion,
   hasRelayConnectionGoneStale,
   persistBridgePreferences,
   sanitizeLiveGeneratedImageMessageForRelay,
   sanitizeThreadHistoryImagesForRelay,
 } = require("../src/bridge");
+const { createMacOSBridgeWakeAssertion } = require("../src/wake-assertion");
 
 test("hasRelayConnectionGoneStale returns true once the relay silence crosses the timeout", () => {
   assert.equal(
