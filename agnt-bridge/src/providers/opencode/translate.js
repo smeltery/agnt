@@ -38,6 +38,7 @@
 const {
   buildTurnOverlapError,
   createFrameEmitter,
+  createTurnLifecycleEmitter,
   generateItemId,
   generateTurnId,
   numberOr,
@@ -49,6 +50,7 @@ const PROTO_VERSION = "1.0.0-opencode-shim";
 
 function createOpencodeTranslator({ injectInbound, transport, env: _env = process.env } = {}) {
   const { emitNotification, injectResponse, respondError } = createFrameEmitter(injectInbound);
+  const turnLifecycle = createTurnLifecycleEmitter(emitNotification);
 
   // ── per-connection state ───────────────────────────────────────────────
   /** Map of threadId → opencode session id. The bridge uses sessionId == threadId. */
@@ -82,17 +84,8 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     handleStarted() {},
     handleClose() {
       if (activeTurnId && activeThreadId && !didEmitTurnCompletedForActive) {
-        emitNotification("turn/failed", {
-          threadId: activeThreadId,
-          turnId: activeTurnId,
-          id: activeTurnId,
-          error: { message: "opencode transport closed before turn completed" },
-        });
-        emitNotification("turn/completed", {
-          threadId: activeThreadId,
-          turnId: activeTurnId,
-          id: activeTurnId,
-        });
+        turnLifecycle.emitTurnFailed(activeThreadId, activeTurnId, "opencode transport closed before turn completed");
+        turnLifecycle.emitTurnCompleted(activeThreadId, activeTurnId);
       }
       resetTurnState();
       approvalIdToPermission.clear();
@@ -330,26 +323,12 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       });
     }
 
-    emitNotification("turn/started", {
-      threadId: activeThreadId,
-      turnId,
-      id: turnId,
-      turn_id: turnId,
-    });
+    turnLifecycle.emitTurnStarted(activeThreadId, turnId);
 
     const body = buildOpencodeMessageBody(params);
     if (!body) {
-      emitNotification("turn/failed", {
-        threadId: activeThreadId,
-        turnId,
-        id: turnId,
-        error: { message: "turn/start had no usable text or attachments" },
-      });
-      emitNotification("turn/completed", {
-        threadId: activeThreadId,
-        turnId,
-        id: turnId,
-      });
+      turnLifecycle.emitTurnFailed(activeThreadId, turnId, "turn/start had no usable text or attachments");
+      turnLifecycle.emitTurnCompleted(activeThreadId, turnId);
       return;
     }
 
@@ -358,17 +337,8 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     // on it — the iOS app's UI is driven entirely off the SSE notifications.
     transport.httpRequest("POST", `/session/${encodeURIComponent(activeThreadId)}/message`, body)
       .catch((err) => {
-        emitNotification("turn/failed", {
-          threadId: activeThreadId,
-          turnId,
-          id: turnId,
-          error: { message: `opencode POST /session/{id}/message failed: ${err?.message || err}` },
-        });
-        emitNotification("turn/completed", {
-          threadId: activeThreadId,
-          turnId,
-          id: turnId,
-        });
+        turnLifecycle.emitTurnFailed(activeThreadId, turnId, `opencode POST /session/{id}/message failed: ${err?.message || err}`);
+        turnLifecycle.emitTurnCompleted(activeThreadId, turnId);
       });
   }
 
@@ -377,17 +347,8 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     if (!activeThreadId || !activeTurnId) return;
     transport.httpRequest("POST", `/session/${encodeURIComponent(activeThreadId)}/abort`, {})
       .catch(() => { /* best-effort */ });
-    emitNotification("turn/failed", {
-      threadId: activeThreadId,
-      turnId: activeTurnId,
-      id: activeTurnId,
-      error: { message: "interrupted by user" },
-    });
-    emitNotification("turn/completed", {
-      threadId: activeThreadId,
-      turnId: activeTurnId,
-      id: activeTurnId,
-    });
+    turnLifecycle.emitTurnFailed(activeThreadId, activeTurnId, "interrupted by user");
+    turnLifecycle.emitTurnCompleted(activeThreadId, activeTurnId);
     didEmitTurnCompletedForActive = true;
     resetTurnState();
   }
@@ -600,12 +561,7 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
         });
       }
       if (activeTurnId && activeThreadId) {
-        emitNotification("turn/failed", {
-          threadId: activeThreadId,
-          turnId: activeTurnId,
-          id: activeTurnId,
-          error: { message },
-        });
+        turnLifecycle.emitTurnFailed(activeThreadId, activeTurnId, message);
         // Don't fire turn/completed here — opencode may auto-recover; an
         // explicit `idle` status will follow once the retry resolves.
       }
@@ -920,17 +876,8 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       || readString(props?.message)
       || "opencode session reported an error";
     if (activeTurnId && activeThreadId) {
-      emitNotification("turn/failed", {
-        threadId: activeThreadId,
-        turnId: activeTurnId,
-        id: activeTurnId,
-        error: { message },
-      });
-      emitNotification("turn/completed", {
-        threadId: activeThreadId,
-        turnId: activeTurnId,
-        id: activeTurnId,
-      });
+      turnLifecycle.emitTurnFailed(activeThreadId, activeTurnId, message);
+      turnLifecycle.emitTurnCompleted(activeThreadId, activeTurnId);
       didEmitTurnCompletedForActive = true;
       resetTurnState();
     }
@@ -1045,12 +992,7 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
         },
       });
     }
-    emitNotification("turn/completed", {
-      threadId: activeThreadId,
-      turnId: activeTurnId,
-      id: activeTurnId,
-      turn_id: activeTurnId,
-    });
+    turnLifecycle.emitTurnCompleted(activeThreadId, activeTurnId);
     didEmitTurnCompletedForActive = true;
     resetTurnState();
   }

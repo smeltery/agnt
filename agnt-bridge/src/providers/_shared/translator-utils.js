@@ -6,7 +6,9 @@
 // Layer: shared translator utilities
 // Exports: safeParseJson, readString, numberOr, generateThreadId,
 //          generateTurnId, generateItemId, createFrameEmitter,
-//          TURN_OVERLAP_ERROR_CODE, buildTurnOverlapError
+//          TURN_OVERLAP_ERROR_CODE, buildTurnOverlapError,
+//          createTurnLifecycleEmitter, deriveTitleFromSeed,
+//          emitAssistantItemStarted
 //
 // What lives here vs. in each translator:
 //   - PURE shape: id formats and JSON-RPC envelope wrapping live here. The
@@ -86,6 +88,80 @@ function createFrameEmitter(injectInbound) {
   };
 }
 
+/**
+ * Builds the turn-lifecycle notification trio every translator needs:
+ * `turn/started`, `turn/completed`, and `turn/failed`. Envelopes carry both
+ * `turnId`/`turn_id` and `id` aliases because the iOS app has historically
+ * read whichever the active codepath happened to populate — keep all three
+ * keys to avoid waking that ghost.
+ *
+ * Translators that track side-effects around emission (e.g. a
+ * `didEmitTurnStarted` flag) should wrap these helpers in a local function
+ * rather than push the flag in here.
+ *
+ * @param {(method: string, params: object) => void} emitNotification
+ */
+function createTurnLifecycleEmitter(emitNotification) {
+  return {
+    emitTurnStarted(threadId, turnId) {
+      emitNotification("turn/started", {
+        threadId,
+        turnId,
+        id: turnId,
+        turn_id: turnId,
+      });
+    },
+    emitTurnCompleted(threadId, turnId) {
+      emitNotification("turn/completed", {
+        threadId,
+        turnId,
+        id: turnId,
+        turn_id: turnId,
+      });
+    },
+    emitTurnFailed(threadId, turnId, errorMessage) {
+      emitNotification("turn/failed", {
+        threadId,
+        turnId,
+        id: turnId,
+        turn_id: turnId,
+        error: { message: errorMessage },
+      });
+    },
+  };
+}
+
+/**
+ * Trims a seed prompt down to a thread title. Whitespace is collapsed,
+ * empty seeds get a fallback, and long seeds get truncated with an
+ * ellipsis at 60 chars (mirroring what iOS expects to render).
+ */
+function deriveTitleFromSeed(seed) {
+  const trimmed = String(seed || "").replace(/\s+/g, " ").trim();
+  if (!trimmed) return "New conversation";
+  return trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
+}
+
+/**
+ * Emits the canonical `item/started` notification for an assistant message
+ * row. The `item.id`/`itemId` aliases and the `role: "assistant"` shape
+ * have to stay byte-identical across providers because the iOS app keys
+ * timeline rows off the item id.
+ */
+function emitAssistantItemStarted({ emitNotification, threadId, turnId, itemId }) {
+  emitNotification("item/started", {
+    threadId,
+    turnId,
+    itemId,
+    item: {
+      id: itemId,
+      itemId,
+      type: "assistant_message",
+      role: "assistant",
+    },
+  });
+}
+
 function safeParseJson(line) {
   if (typeof line !== "string") return null;
   try {
@@ -108,6 +184,9 @@ module.exports = {
   TURN_OVERLAP_ERROR_MESSAGE,
   buildTurnOverlapError,
   createFrameEmitter,
+  createTurnLifecycleEmitter,
+  deriveTitleFromSeed,
+  emitAssistantItemStarted,
   generateItemId,
   generateThreadId,
   generateTurnId,

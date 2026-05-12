@@ -48,17 +48,22 @@ const os = require("os");
 const {
   buildTurnOverlapError,
   createFrameEmitter,
+  createTurnLifecycleEmitter,
+  deriveTitleFromSeed,
+  emitAssistantItemStarted,
   generateItemId,
   generateThreadId,
   generateTurnId,
   readString,
   safeParseJson,
 } = require("../_shared/translator-utils");
+const { reconstructThreadFromJsonl } = require("../_shared/thread-jsonl-reconstructor");
 
 const PROTO_VERSION = "1.0.0-cursor-shim";
 
 function createCursorTranslator({ injectInbound, transport, env = process.env } = {}) {
   const { emitNotification, injectResponse, respondError } = createFrameEmitter(injectInbound);
+  const turnLifecycle = createTurnLifecycleEmitter(emitNotification);
 
   // ── per-connection state ───────────────────────────────────────────────
   /** Synthetic threadId surfaced to the iOS app. */
@@ -88,17 +93,8 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
       // Surface a synthetic turn/failed if a turn is mid-flight when the CLI
       // exits — otherwise the iOS app's spinner stays forever.
       if (activeTurnId && threadId) {
-        emitNotification("turn/failed", {
-          threadId,
-          turnId: activeTurnId,
-          id: activeTurnId,
-          error: { message: "cursor transport closed before turn completed" },
-        });
-        emitNotification("turn/completed", {
-          threadId,
-          turnId: activeTurnId,
-          id: activeTurnId,
-        });
+        turnLifecycle.emitTurnFailed(threadId, activeTurnId, "cursor transport closed before turn completed");
+        turnLifecycle.emitTurnCompleted(threadId, activeTurnId);
       }
       resetTurnState();
     },
@@ -329,7 +325,11 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
 
     if (!threadId) threadId = targetThreadId;
 
-    const reconstructed = reconstructThreadFromChats(targetThreadId);
+    const reconstructed = reconstructThreadFromJsonl({
+      targetThreadId,
+      sessionFile: locateSessionFile(targetThreadId),
+      fallbackCwd: sessionCwd,
+    });
     if (request?.id != null) {
       injectResponse(request.id, {
         thread: reconstructed || {
@@ -349,7 +349,11 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
     const targetThreadId = readString(params.threadId)
       || readString(params.thread_id)
       || threadId;
-    const reconstructed = reconstructThreadFromChats(targetThreadId);
+    const reconstructed = reconstructThreadFromJsonl({
+      targetThreadId,
+      sessionFile: locateSessionFile(targetThreadId),
+      fallbackCwd: sessionCwd,
+    });
     const turns = reconstructed?.turns || [];
 
     if (request?.id != null) {
@@ -831,16 +835,11 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
   function ensureAssistantItemId() {
     if (activeAssistantItemId) return activeAssistantItemId;
     activeAssistantItemId = generateItemId("assistant");
-    emitNotification("item/started", {
+    emitAssistantItemStarted({
+      emitNotification,
       threadId,
       turnId: activeTurnId,
       itemId: activeAssistantItemId,
-      item: {
-        id: activeAssistantItemId,
-        itemId: activeAssistantItemId,
-        type: "assistant_message",
-        role: "assistant",
-      },
     });
     return activeAssistantItemId;
   }
@@ -866,76 +865,6 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
       text += text ? `\n${fragment}` : fragment;
     }
     return text;
-  }
-
-  // ── thread reconstruction from ~/.cursor/chats/*.jsonl ─────────────────
-  function reconstructThreadFromChats(targetThreadId) {
-    const sessionFile = locateSessionFile(targetThreadId);
-    if (!sessionFile) return null;
-    let raw;
-    try { raw = fs.readFileSync(sessionFile, "utf8"); } catch { return null; }
-
-    const turns = [];
-    let currentTurn = null;
-    let cwd = "";
-    for (const line of raw.split("\n")) {
-      const entry = safeParseJson(line);
-      if (!entry || typeof entry !== "object") continue;
-      if (typeof entry.cwd === "string" && !cwd) cwd = entry.cwd;
-      if (entry.type === "user" && entry.message && typeof entry.message === "object") {
-        const text = readUserMessageText(entry.message);
-        if (!text) continue;
-        currentTurn = {
-          id: readString(entry.uuid) || generateTurnId(),
-          turnId: readString(entry.uuid) || generateTurnId(),
-          status: "completed",
-          input: [{ type: "text", text }],
-          items: [],
-        };
-        turns.push(currentTurn);
-        continue;
-      }
-      if (entry.type === "assistant" && entry.message && typeof entry.message === "object") {
-        if (!currentTurn) continue;
-        const content = Array.isArray(entry.message.content) ? entry.message.content : [];
-        for (const part of content) {
-          if (!part || typeof part !== "object") continue;
-          if (readString(part.type) !== "text") continue;
-          const text = readString(part.text);
-          if (!text) continue;
-          currentTurn.items.push({
-            id: readString(entry.uuid) || generateItemId("assistant"),
-            type: "assistant_message",
-            role: "assistant",
-            text,
-            content: [{ type: "text", text }],
-          });
-        }
-      }
-    }
-    return {
-      id: targetThreadId,
-      threadId: targetThreadId,
-      thread_id: targetThreadId,
-      cwd: cwd || sessionCwd || process.cwd(),
-      status: "idle",
-      turns,
-    };
-  }
-
-  function readUserMessageText(message) {
-    const content = message.content;
-    if (typeof content === "string") return content;
-    if (!Array.isArray(content)) return "";
-    const parts = [];
-    for (const entry of content) {
-      if (typeof entry === "string") {
-        parts.push(entry);
-      } else if (entry && typeof entry === "object" && entry.type === "text") {
-        parts.push(readString(entry.text));
-      }
-    }
-    return parts.join("");
   }
 
   function locateSessionFile(targetThreadId) {
@@ -982,38 +911,18 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
   }
 
   // ── helpers ────────────────────────────────────────────────────────────
-  function deriveTitleFromSeed(seed) {
-    const trimmed = seed.replace(/\s+/g, " ").trim();
-    if (!trimmed) return "New conversation";
-    return trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
-  }
 
   function emitTurnStarted(turnId) {
     didEmitTurnStarted = true;
-    emitNotification("turn/started", {
-      threadId,
-      turnId,
-      id: turnId,
-      turn_id: turnId,
-    });
+    turnLifecycle.emitTurnStarted(threadId, turnId);
   }
 
   function emitTurnCompleted(turnId) {
-    emitNotification("turn/completed", {
-      threadId,
-      turnId,
-      id: turnId,
-      turn_id: turnId,
-    });
+    turnLifecycle.emitTurnCompleted(threadId, turnId);
   }
 
   function emitErrorNotification(turnId, errorMessage) {
-    emitNotification("turn/failed", {
-      threadId,
-      turnId,
-      id: turnId,
-      error: { message: errorMessage },
-    });
+    turnLifecycle.emitTurnFailed(threadId, turnId, errorMessage);
   }
 
   function resetTurnState() {
