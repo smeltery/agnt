@@ -353,6 +353,7 @@ final class CodexService {
     var syncRealtimeEnabled = true
     var availableModels: [CodexModelOption] = []
     var selectedModelId: String?
+    var hasPersistedSelectedModelId = false
     var selectedGitWriterModelId: String?
     var selectedReasoningEffort: String?
     var selectedServiceTier: CodexServiceTier?
@@ -670,6 +671,7 @@ final class CodexService {
         let savedModelId = defaults.string(forKey: Self.selectedModelIdDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let hasSavedModelId = savedModelId?.isEmpty == false
+        self.hasPersistedSelectedModelId = hasSavedModelId
         self.selectedModelId = hasSavedModelId ? savedModelId : "gpt-5.5"
 
         let savedGitWriterModelId = defaults.string(forKey: Self.selectedGitWriterModelIdDefaultsKey)?
