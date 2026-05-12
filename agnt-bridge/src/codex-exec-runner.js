@@ -204,6 +204,16 @@ function spawnCodexExecJson({
       }
     });
 
+    // Linux emits EPIPE on stdin when the child exits before consuming the
+    // prompt (e.g. an invalid invocation that exits fast). The real failure
+    // is captured by the `close` handler via exit code + stderr; swallow
+    // EPIPE here so it doesn't become an uncaughtException.
+    child.stdin.on("error", (error) => {
+      if (error?.code !== "EPIPE") {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
     child.stdin.end(prompt);
   });
 }
