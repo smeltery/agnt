@@ -1,0 +1,120 @@
+package com.dotbrains.agnt.mobile
+
+import android.content.Context
+import com.dotbrains.agnt.mobile.beta.BetaDeviceInfo
+import com.dotbrains.agnt.mobile.beta.BetaEngagementClient
+import com.dotbrains.agnt.mobile.beta.BetaEngagementRepository
+import com.dotbrains.agnt.mobile.beta.BetaTesterStore
+import com.dotbrains.agnt.mobile.beta.SharedPreferencesBetaKeyValueStore
+import com.dotbrains.agnt.mobile.core.persistence.AIChangeSetPersistence
+import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
+import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
+import com.dotbrains.agnt.mobile.core.security.SecureStore
+import com.dotbrains.agnt.mobile.core.config.FeatureFlags
+import com.dotbrains.agnt.mobile.data.CodexRepository
+import com.dotbrains.agnt.mobile.services.CodexService
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
+
+/** Application-wide services (secure store, persistence, OkHttp, bridge client). */
+object AppContainer {
+    private val pendingNotificationThreadLock = Any()
+
+    @Volatile
+    private var pendingNotificationThreadId: String? = null
+
+    /** Set when the user taps a local notification ([AgntLocalNotificationPresenter]). */
+    fun setPendingOpenThreadFromNotification(threadId: String?) {
+        val t = threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        synchronized(pendingNotificationThreadLock) {
+            pendingNotificationThreadId = t
+        }
+    }
+
+    fun consumePendingOpenThreadFromNotification(): String? =
+        synchronized(pendingNotificationThreadLock) {
+            val v = pendingNotificationThreadId
+            pendingNotificationThreadId = null
+            v
+        }
+
+    lateinit var appContext: Context
+        private set
+
+    lateinit var secureStore: SecureStore
+        private set
+
+    lateinit var messagePersistence: CodexMessagePersistence
+        private set
+
+    lateinit var aiChangeSetPersistence: AIChangeSetPersistence
+        private set
+
+    lateinit var sessionPersistence: SessionPersistence
+        private set
+
+    lateinit var httpClient: OkHttpClient
+        private set
+
+    lateinit var httpCallClient: OkHttpClient
+        private set
+
+    lateinit var codexRepository: CodexRepository
+        private set
+
+    lateinit var betaEngagementRepository: BetaEngagementRepository
+        private set
+
+    fun initialize(context: Context) {
+        val app = context.applicationContext
+        appContext = app
+        secureStore = SecureStore(app)
+        messagePersistence = CodexMessagePersistence(app, secureStore)
+        aiChangeSetPersistence = AIChangeSetPersistence(app)
+        sessionPersistence = SessionPersistence(secureStore, app)
+        httpCallClient =
+            OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .writeTimeout(20, TimeUnit.SECONDS)
+                .callTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(false)
+                .build()
+        httpClient =
+            httpCallClient.newBuilder()
+                .pingInterval(30, TimeUnit.SECONDS)
+                .readTimeout(0, TimeUnit.SECONDS)
+                .callTimeout(0, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .build()
+        codexRepository =
+            CodexService(
+                context = app,
+                httpClient = httpClient,
+                httpCallClient = httpCallClient,
+                secureStore = secureStore,
+                sessionPersistence = sessionPersistence,
+                messagePersistence = messagePersistence,
+            )
+        val betaStore = BetaTesterStore(SharedPreferencesBetaKeyValueStore(app))
+        val betaApi =
+            if (FeatureFlags.betaEngagementEnabled) {
+                BetaEngagementClient(
+                    httpClient = httpCallClient,
+                    baseUrl = BuildConfig.BETA_API_BASE_URL,
+                    apiKey = BuildConfig.BETA_API_KEY,
+                )
+            } else {
+                null
+            }
+        betaEngagementRepository =
+            BetaEngagementRepository(
+                enabled = FeatureFlags.betaEngagementEnabled,
+                store = betaStore,
+                api = betaApi,
+                appVersionProvider = { BetaDeviceInfo.appVersionName(app) },
+                deviceModelProvider = { BetaDeviceInfo.coarseDeviceModel() },
+                deviceKeyProvider = { BetaDeviceInfo.stableBetaDeviceKey(app) },
+            )
+    }
+}

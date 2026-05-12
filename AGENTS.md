@@ -20,7 +20,7 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 
 ## Provider plugin guardrails
 
-- agnt brokers between two clients (the iOS app under `AgntMobile/` and the browser client under `agnt-web/`) and any supported coding-agent CLI (Codex, Claude Code, opencode, Cursor, ...). Both clients speak the same E2EE-wrapped JSON-RPC protocol; provider modules don't know or care which client is connected. New providers go under `agnt-bridge/src/providers/<id>/index.js` and are registered in `agnt-bridge/src/providers/index.js`.
+- agnt brokers between three clients (the iOS app under `AgntMobile/`, the Android app under `AgntAndroid/`, and the browser client under `agnt-web/`) and any supported coding-agent CLI (Codex, Claude Code, opencode, Cursor, ...). All three clients speak the same E2EE-wrapped JSON-RPC protocol; provider modules don't know or care which client is connected. New providers go under `agnt-bridge/src/providers/<id>/index.js` and are registered in `agnt-bridge/src/providers/index.js`.
 - Provider modules must conform to the contract in `agnt-bridge/src/providers/types.js` (`defineProvider`). Required: `id`, `displayName`, `createTransport`, `homeDir`, `sessionsDir`, `capabilities`. Optional: `bootstrap`, `createDesktopRefresher`, `parseRolloutLine`, `isInstalled`, `createTranslator`.
 - If the agent CLI does not speak Codex JSON-RPC natively (Claude stream-json, opencode REST/SSE, Cursor stream-json, …), the protocol shim lives in `providers/<id>/translate.js` and is wired via `createTranslator(ctx)`. The shim can `ctx.injectInbound(line)` to synthesize JSON-RPC responses without round-tripping the CLI — use this for `thread/start`, `thread/read`, `thread/turns/list`, and any other Codex-only methods the upstream CLI does not implement.
 - Per-turn provider flags (model, effort, plan mode) flow through `transport.setTurnArgs(args)`. Translators publish them from `turn/start.params`. The Claude transport restarts the CLI when the arg list changes and uses `--resume <session_id>` (published via `setResumeSessionId`) to keep history. Don't read `params.model` directly in transports — keep that mapping inside `translate.js` so the spawn/REST layer stays mechanical.
@@ -74,6 +74,17 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 - Browsers can't set custom WebSocket headers; the relay accepts `?role=iphone` as a fallback. Do not remove that fallback. Mac bridges still set `x-role: mac` via headers — do not start trusting query-string roles for the Mac side.
 - Long-running parity work tracked in `agnt-web/PARITY.md` and `agnt-web/ROADMAP.md`. Update both whenever a surface lands or its scope changes.
 - Static-only build. Do not introduce a Node runtime in `agnt-web/`; the browser is the runtime.
+
+## Android client guardrails (`AgntAndroid/`)
+
+- `AgntAndroid` is a third client for the same relay+bridge stack — it is **not** a hosted service. Imported from [Stivy-01/remodex](https://github.com/Stivy-01/remodex) (Apache-2.0); see `AgntAndroid/NOTICE` for attribution. Modifications relative to upstream must be reflected in `NOTICE` if they affect copyright/attribution.
+- The Android secure-transport (`AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt` + `core/crypto/SecureEnvelopeCipher.kt`) must stay byte-for-byte aligned with `agnt-bridge/src/secure-transport.js` and `agnt-web/src/crypto/transcript.ts`. Any change to transcript framing, nonce layout, or HKDF info must land in all three modules in the same PR.
+- Android can't set custom WebSocket headers reliably either; it uses `?role=iphone` like the browser. Don't start trusting query-string roles for the Mac side.
+- The package is `com.dotbrains.agnt.mobile`. Upstream identifiers (`com.remodex.mobile`, `remodex-e2ee-v1`, `remodex-trusted-session-resolve-*-v1`, `refs/remodex/checkpoints`, `PHODEX_DEFAULT_RELAY_URL`) must not be reintroduced — they break the agnt protocol contract.
+- The upstream Android client was Codex-only. Codex-only RPCs (see the Provider plugin guardrails section above) must be either hidden when `activeProvider.id != "codex"` or tolerated as "managed externally" responses; UI affordances need an active-provider gate. Tracked in `AgntAndroid/ROADMAP.md` (P1).
+- The `CodexService*` class names and `CODEX_*` constants are upstream holdovers — the class hierarchy is protocol-agnostic in practice. Don't add Codex-specific assumptions inside them; the rename is deferred (ROADMAP P3) but the contract is provider-agnostic now.
+- Long-running parity work tracked in `AgntAndroid/PARITY.md` and `AgntAndroid/ROADMAP.md`. Update both whenever a surface lands or its scope changes.
+- Do not run Android emulator/device tests unless the user explicitly asks. Prefer `./gradlew :app:testDebugUnitTest` and inspection over emulator runs.
 
 ## Local quick runbook
 

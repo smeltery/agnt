@@ -1,0 +1,47 @@
+AgntAndroid
+===========
+
+This directory is derived from the Android client in the Remodex project,
+which is licensed under the Apache License, Version 2.0.
+
+Upstream source: Stivy-01/remodex (https://github.com/Stivy-01/remodex)
+  fork of: Emanuele-web04/remodex (https://github.com/Emanuele-web04/remodex)
+Imported from:   Stivy-01/remodex@main, directory `android/`
+
+Modifications relative to upstream:
+  - Package and namespace renamed from `com.remodex.mobile` to
+    `com.dotbrains.agnt.mobile`; classes prefixed with `Remodex` renamed to
+    `Agnt` to match the rest of this repository.
+  - Secure-transport identifiers updated to match agnt-bridge:
+      remodex-e2ee-v1                       -> agnt-e2ee-v1
+      remodex-trusted-session-resolve-v1    -> agnt-trusted-session-resolve-v1
+      refs/remodex/checkpoints              -> refs/agnt/checkpoints
+  - Env-var prefix updated: PHODEX_DEFAULT_RELAY_URL -> AGNT_DEFAULT_RELAY_URL.
+  - User-facing strings rebranded to "agnt".
+  - Build typo (orphaned `sionCode = 7`) removed; version reset to 0.1.0.
+
+Original Remodex copyright and Apache-2.0 license notice
+--------------------------------------------------------
+
+Remodex is Copyright (c) the Remodex authors, used under the Apache License,
+Version 2.0. A copy of the Apache-2.0 license is available at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Per the Apache-2.0 license, this file preserves required attribution.
+
+Derivative-work license
+-----------------------
+
+The Apache-2.0 license permits modification and redistribution of the upstream
+sources under different terms, subject to attribution (this NOTICE file) and
+preservation of the Apache-2.0 license text for the unmodified portions.
+
+The modifications under this directory, and the AgntAndroid module as a whole
+as integrated into the agnt repository, are licensed under PolyForm Shield
+1.0.0 alongside the rest of this repository. See `/LICENSE` at the repository
+root for the full terms.
+
+Files imported verbatim from upstream remain available under Apache-2.0; the
+license headers and copyright notices in those files have been preserved where
+present.
