@@ -32,6 +32,7 @@ const { createPullRequestActions } = require("./pr-creation");
 const { createGitOps, normalizeBranchListEntry } = require("./git-ops");
 const { createWorktreeActions } = require("./worktree-actions");
 const { createDraftActions } = require("./draft-actions");
+const { createDiffHelpers, parseNumstatTotals } = require("./diff-helpers");
 
 const worktreeHandoff = createWorktreeHandoff({
   git: (cwd, ...args) => git(cwd, ...args),
@@ -156,12 +157,25 @@ const {
   threadGenerateTitle,
 } = draftActions;
 
+const diffHelpers = createDiffHelpers({
+  git: (cwd, ...args) => git(cwd, ...args),
+  refExists: (cwd, ref) => refExists(cwd, ref),
+});
+const {
+  countLocalOnlyCommits,
+  diffPatchForUntrackedFiles,
+  diffTotalsAgainstBase,
+  diffTotalsForUntrackedFiles,
+  gitDiffAgainstBase,
+  repoDiffTotals,
+  resolveRepoDiffBase,
+} = diffHelpers;
+
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
 // Node defaults maxBuffer to 1 MiB; large repo diffs trip "stdout maxBuffer length exceeded".
 const GIT_EXEC_MAX_BUFFER_BYTES = 50 * 1024 * 1024;
 const GITHUB_CLI_TIMEOUT_MS = 120_000;
-const EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 let runStructuredCodexJsonImpl = runStructuredCodexJson;
 let runGitHubCliImpl = runGitHubCli;
@@ -507,175 +521,6 @@ function scopedLocalCheckoutPath(checkoutRootPath, projectRelativePath) {
 }
 
 // Computes the local repo delta that still exists on this machine and is not on the remote.
-async function repoDiffTotals(cwd, context) {
-  const baseRef = await resolveRepoDiffBase(cwd, context.tracking);
-  const trackedTotals = await diffTotalsAgainstBase(cwd, baseRef);
-  const untrackedPaths = context.fileLines
-    .filter((line) => line.startsWith("?? "))
-    .map((line) => line.substring(3).trim())
-    .filter(Boolean);
-  const untrackedTotals = await diffTotalsForUntrackedFiles(cwd, untrackedPaths);
-
-  return {
-    additions: trackedTotals.additions + untrackedTotals.additions,
-    deletions: trackedTotals.deletions + untrackedTotals.deletions,
-    binaryFiles: trackedTotals.binaryFiles + untrackedTotals.binaryFiles,
-  };
-}
-
-// Uses upstream when available; otherwise falls back to commits not yet present on any remote.
-async function resolveRepoDiffBase(cwd, tracking) {
-  if (!(await refExists(cwd, "HEAD"))) {
-    return EMPTY_TREE_HASH;
-  }
-
-  if (tracking) {
-    try {
-      return (await git(cwd, "merge-base", "HEAD", "@{u}")).trim();
-    } catch {
-      // Fall through to the local-only commit scan if upstream metadata is stale.
-    }
-  }
-
-  const firstLocalOnlyCommit = (
-    await git(cwd, "rev-list", "--reverse", "--topo-order", "HEAD", "--not", "--remotes")
-  )
-    .trim()
-    .split("\n")
-    .find(Boolean);
-
-  if (!firstLocalOnlyCommit) {
-    return "HEAD";
-  }
-
-  try {
-    return (await git(cwd, "rev-parse", `${firstLocalOnlyCommit}^`)).trim();
-  } catch {
-    return EMPTY_TREE_HASH;
-  }
-}
-
-async function diffTotalsAgainstBase(cwd, baseRef) {
-  const output = await git(cwd, "diff", "--numstat", baseRef);
-  return parseNumstatTotals(output);
-}
-
-async function gitDiffAgainstBase(cwd, baseRef) {
-  return git(cwd, "diff", "--binary", "--find-renames", baseRef);
-}
-
-async function diffTotalsForUntrackedFiles(cwd, filePaths) {
-  if (!filePaths.length) {
-    return { additions: 0, deletions: 0, binaryFiles: 0 };
-  }
-
-  const totals = await Promise.all(
-    filePaths.map(async (filePath) => {
-      const output = await gitDiffNoIndexNumstat(cwd, filePath);
-      return parseNumstatTotals(output);
-    })
-  );
-
-  return totals.reduce(
-    (aggregate, current) => ({
-      additions: aggregate.additions + current.additions,
-      deletions: aggregate.deletions + current.deletions,
-      binaryFiles: aggregate.binaryFiles + current.binaryFiles,
-    }),
-    { additions: 0, deletions: 0, binaryFiles: 0 }
-  );
-}
-
-// Counts commits reachable from HEAD that are not present on any remote ref.
-async function countLocalOnlyCommits(cwd, context) {
-  if (context.detached) {
-    return 0;
-  }
-
-  const remoteRefs = await git(cwd, "for-each-ref", "--format=%(refname)", "refs/remotes");
-  const hasAnyRemoteRefs = remoteRefs
-    .trim()
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .length > 0;
-
-  if (!hasAnyRemoteRefs) {
-    return 0;
-  }
-
-  const output = await git(cwd, "rev-list", "--count", "HEAD", "--not", "--remotes");
-  return Number.parseInt(output.trim(), 10) || 0;
-}
-
-function parseNumstatTotals(output) {
-  return output
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .reduce(
-      (aggregate, line) => {
-        const [rawAdditions, rawDeletions] = line.split("\t");
-        const additions = Number.parseInt(rawAdditions, 10);
-        const deletions = Number.parseInt(rawDeletions, 10);
-        const isBinary = !Number.isFinite(additions) || !Number.isFinite(deletions);
-
-        return {
-          additions: aggregate.additions + (Number.isFinite(additions) ? additions : 0),
-          deletions: aggregate.deletions + (Number.isFinite(deletions) ? deletions : 0),
-          binaryFiles: aggregate.binaryFiles + (isBinary ? 1 : 0),
-        };
-      },
-      { additions: 0, deletions: 0, binaryFiles: 0 }
-    );
-}
-
-
-async function gitDiffNoIndexNumstat(cwd, filePath) {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["diff", "--no-index", "--numstat", "--", "/dev/null", filePath],
-      { cwd, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_EXEC_MAX_BUFFER_BYTES }
-    );
-    return stdout;
-  } catch (err) {
-    if (typeof err?.code === "number" && err.code === 1) {
-      return err.stdout || "";
-    }
-    const msg = (err.stderr || err.message || "").trim();
-    throw new Error(msg || "git diff --no-index failed");
-  }
-}
-
-async function diffPatchForUntrackedFiles(cwd, filePaths) {
-  if (!filePaths.length) {
-    return "";
-  }
-
-  const patches = await Promise.all(filePaths.map((filePath) => gitDiffNoIndexPatch(cwd, filePath)));
-  return patches.filter(Boolean).join("\n\n");
-}
-
-async function gitDiffNoIndexPatch(cwd, filePath) {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["diff", "--no-index", "--binary", "--", "/dev/null", filePath],
-      { cwd, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_EXEC_MAX_BUFFER_BYTES }
-    );
-    return stdout;
-  } catch (err) {
-    if (typeof err?.code === "number" && err.code === 1) {
-      return err.stdout || "";
-    }
-    const msg = (err.stderr || err.message || "").trim();
-    throw new Error(msg || "git diff --no-index failed");
-  }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────
-
 function git(cwd, ...args) {
   return execFileAsync("git", args, {
     cwd,
