@@ -14,7 +14,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createHandshakeHandler } = require("../../src/handshake-handler");
+const { createHandshakeHandler } = require("../../src/bridge/handshake-handler");
 
 const BRIDGE_VERSION = "0.9.0";
 

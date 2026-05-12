@@ -18,8 +18,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createNoopDesktopRefresher } = require("../../src/bridge");
-const { listProviders, getProvider } = require("../../src/providers");
+const { createNoopDesktopRefresher } = require("../../src/bridge/bridge");
+const { listProviders, getProvider } = require("../../src/providers/index");
 
 test("createNoopDesktopRefresher implements every hook the bridge call sites invoke", () => {
   const noop = createNoopDesktopRefresher();

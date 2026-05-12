@@ -164,11 +164,11 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
 
 // Loads bridge.js with plaintext test transports while leaving the production module untouched.
 function loadBridgeWithTestDoubles({ createCodexTransportImpl }) {
-  const bridgePath = require.resolve("../src/bridge");
+  const bridgePath = require.resolve("../src/bridge/bridge");
   const originalLoad = Module._load;
   delete require.cache[bridgePath];
   Module._load = function loadWithBridgeDoubles(request, parent, isMain) {
-    if (parent?.filename === bridgePath && request === "./providers") {
+    if (parent?.filename === bridgePath && request === "../providers/index") {
       const fakeProvider = {
         id: "codex",
         displayName: "Codex (test)",
@@ -189,17 +189,17 @@ function loadBridgeWithTestDoubles({ createCodexTransportImpl }) {
         PROVIDERS: [fakeProvider],
       };
     }
-    if (parent?.filename === bridgePath && request === "./secure-transport") {
+    if (parent?.filename === bridgePath && request === "../transport/secure-transport") {
       return { createBridgeSecureTransport: createPlaintextSecureTransport };
     }
-    if (parent?.filename === bridgePath && request === "./secure-device-state") {
+    if (parent?.filename === bridgePath && request === "../transport/secure-device-state") {
       return createSecureDeviceStateDouble();
     }
     return originalLoad.call(this, request, parent, isMain);
   };
 
   try {
-    return require("../src/bridge");
+    return require("../src/bridge/bridge");
   } finally {
     Module._load = originalLoad;
     delete require.cache[bridgePath];

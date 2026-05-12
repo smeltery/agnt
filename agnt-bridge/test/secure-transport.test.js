@@ -22,7 +22,7 @@ const {
   HANDSHAKE_MODE_TRUSTED_RECONNECT,
   createBridgeSecureTransport,
   nonceForDirection,
-} = require("../src/secure-transport");
+} = require("../src/transport/secure-transport");
 
 test("secure transport rejects plaintext JSON-RPC before the secure handshake", () => {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");

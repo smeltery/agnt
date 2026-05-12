@@ -10,7 +10,7 @@ const {
   SHORT_PAIRING_CODE_ALPHABET,
   SHORT_PAIRING_CODE_LENGTH,
   createShortPairingCode,
-} = require("../src/qr");
+} = require("../src/transport/qr");
 
 test("createShortPairingCode emits a short human-friendly token", () => {
   const code = createShortPairingCode({

@@ -14,7 +14,7 @@
 // cluster into a focused module makes the watcher's keyed-replace semantics
 // obvious instead of being interleaved with relay state.
 
-const { createThreadRolloutActivityWatcher } = require("./rollout-watch");
+const { createThreadRolloutActivityWatcher } = require("../desktop/rollout-watch");
 
 /**
  * Pure helper used to build the watcher key. Exported only for tests.

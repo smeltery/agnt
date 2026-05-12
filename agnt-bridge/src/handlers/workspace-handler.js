@@ -9,8 +9,8 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { promisify } = require("util");
-const { resolveActiveProvider } = require("./providers");
-const { gitStatus } = require("./git-handler");
+const { resolveActiveProvider } = require("../providers/index");
+const { gitStatus } = require("../git/git-handler");
 const {
   workspaceCheckpointCapture,
   workspaceCheckpointCopy,

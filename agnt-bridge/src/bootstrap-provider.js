@@ -6,10 +6,10 @@
 // Exports: none
 // Depends on: ./providers, ./secure-device-state, ./ios-app-compatibility
 
-const { resolveActiveProvider } = require("./providers");
+const { resolveActiveProvider } = require("./providers/index");
 const { version: bridgePackageVersion = "" } = require("../package.json");
-const { readBridgeDeviceState } = require("./secure-device-state");
-const { buildCachedIOSAppCompatibilityWarning } = require("./ios-app-compatibility");
+const { readBridgeDeviceState } = require("./transport/secure-device-state");
+const { buildCachedIOSAppCompatibilityWarning } = require("./bridge/ios-app-compatibility");
 
 const installLocation = String(process.env.npm_config_location || "").trim().toLowerCase();
 const isGlobalInstall = process.env.npm_config_global === "true" || installLocation === "global";

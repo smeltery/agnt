@@ -8,10 +8,10 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { startBridge } = require("./bridge");
-const { readBridgeConfig } = require("./bridge-config");
-const { printQR } = require("./qr");
-const { resetBridgeDeviceState } = require("./secure-device-state");
+const { startBridge } = require("../bridge/bridge");
+const { readBridgeConfig } = require("../bridge/bridge-config");
+const { printQR } = require("../transport/qr");
+const { resetBridgeDeviceState } = require("../transport/secure-device-state");
 const {
   clearBridgeStatus,
   clearPairingSession,
@@ -26,7 +26,7 @@ const {
   writeBridgeStatus,
   writeDaemonConfig,
   writePairingSession,
-} = require("./daemon-state");
+} = require("../daemon-state");
 
 const SERVICE_LABEL = "com.dotbrains.agnt.bridge";
 const DEFAULT_PAIRING_WAIT_TIMEOUT_MS = 10_000;

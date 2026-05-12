@@ -11,8 +11,8 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { CodexDesktopRefresher } = require("../src/providers/codex/desktop-refresher");
-const { readBridgeConfig } = require("../src/bridge-config");
-const { createThreadRolloutActivityWatcher } = require("../src/rollout-watch");
+const { readBridgeConfig } = require("../src/bridge/bridge-config");
+const { createThreadRolloutActivityWatcher } = require("../src/desktop/rollout-watch");
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -5,7 +5,7 @@
 // Depends on: https, ../package.json
 
 const https = require("https");
-const { version: installedVersion = "" } = require("../package.json");
+const { version: installedVersion = "" } = require("../../package.json");
 
 const DEFAULT_CACHE_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_EMPTY_CACHE_RETRY_MS = 60 * 1000;

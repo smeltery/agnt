@@ -10,7 +10,7 @@ const { version: bridgePackageVersion } = require("../package.json");
 
 const {
   createBridgePackageVersionStatusReader,
-} = require("../src/package-version-status");
+} = require("../src/bridge/package-version-status");
 
 function createDeferred() {
   let resolve;

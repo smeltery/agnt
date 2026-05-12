@@ -4,7 +4,7 @@
 // Exports: handleThreadContextRequest
 // Depends on: ./rollout-watch
 
-const { readLatestContextWindowUsage } = require("./rollout-watch");
+const { readLatestContextWindowUsage } = require("../desktop/rollout-watch");
 
 function handleThreadContextRequest(rawMessage, sendResponse) {
   let parsed;

@@ -7,8 +7,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createPushNotificationTracker } = require("../src/push-notification-tracker");
-const { createNotificationsHandler } = require("../src/notifications-handler");
+const { createPushNotificationTracker } = require("../src/transport/push-notification-tracker");
+const { createNotificationsHandler } = require("../src/handlers/notifications-handler");
 
 test("push tracker sends one completion push with a stable ready body", async () => {
   const notifications = [];

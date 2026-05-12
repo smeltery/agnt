@@ -11,7 +11,7 @@ const {
   findRecentRolloutFileForContextRead,
   resolveSessionsRoot,
 } = require("./rollout-watch");
-const { resolveCodexGeneratedImagesRoot } = require("./providers/codex/home");
+const { resolveCodexGeneratedImagesRoot } = require("../providers/codex/home");
 
 const DEFAULT_POLL_INTERVAL_MS = 700;
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;

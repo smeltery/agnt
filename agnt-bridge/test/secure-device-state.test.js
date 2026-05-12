@@ -16,7 +16,7 @@ const {
   rememberTrustedPhone,
   resetBridgeDeviceState,
   resolveBridgeRelaySession,
-} = require("../src/secure-device-state");
+} = require("../src/transport/secure-device-state");
 
 // ─── Relay Session Resolution ───────────────────────────────
 

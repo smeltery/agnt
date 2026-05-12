@@ -7,7 +7,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { handleDesktopRequest } = require("../src/desktop-handler");
+const { handleDesktopRequest } = require("../src/handlers/desktop-handler");
 
 test("desktop/continueOnMac relaunches Codex for the requested thread", async () => {
   const executorCalls = [];

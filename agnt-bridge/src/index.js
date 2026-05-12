@@ -4,11 +4,11 @@
 // Exports: bridge lifecycle, pairing reset, thread resume/watch, and per-platform service helpers.
 // Depends on: ./bridge, ./secure-device-state, ./session-state, ./rollout-watch, ./macos-launch-agent, ./linux-systemd-agent
 
-const { startBridge } = require("./bridge");
-const { readBridgeDeviceState, resetBridgeDeviceState } = require("./secure-device-state");
-const { openLastActiveThread } = require("./session-state");
-const { watchThreadRollout } = require("./rollout-watch");
-const { readBridgeConfig } = require("./bridge-config");
+const { startBridge } = require("./bridge/bridge");
+const { readBridgeDeviceState, resetBridgeDeviceState } = require("./transport/secure-device-state");
+const { openLastActiveThread } = require("./bridge/session-state");
+const { watchThreadRollout } = require("./desktop/rollout-watch");
+const { readBridgeConfig } = require("./bridge/bridge-config");
 const {
   getMacOSBridgeServiceStatus,
   printMacOSBridgePairingQr,
@@ -17,7 +17,7 @@ const {
   runMacOSBridgeService,
   startMacOSBridgeService,
   stopMacOSBridgeService,
-} = require("./macos-launch-agent");
+} = require("./platform/macos-launch-agent");
 const {
   getLinuxBridgeServiceStatus,
   isLinuxBridgeServiceNotInstalledError,
@@ -27,7 +27,7 @@ const {
   runLinuxBridgeService,
   startLinuxBridgeService,
   stopLinuxBridgeService,
-} = require("./linux-systemd-agent");
+} = require("./platform/linux-systemd-agent");
 
 module.exports = {
   getMacOSBridgeServiceStatus,

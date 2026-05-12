@@ -29,7 +29,7 @@ const {
   buildIOSAppCompatibilitySnapshot,
   normalizeVersionString,
 } = require("./ios-app-compatibility");
-const { rememberLastSeenPhoneAppVersion } = require("./secure-device-state");
+const { rememberLastSeenPhoneAppVersion } = require("../transport/secure-device-state");
 
 /**
  * @param {object} deps

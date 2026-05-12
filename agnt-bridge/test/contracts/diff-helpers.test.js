@@ -12,7 +12,7 @@ const {
   EMPTY_TREE_HASH,
   createDiffHelpers,
   parseNumstatTotals,
-} = require("../../src/diff-helpers");
+} = require("../../src/git/diff-helpers");
 
 // ── parseNumstatTotals ─────────────────────────────────────────────────
 

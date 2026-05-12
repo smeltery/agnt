@@ -15,7 +15,7 @@ const path = require("node:path");
 const {
   CODEX_EXEC_TIMEOUT_MS,
   runStructuredCodexJson,
-} = require("../../src/codex-exec-runner");
+} = require("../../src/git/codex-exec-runner");
 
 test("CODEX_EXEC_TIMEOUT_MS is the documented 2-minute budget", () => {
   assert.equal(CODEX_EXEC_TIMEOUT_MS, 120_000);

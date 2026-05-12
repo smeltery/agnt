@@ -18,7 +18,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { resolveActiveProvider, listProviders } = require("../../src/providers");
+const { resolveActiveProvider, listProviders } = require("../../src/providers/index");
 
 function emptyEnv() {
   // Wipe both AGNT_PROVIDER and the legacy resolution inputs so the test
@@ -129,11 +129,11 @@ test("default fallback (when auto-detect also fails) is the first registered pro
   // depending on host installation state. Re-require the module under a
   // fresh cache entry so the patched providers/index sees a deterministic
   // registry.
-  const providersModulePath = require.resolve("../../src/providers");
+  const providersModulePath = require.resolve("../../src/providers/index");
   delete require.cache[providersModulePath];
   // Stub each registered provider so isInstalled() returns false, forcing
   // resolution into the final "first registered" branch.
-  const realModule = require("../../src/providers");
+  const realModule = require("../../src/providers/index");
   const realFirstId = realModule.listProviders()[0].id;
   // Note: we don't actually monkey-patch the array (it's frozen via map()).
   // Instead we assert the invariant the source promises: when source is

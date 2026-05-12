@@ -10,7 +10,7 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { handleWorkspaceMethod } = require("../src/workspace-handler");
+const { handleWorkspaceMethod } = require("../src/handlers/workspace-handler");
 
 const validOnePixelPNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",

@@ -11,7 +11,7 @@ const {
   buildIOSAppCompatibilitySnapshot,
   compareNumericVersions,
   shouldEnforceIOSAppCompatibility,
-} = require("../src/ios-app-compatibility");
+} = require("../src/bridge/ios-app-compatibility");
 
 test("compareNumericVersions compares dotted versions numerically", () => {
   assert.equal(compareNumericVersions("1.3.8", "1.3.7"), 1);

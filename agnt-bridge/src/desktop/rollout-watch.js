@@ -7,7 +7,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { readLastActiveThread } = require("./session-state");
+const { readLastActiveThread } = require("../bridge/session-state");
 
 const DEFAULT_WATCH_INTERVAL_MS = 1_000;
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;

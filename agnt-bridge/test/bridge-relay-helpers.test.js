@@ -17,7 +17,7 @@ const {
   maybeBuildJsonlThreadTurnsListFallback,
   normalizeRelayBoundJsonRpcMessage,
   unwrapAppServerPayloadResult,
-} = require("../src/bridge");
+} = require("../src/bridge/bridge");
 
 // ─── normalizeRelayBoundJsonRpcMessage ──────────────────────────────────────
 

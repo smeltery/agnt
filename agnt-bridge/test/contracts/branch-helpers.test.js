@@ -13,7 +13,7 @@ const {
   normalizeCreatedBranchName,
   normalizeWorktreeBranchRef,
   resolveBaseBranchName,
-} = require("../../src/branch-helpers");
+} = require("../../src/git/branch-helpers");
 
 // ── pure helpers ─────────────────────────────────────────────────────────
 

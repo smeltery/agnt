@@ -8,7 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readDaemonConfig } = require("./daemon-state");
+const { readDaemonConfig } = require("../daemon-state");
 
 const DEFAULT_DEBOUNCE_MS = 1200;
 

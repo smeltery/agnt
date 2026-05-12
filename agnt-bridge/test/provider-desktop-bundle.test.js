@@ -7,10 +7,10 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const codex = require("../src/providers/codex");
-const claude = require("../src/providers/claude");
-const opencode = require("../src/providers/opencode");
-const cursor = require("../src/providers/cursor");
+const codex = require("../src/providers/codex/index");
+const claude = require("../src/providers/claude/index");
+const opencode = require("../src/providers/opencode/index");
+const cursor = require("../src/providers/cursor/index");
 
 test("codex provider exposes desktopBundle with the Codex.app metadata by default", () => {
   const bundle = codex.desktopBundle({ env: {} });

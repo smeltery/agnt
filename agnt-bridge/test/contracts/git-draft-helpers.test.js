@@ -27,7 +27,7 @@ const {
   tokenizeThreadTitleWords,
   truncateDraftPatch,
   wrapDraftGenerationError,
-} = require("../../src/git-draft-helpers");
+} = require("../../src/git/git-draft-helpers");
 
 // ── prompt builders ──────────────────────────────────────────────────────
 
