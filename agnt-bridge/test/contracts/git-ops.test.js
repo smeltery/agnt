@@ -20,7 +20,7 @@ const {
   parseOwnerRepo,
   parseTrackingFromStatus,
   trackingRemoteName,
-} = require("../../src/git-ops");
+} = require("../../src/git/git-ops");
 
 // ── parseBranchFromStatus ───────────────────────────────────────────────
 

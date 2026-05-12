@@ -15,7 +15,7 @@ const {
   contextUsageFromTokenCountPayload,
   createThreadRolloutActivityWatcher,
   readLatestContextWindowUsage,
-} = require("../src/rollout-watch");
+} = require("../src/desktop/rollout-watch");
 
 test("contextUsageFromTokenCountPayload prefers last_token_usage totals", () => {
   const usage = contextUsageFromTokenCountPayload({

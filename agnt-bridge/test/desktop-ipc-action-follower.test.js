@@ -18,7 +18,7 @@ const {
   desktopFollowerPayloadForResponse,
   projectPendingDesktopActions,
   seedConversationStateFromThreadRead,
-} = require("../src/desktop-ipc-action-follower");
+} = require("../src/desktop/desktop-ipc-action-follower");
 
 test("projects desktop pending user input as an app-server request shape", () => {
   const actions = projectPendingDesktopActions("thread-1", {

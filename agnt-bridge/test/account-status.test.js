@@ -12,7 +12,7 @@ const {
   composeAccountStatus,
   composeSanitizedAuthStatusFromSettledResults,
   redactAuthStatus,
-} = require("../src/account-status");
+} = require("../src/handlers/account-status");
 
 const macHostMetadata = {
   codexTransportMode: null,

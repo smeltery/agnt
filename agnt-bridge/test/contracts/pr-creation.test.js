@@ -15,7 +15,7 @@ const {
   normalizeStackedGitAction,
   parsePullRequestUrlFromText,
   pullRequestResult,
-} = require("../../src/pr-creation");
+} = require("../../src/git/pr-creation");
 
 // ── pure helpers ─────────────────────────────────────────────────────────
 

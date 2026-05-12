@@ -16,7 +16,7 @@ const {
   resolveSystemdUserUnitPath,
   startLinuxBridgeService,
   stopLinuxBridgeService,
-} = require("../src/linux-systemd-agent");
+} = require("../src/platform/linux-systemd-agent");
 const {
   writeDaemonConfig,
   readBridgeStatus,

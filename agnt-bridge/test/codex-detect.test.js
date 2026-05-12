@@ -10,7 +10,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { detectCodexBinary, isCodexInstalled } = require("../src/providers/codex/detect");
-const { resolveActiveProvider } = require("../src/providers");
+const { resolveActiveProvider } = require("../src/providers/index");
 
 test("detectCodexBinary returns the explicit CODEX_CLI_PATH override when it exists", () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-detect-"));

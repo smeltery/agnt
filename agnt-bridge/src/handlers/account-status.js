@@ -4,7 +4,7 @@
 // Exports: composeAccountStatus, composeSanitizedAuthStatusFromSettledResults, redactAuthStatus
 // Depends on: none
 
-const { version: bridgePackageVersion = "" } = require("../package.json");
+const { version: bridgePackageVersion = "" } = require("../../package.json");
 
 // ─── Status composition ─────────────────────────────────────
 

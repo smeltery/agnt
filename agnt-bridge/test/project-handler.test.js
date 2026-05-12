@@ -16,7 +16,7 @@ const {
   projectListDirectory,
   projectSearchDirectories,
   projectValidatePath,
-} = require("../src/project-handler");
+} = require("../src/handlers/project-handler");
 
 function makeTempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "agnt-project-handler-"));

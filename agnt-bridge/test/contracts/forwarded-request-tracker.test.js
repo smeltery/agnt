@@ -10,7 +10,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createForwardedRequestTracker, DEFAULT_TTL_MS } = require("../../src/forwarded-request-tracker");
+const { createForwardedRequestTracker, DEFAULT_TTL_MS } = require("../../src/bridge/forwarded-request-tracker");
 
 function parseJson(value) {
   try {

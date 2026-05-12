@@ -18,7 +18,7 @@ const {
   runMacOSBridgeService,
   startMacOSBridgeService,
   stopMacOSBridgeService,
-} = require("../src/macos-launch-agent");
+} = require("../src/platform/macos-launch-agent");
 const {
   writeDaemonConfig,
   readBridgeStatus,

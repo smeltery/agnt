@@ -8,7 +8,7 @@ const { execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { promisify } = require("util");
-const { findRolloutFileForThread, resolveSessionsRoot } = require("./rollout-watch");
+const { findRolloutFileForThread, resolveSessionsRoot } = require("../desktop/rollout-watch");
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_BUNDLE_ID = "com.openai.codex";

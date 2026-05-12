@@ -11,7 +11,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { handleWorkspaceMethod } = require("../src/workspace-handler");
+const { handleWorkspaceMethod } = require("../src/handlers/workspace-handler");
 
 const validOnePixelPNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
@@ -82,7 +82,7 @@ test("image_path_not_allowed error message no longer hardcodes 'Codex'", () => {
   // the source so the assertion is independent of the tricky "image outside
   // temp" rejection path (which is already covered by workspace-image.test.js).
   const handlerSource = fs.readFileSync(
-    path.join(__dirname, "..", "src", "workspace-handler.js"),
+    path.join(__dirname, "..", "src", "handlers", "workspace-handler.js"),
     "utf8"
   );
   assert.doesNotMatch(handlerSource, /Codex generated images/);

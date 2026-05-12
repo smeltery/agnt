@@ -6,7 +6,7 @@
 
 const { execFile } = require("child_process");
 const path = require("path");
-const { createThreadRolloutActivityWatcher } = require("../../rollout-watch");
+const { createThreadRolloutActivityWatcher } = require("../../desktop/rollout-watch");
 
 const DEFAULT_BUNDLE_ID = "com.openai.codex";
 const DEFAULT_APP_PATH = "/Applications/Codex.app";

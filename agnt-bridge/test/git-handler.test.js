@@ -11,7 +11,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const { __test, gitStatus, handleGitRequest } = require("../src/git-handler");
+const { __test, gitStatus, handleGitRequest } = require("../src/git/git-handler");
 
 test.afterEach(() => {
   __test.resetRunStructuredCodexJsonImplementation();

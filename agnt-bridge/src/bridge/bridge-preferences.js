@@ -13,7 +13,7 @@
 // removes ~30 lines from bridge.js and keeps the preference-translation logic
 // near the persistence helper.
 
-const { readDaemonConfig, writeDaemonConfig } = require("./daemon-state");
+const { readDaemonConfig, writeDaemonConfig } = require("../daemon-state");
 
 /**
  * @param {object} deps

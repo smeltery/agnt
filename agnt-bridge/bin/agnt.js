@@ -26,7 +26,7 @@ const {
   resetBridgePairing,
   openLastActiveThread,
   watchThreadRollout,
-} = require("../src");
+} = require("../src/index");
 const { version } = require("../package.json");
 
 const defaultDeps = {

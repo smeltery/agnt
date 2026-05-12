@@ -4,10 +4,10 @@
 // Exports: getProvider, listProviders, resolveActiveProvider
 // Depends on: ./codex, ./claude, ./opencode, ./cursor, ./types
 
-const codex = require("./codex");
-const claude = require("./claude");
-const opencode = require("./opencode");
-const cursor = require("./cursor");
+const codex = require("./codex/index");
+const claude = require("./claude/index");
+const opencode = require("./opencode/index");
+const cursor = require("./cursor/index");
 const { validateProviderModule } = require("./types");
 
 // Order matters: first entry wins as default fallback when none configured.

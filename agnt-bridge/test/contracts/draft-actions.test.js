@@ -14,7 +14,7 @@ const {
   createDraftActions,
   normalizeNonNegativeInteger,
   resolveGitWriterModel,
-} = require("../../src/draft-actions");
+} = require("../../src/git/draft-actions");
 
 // ── pure helpers ─────────────────────────────────────────────────────────
 

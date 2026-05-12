@@ -9,7 +9,7 @@ const assert = require("node:assert/strict");
 
 const {
   createPushNotificationCompletionDedupe,
-} = require("../src/push-notification-completion-dedupe");
+} = require("../src/transport/push-notification-completion-dedupe");
 
 test("completion dedupe suppresses thread-status fallback until a new run starts", () => {
   let currentTime = 0;

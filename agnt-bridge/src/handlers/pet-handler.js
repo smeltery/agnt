@@ -6,7 +6,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { resolveCodexHome } = require("./providers/codex/home");
+const { resolveCodexHome } = require("../providers/codex/home");
 
 const ATLAS_WIDTH = 1536;
 const ATLAS_HEIGHT = 1872;

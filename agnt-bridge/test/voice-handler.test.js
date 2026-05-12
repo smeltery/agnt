@@ -7,7 +7,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createVoiceHandler } = require("../src/voice-handler");
+const { createVoiceHandler } = require("../src/handlers/voice-handler");
 
 test("voice/transcribe returns transcribed text without exposing auth tokens", async () => {
   const responses = [];
@@ -285,7 +285,7 @@ test("voice/transcribe rejects clips longer than two minutes before contacting t
 
 // ─── resolveVoiceAuth tests ─────────────────────────────────
 
-const { resolveVoiceAuth } = require("../src/voice-handler");
+const { resolveVoiceAuth } = require("../src/handlers/voice-handler");
 
 test("resolveVoiceAuth returns token for ChatGPT sessions", async () => {
   const result = await resolveVoiceAuth(async (method, params) => {

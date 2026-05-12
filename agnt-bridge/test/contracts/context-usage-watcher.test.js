@@ -11,7 +11,7 @@ const assert = require("node:assert/strict");
 const {
   buildWatcherKey,
   createContextUsageWatcher,
-} = require("../../src/context-usage-watcher");
+} = require("../../src/bridge/context-usage-watcher");
 
 function makeFakeWatcherFactory() {
   const created = [];

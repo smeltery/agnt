@@ -19,8 +19,8 @@ const assert = require("node:assert/strict");
 const {
   buildNonCodexAccountResponse,
   buildNonCodexVoiceTranscribeError,
-} = require("../../src/account-handler");
-const { getProvider } = require("../../src/providers");
+} = require("../../src/handlers/account-handler");
+const { getProvider } = require("../../src/providers/index");
 
 const NON_CODEX_PROVIDER_IDS = ["claude", "opencode", "cursor"];
 
@@ -94,7 +94,7 @@ test("every non-Codex provider in the registry is covered by the contract", () =
   // Guard against silently adding a new provider that escapes these checks:
   // if a new entry is registered without being added to NON_CODEX_PROVIDER_IDS,
   // this test fails loudly instead of leaving the gating untested.
-  const { listProviders } = require("../../src/providers");
+  const { listProviders } = require("../../src/providers/index");
   const registered = listProviders()
     .map((p) => p.id)
     .filter((id) => id !== "codex")

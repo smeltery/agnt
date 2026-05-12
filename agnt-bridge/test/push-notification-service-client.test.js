@@ -7,7 +7,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createPushNotificationServiceClient } = require("../src/push-notification-service-client");
+const { createPushNotificationServiceClient } = require("../src/transport/push-notification-service-client");
 
 test("push service client aborts stalled requests with a timeout error", async () => {
   const client = createPushNotificationServiceClient({

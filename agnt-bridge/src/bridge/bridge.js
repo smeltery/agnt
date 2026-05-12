@@ -10,53 +10,53 @@ const { spawn } = require("child_process");
 const path = require("path");
 const os = require("os");
 const { readBridgeConfig } = require("./bridge-config");
-const { resolveActiveProvider } = require("./providers");
-const { withTranslator } = require("./providers/types");
+const { resolveActiveProvider } = require("../providers/index");
+const { withTranslator } = require("../providers/types");
 const {
   createThreadRolloutActivityWatcher,
   findRecentRolloutFileForContextRead,
   resolveSessionsRoot,
-} = require("./rollout-watch");
+} = require("../desktop/rollout-watch");
 const {
   readThreadTurnsListPageFromSessionJsonl,
-} = require("./providers/codex/session-jsonl-history");
-const { printQR } = require("./qr");
+} = require("../providers/codex/session-jsonl-history");
+const { printQR } = require("../transport/qr");
 const { rememberActiveThread } = require("./session-state");
-const { handleDesktopRequest } = require("./desktop-handler");
-const { readDaemonConfig, writeDaemonConfig } = require("./daemon-state");
-const { handleGitRequest } = require("./git-handler");
-const { handleThreadContextRequest } = require("./thread-context-handler");
-const { handleWorkspaceRequest } = require("./workspace-handler");
-const { handleProjectRequest } = require("./project-handler");
-const { handlePetRequest } = require("./pet-handler");
-const { createNotificationsHandler } = require("./notifications-handler");
-const { createVoiceHandler, resolveVoiceAuth } = require("./voice-handler");
+const { handleDesktopRequest } = require("../handlers/desktop-handler");
+const { readDaemonConfig, writeDaemonConfig } = require("../daemon-state");
+const { handleGitRequest } = require("../git/git-handler");
+const { handleThreadContextRequest } = require("../handlers/thread-context-handler");
+const { handleWorkspaceRequest } = require("../handlers/workspace-handler");
+const { handleProjectRequest } = require("../handlers/project-handler");
+const { handlePetRequest } = require("../handlers/pet-handler");
+const { createNotificationsHandler } = require("../handlers/notifications-handler");
+const { createVoiceHandler, resolveVoiceAuth } = require("../handlers/voice-handler");
 const {
   composeSanitizedAuthStatusFromSettledResults,
-} = require("./account-status");
-const { createAccountHandler, createJsonRpcErrorResponse } = require("./account-handler");
+} = require("../handlers/account-status");
+const { createAccountHandler, createJsonRpcErrorResponse } = require("../handlers/account-handler");
 const { createForwardedRequestTracker } = require("./forwarded-request-tracker");
-const { createMacOSBridgeWakeAssertion } = require("./wake-assertion");
+const { createMacOSBridgeWakeAssertion } = require("../platform/wake-assertion");
 const { createBridgePreferences, persistBridgePreferences } = require("./bridge-preferences");
 const { createContextUsageWatcher } = require("./context-usage-watcher");
 const { createHandshakeHandler } = require("./handshake-handler");
 const { createBridgePackageVersionStatusReader } = require("./package-version-status");
-const { createPushNotificationServiceClient } = require("./push-notification-service-client");
-const { createPushNotificationTracker } = require("./push-notification-tracker");
-const { resolveCodexGeneratedImagesRoot } = require("./providers/codex/home");
+const { createPushNotificationServiceClient } = require("../transport/push-notification-service-client");
+const { createPushNotificationTracker } = require("../transport/push-notification-tracker");
+const { resolveCodexGeneratedImagesRoot } = require("../providers/codex/home");
 const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
-} = require("./secure-device-state");
-const { createBridgeSecureTransport } = require("./secure-transport");
-const { createRolloutLiveMirrorController } = require("./rollout-live-mirror");
+} = require("../transport/secure-device-state");
+const { createBridgeSecureTransport } = require("../transport/secure-transport");
+const { createRolloutLiveMirrorController } = require("../desktop/rollout-live-mirror");
 const {
   createDesktopIpcActionFollower,
   seedConversationStateFromThreadRead,
-} = require("./desktop-ipc-action-follower");
-const { version: bridgePackageVersion = "" } = require("../package.json");
+} = require("../desktop/desktop-ipc-action-follower");
+const { version: bridgePackageVersion = "" } = require("../../package.json");
 const { buildCachedIOSAppCompatibilityWarning } = require("./ios-app-compatibility");
-const { createShortPairingCode, SHORT_PAIRING_CODE_LENGTH } = require("./qr");
+const { createShortPairingCode, SHORT_PAIRING_CODE_LENGTH } = require("../transport/qr");
 
 const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
 // Keep the watchdog above the relay heartbeat cadence so quiet healthy sockets survive idle gaps.
