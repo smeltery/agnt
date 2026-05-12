@@ -4,18 +4,18 @@
 // Exports: handleGitRequest
 // Depends on: child_process, fs, os, path, crypto
 
-const { execFile, spawn } = require("child_process");
+const { execFile } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { randomBytes } = require("crypto");
 const { promisify } = require("util");
+const { runStructuredCodexJson } = require("./codex-exec-runner");
 
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
 // Node defaults maxBuffer to 1 MiB; large repo diffs trip "stdout maxBuffer length exceeded".
 const GIT_EXEC_MAX_BUFFER_BYTES = 50 * 1024 * 1024;
-const GIT_DRAFT_TIMEOUT_MS = 120_000;
 const GITHUB_CLI_TIMEOUT_MS = 120_000;
 const GIT_DRAFT_PATCH_MAX_BYTES = 80_000;
 const EMPTY_TREE_HASH = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -1651,182 +1651,6 @@ function resolveThreadTitleCwd(rawCwd) {
   return process.cwd();
 }
 
-async function runStructuredCodexJson({
-  cwd,
-  model,
-  prompt,
-  schema,
-  codexAppPath,
-  skipGitRepoCheck = false,
-  sandboxMode = null,
-}) {
-  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-git-ai-"));
-  const schemaPath = path.join(tempDirectory, "schema.json");
-  const outputPath = path.join(tempDirectory, "output.json");
-  const commands = resolveCodexExecCommands(codexAppPath);
-
-  fs.writeFileSync(schemaPath, JSON.stringify(schema), "utf8");
-
-  try {
-    let lastError = null;
-
-    for (const command of commands) {
-      try {
-        return await spawnCodexExecJson({
-          command,
-          cwd,
-          model,
-          prompt,
-          schemaPath,
-          outputPath,
-          skipGitRepoCheck,
-          sandboxMode,
-        });
-      } catch (error) {
-        lastError = error;
-        if (!shouldRetryCodexExecWithNextCommand(error)) {
-          throw error;
-        }
-      }
-    }
-
-    throw lastError || new Error("Codex CLI is not available on this Mac.");
-  } finally {
-    fs.rmSync(tempDirectory, { recursive: true, force: true });
-  }
-}
-
-function resolveCodexExecCommands(codexAppPath) {
-  const commands = ["codex"];
-  const bundledCommand = resolveBundledCodexCommand(codexAppPath);
-  if (bundledCommand && !commands.includes(bundledCommand)) {
-    commands.push(bundledCommand);
-  }
-  return commands;
-}
-
-function resolveBundledCodexCommand(codexAppPath) {
-  const trimmedAppPath = typeof codexAppPath === "string" ? codexAppPath.trim() : "";
-  if (!trimmedAppPath) {
-    return "";
-  }
-
-  const candidate = path.join(trimmedAppPath, "Contents", "Resources", "codex");
-  return isLaunchableFile(candidate) ? candidate : "";
-}
-
-function isLaunchableFile(candidatePath) {
-  try {
-    return fs.statSync(candidatePath).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function shouldRetryCodexExecWithNextCommand(error) {
-  return error?.code === "ENOENT";
-}
-
-function spawnCodexExecJson({
-  command,
-  cwd,
-  model,
-  prompt,
-  schemaPath,
-  outputPath,
-  skipGitRepoCheck = false,
-  sandboxMode = null,
-}) {
-  const args = [
-    "exec",
-    "--ephemeral",
-    "-C",
-    cwd,
-    "-m",
-    model,
-  ];
-  if (skipGitRepoCheck) {
-    args.push("--skip-git-repo-check");
-  }
-  if (sandboxMode) {
-    args.push("-s", sandboxMode);
-  }
-  args.push("--output-schema", schemaPath, "-o", outputPath, "-");
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      env: process.env,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-    let timedOut = false;
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
-    }, GIT_DRAFT_TIMEOUT_MS);
-
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8");
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8");
-    });
-
-    child.on("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-
-    child.on("close", (code, signal) => {
-      clearTimeout(timeout);
-
-      if (timedOut) {
-        reject(new Error("Codex CLI timed out while generating the draft."));
-        return;
-      }
-
-      if (code !== 0) {
-        reject(createCodexExecFailure(code, signal, stdout, stderr));
-        return;
-      }
-
-      try {
-        const outputText = fs.readFileSync(outputPath, "utf8").trim();
-        if (!outputText) {
-          throw new Error("Codex CLI returned an empty structured response.");
-        }
-        resolve(JSON.parse(outputText));
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    child.stdin.end(prompt);
-  });
-}
-
-function createCodexExecFailure(code, signal, stdout, stderr) {
-  const detail = [stderr, stdout]
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .flatMap((value) => value.split("\n"))
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .pop();
-
-  const suffix = detail ? ` ${detail}` : "";
-  const error = new Error(
-    signal
-      ? `Codex CLI was interrupted while generating the draft.${suffix}`
-      : `Codex CLI exited with code ${code} while generating the draft.${suffix}`
-  );
-  error.code = code;
-  error.signal = signal;
-  return error;
-}
 
 function parseOwnerRepo(remoteUrl) {
   const match = remoteUrl.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
