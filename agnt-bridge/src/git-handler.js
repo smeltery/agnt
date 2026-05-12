@@ -33,6 +33,12 @@ const { createGitOps, normalizeBranchListEntry } = require("./git-ops");
 const { createWorktreeActions } = require("./worktree-actions");
 const { createDraftActions } = require("./draft-actions");
 const { createDiffHelpers, parseNumstatTotals } = require("./diff-helpers");
+const {
+  createBranchHelpers,
+  normalizeCreatedBranchName,
+  normalizeWorktreeBranchRef,
+  resolveBaseBranchName,
+} = require("./branch-helpers");
 
 const worktreeHandoff = createWorktreeHandoff({
   git: (cwd, ...args) => git(cwd, ...args),
@@ -156,6 +162,19 @@ const {
   gitGeneratePullRequestDraft,
   threadGenerateTitle,
 } = draftActions;
+
+const branchHelpers = createBranchHelpers({
+  git: (cwd, ...args) => git(cwd, ...args),
+  gitError: (errorCode, userMessage) => gitError(errorCode, userMessage),
+  scopedWorktreePath: (worktreeRootPath, projectRelativePath) => scopedWorktreePath(worktreeRootPath, projectRelativePath),
+});
+const {
+  refExists,
+  localBranchExists,
+  assertValidCreatedBranchName,
+  gitWorktreePathByBranch,
+  parseWorktreePathByBranch,
+} = branchHelpers;
 
 const diffHelpers = createDiffHelpers({
   git: (cwd, ...args) => git(cwd, ...args),
@@ -318,16 +337,6 @@ function threadNameSet(params) {
 
 // ─── Git Status ───────────────────────────────────────────────
 
-async function refExists(cwd, refName) {
-  try {
-    await git(cwd, "show-ref", "--verify", "--quiet", refName);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-
 function normalizeNonEmptyLine(rawValue) {
   if (typeof rawValue !== "string") {
     return "";
@@ -343,101 +352,6 @@ function normalizeNonEmptyMultilineString(rawValue) {
   return trimmed || "";
 }
 
-async function gitWorktreePathByBranch(cwd, options = {}) {
-  const output = await git(cwd, "worktree", "list", "--porcelain");
-  return parseWorktreePathByBranch(output, options);
-}
-
-
-function parseWorktreePathByBranch(output, options = {}) {
-  const worktreePathByBranch = {};
-  const records = typeof output === "string" ? output.split("\n\n") : [];
-  const projectRelativePath = typeof options.projectRelativePath === "string"
-    ? options.projectRelativePath
-    : "";
-
-  for (const record of records) {
-    const lines = record
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    if (!lines.length) {
-      continue;
-    }
-
-    const worktreeLine = lines.find((line) => line.startsWith("worktree "));
-    const branchLine = lines.find((line) => line.startsWith("branch "));
-    const worktreePath = worktreeLine?.slice("worktree ".length).trim();
-    const branchName = normalizeWorktreeBranchRef(branchLine?.slice("branch ".length).trim());
-
-    if (!worktreePath || !branchName) {
-      continue;
-    }
-
-    worktreePathByBranch[branchName] = scopedWorktreePath(worktreePath, projectRelativePath);
-  }
-
-  return worktreePathByBranch;
-}
-
-// Normalizes `git branch` output so the UI never sees worktree markers like `+ main`.
-function normalizeWorktreeBranchRef(rawRef) {
-  const trimmed = typeof rawRef === "string" ? rawRef.trim() : "";
-  if (!trimmed.startsWith("refs/heads/")) {
-    return null;
-  }
-
-  const branchName = trimmed.slice("refs/heads/".length).trim();
-  return branchName || null;
-}
-
-function normalizeCreatedBranchName(rawName) {
-  const trimmed = typeof rawName === "string" ? rawName.trim() : "";
-  if (!trimmed) {
-    return "";
-  }
-
-  // Keep slash-separated branch groups, but normalize user-entered whitespace into Git-friendly dashes.
-  const normalized = trimmed
-    .split("/")
-    .map((segment) => segment.trim().replace(/\s+/g, "-"))
-    .join("/");
-
-  if (normalized.startsWith("agnt/")) {
-    return normalized;
-  }
-  return `agnt/${normalized}`;
-}
-
-function resolveBaseBranchName(rawBaseBranch, fallbackBranch) {
-  const trimmedBaseBranch = typeof rawBaseBranch === "string" ? rawBaseBranch.trim() : "";
-  if (trimmedBaseBranch) {
-    return trimmedBaseBranch;
-  }
-
-  return typeof fallbackBranch === "string" && fallbackBranch.trim() ? fallbackBranch.trim() : "";
-}
-
-// Mirrors Codex-managed worktree paths under CODEX_HOME/worktrees/<token>/<repo>.
-async function localBranchExists(cwd, branchName) {
-  try {
-    await git(cwd, "show-ref", "--verify", "--quiet", `refs/heads/${branchName}`);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function assertValidCreatedBranchName(cwd, branchName) {
-  try {
-    await git(cwd, "check-ref-format", "--branch", branchName);
-  } catch {
-    throw gitError("invalid_branch_name", `Branch '${branchName}' is not a valid Git branch name.`);
-  }
-}
-
-// Keeps branch creation local-only even when a same-named ref exists on origin.
 function sameFilePath(leftPath, rightPath) {
   const normalizedLeft = normalizeExistingPath(leftPath);
   const normalizedRight = normalizeExistingPath(rightPath);
