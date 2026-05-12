@@ -95,6 +95,80 @@ test("setTurnArgs layers extra flags onto the next spawn", () => {
   assert.ok(respawnArgs.includes("plan"));
 });
 
+test("setTurnArgs while a child is running SIGTERMs it so the next send respawns with the new args", () => {
+  // Per the docstring on setTurnArgs in claude/transport.js: "If the arg list
+  // changes while a child is running, we kill it so the next send() respawns
+  // with the new flags. Mid-conversation continuity is preserved by --resume."
+  //
+  // Without this guarantee, a user who switches model mid-thread would still
+  // be talking to the previously-spawned CLI with the old --model flag until
+  // the next interrupt — a silent regression vector.
+  const spawnCalls = [];
+  const children = [];
+  function spawnImpl(_bin, args) {
+    spawnCalls.push(args);
+    const child = makeFakeChild();
+    children.push(child);
+    setImmediate(() => child.emit("spawn"));
+    return child;
+  }
+
+  const transport = createClaudeTransport({
+    binPath: "/usr/local/bin/claude",
+    spawnImpl,
+  });
+  // Initial spawn at construction. Note no --model yet.
+  assert.equal(spawnCalls.length, 1);
+  assert.ok(!spawnCalls[0].includes("--model"));
+  const firstChild = children[0];
+
+  // Translator publishes a new model mid-stream. Child must be SIGTERM'd.
+  transport.setTurnArgs(["--model", "opus"]);
+  assert.equal(firstChild.killedSignal, "SIGTERM",
+    "child must be SIGTERM'd when setTurnArgs changes the arg list");
+
+  // Next send respawns with --model opus.
+  transport.send('{"type":"user","message":{"role":"user","content":"hi"}}');
+  assert.equal(spawnCalls.length, 2, "next send must spawn a fresh child");
+  const respawnArgs = spawnCalls[1];
+  const modelIdx = respawnArgs.indexOf("--model");
+  assert.ok(modelIdx >= 0);
+  assert.equal(respawnArgs[modelIdx + 1], "opus");
+});
+
+test("setTurnArgs with the same arg list does NOT kill the running child", () => {
+  // Idempotency: republishing the identical arg list (e.g. iOS reconnects
+  // and the translator re-emits setTurnArgs from cached params) must not
+  // cause a spurious respawn — that would drop the in-flight CLI for no
+  // reason and re-cost session resume.
+  const spawnCalls = [];
+  const children = [];
+  function spawnImpl(_bin, args) {
+    spawnCalls.push(args);
+    const child = makeFakeChild();
+    children.push(child);
+    setImmediate(() => child.emit("spawn"));
+    return child;
+  }
+
+  const transport = createClaudeTransport({
+    binPath: "/usr/local/bin/claude",
+    spawnImpl,
+  });
+
+  // Establish a stable arg list, then send to spawn a fresh child with it.
+  transport.setTurnArgs(["--model", "sonnet"]);
+  transport.send('{"type":"user","message":{"role":"user","content":"hi"}}');
+  const liveChild = children[children.length - 1];
+  assert.equal(liveChild.killedSignal, null, "fresh child after send should be alive");
+
+  // Republishing the identical arg list must not touch the live child.
+  transport.setTurnArgs(["--model", "sonnet"]);
+  assert.equal(liveChild.killedSignal, null,
+    "identical setTurnArgs must not SIGTERM the live child");
+  assert.equal(spawnCalls.length, 2, "no extra spawn should fire");
+});
+
 test("setCwd respawns with the new working directory", () => {
   const spawnCalls = [];
   function spawnImpl(_bin, args, opts) {

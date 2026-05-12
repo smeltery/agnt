@@ -817,3 +817,74 @@ test("inbound events for a different sessionID are ignored once a turn is active
 
   assert.equal(injected.length, 0);
 });
+
+test("assistant deltas continue to flow while an approval request is pending", () => {
+  // Race scenario: iOS may take seconds/minutes to respond to permission.asked.
+  // During that window, opencode's SSE keeps pushing assistant deltas
+  // (model is still talking) and other events. The translator must keep
+  // forwarding them — blocking would freeze the UI until the user decides.
+  const { translator, injected } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_ar", input: [{ type: "text", text: "do" }] },
+  }));
+  injected.length = 0;
+
+  // 1) Assistant emits some text before the permission ask.
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_ar",
+      part: { type: "text", text: "Reading", id: "prt_1", messageID: "msg_1" },
+    },
+  }));
+
+  // 2) opencode asks for permission mid-flight.
+  translator.inbound(JSON.stringify({
+    type: "permission.asked",
+    properties: {
+      sessionID: "ses_ar",
+      info: { id: "perm_1", sessionID: "ses_ar", permission: "edit", metadata: { filepath: "/tmp/z" } },
+    },
+  }));
+
+  // 3) Without iOS responding yet, more assistant text arrives.
+  translator.inbound(JSON.stringify({
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_ar",
+      part: { type: "text", text: "Reading file...", id: "prt_1", messageID: "msg_1" },
+    },
+  }));
+
+  const events = parseInjected(injected).filter((e) => e.method);
+  const approval = events.find((e) => e.method?.endsWith("requestApproval"));
+  const deltas = events.filter((e) => e.method === "item/agentMessage/delta");
+  assert.ok(approval, "approval request must still be emitted");
+  assert.equal(deltas.length, 2, "both pre- and post-approval deltas must propagate");
+  assert.equal(deltas[0].params.delta, "Reading");
+  // Differential delta: only the new suffix after the first chunk.
+  assert.equal(deltas[1].params.delta, " file...");
+});
+
+test("an approval reply with an unknown id is dropped, not POSTed", async () => {
+  // Defensive: if iOS sends a stale or misrouted approval response (e.g. an
+  // id from a prior thread that the translator never issued), the shim
+  // must NOT forward it to opencode's /permissions endpoint — that would
+  // act on the wrong permission record on the server side.
+  const { translator, httpCalls } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu", method: "turn/start",
+    params: { threadId: "ses_drop", input: [{ type: "text", text: "go" }] },
+  }));
+  httpCalls.length = 0;
+
+  translator.outbound(JSON.stringify({
+    id: "approval_unknown_999",
+    result: { decision: "accept" },
+  }));
+  await new Promise((r) => setImmediate(r));
+
+  const permPosts = httpCalls.filter((c) => c.pathName.includes("/permissions/"));
+  assert.equal(permPosts.length, 0, "unknown approval id must not POST to /permissions");
+});

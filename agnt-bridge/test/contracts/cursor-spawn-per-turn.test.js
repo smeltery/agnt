@@ -154,6 +154,29 @@ test("send() ignores frames that are not the {type:'prompt', text} envelope", ()
   assert.equal(recorder.calls.length, 0, "no spawn for non-prompt frames");
 });
 
+test("a child that already exited naturally between turns is not SIGTERM'd by the next spawn", () => {
+  // The normal happy path: cursor-agent emits its `result` frame and the
+  // process exits with code 0. The translator may or may not have nulled
+  // the transport's child reference by then — the close handler runs
+  // asynchronously. If a new turn arrives while the dead child is still
+  // referenced, send() must not try to SIGTERM the corpse (no-op via
+  // shutdownChild's exitCode guard) and must spawn a fresh child.
+  const { transport, recorder } = newTransport();
+  transport.send(JSON.stringify({ type: "prompt", text: "first" }));
+  const firstChild = recorder.children[0];
+
+  // Simulate the cursor-agent process exiting cleanly after `result`.
+  firstChild.exitCode = 0;
+
+  transport.send(JSON.stringify({ type: "prompt", text: "second" }));
+  assert.equal(recorder.children.length, 2, "second turn must spawn a fresh child");
+  assert.deepEqual(
+    firstChild.killCalls,
+    [],
+    "a child whose exitCode is non-null must not receive SIGTERM (the guard in shutdownChild)",
+  );
+});
+
 test("interruptTurn() SIGINTs the live child and lets the next turn spawn cleanly", () => {
   const { transport, recorder } = newTransport();
   transport.send(JSON.stringify({ type: "prompt", text: "first" }));
