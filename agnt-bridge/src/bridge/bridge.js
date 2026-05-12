@@ -74,6 +74,12 @@ const {
   createBridgeRelayHeartbeat,
 } = require("./relay-heartbeat");
 const {
+  sanitizeThreadHistoryImagesForRelay,
+  sanitizeThreadTurnsListForRelay,
+  sanitizeRelayHistoryTurns,
+  sanitizeRelayHistoryTurn,
+} = require("./relay-payload-pipeline");
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -950,149 +956,6 @@ function readString(value) {
 
 function normalizeNonEmptyString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-// Shrinks thread history snapshots/pages for mobile relay delivery.
-// This elides bulky blobs and replaces oversized older history with a compact marker.
-function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
-  if (requestMethod === "thread/turns/list") {
-    return sanitizeThreadTurnsListForRelay(rawMessage);
-  }
-
-  if (requestMethod !== "thread/read" && requestMethod !== "thread/resume") {
-    return rawMessage;
-  }
-
-  const parsed = parseBridgeJSON(rawMessage);
-  const thread = parsed?.result?.thread;
-  if (!thread || typeof thread !== "object" || !Array.isArray(thread.turns)) {
-    return rawMessage;
-  }
-
-  const threadId = normalizeNonEmptyString(thread.id)
-    || normalizeNonEmptyString(thread.threadId)
-    || normalizeNonEmptyString(thread.thread_id);
-  const { turns: sanitizedTurns, didSanitize } = sanitizeRelayHistoryTurns(thread.turns, threadId);
-
-  if (!didSanitize) {
-    const trimmedPayload = trimThreadPayloadForRelay(parsed, thread);
-    return trimmedPayload == null ? rawMessage : trimmedPayload;
-  }
-
-  const sanitizedPayload = JSON.stringify({
-    ...parsed,
-    result: {
-      ...parsed.result,
-      thread: {
-        ...thread,
-        turns: sanitizedTurns,
-      },
-    },
-  });
-
-  return trimThreadPayloadForRelay(parseBridgeJSON(sanitizedPayload), null) ?? sanitizedPayload;
-}
-
-function sanitizeThreadTurnsListForRelay(rawMessage) {
-  const parsed = parseBridgeJSON(rawMessage);
-  const result = parsed?.result;
-  if (!result || typeof result !== "object" || Array.isArray(result)) {
-    return rawMessage;
-  }
-
-  const turnsKey = ["data", "items", "turns"].find((key) => Array.isArray(result[key]));
-  if (!turnsKey) {
-    return rawMessage;
-  }
-
-  const threadId = normalizeNonEmptyString(result.threadId)
-    || normalizeNonEmptyString(result.thread_id)
-    || normalizeNonEmptyString(result.thread?.id)
-    || normalizeNonEmptyString(result.thread?.threadId)
-    || normalizeNonEmptyString(result.thread?.thread_id);
-  const { turns: sanitizedTurns, didSanitize } = sanitizeRelayHistoryTurns(result[turnsKey], threadId);
-  const sanitizedParsed = didSanitize
-    ? {
-      ...parsed,
-      result: {
-        ...result,
-        [turnsKey]: sanitizedTurns,
-      },
-    }
-    : parsed;
-
-  return trimTurnsListPayloadForRelay(sanitizedParsed, turnsKey, didSanitize ? null : rawMessage);
-}
-
-function sanitizeRelayHistoryTurns(turns, threadId = "") {
-  let didSanitize = false;
-  const sanitizedTurns = turns.map((turn) => {
-    const sanitizedTurn = sanitizeRelayHistoryTurn(turn, threadId);
-    if (sanitizedTurn !== turn) {
-      didSanitize = true;
-    }
-    return sanitizedTurn;
-  });
-
-  return { turns: sanitizedTurns, didSanitize };
-}
-
-function sanitizeRelayHistoryTurn(turn, threadId = "") {
-  if (!turn || typeof turn !== "object" || !Array.isArray(turn.items)) {
-    return turn;
-  }
-
-  let turnDidChange = false;
-  const turnThreadId = normalizeNonEmptyString(threadId)
-    || normalizeNonEmptyString(turn.threadId)
-    || normalizeNonEmptyString(turn.thread_id);
-  const sanitizedItems = turn.items.map((item) => {
-    if (!item || typeof item !== "object") {
-      return item;
-    }
-
-    let itemDidChange = false;
-    let sanitizedItem = annotateImageGenerationHistoryItem(item, turnThreadId);
-    if (sanitizedItem !== item) {
-      itemDidChange = true;
-    }
-
-    if (Array.isArray(sanitizedItem.content)) {
-      const sanitizedContent = sanitizedItem.content.map((contentItem) => {
-        const sanitizedEntry = sanitizeInlineHistoryImageContentItem(contentItem);
-        if (sanitizedEntry !== contentItem) {
-          itemDidChange = true;
-        }
-        return sanitizedEntry;
-      });
-
-      if (itemDidChange) {
-        sanitizedItem = {
-          ...sanitizedItem,
-          content: sanitizedContent,
-        };
-      }
-    }
-
-    const sanitizedCompactionItem = sanitizeCompactionHistoryItem(sanitizedItem);
-    if (sanitizedCompactionItem !== sanitizedItem) {
-      sanitizedItem = sanitizedCompactionItem;
-      itemDidChange = true;
-    }
-
-    if (itemDidChange) {
-      turnDidChange = true;
-    }
-
-    return itemDidChange ? sanitizedItem : item;
-  });
-
-  return turnDidChange
-    ? {
-      ...turn,
-      items: sanitizedItems,
-    }
-    : turn;
 }
 
 
