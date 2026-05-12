@@ -11,6 +11,7 @@ const path = require("path");
 const { promisify } = require("util");
 const { resolveActiveProvider } = require("../providers/index");
 const { gitStatus } = require("../git/git-handler");
+const { createJsonRpcRequestHandler } = require("./handler-utils");
 const {
   workspaceCheckpointCapture,
   workspaceCheckpointCopy,
@@ -41,43 +42,12 @@ const IMAGE_MIME_TYPES_BY_EXTENSION = new Map([
 ]);
 const repoMutationLocks = new Map();
 
-function handleWorkspaceRequest(rawMessage, sendResponse, options = {}) {
-  let parsed;
-  try {
-    parsed = JSON.parse(rawMessage);
-  } catch {
-    return false;
-  }
-
-  const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-  if (!method.startsWith("workspace/")) {
-    return false;
-  }
-
-  const id = parsed.id;
-  const params = parsed.params || {};
-
-  handleWorkspaceMethod(method, params, options)
-    .then((result) => {
-      sendResponse(JSON.stringify({ id, result }));
-    })
-    .catch((err) => {
-      const errorCode = err.errorCode || "workspace_error";
-      const message = err.userMessage || err.message || "Unknown workspace error";
-      sendResponse(
-        JSON.stringify({
-          id,
-          error: {
-            code: -32000,
-            message,
-            data: { errorCode },
-          },
-        })
-      );
-    });
-
-  return true;
-}
+const handleWorkspaceRequest = createJsonRpcRequestHandler({
+  match: (method) => method.startsWith("workspace/"),
+  dispatch: handleWorkspaceMethod,
+  defaultErrorCode: "workspace_error",
+  defaultErrorMessage: "Unknown workspace error",
+});
 
 async function handleWorkspaceMethod(method, params, options = {}) {
   if (method === "workspace/readImage") {

@@ -2,45 +2,20 @@
 // Purpose: Intercepts notifications/push/* bridge RPCs and forwards device registration to the configured push service.
 // Layer: Bridge handler
 // Exports: createNotificationsHandler
-// Depends on: none
+// Depends on: ./handler-utils
+
+const { createJsonRpcRequestHandler } = require("./handler-utils");
 
 function createNotificationsHandler({ pushServiceClient, logPrefix = "[agnt]" } = {}) {
-  function handleNotificationsRequest(rawMessage, sendResponse) {
-    let parsed;
-    try {
-      parsed = JSON.parse(rawMessage);
-    } catch {
-      return false;
-    }
-
-    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-    if (method !== "notifications/push/register") {
-      return false;
-    }
-
-    const id = parsed.id;
-    const params = parsed.params || {};
-
-    handleNotificationsMethod(method, params)
-      .then((result) => {
-        sendResponse(JSON.stringify({ id, result }));
-      })
-      .catch((error) => {
-        console.error(`${logPrefix} push registration failed: ${error.message}`);
-        sendResponse(JSON.stringify({
-          id,
-          error: {
-            code: -32000,
-            message: error.userMessage || error.message || "Push registration failed.",
-            data: {
-              errorCode: error.errorCode || "push_registration_failed",
-            },
-          },
-        }));
-      });
-
-    return true;
-  }
+  const handleNotificationsRequest = createJsonRpcRequestHandler({
+    match: (method) => method === "notifications/push/register",
+    dispatch: handleNotificationsMethod,
+    defaultErrorCode: "push_registration_failed",
+    defaultErrorMessage: "Push registration failed.",
+    onError: (error) => {
+      console.error(`${logPrefix} push registration failed: ${error?.message || error}`);
+    },
+  });
 
   async function handleNotificationsMethod(method, params) {
     if (!pushServiceClient?.hasConfiguredBaseUrl) {
