@@ -775,40 +775,9 @@ function startBridge({
     if (parsed.id == null) return true;
     sendResponse(JSON.stringify({
       id: parsed.id,
-      error: {
-        code: -32601,
-        message: `Voice transcription is not supported with ${activeProvider.displayName}.`,
-        data: { errorCode: "not_supported", provider: activeProvider.id },
-      },
+      ...buildNonCodexVoiceTranscribeError(activeProvider),
     }));
     return true;
-  }
-
-  function buildNonCodexAccountResponse(method, provider) {
-    if (method === "account/status/read" || method === "getAuthStatus") {
-      return {
-        value: {
-          loggedIn: false,
-          supportsLogin: false,
-          provider: provider.id,
-          providerName: provider.displayName,
-          authMethod: "external",
-          message: `${provider.displayName} manages authentication outside of agnt.`,
-        },
-      };
-    }
-    if (method === "voice/resolveAuth") {
-      return { value: { token: "", supported: false } };
-    }
-    if (method === "account/login/start"
-      || method === "account/login/cancel"
-      || method === "account/login/openOnMac"
-      || method === "account/logout") {
-      const err = new Error(`${provider.displayName} does not support agnt-managed sign-in.`);
-      err.errorCode = "not_supported";
-      return { error: err };
-    }
-    return { value: null };
   }
 
   // Resolves bridge-owned account helpers like status reads and Mac-side browser opening.
@@ -3031,13 +3000,62 @@ function createNoopDesktopRefresher() {
   };
 }
 
+// Pure response builder for non-Codex account RPCs. Codex is the only provider
+// that implements ChatGPT-style account/login/voice-auth flows; for other
+// providers the bridge answers locally so the iOS auth UI renders a "managed
+// externally" state instead of hanging on a request that would never reach a
+// handler. Hoisted to module scope so contract tests can exercise the
+// response shape directly without spinning up a full bridge.
+function buildNonCodexAccountResponse(method, provider) {
+  if (method === "account/status/read" || method === "getAuthStatus") {
+    return {
+      value: {
+        loggedIn: false,
+        supportsLogin: false,
+        provider: provider.id,
+        providerName: provider.displayName,
+        authMethod: "external",
+        message: `${provider.displayName} manages authentication outside of agnt.`,
+      },
+    };
+  }
+  if (method === "voice/resolveAuth") {
+    return { value: { token: "", supported: false } };
+  }
+  if (method === "account/login/start"
+    || method === "account/login/cancel"
+    || method === "account/login/openOnMac"
+    || method === "account/logout") {
+    const err = new Error(`${provider.displayName} does not support agnt-managed sign-in.`);
+    err.errorCode = "not_supported";
+    return { error: err };
+  }
+  return { value: null };
+}
+
+// Pure JSON-RPC error shape for voice/transcribe when the active provider is
+// not Codex. Exported so the gating contract is testable without a real
+// transport.
+function buildNonCodexVoiceTranscribeError(provider) {
+  return {
+    error: {
+      code: -32601,
+      message: `Voice transcription is not supported with ${provider.displayName}.`,
+      data: { errorCode: "not_supported", provider: provider.id },
+    },
+  };
+}
+
 module.exports = {
   buildEmergencySingleTurnResponse,
   buildEmptyTurnsListResponse,
   buildHeartbeatBridgeStatus,
   buildLargestSafeTurnsListResponse,
+  buildNonCodexAccountResponse,
+  buildNonCodexVoiceTranscribeError,
   compactEmergencySingleTurnForRelay,
   createMacOSBridgeWakeAssertion,
+  createNoopDesktopRefresher,
   fetchAdaptiveThreadTurnsListForRelay,
   hasRelayConnectionGoneStale,
   isEmptyTurnsListResponse,
