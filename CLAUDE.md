@@ -36,6 +36,30 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 - When a capability is absent (e.g. `desktopRefresher`, `rolloutMirror`), gate the codepath on `provider.capabilities.<flag>` and degrade gracefully (no-op refresher, skip mirror watcher) instead of crashing.
 - Provider selection precedence: `--provider <id>` CLI flag, then `AGNT_PROVIDER` env, then persisted daemon-state, then `isInstalled()` auto-detect, then first registered.
 
+## Bridge architecture map
+
+`agnt-bridge/src/bridge/bridge.js` is intentionally lean — it wires the bridge together but delegates almost every concern to a named module. Before adding logic to `bridge.js`, check whether the abstraction already exists. Adding to an existing module beats growing the bridge.
+
+Inbound + outbound dispatch:
+
+- `bridge/application-message-router.js` — decrypted relay payloads fan out through an ordered list of stages (handshake, account, voice, thread-context, workspace, project, pet, notifications, desktop, git, turns-list). First truthy stage claims the message; fallback forwards to the active provider. Add new handlers as a stage; do not grow the if-ladder inline.
+- `bridge/relay-outbound-pipeline.js` — codex → relay direction. Phases: short-circuit (bridge-managed responses) → observers (auth, handshake, desktop refresh, push tracking, thread tracking) → sanitize (image redaction etc.) → forward. Observer-only stages return false; sanitize returning null drops the message.
+- `bridge/relay-socket-loop.js` — owns the WebSocket lifecycle and reconnect policy. Bridge passes callbacks (`onStatus`, `onOpen`, `onTeardown`, `onShutdown`, `handleIncomingWireMessage`, `onApplicationMessage`). Close-code policy: codes 4000 / 4001 trigger `onShutdown`; everything else reconnects via `reconnectScheduler`.
+
+Shared translator helpers (used by claude / opencode / cursor shims):
+
+- `providers/_shared/translator-utils.js` — pure helpers and frame envelopes. Includes `createFrameEmitter`, `createTurnLifecycleEmitter` (`turn/started`/`turn/completed`/`turn/failed` shapes), `buildTurnOverlapError` (the `-32003` reject), `emitAssistantItemStarted`, `deriveTitleFromSeed`, `generateThreadId`/`generateTurnId`/`generateItemId`. Frame envelopes must stay byte-identical across providers — change here, never inline a copy.
+- `providers/_shared/thread-jsonl-reconstructor.js` — `reconstructThreadFromJsonl` rebuilds a thread snapshot from a single rollout JSONL file. Used by claude (`~/.claude/projects/<encoded>/<session>.jsonl`) and cursor (`~/.cursor/chats/<id>.jsonl`). Each translator passes its own resolved file path; the parser doesn't know where on disk to look.
+
+Shared handler infrastructure:
+
+- `handlers/handler-utils.js` — `createJsonRpcRequestHandler({ match, dispatch, defaultErrorCode, defaultErrorMessage, onError? })` owns the JSON-RPC envelope: parse, match-or-pass-through, dispatch, wrap success as `{id, result}` or error as `{id, error:{code:-32000, message, data:{errorCode}}}`. Used by workspace, desktop, pet, project, voice, notifications. New handlers should use this factory rather than re-implementing the skeleton.
+
+Contract tests for the abstractions:
+
+- `test/contracts/cross-translator-contract.test.js` — parameterized over claude / opencode / cursor. Pins the shared wire contract: `thread/start` envelope, `turn/start` ack + `turn/started`, `-32003` overlap rejection, `turn/interrupt` finalization. Adding a fourth provider: add an adapter to the `PROVIDERS` array and the existing invariants are covered automatically.
+- `test/contracts/application-message-router.test.js`, `test/contracts/relay-outbound-pipeline.test.js`, `test/contracts/relay-socket-loop.test.js`, `test/contracts/handler-utils.test.js` — lock the dispatch / lifecycle / envelope guarantees the bridge depends on.
+
 ## iOS runtime + timeline guardrails
 
 - `turn/started` may not include a usable `turnId`: keep the per-thread running fallback.
