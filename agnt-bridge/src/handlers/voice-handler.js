@@ -4,6 +4,8 @@
 // Exports: createVoiceHandler
 // Depends on: global fetch/FormData/Blob, local codex app-server auth via sendCodexRequest
 
+const { createJsonRpcRequestHandler } = require("./handler-utils");
+
 const CHATGPT_TRANSCRIPTIONS_URL = "https://chatgpt.com/backend-api/transcribe";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const MAX_DURATION_MS = 120_000;
@@ -15,47 +17,20 @@ function createVoiceHandler({
   BlobImpl = globalThis.Blob,
   logPrefix = "[agnt]",
 } = {}) {
-  function handleVoiceRequest(rawMessage, sendResponse) {
-    let parsed;
-    try {
-      parsed = JSON.parse(rawMessage);
-    } catch {
-      return false;
-    }
-
-    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-    if (method !== "voice/transcribe") {
-      return false;
-    }
-
-    const id = parsed.id;
-    const params = parsed.params || {};
-
-    transcribeVoice(params, {
+  const handleVoiceRequest = createJsonRpcRequestHandler({
+    match: (method) => method === "voice/transcribe",
+    dispatch: (_method, params) => transcribeVoice(params, {
       sendCodexRequest,
       fetchImpl,
       FormDataImpl,
       BlobImpl,
-    })
-      .then((result) => {
-        sendResponse(JSON.stringify({ id, result }));
-      })
-      .catch((error) => {
-        console.error(`${logPrefix} voice transcription failed: ${error.message}`);
-        sendResponse(JSON.stringify({
-          id,
-          error: {
-            code: -32000,
-            message: error.userMessage || error.message || "Voice transcription failed.",
-            data: {
-              errorCode: error.errorCode || "voice_transcription_failed",
-            },
-          },
-        }));
-      });
-
-    return true;
-  }
+    }),
+    defaultErrorCode: "voice_transcription_failed",
+    defaultErrorMessage: "Voice transcription failed.",
+    onError: (error) => {
+      console.error(`${logPrefix} voice transcription failed: ${error?.message || error}`);
+    },
+  });
 
   return {
     handleVoiceRequest,

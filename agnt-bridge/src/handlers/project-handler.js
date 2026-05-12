@@ -7,6 +7,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { createJsonRpcRequestHandler } = require("./handler-utils");
 
 const DEFAULT_DIRECTORY_LIMIT = 200;
 const DEFAULT_DIRECTORY_SEARCH_LIMIT = 80;
@@ -16,43 +17,12 @@ const DEFAULT_HIDDEN_DIRECTORY_NAMES = new Set(["Library"]);
 
 // ─── ENTRY POINT ─────────────────────────────────────────────
 
-function handleProjectRequest(rawMessage, sendResponse) {
-  let parsed;
-  try {
-    parsed = JSON.parse(rawMessage);
-  } catch {
-    return false;
-  }
-
-  const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-  if (!method.startsWith("project/")) {
-    return false;
-  }
-
-  const id = parsed.id;
-  const params = parsed.params || {};
-
-  handleProjectMethod(method, params)
-    .then((result) => {
-      sendResponse(JSON.stringify({ id, result }));
-    })
-    .catch((err) => {
-      const errorCode = err.errorCode || "project_error";
-      const message = err.userMessage || err.message || "Unknown project folder error";
-      sendResponse(
-        JSON.stringify({
-          id,
-          error: {
-            code: -32000,
-            message,
-            data: { errorCode },
-          },
-        })
-      );
-    });
-
-  return true;
-}
+const handleProjectRequest = createJsonRpcRequestHandler({
+  match: (method) => method.startsWith("project/"),
+  dispatch: handleProjectMethod,
+  defaultErrorCode: "project_error",
+  defaultErrorMessage: "Unknown project folder error",
+});
 
 async function handleProjectMethod(method, params, options = {}) {
   switch (method) {

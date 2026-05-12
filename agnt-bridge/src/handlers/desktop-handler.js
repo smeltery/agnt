@@ -9,6 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const { promisify } = require("util");
 const { findRolloutFileForThread, resolveSessionsRoot } = require("../desktop/rollout-watch");
+const { createJsonRpcRequestHandler } = require("./handler-utils");
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_BUNDLE_ID = "com.openai.codex";
@@ -21,41 +22,12 @@ const DEFAULT_THREAD_MATERIALIZE_WAIT_MS = 4_000;
 const DEFAULT_THREAD_MATERIALIZE_POLL_MS = 250;
 const DEFAULT_WAKE_DISPLAY_DURATION_SECONDS = 30;
 
-function handleDesktopRequest(rawMessage, sendResponse, options = {}) {
-  let parsed;
-  try {
-    parsed = JSON.parse(rawMessage);
-  } catch {
-    return false;
-  }
-
-  const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-  if (!method.startsWith("desktop/")) {
-    return false;
-  }
-
-  const id = parsed.id;
-  const params = parsed.params || {};
-
-  handleDesktopMethod(method, params, options)
-    .then((result) => {
-      sendResponse(JSON.stringify({ id, result }));
-    })
-    .catch((err) => {
-      const errorCode = err.errorCode || "desktop_error";
-      const message = err.userMessage || err.message || "Unknown desktop handoff error";
-      sendResponse(JSON.stringify({
-        id,
-        error: {
-          code: -32000,
-          message,
-          data: { errorCode },
-        },
-      }));
-    });
-
-  return true;
-}
+const handleDesktopRequest = createJsonRpcRequestHandler({
+  match: (method) => method.startsWith("desktop/"),
+  dispatch: handleDesktopMethod,
+  defaultErrorCode: "desktop_error",
+  defaultErrorMessage: "Unknown desktop handoff error",
+});
 
 async function handleDesktopMethod(method, params, options = {}) {
   const platform = options.platform || DEFAULT_PLATFORM;

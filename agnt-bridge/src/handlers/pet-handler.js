@@ -7,6 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 const { resolveCodexHome } = require("../providers/codex/home");
+const { createJsonRpcRequestHandler } = require("./handler-utils");
 
 const ATLAS_WIDTH = 1536;
 const ATLAS_HEIGHT = 1872;
@@ -16,42 +17,12 @@ const IMAGE_MIME_TYPES_BY_EXTENSION = new Map([
   [".webp", "image/webp"],
 ]);
 
-function handlePetRequest(rawMessage, sendResponse) {
-  let parsed;
-  try {
-    parsed = JSON.parse(rawMessage);
-  } catch {
-    return false;
-  }
-
-  const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
-  if (!isPetMethod(method)) {
-    return false;
-  }
-
-  const id = parsed.id;
-  const params = parsed.params || {};
-  handlePetMethod(method, params)
-    .then((result) => {
-      sendResponse(JSON.stringify({ id, result }));
-    })
-    .catch((err) => {
-      const errorCode = err.errorCode || "pet_error";
-      const message = err.userMessage || err.message || "Unable to load Codex pets.";
-      sendResponse(
-        JSON.stringify({
-          id,
-          error: {
-            code: -32000,
-            message,
-            data: { errorCode },
-          },
-        })
-      );
-    });
-
-  return true;
-}
+const handlePetRequest = createJsonRpcRequestHandler({
+  match: isPetMethod,
+  dispatch: handlePetMethod,
+  defaultErrorCode: "pet_error",
+  defaultErrorMessage: "Unable to load Codex pets.",
+});
 
 async function handlePetMethod(method, params = {}) {
   if (!isPetMethod(method)) {
