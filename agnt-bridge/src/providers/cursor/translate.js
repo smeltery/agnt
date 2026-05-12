@@ -5,7 +5,7 @@
 //          exec_command_* notifications, and resumes sessions across turns.
 // Layer: provider plugin (cursor)
 // Exports: createCursorTranslator
-// Depends on: crypto, fs, path, os
+// Depends on: fs, path, os, ../_shared/translator-utils
 //
 // Wire mapping (high level):
 //   bridge JSON-RPC outbound       cursor action
@@ -41,14 +41,25 @@
 //     decide whether to emit Codex exec_command_* events (shell) or the
 //     item/* family (file ops + everything else).
 
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
+const {
+  buildTurnOverlapError,
+  createFrameEmitter,
+  generateItemId,
+  generateThreadId,
+  generateTurnId,
+  readString,
+  safeParseJson,
+} = require("../_shared/translator-utils");
+
 const PROTO_VERSION = "1.0.0-cursor-shim";
 
 function createCursorTranslator({ injectInbound, transport, env = process.env } = {}) {
+  const { emitNotification, injectResponse, respondError } = createFrameEmitter(injectInbound);
+
   // ── per-connection state ───────────────────────────────────────────────
   /** Synthetic threadId surfaced to the iOS app. */
   let threadId = "";
@@ -255,7 +266,8 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
 
     // Reject overlapping turns rather than letting state collide.
     if (activeTurnId) {
-      respondError(request?.id, -32003, "A turn is already in flight on this thread");
+      const err = buildTurnOverlapError();
+      respondError(request?.id, err.code, err.message);
       return null;
     }
 
@@ -1012,39 +1024,6 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
     pendingToolCalls.clear();
   }
 
-  function generateThreadId() {
-    return `thr_${crypto.randomBytes(12).toString("hex")}`;
-  }
-
-  function generateTurnId() {
-    return `turn_${crypto.randomBytes(12).toString("hex")}`;
-  }
-
-  function generateItemId(kind) {
-    return `${kind}_${crypto.randomBytes(10).toString("hex")}`;
-  }
-
-  function emitNotification(method, params) {
-    injectInbound(JSON.stringify({ method, params }));
-  }
-
-  function injectResponse(id, result) {
-    injectInbound(JSON.stringify({ id, result }));
-  }
-
-  function respondError(id, code, message) {
-    if (id == null) return;
-    injectInbound(JSON.stringify({ id, error: { code, message } }));
-  }
-}
-
-function safeParseJson(line) {
-  if (typeof line !== "string") return null;
-  try { return JSON.parse(line); } catch { return null; }
-}
-
-function readString(value) {
-  return typeof value === "string" && value ? value : "";
 }
 
 module.exports = {

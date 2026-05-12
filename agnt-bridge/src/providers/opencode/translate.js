@@ -4,7 +4,7 @@
 //          turn lifecycle it uses for Codex.
 // Layer: provider plugin (opencode)
 // Exports: createOpencodeTranslator
-// Depends on: crypto
+// Depends on: ../_shared/translator-utils
 //
 // Wire mapping (high level):
 //   bridge JSON-RPC outbound       opencode action
@@ -35,11 +35,21 @@
 //   user-initiated `turn/start` and fire `turn/completed` on the next idle
 //   transition.
 
-const crypto = require("crypto");
+const {
+  buildTurnOverlapError,
+  createFrameEmitter,
+  generateItemId,
+  generateTurnId,
+  numberOr,
+  readString,
+  safeParseJson,
+} = require("../_shared/translator-utils");
 
 const PROTO_VERSION = "1.0.0-opencode-shim";
 
 function createOpencodeTranslator({ injectInbound, transport, env: _env = process.env } = {}) {
+  const { emitNotification, injectResponse, respondError } = createFrameEmitter(injectInbound);
+
   // ── per-connection state ───────────────────────────────────────────────
   /** Map of threadId → opencode session id. The bridge uses sessionId == threadId. */
   let activeThreadId = "";
@@ -291,7 +301,8 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
 
     // Reject overlapping turns. Same backstop as the Claude shim.
     if (activeTurnId) {
-      respondError(request?.id, -32003, "A turn is already in flight on this thread");
+      const err = buildTurnOverlapError();
+      respondError(request?.id, err.code, err.message);
       return;
     }
 
@@ -1239,43 +1250,6 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     return "image/png";
   }
 
-  function generateTurnId() {
-    return `turn_${crypto.randomBytes(12).toString("hex")}`;
-  }
-
-  function generateItemId(kind) {
-    return `${kind}_${crypto.randomBytes(10).toString("hex")}`;
-  }
-
-  function emitNotification(method, params) {
-    injectInbound(JSON.stringify({ method, params }));
-  }
-
-  function injectResponse(id, result) {
-    injectInbound(JSON.stringify({ id, result }));
-  }
-
-  function respondError(id, code, message) {
-    if (id == null) return;
-    injectInbound(JSON.stringify({ id, error: { code, message } }));
-  }
-}
-
-function safeParseJson(line) {
-  if (typeof line !== "string") return null;
-  try {
-    return JSON.parse(line);
-  } catch {
-    return null;
-  }
-}
-
-function readString(value) {
-  return typeof value === "string" && value ? value : "";
-}
-
-function numberOr(value, fallback) {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 module.exports = {
