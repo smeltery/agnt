@@ -101,6 +101,9 @@ const {
   createApplicationMessageRouter,
 } = require("./application-message-router");
 const {
+  createRelayOutboundPipeline,
+} = require("./relay-outbound-pipeline");
+const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
 } = require("../transport/secure-device-state");
@@ -500,20 +503,18 @@ function startBridge({
   pushServiceClient.logUnavailable();
   connectRelay();
 
-  codex.onMessage((message) => {
-    if (bridgeManagedCodex.handleResponse(message)) {
-      return;
-    }
-    accountHandler.updatePendingAuthLoginFromCodexMessage(message);
-    handshakeHandler.observeCodexResponse(message);
-    desktopRefresher.handleOutbound(message);
-    pushNotificationTracker.handleOutbound(message);
-    rememberThreadFromMessage("codex", message);
-    secureTransport.queueOutboundApplicationMessage(
-      sanitizeRelayBoundCodexMessage(message),
-      sendRelayWireMessage
-    );
-  });
+  codex.onMessage(createRelayOutboundPipeline({
+    shortCircuit: (msg) => bridgeManagedCodex.handleResponse(msg),
+    observers: [
+      (msg) => accountHandler.updatePendingAuthLoginFromCodexMessage(msg),
+      (msg) => handshakeHandler.observeCodexResponse(msg),
+      (msg) => desktopRefresher.handleOutbound(msg),
+      (msg) => pushNotificationTracker.handleOutbound(msg),
+      (msg) => rememberThreadFromMessage("codex", msg),
+    ],
+    sanitize: sanitizeRelayBoundCodexMessage,
+    forward: (payload) => secureTransport.queueOutboundApplicationMessage(payload, sendRelayWireMessage),
+  }));
 
   codex.onClose(() => {
     clearRelayWatchdog();
