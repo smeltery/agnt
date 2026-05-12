@@ -6,26 +6,29 @@
 [![Web Check](https://github.com/dotbrains/agnt/actions/workflows/agnt-web-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/agnt-web-check.yml)
 [![Relay Check](https://github.com/dotbrains/agnt/actions/workflows/relay-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/relay-check.yml)
 [![Build Unsigned IPA](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/build-unsigned-ipa.yml)
+[![Android Check](https://github.com/dotbrains/agnt/actions/workflows/android-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/android-check.yml)
 
-**Drive coding-agent CLIs from your iPhone or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac or Linux box and proxies an end-to-end encrypted session to your iOS app or to a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
+**Drive coding-agent CLIs from your iPhone, Android, or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac or Linux box and proxies an end-to-end encrypted session to your iOS app, Android app, or a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
 
 ## What it is
 
 ```mermaid
 flowchart LR
     iOS["iOS app"]
+    Android["Android app"]
     Web["web app<br/>(browser)"]
     Relay["relay<br/>(opaque transport)"]
     Bridge["bridge<br/>(your Mac)"]
     CLI["agent CLI<br/>(codex / claude /<br/>opencode / cursor)"]
 
     iOS <-->|"E2E-encrypted<br/>JSON-RPC"| Relay
+    Android <-->|"E2E-encrypted<br/>JSON-RPC"| Relay
     Web <-->|"E2E-encrypted<br/>JSON-RPC"| Relay
     Relay <-->|"WebSocket"| Bridge
     Bridge -->|"native protocol<br/>(translator shim)"| CLI
 ```
 
-- **iOS app** and **web app** are two clients of the same protocol — Codex JSON-RPC over a paired secure session.
+- **iOS app**, **Android app**, and **web app** are three clients of the same protocol — Codex JSON-RPC over a paired secure session.
 - **Bridge** runs on your Mac or Linux host. It picks a provider, spawns the matching CLI, and translates between JSON-RPC and whatever native protocol the CLI uses (stream-json, REST+SSE, …). The built-in service installer uses launchd on macOS and systemd-user on Linux; on other operating systems `agnt up` runs in the foreground.
 - **Relay** routes ciphertext bytes only. Run it locally for LAN use, or self-host it on a VPS / Tailscale for off-network access.
 
@@ -41,9 +44,10 @@ cd agnt
 
 That spins up a local relay + the bridge in the foreground and prints a QR code, the JSON payload, and a short alphanumeric pairing code. Force a specific provider with `--provider codex|claude|opencode|cursor`.
 
-Pair from either client:
+Pair from any client:
 
 - **iOS app** — install [agnt](https://github.com/dotbrains/agnt), scan the QR. The phone reconnects automatically afterward.
+- **Android app** — build from `AgntAndroid/` (`./gradlew :app:installDebug`), scan the QR. Alpha — see [`AgntAndroid/README.md`](AgntAndroid/README.md) and [`AgntAndroid/PARITY.md`](AgntAndroid/PARITY.md) for status. Imported from [Stivy-01/remodex](https://github.com/Stivy-01/remodex) (Apache-2.0); attribution in [`AgntAndroid/NOTICE`](AgntAndroid/NOTICE).
 - **Browser** — `cd agnt-web && bun install && bun run dev`, open `http://localhost:5173`, then paste the JSON, type the short code, or scan the QR with your camera. Same E2EE handshake. See [`agnt-web/README.md`](agnt-web/README.md) for static-build deployment (Tailscale, VPS, S3+CloudFront, …).
 
 For self-hosting (Tailscale, public VPS, etc.) see [`docs/operations/self-hosting.md`](docs/operations/self-hosting.md).
