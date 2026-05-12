@@ -99,16 +99,16 @@
       ));
     }
 
-    window.remodexMermaidHeight = function () {
+    window.agntMermaidHeight = function () {
       return currentHeight();
     };
 
-    window.renderRemodexMermaid = async function (source, darkMode) {
+    window.renderAgntMermaid = async function (source, darkMode) {
       document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
       mermaid.initialize(configuration(darkMode));
 
       try {
-        const result = await mermaid.render("remodex-mermaid-" + Math.random().toString(36).slice(2), source);
+        const result = await mermaid.render("agnt-mermaid-" + Math.random().toString(36).slice(2), source);
         diagram.innerHTML = result.svg;
         fallback.textContent = "";
         fallback.style.display = "none";
@@ -118,7 +118,7 @@
         fallback.style.display = "block";
       }
 
-      return window.remodexMermaidHeight();
+      return window.agntMermaidHeight();
     };
   </script>
 </body>
