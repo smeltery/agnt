@@ -76,6 +76,7 @@ function createAccountHandler({
   tracker,
   composeSanitizedAuthStatusFromSettledResults,
   resolveVoiceAuth,
+  isWebTerminalEnabled = () => false,
 }) {
   // ── per-bridge state ───────────────────────────────────────────────────
   // The phone reads `loginInFlight` (via readSanitizedAuthStatus) to know
@@ -248,6 +249,7 @@ function createAccountHandler({
         : null,
       transportMode: codexMode,
       hostPlatform: process.platform,
+      webTerminalEnabled: Boolean(isWebTerminalEnabled?.()),
     });
   }
 

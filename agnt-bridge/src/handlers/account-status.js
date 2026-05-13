@@ -15,6 +15,7 @@ function composeAccountStatus({
   bridgeVersionInfo = null,
   transportMode = null,
   hostPlatform = process.platform,
+  webTerminalEnabled = false,
 } = {}) {
   const account = accountRead?.account || null;
   const authToken = normalizeString(authStatus?.authToken);
@@ -49,7 +50,7 @@ function composeAccountStatus({
     bridgeLatestVersion: normalizeString(bridgeVersionInfo?.bridgeLatestVersion) || null,
     codexTransportMode: normalizeString(transportMode) || null,
     hostPlatform: normalizeHostPlatform(hostPlatform),
-    hostCapabilities: deriveHostCapabilities(hostPlatform),
+    hostCapabilities: deriveHostCapabilities(hostPlatform, { webTerminalEnabled }),
   };
 }
 
@@ -62,6 +63,7 @@ function redactAuthStatus(authStatus = null, extras = {}) {
     bridgeVersionInfo: extras.bridgeVersionInfo || null,
     transportMode: extras.transportMode || null,
     hostPlatform: extras.hostPlatform || process.platform,
+    webTerminalEnabled: Boolean(extras.webTerminalEnabled),
   });
 
   return {
@@ -93,6 +95,7 @@ function composeSanitizedAuthStatusFromSettledResults({
   bridgeVersionInfo = null,
   transportMode = null,
   hostPlatform = process.platform,
+  webTerminalEnabled = false,
 } = {}) {
   const accountRead = accountReadResult?.status === "fulfilled" ? accountReadResult.value : null;
   const authStatus = authStatusResult?.status === "fulfilled" ? authStatusResult.value : null;
@@ -109,6 +112,7 @@ function composeSanitizedAuthStatusFromSettledResults({
     bridgeVersionInfo,
     transportMode,
     hostPlatform,
+    webTerminalEnabled: Boolean(webTerminalEnabled),
   });
 }
 
@@ -158,15 +162,19 @@ function normalizeHostPlatform(platform) {
   }
 }
 
-function deriveHostCapabilities(platform) {
+function deriveHostCapabilities(platform, { webTerminalEnabled = false } = {}) {
   const isMacOS = platform === "darwin";
   return {
     desktopHandoff: isMacOS,
     displayWake: isMacOS,
     keepAwake: isMacOS,
     hostBrowserLogin: isMacOS,
-    // On-device SSH terminal runs on the phone via Citadel, so it's available regardless of host.
+    // On-device SSH terminal runs on the phone via Citadel; available regardless of host.
     terminal: true,
+    // Bridge-spawned local PTY shell exposed to the web client. Off by default —
+    // requires the user to flip `enableWebTerminal` in bridge preferences. iOS
+    // ignores this; it has its own on-device SSH terminal instead.
+    terminalLocal: Boolean(webTerminalEnabled),
   };
 }
 

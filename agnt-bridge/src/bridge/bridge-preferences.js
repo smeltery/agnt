@@ -30,6 +30,10 @@ function createBridgePreferences({ config, bridgeWakeAssertion }) {
       success: true,
       preferences: {
         keepMacAwake: config.keepMacAwakeEnabled !== false,
+        // Off by default — flips a bridge-side capability so the web client
+        // shows the terminal entry point and the terminal handler accepts
+        // requests.
+        enableWebTerminal: config.enableWebTerminal === true,
       },
       applied: bridgeWakeAssertion.active,
     };
@@ -40,9 +44,16 @@ function createBridgePreferences({ config, bridgeWakeAssertion }) {
     config.keepMacAwakeEnabled = nextKeepMacAwakeEnabled;
     bridgeWakeAssertion.setEnabled?.(nextKeepMacAwakeEnabled);
 
+    // Only honor explicitly-provided values so partial updates (today's iOS
+    // panel only sends `keepMacAwake`) don't silently flip the new flag.
+    if (Object.prototype.hasOwnProperty.call(preferences, "enableWebTerminal")) {
+      config.enableWebTerminal = preferences.enableWebTerminal === true;
+    }
+
     try {
       persistBridgePreferences({
         keepMacAwakeEnabled: nextKeepMacAwakeEnabled,
+        enableWebTerminal: config.enableWebTerminal === true,
       });
     } catch (error) {
       const nextError = new Error("Could not save the bridge preference on this Mac.");
@@ -61,15 +72,19 @@ function createBridgePreferences({ config, bridgeWakeAssertion }) {
 // Module-scope so the existing bridge.test.js suite can import it directly to
 // pin the daemon-config write contract.
 function persistBridgePreferences(
-  { keepMacAwakeEnabled },
+  { keepMacAwakeEnabled, enableWebTerminal },
   {
     readDaemonConfigImpl = readDaemonConfig,
     writeDaemonConfigImpl = writeDaemonConfig,
   } = {}
 ) {
+  const previous = readDaemonConfigImpl() || {};
   writeDaemonConfigImpl({
-    ...(readDaemonConfigImpl() || {}),
+    ...previous,
     keepMacAwakeEnabled,
+    // Skip if the caller didn't explicitly pass this — keeps the existing
+    // single-key callsites working without flipping the new flag to false.
+    ...(typeof enableWebTerminal === "boolean" ? { enableWebTerminal } : {}),
   });
 }
 

@@ -26,6 +26,7 @@ const { handleProjectRequest } = require("../handlers/project-handler");
 const { handlePetRequest } = require("../handlers/pet-handler");
 const { createNotificationsHandler } = require("../handlers/notifications-handler");
 const { createVoiceHandler, resolveVoiceAuth } = require("../handlers/voice-handler");
+const { createTerminalHandler } = require("../handlers/terminal-handler");
 const {
   composeSanitizedAuthStatusFromSettledResults,
 } = require("../handlers/account-status");
@@ -293,6 +294,12 @@ function startBridge({
     tracker: forwardedRequestTracker,
     composeSanitizedAuthStatusFromSettledResults,
     resolveVoiceAuth,
+    isWebTerminalEnabled: () => config.enableWebTerminal === true,
+  });
+  const terminalHandler = createTerminalHandler({
+    isEnabled: () => config.enableWebTerminal === true,
+    sendApplicationResponse: (raw) => sendApplicationResponse(raw),
+    logPrefix: "[agnt]",
   });
   startBridgeStatusHeartbeat();
   publishBridgeStatus({
@@ -500,6 +507,7 @@ function startBridge({
     clearReconnectTimer();
     clearRelayWatchdog();
     clearBridgeStatusHeartbeat();
+    terminalHandler.shutdown();
   }));
   process.on("SIGTERM", () => shutdown(codex, () => socketLoop.getSocket(), () => {
     isShuttingDown = true;
@@ -507,6 +515,7 @@ function startBridge({
     clearReconnectTimer();
     clearRelayWatchdog();
     clearBridgeStatusHeartbeat();
+    terminalHandler.shutdown();
   }));
 
   // Routes decrypted app payloads through the same bridge handlers as before.
@@ -519,6 +528,7 @@ function startBridge({
       (msg) => accountHandler.handleBridgeManagedAccountRequest(msg, sendApplicationResponse),
       (msg) => accountHandler.handleNonCodexVoiceRequest(msg, sendApplicationResponse),
       (msg) => voiceHandler.handleVoiceRequest(msg, sendApplicationResponse),
+      (msg) => terminalHandler.handleTerminalRequest(msg, sendApplicationResponse),
       (msg) => handleThreadContextRequest(msg, sendApplicationResponse),
       (msg) => handleWorkspaceRequest(msg, sendApplicationResponse, {
         // Forward whatever the active provider considers its generated-image root.
