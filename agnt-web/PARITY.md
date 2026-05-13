@@ -46,6 +46,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `History` | ✅ | 2 (history events replayed through the same reducer) |
 | `Voice` + `VoiceCompatibility` | ✅ | 6 (MediaRecorder + Web Audio resample → 24 kHz mono WAV → voice/transcribe; Codex-only at the bridge) |
 | `Notifications` | 🟡 | 21 (browser desktop notifications via `Notification` API on `turn/completed`/`turn/failed` when tab is hidden; auto/on/off pref; per-thread coalescing tag. Web-push for fully-closed-tab delivery still future.) |
+| `Terminal` (bridge-PTY) | 🟡 | 32 (different shape from iOS — browser cannot open raw SSH; instead the bridge spawns its login shell via `node-pty` and proxies bytes over `terminal/*` JSON-RPC + `terminal/output` notifications. xterm.js + addon-fit on the front-end. Off by default; opt-in via `enableWebTerminal` bridge preference. Single session, single PTY for now — multi-tab sessions UI deferred.) |
 | `Pets` | ⛔ dropped | iOS-specific UX (animations / haptics / Live Activities). Use the iOS app for pets. |
 | `Review` | ⛔ | future (`review/start` UI; bridge supports the RPC, no clear web surface yet) |
 | `AIChangeSets` | ⛔ deferred | per-turn `RevertSheet` (Session 10) covers the practical "undo what this turn did" workflow; finer-grained per-message patch revert needs reducer to track forward patches captured during streaming |

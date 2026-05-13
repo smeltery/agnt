@@ -369,6 +369,30 @@ later session because the protocol and storage layers are already complete.
 - ✅ Per-row "↶ Revert" affordance on completed assistant rows; gated on `thread.cwd` (without it the bridge errors with `missing_working_directory`)
 - ⛔ `turn/steer` skipped this session: 3 of 4 providers explicitly reject it (`-32601`); only Codex's native pass-through might work, and behavior is unverified. Document as provider-limited rather than ship a button that fails for most users.
 
+## Session 32 — Bridge-PTY terminal ✅ DONE
+
+The web client cannot open raw SSH from JavaScript, so this session
+deliberately diverges from the iOS/Android shape (those two run an on-device
+SSH terminal via Citadel/sshj). Instead the bridge spawns its own login shell
+via `node-pty` and proxies bytes over the encrypted JSON-RPC channel.
+
+- ✅ Bridge handler `agnt-bridge/src/handlers/terminal-handler.js`. RPC surface:
+  `terminal/open|write|resize|clear|close|snapshot`. Notifications:
+  `terminal/output {dataBase64}` and `terminal/exited {exitCode, signal}`.
+- ✅ Opt-in security gate. `enableWebTerminal` bridge preference (default
+  `false`). Capability flag exposed on `account/status/read.hostCapabilities.terminalLocal`
+  so the web client only paints the entry point when the user has flipped the
+  toggle. iOS-side `hostCapabilities.terminal` (on-device SSH) stays as-is.
+- ✅ Web protocol client `src/protocol/terminal.ts` + zustand `src/state/terminal-store.ts`
+  with snapshot map, output event stream, and incremental history merge.
+- ✅ `src/components/terminal/TerminalSurface.tsx` wraps `@xterm/xterm` +
+  `@xterm/addon-fit`. Theme follows the workspace dark/light mode.
+- ✅ Workspace header gains a `Terminal` button (capability-gated). Clicking
+  opens a full-screen overlay routed through the existing lazy-modal pattern.
+- 🟡 Single PTY per bridge for now — multi-tab session UI deferred. Bridge
+  handler already supports multiple `terminalId`s; the UI just doesn't expose
+  the picker yet.
+
 ## Session N — Future hardening (deferred — not blocking)
 
 - WebPush for completion notifications (gated on a self-hostable web-push gateway; meanwhile completions surface via the existing `system/notice` toasts)

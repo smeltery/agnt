@@ -292,6 +292,11 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
         models: snapshot.models,
         loading: false,
       });
+      // Pull host capabilities (terminalLocal etc.) once on connect so the
+      // workspace header can decide whether to show the Terminal button.
+      // SettingsModal also calls this on open, but we don't want to require
+      // that detour just to discover the feature.
+      void useAccountStore.getState().refresh();
     } catch (error) {
       log.warn("bootstrap failed", error);
       set({ loading: false, error: (error as Error).message });
