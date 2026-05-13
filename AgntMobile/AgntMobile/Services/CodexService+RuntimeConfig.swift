@@ -239,7 +239,7 @@ extension CodexService {
 
     func selectedReasoningEffortForSelectedModel(threadId: String? = nil) -> String? {
         guard let model = selectedModelOption() else {
-            return nil
+            return selectedReasoningEffort ?? RuntimeSelectionDefaults.reasoningEffort
         }
 
         let supported = Set(model.supportedReasoningEfforts.map { $0.reasoningEffort })
@@ -272,7 +272,7 @@ extension CodexService {
     }
 
     func runtimeModelIdentifierForTurn() -> String? {
-        selectedModelOption()?.model
+        selectedModelOption()?.model ?? selectedModelId ?? RuntimeSelectionDefaults.modelId
     }
 
     func effectiveServiceTier(for threadId: String? = nil) -> CodexServiceTier? {
@@ -470,6 +470,12 @@ private extension CodexService {
 
     func normalizeRuntimeSelectionsAfterModelsUpdate() {
         guard !availableModels.isEmpty else {
+            if selectedModelId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+                selectedModelId = nil
+            }
+            if selectedReasoningEffort?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+                selectedReasoningEffort = nil
+            }
             persistRuntimeSelections()
             return
         }

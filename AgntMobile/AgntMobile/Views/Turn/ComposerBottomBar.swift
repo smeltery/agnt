@@ -117,6 +117,7 @@ struct ComposerBottomBar: View {
                         .frame(width: 32, height: 32)
                         .background(Color(.label), in: Circle())
                 }
+                .accessibilityLabel("Stop current run")
             }
 
             Button {
@@ -387,7 +388,10 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
     }
 
     private var compactRuntimeTitle: String {
-        "\(compactModelTitle) \(runtimeState.selectedReasoningTitle)"
+        if selectedModelID == nil {
+            return isRuntimeSelectionLoading ? "Loading…" : "Select model"
+        }
+        return "\(compactModelTitle) \(runtimeState.selectedReasoningTitle)"
     }
 
     // Keeps the family suffix visible while shortening the common GPT prefix.

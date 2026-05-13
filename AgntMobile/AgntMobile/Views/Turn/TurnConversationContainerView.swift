@@ -314,13 +314,25 @@ extension CodexMessage {
     }
 
     var shouldDisplayInlinePlanResult: Bool {
-        guard isPlanSystemMessage,
-              resolvedPlanPresentation?.isInlineResultVisible == true,
-              !shouldDisplayPinnedPlanAccessory else {
+        guard isPlanSystemMessage, !shouldDisplayPinnedPlanAccessory else {
+            return false
+        }
+
+        if resolvedPlanPresentation == .resultCompletedItem {
+            return hasRenderablePlanResult
+        }
+
+        guard resolvedPlanPresentation?.isInlineResultVisible == true else {
             return false
         }
 
         return proposedPlan != nil
+    }
+
+    private var hasRenderablePlanResult: Bool {
+        let placeholders: Set<String> = ["Planning..."]
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return proposedPlan != nil || (!trimmedText.isEmpty && !placeholders.contains(trimmedText))
     }
 
     var shouldDisplayComposerStructuredPrompt: Bool {
