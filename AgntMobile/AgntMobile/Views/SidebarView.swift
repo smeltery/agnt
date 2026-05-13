@@ -22,6 +22,7 @@ struct SidebarView: View {
 
     @State private var searchText = ""
     @State private var isCreatingThread = false
+    @State private var pendingTopAction: SidebarTopAction? = nil
     @State private var groupedThreads: [SidebarThreadGroup] = []
     @State private var activeSidebarSheet: SidebarPresentedSheet?
     @State private var projectGroupPendingArchive: SidebarThreadGroup? = nil
@@ -49,11 +50,12 @@ struct SidebarView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 6)
 
-            SidebarNewChatButton(
-                isCreatingThread: isCreatingThread,
+            SidebarTopActionsRow(
                 isEnabled: canCreateThread,
-                statusMessage: nil,
-                action: handleNewChatButtonTap
+                pendingAction: pendingTopAction,
+                onNewChat: handleNewChatButtonTap,
+                onQuickChat: handleQuickChatTap,
+                onNewProject: handleNewProjectTap
             )
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
@@ -270,6 +272,17 @@ struct SidebarView: View {
         activeSidebarSheet = .newChatProjectPicker
     }
 
+    // Starts a chat without a working directory (cwd == nil) directly from the sidebar row.
+    private func handleQuickChatTap() {
+        pendingTopAction = .quickChat
+        handleNewChatTap(preferredProjectPath: nil)
+    }
+
+    // Opens the local folder browser so the user can register a new project root.
+    private func handleNewProjectTap() {
+        presentLocalFolderBrowser()
+    }
+
     private func presentLocalFolderBrowser() {
         activeSidebarSheet = .localFolderBrowser
     }
@@ -282,6 +295,7 @@ struct SidebarView: View {
         Task { @MainActor in
             defer {
                 isCreatingThread = false
+                pendingTopAction = nil
                 onNewChatCreationStateChange(false)
             }
 
@@ -292,7 +306,7 @@ struct SidebarView: View {
                 )
                 onOpenThread(thread)
             } catch {
-                let message = error.localizedDescription
+                guard let message = codex.userFacingTurnErrorMessageForFooter(from: error) else { return }
                 codex.lastErrorMessage = message
                 createThreadErrorMessage = message.isEmpty ? "Unable to create a chat right now." : message
             }
@@ -307,6 +321,7 @@ struct SidebarView: View {
         Task { @MainActor in
             defer {
                 isCreatingThread = false
+                pendingTopAction = nil
                 onNewChatCreationStateChange(false)
             }
 
@@ -317,7 +332,7 @@ struct SidebarView: View {
                 )
                 onOpenThread(thread)
             } catch {
-                let message = error.localizedDescription
+                guard let message = codex.userFacingTurnErrorMessageForFooter(from: error) else { return }
                 codex.lastErrorMessage = message
                 createThreadErrorMessage = message.isEmpty ? "Unable to create a worktree chat right now." : message
             }

@@ -109,7 +109,7 @@ struct TurnView: View {
                 allowsAssistantPlanFallbackRecovery: planSessionSource == .compatibilityFallback,
                 threadMessagesForPlanMatching: renderSnapshot.planMatchingMessages,
                 currentWorkingDirectory: gitWorkingDirectory,
-                errorMessage: codex.lastErrorMessage,
+                errorMessage: timelineFooterErrorMessage,
                 composerRecoveryAccessory: composerRecoveryAccessory,
                 onReportError: { errorMessage in
                     openURL(AppEnvironment.feedbackMailtoURL(
@@ -479,6 +479,47 @@ struct TurnView: View {
         )
     }
 
+    // Keeps reconnect prompts out of the red footer error slot; recovery UI owns that state.
+    private var timelineFooterErrorMessage: String? {
+        guard let message = codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !message.isEmpty else {
+            return nil
+        }
+
+        if isConnectionRecoveryFooterNoise(message)
+            || isUnmaterializedThreadFooterNoise(message)
+            || isCancellationFooterNoise(message) {
+            return nil
+        }
+
+        return message
+    }
+
+    private func isConnectionRecoveryFooterNoise(_ message: String) -> Bool {
+        let normalizedMessage = message.lowercased()
+        return normalizedMessage.contains("tap reconnect")
+            || normalizedMessage.hasPrefix("connection was interrupted")
+            || normalizedMessage.hasPrefix("connection timed out")
+            || normalizedMessage.hasPrefix("trying to reconnect")
+    }
+
+    private func isUnmaterializedThreadFooterNoise(_ message: String) -> Bool {
+        let normalizedMessage = message.lowercased()
+        return normalizedMessage.contains("not materialized")
+            || normalizedMessage.contains("not yet materialized")
+            || (
+                normalizedMessage.contains("thread/turns/list")
+                    && normalizedMessage.contains("unavailable")
+            )
+    }
+
+    private func isCancellationFooterNoise(_ message: String) -> Bool {
+        let normalizedMessage = message.lowercased()
+        return normalizedMessage.contains("cancellationerror")
+            || normalizedMessage.contains("cancelled")
+            || normalizedMessage.contains("canceled")
+    }
+
     private var voiceRecoveryPresentation: VoiceRecoveryPresentation? {
         guard let voiceRecoveryReason else {
             return nil
@@ -617,8 +658,9 @@ struct TurnView: View {
             do {
                 _ = try await codex.startThreadIfReady(preferredProjectPath: resolvedProjectPathForFollowUpThread())
             } catch {
-                if codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
-                    codex.lastErrorMessage = error.localizedDescription
+                if let message = codex.userFacingTurnErrorMessageForFooter(from: error),
+                   codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+                    codex.lastErrorMessage = message
                 }
             }
         }
@@ -1071,8 +1113,9 @@ struct TurnView: View {
                 )
                 openThread(forkedThread.id)
             } catch {
-                if codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
-                    codex.lastErrorMessage = error.localizedDescription
+                if let message = codex.userFacingTurnErrorMessageForFooter(from: error),
+                   codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+                    codex.lastErrorMessage = message
                 }
             }
         }
@@ -1144,8 +1187,9 @@ struct TurnView: View {
                 )
                 viewModel.clearComposerReviewSelection()
             } catch {
-                if codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
-                    codex.lastErrorMessage = error.localizedDescription
+                if let message = codex.userFacingTurnErrorMessageForFooter(from: error),
+                   codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+                    codex.lastErrorMessage = message
                 }
             }
         }

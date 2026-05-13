@@ -162,6 +162,7 @@ struct SidebarThreadListView: View {
                         projectGroupShowMoreButton(group, hiddenCount: hiddenCount)
                     }
                 }
+                .padding(.leading, -8)
                 .padding(.bottom, 14)
                 .transition(.opacity)
             }

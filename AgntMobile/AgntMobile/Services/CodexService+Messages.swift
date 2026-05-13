@@ -140,6 +140,39 @@ extension CodexService {
         return thread.displayTitle == CodexThread.defaultDisplayTitle
     }
 
+    // A freshly started thread has metadata but no server history until the
+    // first user message materializes it. Treat that as an empty composer state.
+    func shouldTreatAsEmptyUnmaterializedThreadHistory(
+        _ error: CodexServiceError,
+        threadId: String,
+        markHydratedWhenNotMaterialized: Bool
+    ) -> Bool {
+        guard case .rpcError(let rpcError) = error else {
+            return false
+        }
+
+        let message = rpcError.message.lowercased()
+        guard message.contains("not materialized")
+                && message.contains("before first user message")
+                && shouldShowImmediateEmptyPlaceholder(
+                    threadId: threadId,
+                    hasVisibleMessages: !messages(for: threadId).isEmpty,
+                    isThreadRunning: threadHasActiveOrRunningTurn(threadId)
+                ) else {
+            return false
+        }
+
+        if markHydratedWhenNotMaterialized
+            && !deferHydratedMarkForNotMaterializedThreadIDs.contains(threadId) {
+            hydratedThreadIDs.insert(threadId)
+        }
+        if activeThreadId == threadId {
+            lastErrorMessage = nil
+        }
+        refreshThreadTimelineState(for: threadId)
+        return true
+    }
+
     // Returns a lightweight per-thread revision token for any message timeline mutation.
     func messageRevision(for threadId: String) -> Int {
         messageRevisionByThread[threadId] ?? 0
@@ -817,6 +850,16 @@ extension CodexService {
         if forceRefresh {
             forcedHistoryLoadThreadIDs.insert(threadId)
         }
+        if shouldShowImmediateEmptyPlaceholder(
+            threadId: threadId,
+            hasVisibleMessages: !messages(for: threadId).isEmpty,
+            isThreadRunning: threadHasActiveOrRunningTurn(threadId)
+        ) {
+            forcedHistoryLoadThreadIDs.remove(threadId)
+            hydratedThreadIDs.insert(threadId)
+            refreshThreadTimelineState(for: threadId)
+            return .alreadyHydrated
+        }
         if !forceRefresh, hydratedThreadIDs.contains(threadId) {
             return .alreadyHydrated
         }
@@ -863,6 +906,13 @@ extension CodexService {
                 let page = try await fetchInitialThreadTurnsHistoryPage(threadId: threadId)
                 threadObject = threadObjectFromPaginatedHistoryPage(threadId: threadId, page: page)
             } catch let error as CodexServiceError {
+                if shouldTreatAsEmptyUnmaterializedThreadHistory(
+                    error,
+                    threadId: threadId,
+                    markHydratedWhenNotMaterialized: markHydratedWhenNotMaterialized
+                ) {
+                    return .notMaterialized
+                }
                 if case .rpcError(let rpcError) = error,
                    rpcError.code == -32601 || rpcError.code == -32600 {
                     // Method not found or thread not materialized — try the legacy whole-thread read.
@@ -878,6 +928,13 @@ extension CodexService {
                         }
                         threadObject = legacyThread
                     } catch let fallbackError as CodexServiceError {
+                        if shouldTreatAsEmptyUnmaterializedThreadHistory(
+                            fallbackError,
+                            threadId: threadId,
+                            markHydratedWhenNotMaterialized: markHydratedWhenNotMaterialized
+                        ) {
+                            return .notMaterialized
+                        }
                         if case .rpcError(let fallbackRpcError) = fallbackError, fallbackRpcError.code == -32600 {
                             let shouldMarkHydrated = markHydratedWhenNotMaterialized
                                 && !deferHydratedMarkForNotMaterializedThreadIDs.contains(threadId)
