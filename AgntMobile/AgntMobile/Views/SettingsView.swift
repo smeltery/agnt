@@ -71,6 +71,18 @@ struct SettingsView: View {
         )
     }
 
+    private var enableWebTerminalOnBridgeBinding: Binding<Bool> {
+        Binding(
+            get: { codex.enableWebTerminalOnBridge },
+            set: { nextValue in
+                codex.setEnableWebTerminalOnBridgePreference(nextValue)
+                Task { @MainActor in
+                    await codex.syncBridgeEnableWebTerminalPreferenceIfNeeded(showFailureInUI: true)
+                }
+            }
+        )
+    }
+
     // MARK: - Runtime defaults
 
     @ViewBuilder private var runtimeDefaultsSection: some View {
@@ -214,6 +226,24 @@ struct SettingsView: View {
                         .font(AppFont.caption())
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Divider()
+
+            // Browser-only feature: when on, the agnt-web client gets a
+            // Terminal button that opens a shell on the bridge host. iOS keeps
+            // its own on-device SSH terminal regardless of this toggle.
+            Toggle("Allow web terminal sessions", isOn: enableWebTerminalOnBridgeBinding)
+                .tint(settingsAccentColor)
+            Text(codex.enableWebTerminalOnBridge
+                 ? "Browser clients paired with this bridge can spawn a shell on the bridge host. Anyone with access to a paired browser session gets the same shell access as the user that started agnt up."
+                 : "Browser clients paired with this bridge cannot spawn a shell on the bridge host.")
+                .font(AppFont.caption())
+                .foregroundStyle(.secondary)
+            if !codex.isConnected {
+                Text("Saved on this iPhone. It will sync to the paired computer the next time the bridge reconnects.")
+                    .font(AppFont.caption())
+                    .foregroundStyle(.secondary)
             }
 
             if codex.isConnected {

@@ -107,12 +107,18 @@ final class DesktopHandoffService {
     }
 
     func updateBridgeKeepMacAwakePreference(enabled: Bool) async throws {
+        try await sendBridgePreferenceUpdate(params: ["keepMacAwake": .bool(enabled)])
+    }
+
+    func updateBridgeEnableWebTerminalPreference(enabled: Bool) async throws {
+        try await sendBridgePreferenceUpdate(params: ["enableWebTerminal": .bool(enabled)])
+    }
+
+    private func sendBridgePreferenceUpdate(params: [String: JSONValue]) async throws {
         do {
             let response = try await codex.sendRequest(
                 method: "desktop/preferences/update",
-                params: .object([
-                    "keepMacAwake": .bool(enabled),
-                ])
+                params: .object(params)
             )
             guard let resultObject = response.result?.objectValue,
                   resultObject["success"]?.boolValue == true else {

@@ -341,6 +341,7 @@ final class CodexService {
     var lastRawMessage: String?
     var lastErrorMessage: String?
     var keepMacAwakeWhileBridgeRuns = false
+    var enableWebTerminalOnBridge = false
     var runtimeDebugLogEntries: [String] = []
     var connectionRecoveryState: CodexConnectionRecoveryState = .idle
     // Per-thread queued drafts for client-side turn queueing while a run is active.
@@ -633,6 +634,7 @@ final class CodexService {
     static let turnTerminalStatesDefaultsKey = "codex.turnTerminalStates"
     static let notificationsPromptedDefaultsKey = "codex.notifications.prompted"
     static let keepMacAwakeWhileBridgeRunsDefaultsKey = "codex.keepMacAwakeWhileBridgeRuns"
+    static let enableWebTerminalOnBridgeDefaultsKey = "codex.enableWebTerminalOnBridge"
 
     init(
         encoder: JSONEncoder = JSONEncoder(),
@@ -694,6 +696,11 @@ final class CodexService {
             self.keepMacAwakeWhileBridgeRuns = defaults.bool(forKey: Self.keepMacAwakeWhileBridgeRunsDefaultsKey)
         } else {
             self.keepMacAwakeWhileBridgeRuns = false
+        }
+        if defaults.object(forKey: Self.enableWebTerminalOnBridgeDefaultsKey) != nil {
+            self.enableWebTerminalOnBridge = defaults.bool(forKey: Self.enableWebTerminalOnBridgeDefaultsKey)
+        } else {
+            self.enableWebTerminalOnBridge = false
         }
 
         if let savedThreadRuntimeOverrides = defaults.data(forKey: Self.threadRuntimeOverridesDefaultsKey),

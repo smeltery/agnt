@@ -118,6 +118,7 @@ extension CodexService {
                 )
                 self?.startGPTLoginSyncIfNeeded()
                 await self?.syncBridgeKeepMacAwakePreferenceIfNeeded()
+                await self?.syncBridgeEnableWebTerminalPreferenceIfNeeded()
             }
         } catch {
             let shouldResetSavedSession = recordTrustedReconnectFailureIfNeeded(
@@ -205,6 +206,32 @@ extension CodexService {
         do {
             try await handoffService.updateBridgeKeepMacAwakePreference(
                 enabled: keepMacAwakeWhileBridgeRuns
+            )
+        } catch {
+            if showFailureInUI {
+                lastErrorMessage = userFacingTurnErrorMessageForFooter(from: error)
+            }
+        }
+    }
+
+    func setEnableWebTerminalOnBridgePreference(_ enabled: Bool) {
+        enableWebTerminalOnBridge = enabled
+        defaults.set(enabled, forKey: Self.enableWebTerminalOnBridgeDefaultsKey)
+    }
+
+    func updateBridgeEnableWebTerminalPreference(_ enabled: Bool) async {
+        setEnableWebTerminalOnBridgePreference(enabled)
+        await syncBridgeEnableWebTerminalPreferenceIfNeeded(showFailureInUI: true)
+    }
+
+    func syncBridgeEnableWebTerminalPreferenceIfNeeded(showFailureInUI: Bool = false) async {
+        guard isConnected else {
+            return
+        }
+        let handoffService = DesktopHandoffService(codex: self)
+        do {
+            try await handoffService.updateBridgeEnableWebTerminalPreference(
+                enabled: enableWebTerminalOnBridge
             )
         } catch {
             if showFailureInUI {
