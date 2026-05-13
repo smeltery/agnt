@@ -15,6 +15,7 @@ import com.dotbrains.agnt.mobile.ui.home.HomeMainContent
 import com.dotbrains.agnt.mobile.ui.archived.ArchivedChatsScreen
 import com.dotbrains.agnt.mobile.ui.beta.TesterHqScreen
 import com.dotbrains.agnt.mobile.ui.settings.SettingsScreen
+import com.dotbrains.agnt.mobile.ui.terminal.TerminalScreen
 
 @Composable
 fun AppNavHost(
@@ -70,6 +71,11 @@ fun AppNavHost(
         composable(AppRoutes.TesterHq) {
             TesterHqScreen(
                 repository = AppContainer.betaEngagementRepository,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+        composable(AppRoutes.Terminal) {
+            TerminalScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }

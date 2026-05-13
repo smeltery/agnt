@@ -11,6 +11,10 @@ import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
 import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
 import com.dotbrains.agnt.mobile.core.security.SecureStore
 import com.dotbrains.agnt.mobile.core.config.FeatureFlags
+import com.dotbrains.agnt.mobile.core.terminal.TerminalController
+import com.dotbrains.agnt.mobile.core.terminal.TerminalKnownHostStore
+import com.dotbrains.agnt.mobile.core.terminal.TerminalPrivateKeyStore
+import com.dotbrains.agnt.mobile.core.terminal.TerminalProfileStore
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.services.CodexService
 import java.util.concurrent.TimeUnit
@@ -65,6 +69,9 @@ object AppContainer {
     lateinit var betaEngagementRepository: BetaEngagementRepository
         private set
 
+    lateinit var terminalController: TerminalController
+        private set
+
     fun initialize(context: Context) {
         val app = context.applicationContext
         appContext = app
@@ -107,6 +114,12 @@ object AppContainer {
             } else {
                 null
             }
+        terminalController =
+            TerminalController(
+                profileStore = TerminalProfileStore(secureStore),
+                privateKeyStore = TerminalPrivateKeyStore(secureStore),
+                knownHostStore = TerminalKnownHostStore(secureStore),
+            )
         betaEngagementRepository =
             BetaEngagementRepository(
                 enabled = FeatureFlags.betaEngagementEnabled,

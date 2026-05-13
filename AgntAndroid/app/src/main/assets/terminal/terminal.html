@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<link rel="stylesheet" href="xterm.css" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: #0a0a0a;
+    color: #adadb1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  #term {
+    position: absolute;
+    inset: 0;
+    padding: 6px;
+    box-sizing: border-box;
+  }
+  .xterm-viewport::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+<div id="term"></div>
+<script src="xterm.js"></script>
+<script src="xterm-addon-fit.js"></script>
+<script>
+(function () {
+  var term = null;
+  var fitAddon = null;
+  var pendingWrites = [];
+  var lastCols = 0;
+  var lastRows = 0;
+
+  function safePost(method, payload) {
+    try {
+      if (window.AndroidTerminal && typeof window.AndroidTerminal[method] === 'function') {
+        window.AndroidTerminal[method](payload);
+      }
+    } catch (_e) {}
+  }
+
+  function decodeBase64ToBytes(b64) {
+    var binary = atob(b64);
+    var len = binary.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  function encodeBytesToBase64(bytes) {
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  function emitResize() {
+    if (!term) return;
+    if (term.cols === lastCols && term.rows === lastRows) return;
+    lastCols = term.cols;
+    lastRows = term.rows;
+    safePost('onResize', JSON.stringify({ cols: term.cols, rows: term.rows }));
+  }
+
+  function applyTheme(theme) {
+    if (!term || !theme) return;
+    term.options.theme = {
+      background: theme.background,
+      foreground: theme.foreground,
+      cursor: theme.cursor || theme.foreground,
+      cursorAccent: theme.cursorAccent || theme.background,
+      selectionBackground: theme.selectionBackground,
+      black: theme.palette[0],
+      red: theme.palette[1],
+      green: theme.palette[2],
+      yellow: theme.palette[3],
+      blue: theme.palette[4],
+      magenta: theme.palette[5],
+      cyan: theme.palette[6],
+      white: theme.palette[7],
+      brightBlack: theme.palette[8],
+      brightRed: theme.palette[9],
+      brightGreen: theme.palette[10],
+      brightYellow: theme.palette[11],
+      brightBlue: theme.palette[12],
+      brightMagenta: theme.palette[13],
+      brightCyan: theme.palette[14],
+      brightWhite: theme.palette[15]
+    };
+    document.body.style.background = theme.background;
+  }
+
+  // Public API exposed to the Android WebView client.
+  window.bridge = {
+    init: function (configJson) {
+      var config = JSON.parse(configJson || '{}');
+      term = new Terminal({
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontSize: config.fontSize || 12,
+        cursorBlink: true,
+        convertEol: false,
+        scrollback: 5000,
+        allowProposedApi: true
+      });
+      fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(document.getElementById('term'));
+      applyTheme(config.theme);
+
+      term.onData(function (data) {
+        // utf-8 string -> bytes -> base64
+        var encoder = new TextEncoder();
+        safePost('onInput', encodeBytesToBase64(encoder.encode(data)));
+      });
+      term.onBinary(function (data) {
+        // raw 8-bit string from xterm
+        var bytes = new Uint8Array(data.length);
+        for (var i = 0; i < data.length; i++) bytes[i] = data.charCodeAt(i) & 0xff;
+        safePost('onInput', encodeBytesToBase64(bytes));
+      });
+      term.onResize(function () { emitResize(); });
+
+      // Drain any writes that arrived before init().
+      pendingWrites.forEach(function (b64) { term.write(decodeBase64ToBytes(b64)); });
+      pendingWrites = [];
+
+      window.bridge.fit();
+      safePost('onReady', '{}');
+    },
+
+    write: function (b64) {
+      if (!term) { pendingWrites.push(b64); return; }
+      term.write(decodeBase64ToBytes(b64));
+    },
+
+    setBuffer: function (b64) {
+      if (!term) { pendingWrites = [b64]; return; }
+      term.reset();
+      term.write(decodeBase64ToBytes(b64));
+    },
+
+    clear: function () {
+      if (!term) return;
+      term.reset();
+    },
+
+    setFontSize: function (size) {
+      if (!term) return;
+      term.options.fontSize = size;
+      window.bridge.fit();
+    },
+
+    setTheme: function (themeJson) {
+      applyTheme(JSON.parse(themeJson || '{}'));
+    },
+
+    fit: function () {
+      if (!fitAddon) return;
+      try { fitAddon.fit(); } catch (_e) {}
+      emitResize();
+    },
+
+    focus: function () {
+      if (term) term.focus();
+    }
+  };
+
+  window.addEventListener('resize', function () { window.bridge.fit(); });
+})();
+</script>
+</body>
+</html>

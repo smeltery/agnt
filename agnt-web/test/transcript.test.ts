@@ -10,7 +10,7 @@ import { bytesToBase64 } from "../src/crypto/encoding";
 const require = createRequire(import.meta.url);
 // The bridge module lives in the sibling package and exports a small public surface;
 // we use SECURE_PROTOCOL_VERSION as a smoke check that the cross-package require works.
-const bridge = require("../../agnt-bridge/src/secure-transport") as {
+const bridge = require("../../agnt-bridge/src/transport/secure-transport") as {
   SECURE_PROTOCOL_VERSION: number;
 };
 

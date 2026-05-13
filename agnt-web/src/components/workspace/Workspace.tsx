@@ -7,6 +7,7 @@ import { useDocumentTitle } from "../../lib/document-title";
 import { buildHashLocation, parseHashLocation } from "../../lib/hash-routing";
 import { useShortcut } from "../../lib/keyboard";
 import { defaultExportFilename, downloadMarkdown, exportThreadToMarkdown } from "../../lib/thread-export";
+import { useAccountStore } from "../../state/account-store";
 import { useChatFocusStore } from "../../state/chat-focus-store";
 import { useCheckpointsStore } from "../../state/checkpoints-store";
 import { useConnectionStore } from "../../state/connection-store";
@@ -54,6 +55,9 @@ const Lightbox = lazy(() =>
 const StructuredInputModal = lazy(() =>
   import("../structured-input/StructuredInputModal").then((m) => ({ default: m.StructuredInputModal }))
 );
+const TerminalRoute = lazy(() =>
+  import("../terminal/TerminalRoute").then((m) => ({ default: m.TerminalRoute }))
+);
 
 export function Workspace() {
   const status = useConnectionStore((state) => state.status);
@@ -69,7 +73,8 @@ export function Workspace() {
     return thread?.name ?? thread?.title;
   });
   useDocumentTitle(activeThreadTitle);
-  const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | "help" | null>(null);
+  const [overlay, setOverlay] = useState<"settings" | "about" | "newChat" | "help" | "terminal" | null>(null);
+  const terminalAvailable = useAccountStore((state) => state.snapshot?.hostCapabilities?.terminalLocal === true);
   const [newChatPrefill, setNewChatPrefill] = useState<{ cwd?: string; prompt?: string }>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -273,6 +278,15 @@ export function Workspace() {
           >
             Read
           </button>
+          {terminalAvailable && (
+            <button
+              className="agnt-button-ghost"
+              onClick={() => setOverlay("terminal")}
+              title="Open a shell on the bridge host"
+            >
+              Terminal
+            </button>
+          )}
           <button className="agnt-button-ghost" onClick={() => setOverlay("settings")}>
             Settings
           </button>
@@ -312,6 +326,7 @@ export function Workspace() {
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         {overlay === "settings" && <SettingsModal onClose={() => setOverlay(null)} />}
         {overlay === "about" && <AboutModal onClose={() => setOverlay(null)} />}
+        {overlay === "terminal" && <TerminalRoute onClose={() => setOverlay(null)} />}
         {overlay === "help" && <HelpModal onClose={() => setOverlay(null)} />}
         {overlay === "newChat" && (
           <NewChatModal

@@ -9,7 +9,7 @@ import { nonceForDirection, openEnvelope, sealEnvelope } from "../src/crypto/env
 import { utf8ToBytes } from "../src/crypto/encoding";
 
 const require = createRequire(import.meta.url);
-const bridge = require("../../agnt-bridge/src/secure-transport") as {
+const bridge = require("../../agnt-bridge/src/transport/secure-transport") as {
   nonceForDirection: (sender: "mac" | "iphone", counter: number) => Buffer;
 };
 

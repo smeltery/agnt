@@ -151,6 +151,9 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 
+    // SSH client for the on-device terminal (parity with Citadel on iOS).
+    implementation("com.hierynomus:sshj:0.38.0")
+
     val camerax = "1.4.1"
     implementation("androidx.camera:camera-core:$camerax")
     implementation("androidx.camera:camera-camera2:$camerax")

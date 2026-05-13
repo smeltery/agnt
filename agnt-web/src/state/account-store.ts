@@ -11,12 +11,20 @@ import type { Connection } from "../protocol";
 
 const log = makeLogger("account");
 
+export interface HostCapabilitiesSnapshot {
+  /** On-device SSH terminal — iOS/Android only; the web client cannot use it. */
+  terminal?: boolean;
+  /** Bridge-spawned local PTY exposed to the web client (opt-in, off by default). */
+  terminalLocal?: boolean;
+}
+
 export interface AccountSnapshot {
   providerId?: string;
   loggedIn: boolean;
   authMethod?: string;
   message?: string;
   loginUrl?: string;
+  hostCapabilities?: HostCapabilitiesSnapshot;
 }
 
 interface State {
@@ -74,6 +82,16 @@ function normalizeAccountSnapshot(method: string, raw: Record<string, unknown>):
     authMethod: stringField(raw, "authMethod", "method"),
     message: stringField(raw, "message", "displayMessage"),
     loginUrl: method === "account/status/read" ? stringField(raw, "loginUrl") : undefined,
+    hostCapabilities: normalizeHostCapabilities(raw.hostCapabilities),
+  };
+}
+
+function normalizeHostCapabilities(raw: unknown): HostCapabilitiesSnapshot | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+  return {
+    terminal: typeof record.terminal === "boolean" ? record.terminal : undefined,
+    terminalLocal: typeof record.terminalLocal === "boolean" ? record.terminalLocal : undefined,
   };
 }
 

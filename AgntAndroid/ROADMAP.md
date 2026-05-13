@@ -42,6 +42,25 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
 - [ ] Verify per-turn `params.model` override is forwarded for all providers
       (currently designed against the Codex shape).
 
+### P2.4 — terminal feature follow-ups
+
+The on-device SSH terminal landed (parity with iOS Citadel/Ghostty surface)
+backed by `sshj` and an xterm.js WebView host (`assets/terminal/terminal.html`).
+Open follow-ups:
+
+- [ ] Per-turn "Open Terminal Here" toolbar entry (iOS lives in
+      `TurnToolbarContent.swift`); on Android this needs to land in the turn
+      action menu and pre-populate the terminal cwd from the active worktree.
+- [ ] ECDSA + OpenSSH FIDO key support. sshj decodes Ed25519 / RSA / ECDSA
+      out of the box, but the editor sheet only documents Ed25519/RSA. Verify
+      ECDSA round-trips and document.
+- [ ] Termux-style native terminal renderer as an alternative to WebView. The
+      WebView path is faithful to Ghostty's rendering but heavier than a
+      `terminal-view`-based widget; revisit if perf or input latency complaints
+      arrive.
+- [ ] Multi-tab session UI polish. The drop-down session list works but
+      lacks the per-tab cwd / status badging the iOS menu has.
+
 ### P2.5 — beta tester module
 
 - [ ] The `beta/` module + `TesterHqScreen.kt` integrate with a hosted Supabase

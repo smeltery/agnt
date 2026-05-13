@@ -51,6 +51,7 @@ applicable iOS commits ported, 1 partial, and 7 iOS-only. Notable areas:
 | Workspace checkpoint lifecycle      | done            |
 | Composer features (skill mentions, runtime overrides, autocomplete) | done |
 | Project/git flow (picker, dir mgmt, git init) | done |
+| On-device SSH terminal (xterm.js + sshj) | done — sidebar entry → full-screen `TerminalScreen` powered by `sshj` and an xterm.js WebView; bridge advertises `hostCapabilities.terminal: true`. iOS-only per-turn "Open Terminal Here" toolbar entry not ported. |
 | End-to-end local flow validation    | done            |
 | Markdown / message pixel polish (upstream commit c7843aa) | pending |
 | Manual device pairing + visual screenshot verification | pending |
