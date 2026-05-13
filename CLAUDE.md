@@ -53,7 +53,12 @@ Shared translator helpers (used by claude / opencode / cursor shims):
 
 Shared handler infrastructure:
 
-- `handlers/handler-utils.js` — `createJsonRpcRequestHandler({ match, dispatch, defaultErrorCode, defaultErrorMessage, onError? })` owns the JSON-RPC envelope: parse, match-or-pass-through, dispatch, wrap success as `{id, result}` or error as `{id, error:{code:-32000, message, data:{errorCode}}}`. Used by workspace, desktop, pet, project, voice, notifications. New handlers should use this factory rather than re-implementing the skeleton.
+- `handlers/handler-utils.js` — `createJsonRpcRequestHandler({ match, dispatch, defaultErrorCode, defaultErrorMessage, onError? })` owns the JSON-RPC envelope: parse, match-or-pass-through, dispatch, wrap success as `{id, result}` or error as `{id, error:{code:-32000, message, data:{errorCode}}}`. Used by workspace, desktop, pet, project, voice, notifications, terminal. New handlers should use this factory rather than re-implementing the skeleton.
+
+Bridge-spawned local PTY (web-only):
+
+- `handlers/terminal-handler.js` — owns `terminal/open|write|resize|clear|close|snapshot` JSON-RPC RPCs and the `terminal/output` / `terminal/exited` notifications. The web client uses these because browsers can't open raw SSH from JS; the iOS/Android clients run an on-device SSH terminal instead and don't touch this surface. Two layers of opt-in: (1) the `enableWebTerminal` bridge preference (default off) gates the entire surface — when off, every `terminal/*` request returns `terminal_disabled`. (2) Even after the user opts in, the very first `terminal/open` per bridge process must carry `acknowledgeFirstUse: true` (typed error `terminal_first_use_unacknowledged`); the web UI catches this and shows a confirm dialog. Both gates exist because a raw shell bypasses the per-command approval flow opencode/Cursor enforce.
+- Capability flag is split: `hostCapabilities.terminal: true` (unchanged — iOS/Android on-device SSH); `hostCapabilities.terminalLocal: <bool>` (new — bridge-spawned local PTY for web, mirrors the `enableWebTerminal` preference). The iOS settings panel writes `enableWebTerminal` via the existing `desktop/preferences/update` RPC alongside `keepMacAwake`.
 
 Contract tests for the abstractions:
 
