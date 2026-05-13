@@ -15,4 +15,8 @@ object CodexSecureKeys {
     const val lastTrustedMacDeviceId = "codex.secure.lastTrustedMacDeviceId"
     const val phoneIdentityState = "codex.secure.phoneIdentityState"
     const val messageHistoryKey = "codex.local.messageHistoryKey"
+    const val terminalSshProfile = "codex.terminal.sshProfile"
+    const val terminalSshPrivateKey = "codex.terminal.sshPrivateKey"
+    const val terminalSshPrivateKeyPassphrase = "codex.terminal.sshPrivateKeyPassphrase"
+    const val terminalSshKnownHostPrefix = "codex.terminal.knownHost"
 }

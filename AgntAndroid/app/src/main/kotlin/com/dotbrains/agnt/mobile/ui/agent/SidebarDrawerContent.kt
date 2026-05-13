@@ -276,6 +276,20 @@ fun SidebarDrawerContent(
                         onClick = {
                             drawerScope.launch {
                                 closeDrawer()
+                                navController.navigate(AppRoutes.Terminal)
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(LucideR.drawable.lucide_ic_terminal),
+                            contentDescription = stringResource(R.string.nav_terminal),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            drawerScope.launch {
+                                closeDrawer()
                                 onOpenPairingScanner()
                             }
                         },
