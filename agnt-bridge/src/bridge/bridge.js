@@ -315,7 +315,7 @@ function startBridge({
     } else {
       console.error("[agnt] Failed to start `codex app-server`.");
       console.error(`[agnt] Launch command: ${codex.describe()}`);
-      console.error("[agnt] Make sure the Codex CLI is installed and that the launcher works on this OS.");
+      console.error("[agnt] Make sure the Codex CLI is installed, authenticated, and launchable on this OS.");
     }
     console.error(error.message);
     process.exit(1);
@@ -551,9 +551,14 @@ function startBridge({
       (msg) => handleBridgeManagedThreadTurnsListRequest(msg),
     ],
     fallback: (msg) => {
-      forwardedRequestTracker.rememberRequest(msg);
-      rememberThreadFromMessage("phone", msg);
-      codex.send(msg);
+      // Spark's Responses API rejects reasoning.summary, so rewrite turn/start before forwarding.
+      // Other providers handle their own model quirks in their translators.
+      const forwarded = activeProvider.id === "codex"
+        ? disableUnsupportedReasoningSummaryForTurnStart(msg)
+        : msg;
+      forwardedRequestTracker.rememberRequest(forwarded);
+      rememberThreadFromMessage("phone", forwarded);
+      codex.send(forwarded);
     },
   });
 
@@ -696,6 +701,54 @@ function readString(value) {
   return typeof value === "string" && value ? value : null;
 }
 
+const MODELS_WITHOUT_REASONING_SUMMARY = new Set([
+  "gpt-5.3-codex-spark",
+]);
+
+// Forces app-server summary generation off for models whose Responses API calls
+// reject reasoning.summary, while leaving the phone-facing runtime choice intact.
+function disableUnsupportedReasoningSummaryForTurnStart(rawMessage) {
+  let parsed = null;
+  try {
+    parsed = JSON.parse(rawMessage);
+  } catch {
+    return rawMessage;
+  }
+  if (!parsed || parsed.method !== "turn/start") {
+    return rawMessage;
+  }
+
+  const params = parsed.params && typeof parsed.params === "object" && !Array.isArray(parsed.params)
+    ? parsed.params
+    : null;
+  if (!params || params.summary === "none") {
+    return rawMessage;
+  }
+
+  const model = readTurnStartModel(params);
+  if (!MODELS_WITHOUT_REASONING_SUMMARY.has(model)) {
+    return rawMessage;
+  }
+
+  return JSON.stringify({
+    ...parsed,
+    params: {
+      ...params,
+      summary: "none",
+    },
+  });
+}
+
+function readTurnStartModel(params) {
+  return readNonEmptyLowerString(params?.model)
+    || readNonEmptyLowerString(params?.collaborationMode?.settings?.model)
+    || readNonEmptyLowerString(params?.collaboration_mode?.settings?.model);
+}
+
+function readNonEmptyLowerString(value) {
+  return typeof value === "string" && value.trim() ? value.trim().toLowerCase() : "";
+}
+
 
 module.exports = {
   buildEmergencySingleTurnResponse,
@@ -704,6 +757,7 @@ module.exports = {
   buildLargestSafeTurnsListResponse,
   compactEmergencySingleTurnForRelay,
   createNoopDesktopRefresher,
+  disableUnsupportedReasoningSummaryForTurnStart,
   fetchAdaptiveThreadTurnsListForRelay,
   hasRelayConnectionGoneStale,
   isEmptyTurnsListResponse,
