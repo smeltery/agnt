@@ -165,6 +165,8 @@ function deriveHostCapabilities(platform) {
     displayWake: isMacOS,
     keepAwake: isMacOS,
     hostBrowserLogin: isMacOS,
+    // On-device SSH terminal runs on the phone via Citadel, so it's available regardless of host.
+    terminal: true,
   };
 }
 
