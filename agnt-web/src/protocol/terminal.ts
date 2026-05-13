@@ -44,10 +44,24 @@ export interface TerminalExitEvent {
 
 export async function openTerminal(
   rpc: JsonRpcClient,
-  params: { terminalId?: string; cols: number; rows: number; cwd?: string }
+  params: {
+    terminalId?: string;
+    cols: number;
+    rows: number;
+    cwd?: string;
+    /**
+     * Set to `true` after the user confirms the first-use warning. The bridge
+     * rejects the very first `terminal/open` per process unless this is set
+     * (typed error code: `terminal_first_use_unacknowledged`).
+     */
+    acknowledgeFirstUse?: boolean;
+  }
 ): Promise<TerminalSnapshot> {
   return rpc.request<TerminalSnapshot>("terminal/open", params);
 }
+
+/** JSON-RPC errorCode the bridge returns when first-use confirm is missing. */
+export const TERMINAL_FIRST_USE_ERROR_CODE = "terminal_first_use_unacknowledged";
 
 export async function writeTerminal(
   rpc: JsonRpcClient,

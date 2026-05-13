@@ -52,6 +52,11 @@ function createTerminalHandler({
   }
 
   const sessions = new Map(); // terminalId -> { instanceId, pty, status, buffer, cols, rows, cwd }
+  // Defense-in-depth on top of the `enableWebTerminal` gate: even after the
+  // user opts in, the very first terminal/open per bridge process must carry
+  // `acknowledgeFirstUse: true` so a long-running paired session that gets
+  // captured cannot silently spawn a shell. Resets on bridge restart.
+  let firstUseAcknowledged = false;
 
   function lazyPty() {
     if (ptyImpl) return ptyImpl;
@@ -123,6 +128,16 @@ function createTerminalHandler({
   }
 
   function openTerminal(params = {}) {
+    if (!firstUseAcknowledged) {
+      if (params.acknowledgeFirstUse !== true) {
+        throw terminalError(
+          "terminal_first_use_unacknowledged",
+          "First terminal session of this bridge process needs an explicit user confirmation. Retry with acknowledgeFirstUse: true."
+        );
+      }
+      firstUseAcknowledged = true;
+    }
+
     const terminalId = readTerminalId(params);
     const cols = readCols(params);
     const rows = readRows(params);

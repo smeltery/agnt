@@ -32,7 +32,7 @@ export interface TerminalState {
   /** Wire notification listeners. Idempotent. */
   ensureSubscribed(rpc: JsonRpcClient): void;
 
-  open(rpc: JsonRpcClient, params: { terminalId?: string; cols: number; rows: number; cwd?: string }): Promise<void>;
+  open(rpc: JsonRpcClient, params: { terminalId?: string; cols: number; rows: number; cwd?: string; acknowledgeFirstUse?: boolean }): Promise<void>;
   write(rpc: JsonRpcClient, params: { terminalId?: string; bytes: Uint8Array }): Promise<void>;
   resize(rpc: JsonRpcClient, params: { terminalId?: string; cols: number; rows: number }): Promise<void>;
   clear(rpc: JsonRpcClient, params: { terminalId?: string }): Promise<void>;
@@ -104,7 +104,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     });
   },
 
-  async open(rpc, { terminalId = DEFAULT_TERMINAL_ID, cols, rows, cwd }) {
+  async open(rpc, { terminalId = DEFAULT_TERMINAL_ID, cols, rows, cwd, acknowledgeFirstUse }) {
     get().ensureSubscribed(rpc);
     set((state) => ({
       snapshots: {
@@ -117,7 +117,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       },
     }));
     try {
-      const snapshot = await openTerminal(rpc, { terminalId, cols, rows, cwd });
+      const snapshot = await openTerminal(rpc, { terminalId, cols, rows, cwd, acknowledgeFirstUse });
       set((state) => ({
         snapshots: { ...state.snapshots, [terminalId]: snapshot },
       }));

@@ -40,19 +40,21 @@ function createBridgePreferences({ config, bridgeWakeAssertion }) {
   }
 
   function update(preferences = {}) {
-    const nextKeepMacAwakeEnabled = preferences.keepMacAwake !== false;
-    config.keepMacAwakeEnabled = nextKeepMacAwakeEnabled;
-    bridgeWakeAssertion.setEnabled?.(nextKeepMacAwakeEnabled);
-
-    // Only honor explicitly-provided values so partial updates (today's iOS
-    // panel only sends `keepMacAwake`) don't silently flip the new flag.
+    // Only honor explicitly-provided keys. Defaulting to `true` for an absent
+    // field would let a `{enableWebTerminal: …}`-only call silently re-enable
+    // the wake assertion the user previously turned off (and vice versa).
+    if (Object.prototype.hasOwnProperty.call(preferences, "keepMacAwake")) {
+      const nextKeepMacAwakeEnabled = preferences.keepMacAwake !== false;
+      config.keepMacAwakeEnabled = nextKeepMacAwakeEnabled;
+      bridgeWakeAssertion.setEnabled?.(nextKeepMacAwakeEnabled);
+    }
     if (Object.prototype.hasOwnProperty.call(preferences, "enableWebTerminal")) {
       config.enableWebTerminal = preferences.enableWebTerminal === true;
     }
 
     try {
       persistBridgePreferences({
-        keepMacAwakeEnabled: nextKeepMacAwakeEnabled,
+        keepMacAwakeEnabled: config.keepMacAwakeEnabled !== false,
         enableWebTerminal: config.enableWebTerminal === true,
       });
     } catch (error) {
@@ -72,7 +74,7 @@ function createBridgePreferences({ config, bridgeWakeAssertion }) {
 // Module-scope so the existing bridge.test.js suite can import it directly to
 // pin the daemon-config write contract.
 function persistBridgePreferences(
-  { keepMacAwakeEnabled, enableWebTerminal },
+  { keepMacAwakeEnabled, enableWebTerminal } = {},
   {
     readDaemonConfigImpl = readDaemonConfig,
     writeDaemonConfigImpl = writeDaemonConfig,
@@ -81,9 +83,9 @@ function persistBridgePreferences(
   const previous = readDaemonConfigImpl() || {};
   writeDaemonConfigImpl({
     ...previous,
-    keepMacAwakeEnabled,
-    // Skip if the caller didn't explicitly pass this — keeps the existing
-    // single-key callsites working without flipping the new flag to false.
+    // Each field is only persisted when the caller passed it. The existing
+    // single-key bridge.test.js callsite still works (it omits the new flag).
+    ...(typeof keepMacAwakeEnabled === "boolean" ? { keepMacAwakeEnabled } : {}),
     ...(typeof enableWebTerminal === "boolean" ? { enableWebTerminal } : {}),
   });
 }

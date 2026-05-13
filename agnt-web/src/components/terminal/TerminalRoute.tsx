@@ -3,6 +3,8 @@
 // management here because the bridge spawns the shell on its own host.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { JsonRpcRemoteError } from "../../protocol/jsonrpc-client";
+import { TERMINAL_FIRST_USE_ERROR_CODE } from "../../protocol/terminal";
 import { useAccountStore } from "../../state/account-store";
 import { useConnectionStore } from "../../state/connection-store";
 import { useThemeStore } from "../../state/theme-store";
@@ -40,6 +42,8 @@ export function TerminalRoute({ onClose }: TerminalRouteProps): JSX.Element {
 
   const [fontSize, setFontSize] = useState(FONT_SIZE_DEFAULT);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Pending open params we'll retry once the user accepts the first-use prompt. */
+  const [pendingFirstUseOpen, setPendingFirstUseOpen] = useState<{ cols: number; rows: number } | null>(null);
   const bootedRef = useRef(false);
 
   const theme = useMemo<TerminalTheme>(
@@ -82,6 +86,26 @@ export function TerminalRoute({ onClose }: TerminalRouteProps): JSX.Element {
     ensureSubscribed(connection.rpc);
   }, [connection, terminalEnabled, ensureSubscribed]);
 
+  // Catches the bridge's first-use rejection and surfaces it as a confirm
+  // prompt instead of an error message. The user can accept (we retry with
+  // acknowledgeFirstUse: true) or close the route.
+  const tryOpen = useCallback(
+    (params: { cols: number; rows: number; acknowledgeFirstUse?: boolean }) => {
+      if (!connection) return;
+      void open(connection.rpc, params).catch((err) => {
+        if (
+          err instanceof JsonRpcRemoteError &&
+          (err.data as { errorCode?: string } | undefined)?.errorCode === TERMINAL_FIRST_USE_ERROR_CODE
+        ) {
+          setPendingFirstUseOpen({ cols: params.cols, rows: params.rows });
+          return;
+        }
+        setActionError(err instanceof Error ? err.message : String(err));
+      });
+    },
+    [connection, open]
+  );
+
   useEffect(() => {
     if (!connection || !terminalEnabled || bootedRef.current) return;
     if (snapshot?.status === "running" || snapshot?.status === "starting") {
@@ -89,10 +113,8 @@ export function TerminalRoute({ onClose }: TerminalRouteProps): JSX.Element {
       return;
     }
     bootedRef.current = true;
-    void open(connection.rpc, { cols: 100, rows: 30 }).catch((err) => {
-      setActionError(err instanceof Error ? err.message : String(err));
-    });
-  }, [connection, terminalEnabled, open, snapshot?.status]);
+    tryOpen({ cols: 100, rows: 30 });
+  }, [connection, terminalEnabled, tryOpen, snapshot?.status]);
 
   const isRunning = snapshot?.status === "running" || snapshot?.status === "starting";
 
@@ -100,10 +122,8 @@ export function TerminalRoute({ onClose }: TerminalRouteProps): JSX.Element {
     if (!connection) return;
     setActionError(null);
     bootedRef.current = true;
-    void open(connection.rpc, { cols: snapshot?.cols ?? 100, rows: snapshot?.rows ?? 30 }).catch((err) => {
-      setActionError(err instanceof Error ? err.message : String(err));
-    });
-  }, [connection, open, snapshot?.cols, snapshot?.rows]);
+    tryOpen({ cols: snapshot?.cols ?? 100, rows: snapshot?.rows ?? 30 });
+  }, [connection, tryOpen, snapshot?.cols, snapshot?.rows]);
 
   const onDisconnect = useCallback(() => {
     if (!connection) return;
@@ -187,6 +207,33 @@ export function TerminalRoute({ onClose }: TerminalRouteProps): JSX.Element {
         </div>
       </header>
       {errorDetail && <div className="agnt-terminal-error">{errorDetail}</div>}
+      {pendingFirstUseOpen && (
+        <div className="agnt-terminal-confirm" role="alertdialog" aria-modal="true" aria-label="Confirm shell access">
+          <div className="agnt-terminal-confirm-card">
+            <h3>Open a shell on the bridge host?</h3>
+            <p>
+              This is the first terminal session since the bridge started.
+              Anything you type runs as the user that started <code>agnt up</code>.
+              Continue?
+            </p>
+            <div className="agnt-terminal-confirm-actions">
+              <button className="agnt-button-ghost" onClick={() => { setPendingFirstUseOpen(null); onClose(); }}>
+                Cancel
+              </button>
+              <button
+                className="agnt-button-primary"
+                onClick={() => {
+                  const params = pendingFirstUseOpen;
+                  setPendingFirstUseOpen(null);
+                  if (params) tryOpen({ ...params, acknowledgeFirstUse: true });
+                }}
+              >
+                Open shell
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="agnt-terminal-body">
         <TerminalSurface
           terminalKey={terminalKey}

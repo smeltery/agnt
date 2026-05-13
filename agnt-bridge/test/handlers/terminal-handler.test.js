@@ -77,6 +77,38 @@ test("terminal/* requests are rejected when the web terminal preference is off",
   assert.equal(responses[0].id, "1");
 });
 
+test("first terminal/open requires acknowledgeFirstUse even when enabled", async () => {
+  const { pty } = makeFakePty();
+  const handler = createTerminalHandler({
+    isEnabled: () => true,
+    sendApplicationResponse: () => {},
+    ptyImpl: pty,
+  });
+
+  const [first] = await dispatch(handler, {
+    id: "1",
+    method: "terminal/open",
+    params: { cols: 80, rows: 24 },
+  });
+  assert.equal(first.error.data.errorCode, "terminal_first_use_unacknowledged");
+
+  const [second] = await dispatch(handler, {
+    id: "2",
+    method: "terminal/open",
+    params: { cols: 80, rows: 24, acknowledgeFirstUse: true },
+  });
+  assert.equal(second.result.status, "running");
+
+  // Subsequent opens (e.g. opening a second tab) do NOT need the flag — the
+  // user has already acknowledged shell access for this bridge process.
+  const [third] = await dispatch(handler, {
+    id: "3",
+    method: "terminal/open",
+    params: { terminalId: "term-2", cols: 80, rows: 24 },
+  });
+  assert.equal(third.result.status, "running");
+});
+
 test("terminal/open spawns a PTY and returns a snapshot with running status", async () => {
   const { pty, child } = makeFakePty();
   const sent = [];
@@ -90,7 +122,7 @@ test("terminal/open spawns a PTY and returns a snapshot with running status", as
   const [response] = await dispatch(handler, {
     id: "open-1",
     method: "terminal/open",
-    params: { terminalId: "term-1", cols: 100, rows: 30, cwd: "/tmp/work" },
+    params: { terminalId: "term-1", cols: 100, rows: 30, cwd: "/tmp/work", acknowledgeFirstUse: true },
   });
 
   assert.equal(response.id, "open-1");
@@ -113,7 +145,7 @@ test("PTY output is forwarded as terminal/output notifications", async () => {
     ptyImpl: pty,
   });
 
-  await dispatch(handler, { id: "1", method: "terminal/open", params: {} });
+  await dispatch(handler, { id: "1", method: "terminal/open", params: { acknowledgeFirstUse: true } });
   await new Promise((resolve) => setImmediate(resolve));
 
   const outputs = sent.filter((m) => m.method === "terminal/output");
@@ -132,7 +164,7 @@ test("terminal/write decodes base64 input and forwards to the PTY as utf8", asyn
     ptyImpl: pty,
   });
 
-  await dispatch(handler, { id: "1", method: "terminal/open", params: {} });
+  await dispatch(handler, { id: "1", method: "terminal/open", params: { acknowledgeFirstUse: true } });
   const inputBytes = Buffer.from("ls -la\n", "utf8");
   await dispatch(handler, {
     id: "2",
@@ -165,7 +197,7 @@ test("terminal/resize forwards new dimensions to the PTY when running", async ()
     ptyImpl: pty,
   });
 
-  await dispatch(handler, { id: "1", method: "terminal/open", params: { cols: 80, rows: 24 } });
+  await dispatch(handler, { id: "1", method: "terminal/open", params: { cols: 80, rows: 24, acknowledgeFirstUse: true } });
   await dispatch(handler, {
     id: "2",
     method: "terminal/resize",
@@ -183,7 +215,7 @@ test("terminal/close kills the PTY and clears state", async () => {
     ptyImpl: pty,
   });
 
-  await dispatch(handler, { id: "1", method: "terminal/open", params: {} });
+  await dispatch(handler, { id: "1", method: "terminal/open", params: { acknowledgeFirstUse: true } });
   await dispatch(handler, { id: "2", method: "terminal/close", params: {} });
   assert.equal(isKilled(), true);
 });
