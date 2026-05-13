@@ -36,6 +36,7 @@ function resolveActiveProvider({
   id = "",
   env = process.env,
   persistedId = "",
+  platform = process.platform,
 } = {}) {
   const candidates = [
     id,
@@ -53,7 +54,7 @@ function resolveActiveProvider({
   for (const provider of PROVIDERS) {
     if (typeof provider.isInstalled === "function") {
       try {
-        if (provider.isInstalled({ env })) {
+        if (provider.isInstalled({ env, platform })) {
           return { provider, source: "auto-detect" };
         }
       } catch {
