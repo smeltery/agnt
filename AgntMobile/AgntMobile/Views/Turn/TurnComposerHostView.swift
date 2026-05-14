@@ -123,6 +123,7 @@ struct TurnComposerHostView: View {
             activeTurnID: activeTurnID,
             isThreadRunning: isThreadRunning,
             isEmptyThread: isEmptyThread,
+            hasWorkingDirectory: thread.gitWorkingDirectory != nil,
             isWorktreeProject: isWorktreeProject,
             orderedModelOptions: orderedModelOptions,
             selectedModelID: selectedModelID,
