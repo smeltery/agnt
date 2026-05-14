@@ -3521,3 +3521,52 @@ button {
   padding: 6px 12px 12px;
 }
 .agnt-terminal-surface { display: block; }
+
+/* ── First-use shell-access confirmation overlay ─────────────────
+   Defense-in-depth on top of the bridge gate. Even if the user has
+   enabled the web terminal, the bridge rejects the first open per
+   process so a long-running paired tab can't silently spawn a shell. */
+.agnt-terminal-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.agnt-terminal-confirm-card {
+  background: var(--agnt-surface);
+  color: var(--agnt-fg);
+  padding: 20px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--agnt-border);
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.agnt-terminal-confirm-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.agnt-terminal-confirm-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--agnt-muted-fg);
+  line-height: 1.45;
+}
+.agnt-terminal-confirm-card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.agnt-terminal-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
