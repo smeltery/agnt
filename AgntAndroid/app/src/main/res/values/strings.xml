@@ -143,7 +143,7 @@
     <string name="turn_feedback_category_safety_check">Safety check</string>
     <string name="turn_feedback_category_other">Other</string>
     <string name="turn_feedback_description_label">Describe the issue</string>
-    <string name="turn_feedback_include_logs">Include current Codex session logs</string>
+    <string name="turn_feedback_include_logs">Include current session logs</string>
     <string name="turn_feedback_submit">Submit</string>
     <string name="turn_feedback_cancel">Cancel</string>
     <string name="turn_worktree_handoff_to_worktree_title">Hand off to Worktree</string>
@@ -207,7 +207,7 @@
     <string name="turn_open_desktop">Desktop</string>
     <string name="turn_open_desktop_opening">Opening…</string>
     <string name="turn_open_desktop_error_title">Desktop handoff</string>
-    <string name="turn_open_desktop_failed_fallback">Could not open Codex on your desktop.</string>
+    <string name="turn_open_desktop_failed_fallback">Could not open the desktop app.</string>
     <string name="thread_continuation_from_archived">Continued from archived thread `%1$s`</string>
     <string name="turn_stop">Stop</string>
     <string name="turn_connected_locally">Connected locally</string>
@@ -405,7 +405,7 @@
     <string name="qr_connect_button">Connect to bridge</string>
     <string name="qr_scan_again">Scan a different QR</string>
     <string name="approval_dialog_title">Approval request</string>
-    <string name="approval_default_body">Codex is requesting permission to continue.</string>
+    <string name="approval_default_body">The agent is requesting permission to continue.</string>
     <string name="approval_command_line">Command: %1$s</string>
     <string name="approval_kind_file_change">File change</string>
     <string name="approval_kind_command">Shell command</string>
@@ -416,7 +416,7 @@
     <string name="approval_approve_for_session">Approve for session</string>
     <string name="approval_decline">Decline</string>
     <string name="structured_input_default_title">Input requested</string>
-    <string name="structured_input_default_body">Codex is waiting for your input.</string>
+    <string name="structured_input_default_body">The agent is waiting for your input.</string>
     <string name="structured_input_send">Send</string>
     <string name="structured_input_skip">Skip</string>
     <string name="structured_input_sending">Sending…</string>

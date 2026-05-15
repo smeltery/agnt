@@ -5,7 +5,20 @@ import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputOption
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputQuestion
 
 internal fun isStructuredInputServerRequestMethod(method: String): Boolean =
-    method == "item/tool/requestUserInput"
+    method.trim()
+        .lowercase()
+        .replace("_", "")
+        .replace("-", "")
+        .let { normalized ->
+            normalized == "item/tool/requestuserinput" ||
+                normalized == "item/tool/requestinput" ||
+                normalized == "tool/requestuserinput" ||
+                normalized == "tool/requestinput" ||
+                normalized == "requestuserinput" ||
+                normalized == "requestinput" ||
+                normalized.endsWith("/requestuserinput") ||
+                normalized.endsWith("/requestinput")
+        }
 
 internal fun isApprovalServerRequestMethod(normalizedMethod: String): Boolean =
     normalizedMethod == "item/commandexecution/requestapproval" ||

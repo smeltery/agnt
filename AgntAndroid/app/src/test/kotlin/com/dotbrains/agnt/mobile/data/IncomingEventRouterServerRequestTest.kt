@@ -218,6 +218,47 @@ class IncomingEventRouterServerRequestTest {
         }
 
     @Test
+    fun dispatchServerRequest_acceptsSnakeCaseStructuredUserInputMethod() =
+        runBlocking {
+            val pending =
+                CompletableDeferred<
+                    Pair<PendingStructuredInputRequest, (answersByQuestionId: Map<String, List<String>>) -> Unit>,
+                >()
+            val response = CompletableDeferred<RPCMessage>()
+            newRouter(
+                onStructuredInputRequest = { request, respond -> pending.complete(request to respond) },
+            ).dispatchServerRequest(
+                method = "request_user_input",
+                requestId = JSONValue.Str("input-snake"),
+                params =
+                    JSONValue.Obj(
+                        mapOf(
+                            "questions" to
+                                JSONValue.Arr(
+                                    listOf(
+                                        JSONValue.Obj(
+                                            mapOf(
+                                                "id" to JSONValue.Str("decision"),
+                                                "question" to JSONValue.Str("Approve plan?"),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                        ),
+                    ),
+                respond = { response.complete(it) },
+            )
+
+            val (request, respond) = withTimeout(ROUTER_TEST_TIMEOUT_MS) { pending.await() }
+            assertEquals("decision", request.questions.single().id)
+            respond(mapOf("decision" to listOf("yes")))
+
+            val message = withTimeout(ROUTER_TEST_TIMEOUT_MS) { response.await() }
+            assertEquals(JSONValue.Str("input-snake"), message.id)
+            assertNull(message.error)
+        }
+
+    @Test
     fun dispatchServerRequest_appendsStructuredInputTimelineMarkerWhenThreadScoped() =
         runBlocking {
             val timeline = MessageTimelineStore()

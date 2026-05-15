@@ -108,6 +108,9 @@ internal class IncomingEventRouter(
         if (m == "codex/event" && tryConsumeCodexCommandExecutionEnvelope(obj)) {
             return
         }
+        if (m == "codex/event" && tryConsumeCodexPlanEnvelope(obj)) {
+            return
+        }
         when (m) {
             "thread/started" -> handleThreadStarted(obj)
             "thread/name/updated" -> handleThreadNameUpdated(obj)
@@ -129,6 +132,11 @@ internal class IncomingEventRouter(
             "item/reasoning/textDelta",
             -> handleReasoningDelta(obj)
             "item/plan/delta" -> handlePlanDelta(obj)
+            "codex/event/plan_update",
+            "codex/event/plan_updated",
+            "codex/event/update_plan",
+            "codex/event/plan_delta",
+            -> handleTurnPlanUpdated(obj)
             "item/fileChange/outputDelta" -> handleFileChangeDelta(obj)
             "item/toolCall/outputDelta",
             "item/toolCall/output_delta",
@@ -160,6 +168,8 @@ internal class IncomingEventRouter(
                 when {
                     m.startsWith("codex/event/") && m.contains("agent") && m.contains("delta") ->
                         handleAgentDelta(obj)
+                    m.startsWith("codex/event/") && nm.contains("plan") ->
+                        handleTurnPlanUpdated(obj)
                     m.startsWith("codex/event/") && nm.contains("imagegeneration") ->
                         handleImageGenerationEnd(obj)
                     nm.contains("filechange") && (nm.contains("delta") || nm.contains("partadded")) ->
@@ -203,6 +213,17 @@ internal class IncomingEventRouter(
             }
             else -> false
         }
+    }
+
+    private fun tryConsumeCodexPlanEnvelope(params: Map<String, JSONValue>?): Boolean {
+        val p = params ?: return false
+        val msg = p["msg"]?.objectValue ?: p["event"]?.objectValue ?: return false
+        val eventType =
+            msg["type"]?.stringValue?.trim()?.lowercase()?.replace("_", "")?.replace("-", "")
+                ?: return false
+        if (!eventType.contains("plan")) return false
+        handleTurnPlanUpdated(p)
+        return true
     }
 
     private fun handleThreadTokenUsagePush(params: Map<String, JSONValue>?) {
@@ -658,18 +679,23 @@ internal class IncomingEventRouter(
 
     private fun handlePlanDelta(params: Map<String, JSONValue>?) {
         val p = params ?: return
+        val event = envelopeEventObject(p)
         val threadId =
             resolveThreadId(p)
                 ?: firstString(p, listOf("threadId", "thread_id"))
                     ?.let { CodexThread.normalizeIdentifier(it) }
+                ?: event?.let { firstString(it, listOf("threadId", "thread_id")) }
+                    ?.let { CodexThread.normalizeIdentifier(it) }
                 ?: return
         val turnId =
             firstString(p, listOf("turnId", "turn_id"))
+                ?: event?.let { firstString(it, listOf("turnId", "turn_id")) }
                 ?: return
         val itemId =
             firstString(p, listOf("itemId", "item_id"))
+                ?: event?.let { firstString(it, listOf("itemId", "item_id")) }
                 ?: return
-        val delta = p["delta"]?.stringValue ?: return
+        val delta = p["delta"]?.stringValue ?: event?.get("delta")?.stringValue ?: return
         if (delta.isEmpty()) return
         recordTurnThread(turnId, threadId)
         scope.launch {
@@ -685,15 +711,23 @@ internal class IncomingEventRouter(
 
     private fun handleTurnPlanUpdated(params: Map<String, JSONValue>?) {
         val p = params ?: return
+        val event = envelopeEventObject(p)
         val threadId =
             resolveThreadId(p)
                 ?: firstString(p, listOf("threadId", "thread_id"))
                     ?.let { CodexThread.normalizeIdentifier(it) }
+                ?: event?.let { firstString(it, listOf("threadId", "thread_id")) }
+                    ?.let { CodexThread.normalizeIdentifier(it) }
                 ?: return
-        val turnId = firstString(p, listOf("turnId", "turn_id")) ?: return
+        val turnId =
+            firstString(p, listOf("turnId", "turn_id"))
+                ?: event?.let { firstString(it, listOf("turnId", "turn_id")) }
+                ?: return
         recordTurnThread(turnId, threadId)
-        val explanation = firstString(p, listOf("explanation"))
-        val steps = decodePlanSteps(p["plan"])
+        val explanation =
+            firstString(p, listOf("explanation"))
+                ?: event?.let { firstString(it, listOf("explanation")) }
+        val steps = decodePlanSteps(p["plan"] ?: event?.get("plan"))
         scope.launch {
             messageTimeline.upsertPlanMessage(
                 threadId = threadId,
