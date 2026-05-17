@@ -96,10 +96,15 @@ Open follow-ups:
 
 ## Finishing the upstream parity audit
 
-Per `ios-android-parity-plan.md`, two items remain on the upstream side:
+Per `ios-android-parity-plan.md`, the reasonable code-inspection parity gaps
+for Android/iOS surface chrome have been closed for the main chat, sidebar,
+project picker, settings, onboarding, and terminal editor flows. Two items
+remain:
 
 - [ ] Final markdown/message pixel polish (upstream commit c7843aa).
-- [ ] Manual device pairing + visual screenshot verification.
+- [ ] Manual device pairing + visual screenshot verification. This is the next
+      useful source of truth before more subjective UI changes; do it with
+      paired iOS/Android screenshots instead of more inferred code-only tweaks.
 
 ## Known upstream divergences
 
