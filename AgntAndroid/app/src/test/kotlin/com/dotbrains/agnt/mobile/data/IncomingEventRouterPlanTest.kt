@@ -89,6 +89,29 @@ class IncomingEventRouterPlanTest {
             assertEquals(CodexPlanStepStatus.pending, plan.planState?.steps?.single()?.status)
         }
 
+    @Test
+    fun codexEventPlanUpdate_acceptsSummaryAsExplanation() =
+        runBlocking {
+            val timeline = MessageTimelineStore()
+            val router = newRouter(messageTimeline = timeline)
+
+            router.dispatchNotification(
+                method = "codex/event/plan_update",
+                params =
+                    JSONValue.Obj(
+                        mapOf(
+                            "threadId" to JSONValue.Str("thread-3"),
+                            "turnId" to JSONValue.Str("turn-3"),
+                            "summary" to JSONValue.Str("Plan summary"),
+                        ),
+                    ),
+            )
+
+            val plan = timeline.messagesByThread.value["thread-3"].orEmpty().single()
+            assertEquals(CodexMessageKind.plan, plan.kind)
+            assertEquals("Plan summary", plan.planState?.explanation)
+        }
+
     private fun newRouter(
         messageTimeline: MessageTimelineStore = MessageTimelineStore(),
     ): IncomingEventRouter =

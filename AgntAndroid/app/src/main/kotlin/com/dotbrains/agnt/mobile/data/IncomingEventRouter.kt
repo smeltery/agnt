@@ -126,6 +126,7 @@ internal class IncomingEventRouter(
             "codex/event/agent_message",
             -> handleItemCompleted(obj)
             "codex/event/user_message" -> handleUserMirrored(obj)
+            "codex/event/background_event" -> handleBackgroundEvent(obj)
             "codex/event/image_generation_end" -> handleImageGenerationEnd(obj)
             "item/reasoning/summaryTextDelta",
             "item/reasoning/summaryPartAdded",
@@ -344,6 +345,16 @@ internal class IncomingEventRouter(
         threadIdByTurnId[t] = th
     }
 
+    private fun markTurnActiveFromLiveEvent(
+        threadId: String,
+        turnId: String?,
+    ) {
+        val th = threadId.trim().takeIf { it.isNotEmpty() } ?: return
+        val t = turnId?.trim()?.takeIf { it.isNotEmpty() }
+        recordTurnThread(t, th)
+        onTurnLifecycle(th, t)
+    }
+
     private fun resolveThreadId(params: Map<String, JSONValue>?): String? {
         IncomingNotificationParsers.extractThreadId(params)?.let { return it }
         val turn = IncomingNotificationParsers.extractTurnId(params) ?: return null
@@ -437,6 +448,8 @@ internal class IncomingEventRouter(
         if (turnId != null) {
             scope.launch {
                 messageTimeline.confirmLatestPendingUserMessage(threadId, turnId)
+                messageTimeline.attachLatestTurnlessUserMessageToTurn(threadId, turnId)
+                messageTimeline.ensureStreamingAssistantPlaceholder(threadId, turnId)
             }
         }
     }
@@ -478,11 +491,11 @@ internal class IncomingEventRouter(
 
     private fun handleAgentDelta(params: Map<String, JSONValue>?) {
         val delta = IncomingNotificationParsers.extractAssistantDelta(params) ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(params) ?: return
-        val threadId = resolveThreadId(params) ?: return
+        val turnId = IncomingNotificationParsers.extractTurnId(params)
+        val threadId = resolveThreadId(params) ?: IncomingNotificationParsers.extractThreadId(params) ?: return
         val itemId = IncomingNotificationParsers.extractItemId(params)
         val assistantPhase = IncomingNotificationParsers.extractAssistantPhase(params)
-        recordTurnThread(turnId, threadId)
+        markTurnActiveFromLiveEvent(threadId, turnId)
         scope.launch {
             messageTimeline.appendAssistantDelta(threadId, turnId, itemId, delta, assistantPhase)
         }
@@ -628,9 +641,44 @@ internal class IncomingEventRouter(
         val text = IncomingNotificationParsers.extractUserMirrorText(params) ?: return
         val turnId = IncomingNotificationParsers.extractTurnId(params)
         val threadId = resolveThreadId(params) ?: return
-        recordTurnThread(turnId, threadId)
+        markTurnActiveFromLiveEvent(threadId, turnId)
         scope.launch {
             messageTimeline.appendMirroredUser(threadId, turnId, text)
+            if (!turnId.isNullOrBlank()) {
+                messageTimeline.ensureStreamingAssistantPlaceholder(threadId, turnId)
+            }
+        }
+    }
+
+    private fun handleBackgroundEvent(params: Map<String, JSONValue>?) {
+        val p = params ?: return
+        val text =
+            (
+                IncomingNotificationParsers.extractTextDelta(p)
+                    ?: firstString(p, listOf("message", "activity", "status"))
+                    ?: envelopeEventObject(p)?.let { firstString(it, listOf("message", "activity", "status")) }
+            )?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        val turnId = IncomingNotificationParsers.extractTurnId(p)
+        val threadId = resolveThreadId(p) ?: return
+        markTurnActiveFromLiveEvent(threadId, turnId)
+        val itemId = IncomingNotificationParsers.extractItemId(p)
+        scope.launch {
+            if (!turnId.isNullOrBlank()) {
+                messageTimeline.upsertStreamingSystemItemSnapshot(
+                    threadId = threadId,
+                    turnId = turnId,
+                    itemId = itemId,
+                    kind = CodexMessageKind.thinking,
+                    snapshot = text,
+                )
+            } else {
+                messageTimeline.appendSystemLine(
+                    threadId = threadId,
+                    turnId = null,
+                    text = text,
+                    kind = CodexMessageKind.thinking,
+                )
+            }
         }
     }
 
@@ -697,7 +745,7 @@ internal class IncomingEventRouter(
                 ?: return
         val delta = p["delta"]?.stringValue ?: event?.get("delta")?.stringValue ?: return
         if (delta.isEmpty()) return
-        recordTurnThread(turnId, threadId)
+        markTurnActiveFromLiveEvent(threadId, turnId)
         scope.launch {
             messageTimeline.upsertPlanMessage(
                 threadId = threadId,
@@ -723,10 +771,10 @@ internal class IncomingEventRouter(
             firstString(p, listOf("turnId", "turn_id"))
                 ?: event?.let { firstString(it, listOf("turnId", "turn_id")) }
                 ?: return
-        recordTurnThread(turnId, threadId)
+        markTurnActiveFromLiveEvent(threadId, turnId)
         val explanation =
-            firstString(p, listOf("explanation"))
-                ?: event?.let { firstString(it, listOf("explanation")) }
+            firstString(p, listOf("explanation", "summary"))
+                ?: event?.let { firstString(it, listOf("explanation", "summary")) }
         val steps = decodePlanSteps(p["plan"] ?: event?.get("plan"))
         scope.launch {
             messageTimeline.upsertPlanMessage(
@@ -744,7 +792,7 @@ internal class IncomingEventRouter(
         val p = params ?: return
         val turnId = IncomingNotificationParsers.extractTurnId(p)
         val threadId = resolveThreadId(p) ?: return
-        recordTurnThread(turnId, threadId)
+        markTurnActiveFromLiveEvent(threadId, turnId)
         val itemId = IncomingNotificationParsers.extractItemId(p)
         val itemObj =
             IncomingNotificationParsers.extractIncomingItemObject(
@@ -885,7 +933,11 @@ internal class IncomingEventRouter(
 
         val turnId = IncomingNotificationParsers.extractTurnId(p)
         val threadId = resolveThreadId(p) ?: return
-        recordTurnThread(turnId, threadId)
+        if (isBegin) {
+            markTurnActiveFromLiveEvent(threadId, turnId)
+        } else {
+            recordTurnThread(turnId, threadId)
+        }
         val itemId = state.itemId ?: IncomingNotificationParsers.extractItemId(p)
         val shortCommand =
             itemId?.let { id ->
@@ -973,7 +1025,7 @@ internal class IncomingEventRouter(
 
         val turnId = IncomingNotificationParsers.extractTurnId(p)
         val threadId = resolveThreadId(p) ?: return
-        recordTurnThread(turnId, threadId)
+        markTurnActiveFromLiveEvent(threadId, turnId)
         val itemId = state.itemId ?: IncomingNotificationParsers.extractItemId(p)
         scope.launch {
             if (itemId != null) {

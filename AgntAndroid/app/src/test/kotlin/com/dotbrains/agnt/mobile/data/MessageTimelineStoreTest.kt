@@ -104,6 +104,40 @@ class MessageTimelineStoreTest {
         }
 
     @Test
+    fun appendAssistantDelta_mergesTurnlessDeltaIntoTurnPlaceholder() =
+        runTest {
+            val store = MessageTimelineStore()
+
+            store.ensureStreamingAssistantPlaceholder("thread-1", "turn-1")
+            store.appendAssistantDelta(
+                threadId = "thread-1",
+                turnId = null,
+                itemId = "item-1",
+                delta = "hello",
+            )
+
+            val messages = store.messagesByThread.value["thread-1"].orEmpty()
+            assertEquals(1, messages.size)
+            assertEquals("hello", messages.single().text)
+            assertEquals("turn-1", messages.single().turnId)
+            assertEquals("item-1", messages.single().itemId)
+        }
+
+    @Test
+    fun attachLatestTurnlessUserMessageToTurn_updatesConfirmedUserRow() =
+        runTest {
+            val store = MessageTimelineStore()
+
+            store.appendMirroredUser("thread-1", null, "hello")
+            store.attachLatestTurnlessUserMessageToTurn("thread-1", "turn-1")
+
+            val messages = store.messagesByThread.value["thread-1"].orEmpty()
+            assertEquals(1, messages.size)
+            assertEquals(CodexMessageRole.user, messages.single().role)
+            assertEquals("turn-1", messages.single().turnId)
+        }
+
+    @Test
     fun appendMirroredUser_mergesPhotoEchoWithDifferentAttachmentMetadata() =
         runTest {
             val store = MessageTimelineStore()
@@ -395,4 +429,3 @@ class MessageTimelineStoreTest {
             attachments = attachments,
         )
 }
-

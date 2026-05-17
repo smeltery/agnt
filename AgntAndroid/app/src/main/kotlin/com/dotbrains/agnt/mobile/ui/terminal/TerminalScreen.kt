@@ -72,6 +72,13 @@ fun TerminalScreen(
 
     val activeSnapshot = snapshots[activeTerminalId] ?: TerminalSnapshot.idle(activeTerminalId)
 
+    LaunchedEffect(Unit) {
+        AppContainer.betaEngagementRepository.recordMissionEvent(
+            eventType = "terminal_opened",
+            screen = "terminal",
+        )
+    }
+
     val resolvedProfile by remember {
         derivedStateOf { draftProfile.applyingConnectionString(connectionDraft).normalizedForSave() }
     }
@@ -93,6 +100,10 @@ fun TerminalScreen(
             controller.savePrivateKey(draftPrivateKey)
             controller.savePassphrase(draftPassphrase)
             try {
+                AppContainer.betaEngagementRepository.recordMissionEvent(
+                    eventType = "terminal_connect_started",
+                    screen = "terminal",
+                )
                 controller.openTerminal(
                     terminalId = targetId,
                     profile = finalProfile,
@@ -342,6 +353,12 @@ fun TerminalScreen(
                 draftPrivateKey = key
                 draftPassphrase = passphrase
                 showEditor = false
+                coroutineScope.launch {
+                    AppContainer.betaEngagementRepository.recordMissionEvent(
+                        eventType = "terminal_profile_saved",
+                        screen = "terminal",
+                    )
+                }
                 userClosedIds = userClosedIds - activeTerminalId
                 bootstrappedIds = bootstrappedIds + activeTerminalId
                 openTerminalNow(activeTerminalId, profile)
@@ -381,4 +398,3 @@ private fun TerminalUnavailableView(
         }
     }
 }
-

@@ -45,7 +45,7 @@ fun validateRelayUrl(
 fun isLocalRelayHost(host: String): Boolean {
     val h = host.trim().trim('[', ']').lowercase()
     if (h.isEmpty()) return false
-    if (h == "localhost" || h == "::1" || h.endsWith(".local")) return true
+    if (h == "localhost" || h == "::1" || h.endsWith(".local") || h.endsWith(".ts.net")) return true
     if (!h.contains('.') && !h.contains(':')) return true
     if (isPrivateIpv4(h)) return true
     if (!h.contains(':')) return false
@@ -64,6 +64,7 @@ private fun isPrivateIpv4(host: String): Boolean {
     if (octets.any { it !in 0..255 }) return false
     return octets[0] == 10 ||
         octets[0] == 127 ||
+        (octets[0] == 100 && octets[1] in 64..127) ||
         (octets[0] == 172 && octets[1] in 16..31) ||
         (octets[0] == 192 && octets[1] == 168) ||
         (octets[0] == 169 && octets[1] == 254)

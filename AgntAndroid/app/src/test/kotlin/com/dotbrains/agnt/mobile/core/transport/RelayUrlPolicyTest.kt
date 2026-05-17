@@ -15,9 +15,22 @@ class RelayUrlPolicyTest {
     }
 
     @Test
+    fun tailscaleCleartextRelay_isAllowed() {
+        val ipValidation = assertNotNull(validateRelayUrl("ws://100.100.100.100:9000/relay"))
+        assertTrue(ipValidation.cleartext)
+        assertEquals("100.100.100.100", ipValidation.httpUrl.host)
+
+        val magicDnsValidation = assertNotNull(validateRelayUrl("ws://macbook.tailnet-name.ts.net:9000/relay"))
+        assertTrue(magicDnsValidation.cleartext)
+        assertEquals("macbook.tailnet-name.ts.net", magicDnsValidation.httpUrl.host)
+    }
+
+    @Test
     fun publicCleartextRelay_isRejected() {
         assertNull(validateRelayUrl("ws://relay.example.com/relay"))
         assertNull(validateRelayUrl("http://relay.example.com/relay"))
+        assertNull(validateRelayUrl("ws://100.63.255.255/relay"))
+        assertNull(validateRelayUrl("ws://100.128.0.0/relay"))
     }
 
     @Test
