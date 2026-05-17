@@ -404,7 +404,7 @@ data class CodexThread(
 }
 
 fun projectDisplayLabelFor(normalizedProjectPath: String?): String {
-    if (normalizedProjectPath == null) return "Cloud"
+    if (normalizedProjectPath == null) return "Quick Chat"
     val base = projectBaseDisplayName(normalizedProjectPath)
     val token = codexManagedWorktreeDisplayToken(normalizedProjectPath) ?: return base
     return "$base $token"
