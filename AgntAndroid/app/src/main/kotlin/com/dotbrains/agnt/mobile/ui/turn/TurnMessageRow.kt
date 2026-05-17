@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -94,9 +95,15 @@ fun TurnMessageRow(
         }
     val bubbleBorder =
         if (message.role == CodexMessageRole.user && isLightChrome) {
-            BorderStroke(0.5.dp, colors.outline.copy(alpha = 0.58f))
+            BorderStroke(0.5.dp, colors.outline.copy(alpha = 0.42f))
         } else {
             null
+        }
+    val bubbleShape =
+        when (message.role) {
+            CodexMessageRole.user -> RoundedCornerShape(12.dp)
+            CodexMessageRole.assistant -> RoundedCornerShape(0.dp)
+            CodexMessageRole.system -> RoundedCornerShape(12.dp)
         }
 
     Column(
@@ -104,7 +111,7 @@ fun TurnMessageRow(
         horizontalAlignment = horizontalAlignment,
     ) {
         Surface(
-            shape = MaterialTheme.shapes.medium,
+            shape = bubbleShape,
             color = bubbleColor,
             border = bubbleBorder,
             modifier =
@@ -130,12 +137,12 @@ fun TurnMessageRow(
                         horizontal =
                             when (message.role) {
                                 CodexMessageRole.user -> 12.dp
-                                CodexMessageRole.assistant -> 4.dp
+                                CodexMessageRole.assistant -> 0.dp
                                 CodexMessageRole.system -> 12.dp
                             },
                         vertical =
                             when (message.role) {
-                                CodexMessageRole.user -> 10.dp
+                                CodexMessageRole.user -> 9.dp
                                 CodexMessageRole.assistant -> 8.dp
                                 CodexMessageRole.system -> 8.dp
                             },

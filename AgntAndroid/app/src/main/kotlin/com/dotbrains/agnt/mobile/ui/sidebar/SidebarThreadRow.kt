@@ -1,6 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.sidebar
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -37,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
+import com.dotbrains.agnt.mobile.ui.theme.AgentLightColors
+import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
 import com.dotbrains.agnt.mobile.ui.shared.WorktreeGlassBadge
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -51,7 +55,20 @@ fun SidebarThreadRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    val rowShape = MaterialTheme.shapes.medium
+    val lightChrome = isAgentLightChrome()
+    val rowShape = RoundedCornerShape(14.dp)
+    val selectedFill =
+        if (lightChrome) {
+            Color(0xFFEDEDED).copy(alpha = 0.82f)
+        } else {
+            colors.surfaceVariant.copy(alpha = 0.5f)
+        }
+    val selectedBorder =
+        if (lightChrome) {
+            colors.outline.copy(alpha = 0.28f)
+        } else {
+            Color.White.copy(alpha = 0.08f)
+        }
     var menuExpanded by remember(thread.id) { mutableStateOf(false) }
     Row(
         modifier =
@@ -61,16 +78,23 @@ fun SidebarThreadRow(
                 .background(
                     color =
                         if (selected) {
-                            colors.surfaceVariant.copy(alpha = 0.42f)
+                            selectedFill
                         } else {
                             Color.Transparent
                         },
+                )
+                .then(
+                    if (selected) {
+                        Modifier.border(0.5.dp, selectedBorder, rowShape)
+                    } else {
+                        Modifier
+                    },
                 )
                 .combinedClickable(
                     onClick = onSelect,
                     onLongClick = { onRenameRequest?.invoke() },
                 )
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = if (thread.isSubagent) 6.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -82,8 +106,8 @@ fun SidebarThreadRow(
                 CircularProgressIndicator(
                     modifier = Modifier.size(10.dp),
                     strokeWidth = 1.5.dp,
-                    color = colors.primary,
-                    trackColor = colors.primary.copy(alpha = 0.18f),
+                    color = colors.onSurface,
+                    trackColor = colors.onSurface.copy(alpha = 0.14f),
                 )
             } else if (selected) {
                 Box(
@@ -91,11 +115,14 @@ fun SidebarThreadRow(
                         Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(colors.primary.copy(alpha = 0.9f)),
+                            .background(colors.onSurface.copy(alpha = 0.72f)),
                 )
             }
         }
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(
                 text = thread.displayTitle,
                 style = MaterialTheme.typography.bodyMedium,
@@ -113,7 +140,7 @@ fun SidebarThreadRow(
                 Text(
                     text = archivedNote,
                     style = MaterialTheme.typography.labelSmall,
-                    color = colors.onSurfaceVariant,
+                    color = colors.onSurfaceVariant.copy(alpha = 0.72f),
                     maxLines = 1,
                 )
             }
@@ -130,7 +157,7 @@ fun SidebarThreadRow(
                 Text(
                     text = rel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = colors.onSurfaceVariant,
+                    color = colors.onSurfaceVariant.copy(alpha = 0.82f),
                     maxLines = 1,
                 )
             }
@@ -138,12 +165,13 @@ fun SidebarThreadRow(
                 Box {
                     IconButton(
                         onClick = { menuExpanded = true },
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(28.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.MoreVert,
                             contentDescription = stringResource(R.string.sidebar_thread_actions_cd),
-                            tint = colors.onSurfaceVariant,
+                            tint = if (lightChrome) AgentLightColors.IconMuted else colors.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                     DropdownMenu(
