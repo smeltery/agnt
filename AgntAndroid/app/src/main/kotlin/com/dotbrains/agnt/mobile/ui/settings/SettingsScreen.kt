@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -126,203 +129,194 @@ fun SettingsScreen(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text(
-                text = stringResource(R.string.settings_section_appearance),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.settings_font_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AppFontStyle.entries.forEach { option ->
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = option == fontStyle,
-                                onClick = {
-                                    fontStyle = option
-                                    AppFontPreferences.writeFontStyle(context, option)
-                                },
-                                role = Role.RadioButton,
-                            )
-                            .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
+            SettingsCard(title = stringResource(R.string.settings_section_appearance)) {
+                Text(
+                    text = stringResource(R.string.settings_font_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                AppFontStyle.entries.forEach { option ->
+                    SettingsOptionRow(
                         selected = option == fontStyle,
-                        onClick = null,
+                        onClick = {
+                            fontStyle = option
+                            AppFontPreferences.writeFontStyle(context, option)
+                        },
+                        title = option.title,
+                        subtitle = option.subtitle,
                     )
-                    Column(modifier = Modifier.padding(start = 8.dp)) {
-                        Text(text = option.title, style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            text = option.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
-            Text(
-                text = stringResource(R.string.settings_language_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.settings_language_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AppLanguagePreference.entries.forEach { option ->
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = option == languagePreference,
-                                onClick = {
-                                    languagePreference = option
-                                    LanguagePreferences.write(context, option)
-                                },
-                                role = Role.RadioButton,
-                            )
-                            .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
+            SettingsCard(title = stringResource(R.string.settings_language_title)) {
+                Text(
+                    text = stringResource(R.string.settings_language_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                AppLanguagePreference.entries.forEach { option ->
+                    SettingsOptionRow(
                         selected = option == languagePreference,
-                        onClick = null,
+                        onClick = {
+                            languagePreference = option
+                            LanguagePreferences.write(context, option)
+                        },
+                        title = stringResource(settingsLanguageTitleRes(option)),
+                        subtitle = stringResource(settingsLanguageSubtitleRes(option)),
                     )
-                    Column(modifier = Modifier.padding(start = 8.dp)) {
-                        Text(
-                            text = stringResource(settingsLanguageTitleRes(option)),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = stringResource(settingsLanguageSubtitleRes(option)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
-            Text(
-                text = stringResource(R.string.settings_theme_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.settings_theme_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AppThemePreference.entries.forEach { option ->
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = option == themePreference,
-                                onClick = {
-                                    themePreference = option
-                                    ThemePreferences.write(context, option)
-                                },
-                                role = Role.RadioButton,
-                            )
-                            .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
+            SettingsCard(title = stringResource(R.string.settings_theme_title)) {
+                Text(
+                    text = stringResource(R.string.settings_theme_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                AppThemePreference.entries.forEach { option ->
+                    SettingsOptionRow(
                         selected = option == themePreference,
-                        onClick = null,
+                        onClick = {
+                            themePreference = option
+                            ThemePreferences.write(context, option)
+                        },
+                        title = stringResource(settingsThemeTitleRes(option)),
+                        subtitle = stringResource(settingsThemeSubtitleRes(option)),
                     )
-                    Column(modifier = Modifier.padding(start = 8.dp)) {
-                        Text(
-                            text = stringResource(settingsThemeTitleRes(option)),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = stringResource(settingsThemeSubtitleRes(option)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
-            Text(
-                text = stringResource(R.string.settings_section_connection),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            SettingsConnectionStatus(conn = conn)
-            OutlinedTextField(
-                value = localRelayHostOverride,
-                onValueChange = {
-                    localRelayHostOverride = it
-                    AppContainer.sessionPersistence.saveLocalRelayHostOverride(it)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.settings_local_relay_host_override_label)) },
-                placeholder = { Text(stringResource(R.string.settings_local_relay_host_override_placeholder)) },
-                singleLine = true,
-            )
-            SettingsNotificationSection(context = context)
+            SettingsCard(title = stringResource(R.string.settings_section_connection)) {
+                SettingsConnectionStatus(conn = conn)
+                OutlinedTextField(
+                    value = localRelayHostOverride,
+                    onValueChange = {
+                        localRelayHostOverride = it
+                        AppContainer.sessionPersistence.saveLocalRelayHostOverride(it)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.settings_local_relay_host_override_label)) },
+                    placeholder = { Text(stringResource(R.string.settings_local_relay_host_override_placeholder)) },
+                    singleLine = true,
+                )
+            }
 
-            SettingsUsageRateLimitsSection(repository = repository)
+            SettingsCard(title = stringResource(R.string.settings_section_notifications)) {
+                SettingsNotificationSection(context = context)
+            }
 
-            Text(
-                text = stringResource(R.string.settings_section_about),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            SettingsNavigationRow(
-                title = stringResource(R.string.nav_about_remodex),
-                subtitle = stringResource(R.string.settings_about_remodex_hint),
-                onClick = {
-                    scope.launch {
-                        AppContainer.betaEngagementRepository.recordMissionEvent(
-                            eventType = "about_screen_opened",
-                            screen = "settings",
-                        )
-                    }
-                    onNavigateToAbout()
-                },
-            )
-            SettingsNavigationRow(
-                title = stringResource(R.string.nav_whats_new),
-                subtitle = stringResource(R.string.settings_whats_new_hint),
-                onClick = {
-                    scope.launch {
-                        AppContainer.betaEngagementRepository.recordMissionEvent(
-                            eventType = "settings_whats_new_opened",
-                            screen = "settings",
-                        )
-                    }
-                    onNavigateToWhatsNew()
-                },
-            )
-            if (FeatureFlags.betaEngagementEnabled) {
+            SettingsCard(title = stringResource(R.string.settings_section_usage)) {
+                SettingsUsageRateLimitsSection(repository = repository)
+            }
+
+            SettingsCard(title = stringResource(R.string.settings_section_about)) {
                 SettingsNavigationRow(
-                    title = stringResource(R.string.nav_tester_hq),
-                    subtitle = stringResource(R.string.settings_tester_hq_hint),
+                    title = stringResource(R.string.nav_about_remodex),
+                    subtitle = stringResource(R.string.settings_about_remodex_hint),
                     onClick = {
                         scope.launch {
                             AppContainer.betaEngagementRepository.recordMissionEvent(
-                                eventType = "settings_tester_hq_entry_opened",
+                                eventType = "about_screen_opened",
                                 screen = "settings",
                             )
                         }
-                        onNavigateToTesterHq()
+                        onNavigateToAbout()
                     },
                 )
+                SettingsNavigationRow(
+                    title = stringResource(R.string.nav_whats_new),
+                    subtitle = stringResource(R.string.settings_whats_new_hint),
+                    onClick = {
+                        scope.launch {
+                            AppContainer.betaEngagementRepository.recordMissionEvent(
+                                eventType = "settings_whats_new_opened",
+                                screen = "settings",
+                            )
+                        }
+                        onNavigateToWhatsNew()
+                    },
+                )
+                if (FeatureFlags.betaEngagementEnabled) {
+                    SettingsNavigationRow(
+                        title = stringResource(R.string.nav_tester_hq),
+                        subtitle = stringResource(R.string.settings_tester_hq_hint),
+                        onClick = {
+                            scope.launch {
+                                AppContainer.betaEngagementRepository.recordMissionEvent(
+                                    eventType = "settings_tester_hq_entry_opened",
+                                    screen = "settings",
+                                )
+                            }
+                            onNavigateToTesterHq()
+                        },
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.settings_about_version, versionName),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = stringResource(R.string.settings_more_coming),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCard(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             Text(
-                text = stringResource(R.string.settings_about_version, versionName),
-                style = MaterialTheme.typography.bodyMedium,
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SettingsOptionRow(
+    selected: Boolean,
+    onClick: () -> Unit,
+    title: String,
+    subtitle: String,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = selected,
+                    onClick = onClick,
+                    role = Role.RadioButton,
+                )
+                .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+        )
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = stringResource(R.string.settings_more_coming),
+                text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -358,10 +352,6 @@ private fun SettingsNotificationSection(context: Context) {
         permissionStatus == LocalNotificationSettings.PermissionStatus.Granted ||
             permissionStatus == LocalNotificationSettings.PermissionStatus.NotRequired
 
-    Text(
-        text = stringResource(R.string.settings_section_notifications),
-        style = MaterialTheme.typography.titleMedium,
-    )
     Text(
         text = stringResource(R.string.settings_notifications_hint),
         style = MaterialTheme.typography.bodySmall,
@@ -487,10 +477,6 @@ private fun SettingsUsageRateLimitsSection(
     val contextLoading by repository.contextWindowUsageLoadingThreads.collectAsStateWithLifecycle()
     val contextErrors by repository.contextWindowUsageErrorByThread.collectAsStateWithLifecycle()
 
-    Text(
-        text = stringResource(R.string.settings_section_usage),
-        style = MaterialTheme.typography.titleMedium,
-    )
     Text(
         text = stringResource(R.string.usage_rate_limits_hint),
         style = MaterialTheme.typography.bodySmall,
