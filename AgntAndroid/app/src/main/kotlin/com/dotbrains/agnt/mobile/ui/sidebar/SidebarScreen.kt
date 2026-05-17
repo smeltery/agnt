@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -41,9 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.GitWorktreeChangeTransferMode
@@ -62,6 +65,12 @@ import com.dotbrains.agnt.mobile.ui.shared.ThreadRenameDialog
 import kotlinx.coroutines.launch
 
 private const val SIDEBAR_THREADS_PER_GROUP = 5
+
+private enum class SidebarTopAction {
+    NewChat,
+    QuickChat,
+    NewProject,
+}
 
 @Composable
 fun SidebarScreen(
@@ -181,6 +190,22 @@ fun SidebarScreen(
         }
     }
 
+    fun startQuickChat() {
+        if (newChatBusy || worktreeChatBusy) return
+        newChatError = null
+        newChatBusy = true
+        scope.launch {
+            try {
+                startSidebarNewChat(repository, null)
+                onThreadSelected()
+            } catch (e: Exception) {
+                newChatError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+            } finally {
+                newChatBusy = false
+            }
+        }
+    }
+
     Column(
         modifier =
             modifier
@@ -193,38 +218,23 @@ fun SidebarScreen(
         val bridgeConnected = conn is ConnectionState.Connected
         val worktreeEntryEnabled = ready && bridgeConnected && !newChatBusy && !worktreeChatBusy
 
-        SidebarCompactActionRow(
-            label = stringResource(R.string.sidebar_new_chat),
-            enabled = ready && !newChatBusy && !worktreeChatBusy,
-            busy = newChatBusy,
-            onClick = {
+        SidebarTopActionsRow(
+            enabled = ready && bridgeConnected,
+            pendingAction =
+                when {
+                    newChatBusy && showProjectPicker -> SidebarTopAction.NewChat
+                    newChatBusy -> SidebarTopAction.QuickChat
+                    worktreeChatBusy -> SidebarTopAction.NewProject
+                    else -> null
+                },
+            onNewChat = {
                 newChatError = null
                 projectPickerInitialPath = WorktreeNewChatDefaults.baseProjectPath(activeId, threads)
                 projectPickerFoldersCollapsed = false
                 showProjectPicker = true
             },
-        )
-        SidebarCompactActionRow(
-            label = stringResource(R.string.sidebar_new_managed_worktree_chat),
-            enabled = worktreeEntryEnabled,
-            busy = worktreeChatBusy,
-            onClick = { startManagedWorktreeChat() },
-            leading = {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AccountTree,
-                        contentDescription = stringResource(R.string.cd_sidebar_new_managed_worktree_chat),
-                        modifier =
-                            Modifier
-                                .padding(horizontal = 7.dp, vertical = 7.dp)
-                                .size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
+            onQuickChat = ::startQuickChat,
+            onNewProject = { startManagedWorktreeChat() },
         )
         SidebarCompactActionRow(
             label = stringResource(R.string.nav_archived_chats),
@@ -682,6 +692,99 @@ private data class PendingSidebarWorktreeChat(
     val baseProjectPath: String,
     val baseBranch: String,
 )
+
+@Composable
+private fun SidebarTopActionsRow(
+    enabled: Boolean,
+    pendingAction: SidebarTopAction?,
+    onNewChat: () -> Unit,
+    onQuickChat: () -> Unit,
+    onNewProject: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(30.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        SidebarTopActionButton(
+            action = SidebarTopAction.NewChat,
+            label = stringResource(R.string.sidebar_new_chat),
+            iconRes = LucideR.drawable.lucide_ic_square_pen,
+            enabled = enabled,
+            pendingAction = pendingAction,
+            onClick = onNewChat,
+        )
+        SidebarTopActionButton(
+            action = SidebarTopAction.QuickChat,
+            label = stringResource(R.string.sidebar_quick_chat),
+            iconRes = LucideR.drawable.lucide_ic_message_square,
+            enabled = enabled,
+            pendingAction = pendingAction,
+            onClick = onQuickChat,
+        )
+        SidebarTopActionButton(
+            action = SidebarTopAction.NewProject,
+            label = stringResource(R.string.sidebar_new_project),
+            iconRes = LucideR.drawable.lucide_ic_folder_plus,
+            enabled = enabled,
+            pendingAction = pendingAction,
+            onClick = onNewProject,
+        )
+    }
+}
+
+@Composable
+private fun SidebarTopActionButton(
+    action: SidebarTopAction,
+    label: String,
+    iconRes: Int,
+    enabled: Boolean,
+    pendingAction: SidebarTopAction?,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val isBusy = pendingAction == action
+    val canClick = enabled && pendingAction == null
+    Column(
+        modifier =
+            Modifier
+                .clickable(enabled = canClick, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = colors.surfaceVariant.copy(alpha = if (enabled) 0.58f else 0.28f),
+            modifier = Modifier.size(55.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (isBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = colors.onSurface,
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(iconRes),
+                        contentDescription = label,
+                        modifier = Modifier.size(18.dp),
+                        tint = colors.onSurface.copy(alpha = if (enabled) 0.92f else 0.34f),
+                    )
+                }
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.onSurface.copy(alpha = if (enabled) 0.92f else 0.34f),
+            maxLines = 1,
+        )
+    }
+}
 
 @Composable
 private fun SidebarGroupHeaderRow(

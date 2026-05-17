@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.DropdownMenu
@@ -33,7 +32,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
 
 /** Compact footnote / unified chip icon size. */
 internal val ComposerFootnoteIconDp = 13.dp
@@ -115,7 +113,6 @@ internal fun UnifiedComposerModelRuntimeChip(
     }
 
     Box {
-        val lightChrome = isAgentLightChrome()
         val showFastModeIcon = runtimeControls.serviceTier.selected.id != TURN_COMPOSER_RUNTIME_AUTO_ID
         Surface(
             modifier =
@@ -123,14 +120,13 @@ internal fun UnifiedComposerModelRuntimeChip(
                     .wrapContentWidth()
                     .widthIn(max = 136.dp)
                     .clickable(enabled = canOpenMenu) { expanded = true },
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (lightChrome) 0.26f else 0.42f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            color = androidx.compose.ui.graphics.Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -141,14 +137,14 @@ internal fun UnifiedComposerModelRuntimeChip(
                             painter = painterResource(LucideR.drawable.lucide_ic_zap),
                             contentDescription = null,
                             modifier = Modifier.size(ComposerFootnoteIconDp),
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(
                         text = unifiedModelRuntimeChipLabel(runtimeControls),
                         modifier = Modifier.widthIn(max = 94.dp),
-                        fontWeight = FontWeight.Medium,
-                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Normal,
+                        style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -156,7 +152,7 @@ internal fun UnifiedComposerModelRuntimeChip(
                 Icon(
                     painter = painterResource(LucideR.drawable.lucide_ic_chevron_down),
                     contentDescription = null,
-                    modifier = Modifier.size(ComposerFootnoteIconDp),
+                    modifier = Modifier.size(11.dp),
                 )
             }
         }

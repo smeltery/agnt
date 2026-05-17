@@ -243,6 +243,8 @@
     <string name="turn_plan_step_done">done</string>
     <string name="sidebar_search_hint">Search conversations</string>
     <string name="sidebar_new_chat">New chat</string>
+    <string name="sidebar_quick_chat">Quick Chat</string>
+    <string name="sidebar_new_project">New Project</string>
     <string name="sidebar_new_managed_worktree_chat">New worktree chat</string>
     <string name="sidebar_worktree_chat_no_local_project">No local project to branch from. Open a project chat, then try again.</string>
     <string name="sidebar_worktree_chat_no_base_branch">Could not determine a base branch. Check Git status in the open chat, then try again.</string>

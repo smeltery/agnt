@@ -1,6 +1,9 @@
 ﻿package com.dotbrains.agnt.mobile.ui.turn
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
@@ -28,7 +31,6 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStep
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStepStatus
 import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
-import com.valentinilk.shimmer.shimmer
 
 private const val PLAN_ACCESSORY_MAX_VISIBLE_STEPS = 4
 
@@ -51,9 +53,9 @@ internal fun TurnPlanAccessoryCard(
     val statusTint =
         if (lightChrome) {
             when (snapshot.status) {
-                PlanAccessoryStatus.Pending -> Color(0xFFE4C25F)
-                PlanAccessoryStatus.InProgress -> Color(0xFFF1D475)
-                PlanAccessoryStatus.Completed -> Color(0xFFAED2C0)
+                PlanAccessoryStatus.Pending -> Color(0xFFD09A1E)
+                PlanAccessoryStatus.InProgress -> Color(0xFFB88412)
+                PlanAccessoryStatus.Completed -> Color(0xFF2E8F5B)
             }
         } else {
             when (snapshot.status) {
@@ -62,55 +64,38 @@ internal fun TurnPlanAccessoryCard(
                 PlanAccessoryStatus.Completed -> MaterialTheme.colorScheme.secondary
             }
         }
-    val activePlan = message.isStreaming || snapshot.status != PlanAccessoryStatus.Completed
-    val completedPlan = !message.isStreaming && snapshot.status == PlanAccessoryStatus.Completed
     val planColor =
-        when {
-            activePlan && lightChrome -> {
-                Color(0xFF202326).copy(alpha = 0.94f)
-            }
-            activePlan -> {
-                Color(0xFF5A4312).copy(alpha = 0.50f)
-            }
-            completedPlan && lightChrome -> {
-                Color(0xFF25282B).copy(alpha = 0.92f)
-            }
-            completedPlan -> {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
-            }
-            else -> {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-            }
-        }
-    val shimmerModifier =
-        if (activePlan || completedPlan) {
-            Modifier.shimmer()
+        if (lightChrome) {
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
         } else {
-            Modifier
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
         }
-    val contentTint =
-        if (lightChrome && (activePlan || completedPlan)) {
-            Color(0xFFF4F2EC)
-        } else {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        }
+    val contentTint = MaterialTheme.colorScheme.onSurface
     val secondaryContentTint = contentTint.copy(alpha = 0.72f)
 
+    val cardTap = onOpenDetailsSheet ?: onToggleExpanded
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
-                .then(shimmerModifier),
-        shape = RoundedCornerShape(14.dp),
+                .then(
+                    if (cardTap != null) {
+                        Modifier.clickable(onClick = cardTap)
+                    } else {
+                        Modifier
+                    },
+                ),
+        shape = RoundedCornerShape(20.dp),
         color = planColor,
         contentColor = contentTint,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (lightChrome) 0.34f else 0.18f)),
         shadowElevation = if (floating) 12.dp else 0.dp,
-        tonalElevation = if (floating) 4.dp else 0.dp,
+        tonalElevation = if (floating) 4.dp else 1.dp,
     ) {
         val bodyModifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = 14.dp, vertical = 11.dp)
                 .then(
                     if (expanded) {
                         Modifier
@@ -122,27 +107,32 @@ internal fun TurnPlanAccessoryCard(
                 )
         Column(
             modifier = bodyModifier,
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = statusTint.copy(alpha = 0.18f),
-                    modifier = Modifier.size(18.dp),
+                Box(
+                    modifier = Modifier.size(22.dp),
+                    contentAlignment = androidx.compose.ui.Alignment.Center,
                 ) {
                     Surface(
                         shape = CircleShape,
+                        color = statusTint.copy(alpha = 0.12f),
+                        modifier = Modifier.size(22.dp),
+                    ) {}
+                    Surface(
+                        shape = CircleShape,
                         color = statusTint,
-                        modifier = Modifier.size(8.dp),
+                        modifier = Modifier.size(7.dp),
                     ) {}
                 }
                 Text(
                     text = stringResource(R.string.turn_timeline_kind_plan),
                     style = MaterialTheme.typography.labelMedium,
-                    color = contentTint,
+                    color = secondaryContentTint,
                 )
                 Text(
                     text = "·",
@@ -159,11 +149,11 @@ internal fun TurnPlanAccessoryCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = statusTint,
                 )
-                snapshot.progressText?.let { progress ->
-                    Text(
-                        text = "· $progress",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = contentTint.copy(alpha = 0.85f),
+                if (snapshot.stepStatuses.isNotEmpty()) {
+                    StepStatusRail(
+                        statuses = snapshot.stepStatuses,
+                        accent = statusTint,
+                        completedTint = contentTint,
                     )
                 }
                 if (message.isStreaming) {
@@ -174,7 +164,14 @@ internal fun TurnPlanAccessoryCard(
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                if (onToggleExpanded != null) {
+                snapshot.progressText?.let { progress ->
+                    Text(
+                        text = progress,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = contentTint,
+                    )
+                }
+                if (expanded && onToggleExpanded != null) {
                     FilterChip(
                         selected = expanded,
                         onClick = onToggleExpanded,
@@ -191,7 +188,7 @@ internal fun TurnPlanAccessoryCard(
                         },
                     )
                 }
-                if (onApplyPlan != null) {
+                if (expanded && onApplyPlan != null) {
                     FilterChip(
                         selected = false,
                         onClick = onApplyPlan,
@@ -204,7 +201,7 @@ internal fun TurnPlanAccessoryCard(
                         },
                     )
                 }
-                if (onOpenDetailsSheet != null) {
+                if (expanded && onOpenDetailsSheet != null) {
                     FilterChip(
                         selected = false,
                         onClick = onOpenDetailsSheet,
@@ -220,18 +217,10 @@ internal fun TurnPlanAccessoryCard(
 
             Text(
                 text = snapshot.summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = contentTint.copy(alpha = 0.92f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentTint,
                 maxLines = if (expanded) 4 else 1,
             )
-
-            if (snapshot.stepStatuses.isNotEmpty()) {
-                StepStatusRail(
-                    statuses = snapshot.stepStatuses,
-                    accent = statusTint,
-                    completedTint = contentTint,
-                )
-            }
 
             if (expanded) {
                 snapshot.steps.take(PLAN_ACCESSORY_MAX_VISIBLE_STEPS).forEachIndexed { index, step ->
