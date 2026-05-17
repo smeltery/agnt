@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -313,7 +314,7 @@ fun SidebarProjectPickerSheet(
             }
             item {
                 ProjectPickerActionRow(
-                    title = "Cloud",
+                    title = stringResource(R.string.sidebar_quick_chat),
                     subtitle = stringResource(R.string.sidebar_project_picker_no_project_desc),
                     icon = {
                         Icon(
@@ -513,8 +514,8 @@ private fun ProjectPickerCollapsibleSectionHeader(
             modifier
                 .fillMaxWidth()
                 .clickable(enabled = toggleEnabled, onClick = onToggle),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -573,8 +574,8 @@ private fun ProjectPickerActionRow(
             modifier
                 .fillMaxWidth()
                 .clickable(enabled = enabled && !busy, onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
-        color = colors.surfaceVariant.copy(alpha = 0.28f),
+        shape = RoundedCornerShape(16.dp),
+        color = colors.surfaceVariant.copy(alpha = 0.46f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -582,7 +583,7 @@ private fun ProjectPickerActionRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Surface(
-                shape = MaterialTheme.shapes.small,
+                shape = RoundedCornerShape(10.dp),
                 color = colors.surface.copy(alpha = 0.52f),
             ) {
                 Box(
