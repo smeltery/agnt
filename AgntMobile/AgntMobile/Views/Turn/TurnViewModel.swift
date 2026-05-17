@@ -103,6 +103,56 @@ struct QueuedTurnDraft: Identifiable {
     }
 }
 
+struct TurnComposerLocalDraft: Codable, Equatable, Sendable {
+    let input: String
+    let mentionedFiles: [TurnComposerMentionedFile]
+    let mentionedSkills: [TurnComposerMentionedSkill]
+    let mentionedPlugins: [TurnComposerMentionedPlugin]
+    let attachments: [TurnComposerImageAttachment]
+    let reviewSelection: TurnComposerReviewSelection?
+    let isPlanModeArmed: Bool
+    let isSubagentsSelectionArmed: Bool
+    let updatedAt: Date
+
+    var isEmpty: Bool {
+        input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && mentionedFiles.isEmpty
+            && mentionedSkills.isEmpty
+            && mentionedPlugins.isEmpty
+            && attachments.isEmpty
+            && reviewSelection == nil
+            && !isPlanModeArmed
+            && !isSubagentsSelectionArmed
+    }
+
+    static func make(
+        input: String,
+        mentionedFiles: [TurnComposerMentionedFile],
+        mentionedSkills: [TurnComposerMentionedSkill],
+        mentionedPlugins: [TurnComposerMentionedPlugin],
+        attachments: [TurnComposerImageAttachment],
+        reviewSelection: TurnComposerReviewSelection?,
+        isPlanModeArmed: Bool,
+        isSubagentsSelectionArmed: Bool,
+        updatedAt: Date = Date()
+    ) -> TurnComposerLocalDraft {
+        TurnComposerLocalDraft(
+            input: input,
+            mentionedFiles: mentionedFiles,
+            mentionedSkills: mentionedSkills,
+            mentionedPlugins: mentionedPlugins,
+            attachments: attachments.compactMap { attachment in
+                guard case .ready = attachment.state else { return nil }
+                return attachment
+            },
+            reviewSelection: reviewSelection,
+            isPlanModeArmed: isPlanModeArmed,
+            isSubagentsSelectionArmed: isSubagentsSelectionArmed,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 enum QueuePauseState: Equatable {
     case active
     case paused(errorMessage: String)
@@ -295,6 +345,7 @@ final class TurnViewModel {
     @ObservationIgnored var fileAutocompleteDebounceTask: Task<Void, Never>?
     @ObservationIgnored var skillAutocompleteDebounceTask: Task<Void, Never>?
     @ObservationIgnored var pluginAutocompleteDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private var localDraftPersistenceDebounceTask: Task<Void, Never>?
     @ObservationIgnored var gitStatusRefreshTask: Task<Void, Never>?
     @ObservationIgnored var pendingGitBranchOperation: GitBranchUserOperation?
     @ObservationIgnored var pendingGitWorktreeOpenHandler: ((GitCreateWorktreeResult) -> Void)?
@@ -312,6 +363,7 @@ final class TurnViewModel {
     private let fileAutocompleteDebounceNanoseconds: UInt64 = 180_000_000
     private let skillAutocompleteDebounceNanoseconds: UInt64 = 180_000_000
     private let pluginAutocompleteDebounceNanoseconds: UInt64 = 180_000_000
+    private let localDraftPersistenceDebounceNanoseconds: UInt64 = 650_000_000
     let gitStatusRefreshDebounceNanoseconds: UInt64 = 350_000_000
 
     init() {}
@@ -342,6 +394,8 @@ final class TurnViewModel {
         skillAutocompleteDebounceTask = nil
         pluginAutocompleteDebounceTask?.cancel()
         pluginAutocompleteDebounceTask = nil
+        localDraftPersistenceDebounceTask?.cancel()
+        localDraftPersistenceDebounceTask = nil
         gitStatusRefreshTask?.cancel()
         gitStatusRefreshTask = nil
     }
@@ -505,6 +559,78 @@ final class TurnViewModel {
         composerMentionedPlugins.removeAll()
     }
 
+    func localDraftSnapshot() -> TurnComposerLocalDraft {
+        TurnComposerLocalDraft.make(
+            input: input,
+            mentionedFiles: composerMentionedFiles,
+            mentionedSkills: composerMentionedSkills,
+            mentionedPlugins: composerMentionedPlugins,
+            attachments: composerAttachments,
+            reviewSelection: composerReviewSelection,
+            isPlanModeArmed: isPlanModeArmed,
+            isSubagentsSelectionArmed: isSubagentsSelectionArmed
+        )
+    }
+
+    func saveLocalDraft(codex: CodexService, threadID: String, persistToDisk: Bool = false) {
+        let draft = localDraftSnapshot()
+        if isSending, draft.isEmpty {
+            if persistToDisk {
+                flushLocalDraftPersistence(codex: codex)
+            }
+            return
+        }
+
+        codex.setComposerDraft(draft.isEmpty ? nil : draft, for: threadID)
+        if persistToDisk {
+            flushLocalDraftPersistence(codex: codex)
+        } else {
+            scheduleLocalDraftPersistence(codex: codex)
+        }
+    }
+
+    func clearLocalDraft(codex: CodexService, threadID: String, persistToDisk: Bool = false) {
+        codex.setComposerDraft(nil, for: threadID)
+        if persistToDisk {
+            flushLocalDraftPersistence(codex: codex)
+        } else {
+            scheduleLocalDraftPersistence(codex: codex)
+        }
+    }
+
+    func restoreSavedLocalDraftIfNeeded(codex: CodexService, threadID: String) {
+        guard !hasComposerDraftContent,
+              let draft = codex.composerDraft(for: threadID),
+              !draft.isEmpty else {
+            return
+        }
+
+        restoreComposerState(from: draft)
+    }
+
+    func scheduleLocalDraftPersistence(codex: CodexService) {
+        localDraftPersistenceDebounceTask?.cancel()
+        localDraftPersistenceDebounceTask = Task { @MainActor [weak self, weak codex] in
+            guard let self, let codex else { return }
+
+            do {
+                try await Task.sleep(nanoseconds: localDraftPersistenceDebounceNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            codex.persistComposerDrafts()
+            self.localDraftPersistenceDebounceTask = nil
+        }
+    }
+
+    func flushLocalDraftPersistence(codex: CodexService) {
+        localDraftPersistenceDebounceTask?.cancel()
+        localDraftPersistenceDebounceTask = nil
+        codex.persistComposerDrafts()
+    }
+
     // Appends spoken text into the composer without sending it automatically.
     func appendVoiceTranscript(_ transcript: String) {
         let normalizedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -571,6 +697,11 @@ final class TurnViewModel {
 
     func removeComposerAttachment(id: String) {
         composerAttachments.removeAll(where: { $0.id == id })
+    }
+
+    func removeComposerAttachment(id: String, codex: CodexService, threadID: String) {
+        removeComposerAttachment(id: id)
+        saveLocalDraft(codex: codex, threadID: threadID)
     }
 
     // Debounces server-side fuzzy search when input ends with a valid `@query` token.
@@ -1035,8 +1166,8 @@ final class TurnViewModel {
         isCameraPresented = true
     }
 
-    func enqueueCapturedImageData(_ data: Data, codex: CodexService) {
-        enqueuePastedImageData([data], codex: codex)
+    func enqueueCapturedImageData(_ data: Data, codex: CodexService, threadID: String) {
+        enqueuePastedImageData([data], codex: codex, threadID: threadID)
     }
 
     func openPhotoLibraryPicker(codex: CodexService) {
@@ -1049,7 +1180,7 @@ final class TurnViewModel {
     }
 
     // Converts the picker results into loading slots and async image pipeline jobs.
-    func enqueuePhotoPickerItems(_ items: [PhotosPickerItem], codex: CodexService) {
+    func enqueuePhotoPickerItems(_ items: [PhotosPickerItem], codex: CodexService, threadID: String) {
         guard !items.isEmpty else {
             return
         }
@@ -1078,14 +1209,15 @@ final class TurnViewModel {
             Task {
                 let state = await Self.loadComposerAttachmentState(from: item)
                 await MainActor.run {
-                    self.updateComposerAttachment(id: attachmentID, state: state)
+                    self.updateComposerAttachment(id: attachmentID, state: state, codex: codex, threadID: threadID)
                 }
             }
         }
+        saveLocalDraft(codex: codex, threadID: threadID)
     }
 
     // Reuses the picker intake pipeline so pasted images obey the same limits and processing.
-    func enqueuePastedImageData(_ imageDataItems: [Data], codex: CodexService) {
+    func enqueuePastedImageData(_ imageDataItems: [Data], codex: CodexService, threadID: String) {
         guard !imageDataItems.isEmpty else {
             return
         }
@@ -1114,18 +1246,25 @@ final class TurnViewModel {
             Task {
                 let state = Self.loadComposerAttachmentState(fromData: imageData)
                 await MainActor.run {
-                    self.updateComposerAttachment(id: attachmentID, state: state)
+                    self.updateComposerAttachment(id: attachmentID, state: state, codex: codex, threadID: threadID)
                 }
             }
         }
+        saveLocalDraft(codex: codex, threadID: threadID)
     }
 
-    private func updateComposerAttachment(id: String, state: TurnComposerImageAttachmentState) {
+    private func updateComposerAttachment(
+        id: String,
+        state: TurnComposerImageAttachmentState,
+        codex: CodexService,
+        threadID: String
+    ) {
         guard let index = composerAttachments.firstIndex(where: { $0.id == id }) else {
             return
         }
 
         composerAttachments[index].state = state
+        saveLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
     }
 
     // Sends a composer payload, queueing follow-ups while the current run is still active.
@@ -1213,6 +1352,7 @@ final class TurnViewModel {
                 appendQueuedDraft(queuedDraft, codex: codex, threadID: threadID)
                 shouldAnchorToAssistantResponse = true
                 clearComposer()
+                clearLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
 
                 resumeQueueAndFlushIfPossible(codex: codex, threadID: threadID)
                 return
@@ -2046,6 +2186,7 @@ final class TurnViewModel {
         shouldAnchorToAssistantResponse = true
         appendQueuedDraft(queuedDraft, codex: codex, threadID: threadID)
         clearComposer()
+        clearLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
     }
 
     // Sends the prepared payload and restores the exact raw composer state if startTurn fails.
@@ -2076,9 +2217,11 @@ final class TurnViewModel {
                     collaborationMode: pendingSend.collaborationMode
                 )
             }
+            clearLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
         } catch {
             shouldAnchorToAssistantResponse = false
             restoreComposerState(from: pendingSend)
+            saveLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
             if pendingSend.collaborationMode == .plan,
                shouldRearmPlanModeAfterSendFailure(error) {
                 isPlanModeArmed = true
@@ -2129,6 +2272,18 @@ final class TurnViewModel {
         composerReviewSelection = nil
         isSubagentsSelectionArmed = draft.rawSubagentsSelectionArmed
         isPlanModeArmed = draft.collaborationMode == .plan
+    }
+
+    private func restoreComposerState(from draft: TurnComposerLocalDraft) {
+        input = draft.input
+        composerMentionedFiles = draft.mentionedFiles
+        composerMentionedSkills = draft.mentionedSkills
+        composerMentionedPlugins = draft.mentionedPlugins
+        composerAttachments = draft.attachments
+        composerReviewSelection = draft.reviewSelection
+        isSubagentsSelectionArmed = draft.isSubagentsSelectionArmed
+        isPlanModeArmed = draft.isPlanModeArmed
+        clearComposerAutocomplete()
     }
 
     // Resolves the active turn id for manual steer without relying on async autoclosure operators.
@@ -2659,24 +2814,44 @@ final class TurnViewModel {
 
 }
 
-struct TurnComposerMentionedFile: Identifiable, Equatable {
-    let id = UUID().uuidString
+struct TurnComposerMentionedFile: Identifiable, Codable, Equatable, Sendable {
+    let id: String
     let fileName: String
     let path: String
+
+    init(id: String = UUID().uuidString, fileName: String, path: String) {
+        self.id = id
+        self.fileName = fileName
+        self.path = path
+    }
 }
 
-struct TurnComposerMentionedSkill: Identifiable, Equatable {
-    let id = UUID().uuidString
+struct TurnComposerMentionedSkill: Identifiable, Codable, Equatable, Sendable {
+    let id: String
     let name: String
     let path: String?
     let description: String?
+
+    init(id: String = UUID().uuidString, name: String, path: String?, description: String?) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.description = description
+    }
 }
 
-struct TurnComposerMentionedPlugin: Identifiable, Equatable {
-    let id = UUID().uuidString
+struct TurnComposerMentionedPlugin: Identifiable, Codable, Equatable, Sendable {
+    let id: String
     let name: String
     let path: String
     let displayName: String?
+
+    init(id: String = UUID().uuidString, name: String, path: String, displayName: String?) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.displayName = displayName
+    }
 }
 
 struct TurnTrailingFileAutocompleteToken: Equatable {

@@ -168,8 +168,13 @@ struct TurnComposerHostView: View {
             onTapVoice: onTapVoice,
             onCancelVoiceRecording: onCancelVoiceRecording,
             onTapCreateWorktree: onOpenWorktreeHandoff,
-            onSetPlanModeArmed: viewModel.setPlanModeArmed,
-            onRemoveAttachment: viewModel.removeComposerAttachment,
+            onSetPlanModeArmed: { isArmed in
+                viewModel.setPlanModeArmed(isArmed)
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
+            onRemoveAttachment: { attachmentID in
+                viewModel.removeComposerAttachment(id: attachmentID, codex: codex, threadID: thread.id)
+            },
             onStopTurn: { turnID in
                 viewModel.interruptTurn(turnID, codex: codex, threadID: thread.id)
             },
@@ -203,9 +208,18 @@ struct TurnComposerHostView: View {
                     activeTurnID: activeTurnID
                 )
             },
-            onSelectFileAutocomplete: viewModel.onSelectFileAutocomplete,
-            onSelectSkillAutocomplete: viewModel.onSelectSkillAutocomplete,
-            onSelectPluginAutocomplete: viewModel.onSelectPluginAutocomplete,
+            onSelectFileAutocomplete: { item in
+                viewModel.onSelectFileAutocomplete(item)
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
+            onSelectSkillAutocomplete: { skill in
+                viewModel.onSelectSkillAutocomplete(skill)
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
+            onSelectPluginAutocomplete: { plugin in
+                viewModel.onSelectPluginAutocomplete(plugin)
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
             onSelectSlashCommand: { command in
                 switch command {
                 case .codeReview:
@@ -227,6 +241,7 @@ struct TurnComposerHostView: View {
                     viewModel.onSelectSlashCommand(command)
                     onCompactThread()
                 }
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
             },
             onSelectCodeReviewTarget: { target in
                 viewModel.prepareForThreadRerouteFromSlashCommand()
@@ -242,13 +257,28 @@ struct TurnComposerHostView: View {
                 }
             },
             onCloseSlashCommandPanel: viewModel.closeSlashCommandPanel,
-            onRemoveMentionedFile: viewModel.removeMentionedFile,
-            onRemoveMentionedSkill: viewModel.removeMentionedSkill,
-            onRemoveMentionedPlugin: viewModel.removeMentionedPlugin,
-            onRemoveComposerReviewSelection: viewModel.clearComposerReviewSelection,
-            onRemoveComposerSubagentsSelection: viewModel.clearSubagentsSelection,
+            onRemoveMentionedFile: { id in
+                viewModel.removeMentionedFile(id: id)
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
+            onRemoveMentionedSkill: { id in
+                viewModel.removeMentionedSkill(id: id)
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
+            onRemoveMentionedPlugin: { id in
+                viewModel.removeMentionedPlugin(id: id)
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
+            onRemoveComposerReviewSelection: {
+                viewModel.clearComposerReviewSelection()
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
+            onRemoveComposerSubagentsSelection: {
+                viewModel.clearSubagentsSelection()
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+            },
             onPasteImageData: { imageDataItems in
-                viewModel.enqueuePastedImageData(imageDataItems, codex: codex)
+                viewModel.enqueuePastedImageData(imageDataItems, codex: codex, threadID: thread.id)
             },
             onResumeQueue: {
                 viewModel.resumeQueueAndFlushIfPossible(codex: codex, threadID: thread.id)
@@ -264,5 +294,8 @@ struct TurnComposerHostView: View {
             },
             onSend: onSend
         )
+        .onChange(of: viewModel.input) { _, _ in
+            viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+        }
     }
 }

@@ -7,15 +7,51 @@
 import SwiftUI
 import UIKit
 
-struct TurnComposerImageAttachment: Identifiable {
+struct TurnComposerImageAttachment: Identifiable, Codable, Equatable, Sendable {
     let id: String
     var state: TurnComposerImageAttachmentState
 }
 
-enum TurnComposerImageAttachmentState: Equatable {
+enum TurnComposerImageAttachmentState: Codable, Equatable, Sendable {
     case loading
     case ready(CodexImageAttachment)
     case failed
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case attachment
+    }
+
+    private enum Kind: String, Codable {
+        case loading
+        case ready
+        case failed
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        switch try container.decode(Kind.self, forKey: .kind) {
+        case .loading:
+            self = .loading
+        case .ready:
+            self = .ready(try container.decode(CodexImageAttachment.self, forKey: .attachment))
+        case .failed:
+            self = .failed
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .loading:
+            try container.encode(Kind.loading, forKey: .kind)
+        case .ready(let attachment):
+            try container.encode(Kind.ready, forKey: .kind)
+            try container.encode(attachment, forKey: .attachment)
+        case .failed:
+            try container.encode(Kind.failed, forKey: .kind)
+        }
+    }
 }
 
 enum TurnAttachmentPipeline {

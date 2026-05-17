@@ -255,7 +255,7 @@ struct TurnView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.88), value: viewModel.gitActionLoadingTitle)
         .fullScreenCover(isPresented: isCameraPresentedBinding) {
             CameraImagePicker { data in
-                viewModel.enqueueCapturedImageData(data, codex: codex)
+                viewModel.enqueueCapturedImageData(data, codex: codex, threadID: thread.id)
             }
             .ignoresSafeArea()
         }
@@ -320,6 +320,7 @@ struct TurnView: View {
                 guard phase != .active else { return }
                 cancelVoiceRecordingIfNeeded()
                 invalidatePendingVoicePreflight()
+                viewModel.saveLocalDraft(codex: codex, threadID: thread.id, persistToDisk: true)
             },
             onApprovalRequestChanged: {
                 syncApprovalAlertPresentation()
@@ -329,6 +330,7 @@ struct TurnView: View {
             cancelVoiceRecordingIfNeeded()
             invalidatePendingVoicePreflight()
             clearVoiceRecovery()
+            viewModel.saveLocalDraft(codex: codex, threadID: thread.id, persistToDisk: true)
             viewModel.cancelTransientTasks()
             viewModel.clearComposerAutocomplete()
         }
@@ -903,11 +905,13 @@ struct TurnView: View {
         if let pendingComposerAction = codex.consumePendingComposerAction(for: thread.id) {
             viewModel.applyPendingComposerAction(pendingComposerAction)
             isInputFocused = true
+        } else {
+            viewModel.restoreSavedLocalDraftIfNeeded(codex: codex, threadID: thread.id)
         }
     }
 
     private func handlePhotoPickerItemsChanged(_ newItems: [PhotosPickerItem]) {
-        viewModel.enqueuePhotoPickerItems(newItems, codex: codex)
+        viewModel.enqueuePhotoPickerItems(newItems, codex: codex, threadID: thread.id)
         viewModel.photoPickerItems = []
     }
 

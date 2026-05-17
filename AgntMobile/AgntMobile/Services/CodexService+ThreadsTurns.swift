@@ -80,7 +80,13 @@ extension CodexService {
 
         let activeLimit = limit ?? recentActiveThreadListLimit
         let archivedLimit = limit ?? recentArchivedThreadListLimit
-        let activeThreads = try await fetchServerThreads(limit: activeLimit)
+        let activeThreads = try await fetchServerThreads(limit: activeLimit) { _, accumulatedThreads in
+            self.reconcileLocalThreadsWithServer(accumulatedThreads, serverArchivedThreads: [])
+
+            if self.activeThreadId == nil {
+                self.activeThreadId = self.firstLiveThreadID()
+            }
+        }
 
         var archivedThreads: [CodexThread] = []
         do {
@@ -188,6 +194,30 @@ extension CodexService {
     // Consumes the pending composer setup once the destination thread view appears.
     func consumePendingComposerAction(for threadId: String) -> CodexPendingThreadComposerAction? {
         pendingComposerActionByThreadID.removeValue(forKey: threadId)
+    }
+
+    func composerDraft(for threadId: String) -> TurnComposerLocalDraft? {
+        composerDraftsByThreadID[threadId]
+    }
+
+    func setComposerDraft(
+        _ draft: TurnComposerLocalDraft?,
+        for threadId: String,
+        persistToDisk: Bool = false
+    ) {
+        if let draft, !draft.isEmpty {
+            composerDraftsByThreadID[threadId] = draft
+        } else {
+            composerDraftsByThreadID.removeValue(forKey: threadId)
+        }
+
+        if persistToDisk {
+            persistComposerDrafts()
+        }
+    }
+
+    func persistComposerDrafts() {
+        composerDraftPersistence.save(composerDraftsByThreadID)
     }
 
     // Sends user input as a new turn against an existing (or newly created) thread.
@@ -763,7 +793,11 @@ enum CodexThreadStartProjectBinding {
 }
 
 extension CodexService {
-    func fetchServerThreads(limit: Int? = nil, archived: Bool = false) async throws -> [CodexThread] {
+    func fetchServerThreads(
+        limit: Int? = nil,
+        archived: Bool = false,
+        onPage: ((_ page: [CodexThread], _ accumulatedThreads: [CodexThread]) -> Void)? = nil
+    ) async throws -> [CodexThread] {
         var allThreads: [CodexThread] = []
         var nextCursor: JSONValue = .null
         var hasRequestedFirstPage = false
@@ -796,7 +830,9 @@ extension CodexService {
                 throw CodexServiceError.invalidResponse("thread/list response missing data array")
             }
 
-            allThreads.append(contentsOf: page.compactMap { decodeModel(CodexThread.self, from: $0) })
+            let decodedPage = page.compactMap { decodeModel(CodexThread.self, from: $0) }
+            allThreads.append(contentsOf: decodedPage)
+            onPage?(decodedPage, allThreads)
             nextCursor = nextThreadListCursor(from: resultObject)
             hasRequestedFirstPage = true
         } while shouldContinueThreadListPagination(
