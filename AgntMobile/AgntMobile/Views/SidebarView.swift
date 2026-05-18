@@ -36,6 +36,7 @@ struct SidebarView: View {
     @State private var lastGroupedThreadsFingerprint: Int = 0
     @State private var lastDiffFingerprint: Int = 0
     @State private var lastBadgeFingerprint: Int = 0
+    @State private var projectlessChatRootPaths: [String] = []
 
     var body: some View {
         let diffTotalsByThreadID = cachedDiffTotals
@@ -132,6 +133,7 @@ struct SidebarView: View {
             debugSidebarLog("task start visible=\(isVisible) threadCount=\(codex.threads.count)")
             rebuildGroupedThreads()
             rebuildCachedSidebarState()
+            await refreshProjectlessChatRoots()
             if codex.isConnected, codex.threads.isEmpty {
                 await refreshThreads()
             }
@@ -162,6 +164,10 @@ struct SidebarView: View {
         }
         .onChange(of: isVisible) { _, visible in
             debugSidebarLog("visibility changed visible=\(visible)")
+        }
+        .onChange(of: codex.isConnected) { _, connected in
+            guard connected else { return }
+            Task { await refreshProjectlessChatRoots() }
         }
         .overlay {
             if SidebarThreadsLoadingPresentation.shouldShowOverlay(
@@ -372,7 +378,11 @@ struct SidebarView: View {
     private func archivePendingProjectGroup() {
         guard let group = projectGroupPendingArchive else { return }
 
-        let threadIDs = SidebarThreadGrouping.liveThreadIDsForProjectGroup(group, in: codex.threads)
+        let threadIDs = SidebarThreadGrouping.liveThreadIDsForProjectGroup(
+            group,
+            in: codex.threads,
+            projectlessRootPaths: projectlessChatRootPaths
+        )
         let selectedThreadWasArchived = selectedThread.map { selected in
             threadIDs.contains(selected.id)
         } ?? false
@@ -392,7 +402,11 @@ struct SidebarView: View {
     private func deletePendingProjectGroupLocally() {
         guard let group = projectGroupPendingDeletion else { return }
 
-        let threadIDs = SidebarThreadGrouping.allThreadIDsForProjectGroup(group, in: codex.threads)
+        let threadIDs = SidebarThreadGrouping.allThreadIDsForProjectGroup(
+            group,
+            in: codex.threads,
+            projectlessRootPaths: projectlessChatRootPaths
+        )
         let selectedThreadWasDeleted = selectedThread.map { selected in
             threadIDs.contains(selected.id)
         } ?? false
@@ -426,7 +440,11 @@ struct SidebarView: View {
         let fingerprint = groupingFingerprint(query: query, source: source)
         guard fingerprint != lastGroupedThreadsFingerprint else { return }
         lastGroupedThreadsFingerprint = fingerprint
-        groupedThreads = SidebarThreadGrouping.makeGroups(from: source, pinnedThreadIDs: codex.pinnedThreadIDs)
+        groupedThreads = SidebarThreadGrouping.makeGroups(
+            from: source,
+            pinnedThreadIDs: codex.pinnedThreadIDs,
+            projectlessRootPaths: projectlessChatRootPaths
+        )
         debugSidebarLog(
             "rebuildGroupedThreads durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1000)) "
                 + "queryLength=\(query.count) sourceCount=\(source.count) groupCount=\(groupedThreads.count)"
@@ -437,6 +455,7 @@ struct SidebarView: View {
         var hasher = Hasher()
         hasher.combine(query)
         hasher.combine(codex.pinnedThreadIDs)
+        hasher.combine(projectlessChatRootPaths)
         for thread in source {
             hasher.combine(thread)
         }
@@ -533,7 +552,24 @@ struct SidebarView: View {
 
     // Keeps the chooser in sync with the same project buckets shown in the sidebar.
     private var newChatProjectChoices: [SidebarProjectChoice] {
-        SidebarThreadGrouping.makeProjectChoices(from: codex.threads)
+        SidebarThreadGrouping.makeProjectChoices(
+            from: codex.threads,
+            projectlessRootPaths: projectlessChatRootPaths
+        )
+    }
+
+    private func refreshProjectlessChatRoots() async {
+        guard codex.isConnected, codex.isInitialized else { return }
+        do {
+            let roots = try await codex.fetchProjectlessChatRoots().roots
+            if roots != projectlessChatRootPaths {
+                projectlessChatRootPaths = roots
+                lastGroupedThreadsFingerprint = 0
+                rebuildGroupedThreads()
+            }
+        } catch {
+            debugSidebarLog("projectless roots refresh failed: \(error.localizedDescription)")
+        }
     }
 
     private var canCreateThread: Bool {

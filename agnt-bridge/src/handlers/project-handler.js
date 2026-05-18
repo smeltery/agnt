@@ -2,12 +2,13 @@
 // Purpose: Serves safe Mac-local project folder discovery and creation requests from the iOS app.
 // Layer: Bridge handler
 // Exports: handleProjectRequest plus testable project filesystem helpers
-// Depends on: fs, os, path
+// Depends on: fs, os, path, ../providers/codex/home
 
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { createJsonRpcRequestHandler } = require("./handler-utils");
+const { resolveCodexHome } = require("../providers/codex/home");
 
 const DEFAULT_DIRECTORY_LIMIT = 200;
 const DEFAULT_DIRECTORY_SEARCH_LIMIT = 80;
@@ -28,6 +29,8 @@ async function handleProjectMethod(method, params, options = {}) {
   switch (method) {
     case "project/quickLocations":
       return projectQuickLocations(options);
+    case "project/projectlessRoots":
+      return projectProjectlessRoots(options);
     case "project/listDirectory":
       return projectListDirectory(params, options);
     case "project/searchDirectories":
@@ -67,6 +70,24 @@ async function projectQuickLocations(options = {}) {
   }
 
   return { locations };
+}
+
+async function projectProjectlessRoots(options = {}) {
+  const homeDir = resolveHomeDir(options);
+  const codexHome = path.resolve(readString(options.codexHome) || resolveCodexHome());
+  const documentedThreadsRoot = path.join(codexHome, "threads");
+  const desktopDocumentsRoot = path.join(homeDir, "Documents", "Codex");
+  const roots = uniqueExistingOrCandidatePaths([
+    documentedThreadsRoot,
+    desktopDocumentsRoot,
+  ]);
+
+  return {
+    codexHome,
+    roots,
+    documentedThreadsRoot,
+    desktopDocumentsRoot,
+  };
 }
 
 async function projectListDirectory(params, options = {}) {
@@ -432,6 +453,23 @@ function resolveHomeDir(options = {}) {
   return options.homeDir || os.homedir();
 }
 
+function uniqueExistingOrCandidatePaths(paths) {
+  const seen = new Set();
+  const result = [];
+
+  for (const candidatePath of paths) {
+    const normalizedPath = path.resolve(candidatePath);
+    const realPath = realpathSyncIfAvailable(normalizedPath) || normalizedPath;
+    if (seen.has(realPath)) {
+      continue;
+    }
+    seen.add(realPath);
+    result.push(realPath);
+  }
+
+  return result;
+}
+
 function realpathSyncIfAvailable(candidatePath) {
   try {
     return fs.realpathSync(candidatePath);
@@ -455,6 +493,7 @@ module.exports = {
   handleProjectRequest,
   handleProjectMethod,
   projectQuickLocations,
+  projectProjectlessRoots,
   projectListDirectory,
   projectSearchDirectories,
   projectValidatePath,

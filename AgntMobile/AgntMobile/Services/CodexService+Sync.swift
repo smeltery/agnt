@@ -101,6 +101,7 @@ extension CodexService {
         isAppInForeground = isForeground
         if isForeground {
             if isConnected && isInitialized {
+                startWebSocketKeepAliveLoop()
                 startSyncLoop()
                 requestImmediateSync(threadId: activeThreadId)
                 // Re-check bridge-managed state when the app becomes active again.
@@ -108,9 +109,11 @@ extension CodexService {
                     await self?.refreshBridgeManagedState(allowAvailableBridgeUpdatePrompt: true)
                 }
             } else {
+                stopWebSocketKeepAliveLoop()
                 stopSyncLoop()
             }
         } else {
+            stopWebSocketKeepAliveLoop()
             if isConnected && isInitialized {
                 startSyncLoop()
                 requestImmediateSync(threadId: activeThreadId)

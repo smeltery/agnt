@@ -41,6 +41,41 @@ final class SidebarThreadGroupingTests: XCTestCase {
         XCTAssertEqual(groups[0].threads.map(\.id), ["thread-a", "thread-b"])
     }
 
+    func testMakeGroupsTreatsGeneratedProjectlessRootsAsNoProject() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "thread-a", updatedAt: now, cwd: "/Users/me/.codex/threads/abc123"),
+            makeThread(id: "thread-b", updatedAt: now.addingTimeInterval(-30), cwd: "/Users/me/Documents/Codex/2026-05-18/hello"),
+            makeThread(id: "thread-c", updatedAt: now.addingTimeInterval(-60), cwd: "/Users/me/work/app"),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(
+            from: threads,
+            projectlessRootPaths: ["/Users/me/.custom-codex/threads"]
+        )
+
+        XCTAssertEqual(groups.map(\.id), ["project:__no_project__", "project:/Users/me/work/app"])
+        XCTAssertEqual(groups[0].label, "No Project")
+        XCTAssertNil(groups[0].projectPath)
+        XCTAssertEqual(groups[0].threads.map(\.id), ["thread-a", "thread-b"])
+    }
+
+    func testMakeGroupsTreatsCustomProjectlessRootsAsNoProject() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "thread-a", updatedAt: now, cwd: "/Users/me/.custom-codex/threads/abc123"),
+            makeThread(id: "thread-b", updatedAt: now.addingTimeInterval(-30), cwd: "/Users/me/work/app"),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(
+            from: threads,
+            projectlessRootPaths: ["/Users/me/.custom-codex/threads"]
+        )
+
+        XCTAssertEqual(groups.map(\.id), ["project:__no_project__", "project:/Users/me/work/app"])
+        XCTAssertEqual(groups[0].threads.map(\.id), ["thread-a"])
+    }
+
     func testMakeGroupsTreatsPseudoProjectBucketsAsNoProject() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let threads = [
@@ -172,6 +207,7 @@ final class SidebarThreadGroupingTests: XCTestCase {
             makeThread(id: "app-thread", updatedAt: now, cwd: "/Users/me/work/app"),
             makeThread(id: "site-thread", updatedAt: now.addingTimeInterval(-60), cwd: "/Users/me/work/site"),
             makeThread(id: "no-project-thread", updatedAt: now.addingTimeInterval(-120), cwd: nil),
+            makeThread(id: "generated-chat-thread", updatedAt: now.addingTimeInterval(-130), cwd: "/Users/me/.codex/threads/abc123"),
             makeThread(
                 id: "archived-thread",
                 updatedAt: now.addingTimeInterval(60),

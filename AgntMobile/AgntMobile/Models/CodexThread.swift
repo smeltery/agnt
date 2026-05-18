@@ -242,7 +242,7 @@ extension CodexThread {
     // --- UI helpers -----------------------------------------------------------
     static let defaultDisplayTitle = "New Thread"
     static let noProjectDisplayName = "No Project"
-    private static let noProjectGroupKey = "__no_project__"
+    static let noProjectGroupKey = "__no_project__"
 
     // Old rollouts may still persist "Conversation", so treat both labels as the same placeholder.
     static func isGenericPlaceholderTitle(_ value: String?) -> Bool {
