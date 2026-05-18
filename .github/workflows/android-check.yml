@@ -28,7 +28,7 @@ jobs:
       # SDK is provisioned by android-actions/setup-android below, which the
       # Gradle plugin discovers via $ANDROID_HOME.
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Sets up $ANDROID_HOME + cmdline-tools and pre-accepts SDK licenses.
       # The platform (android-36) and matching build-tools are auto-installed
