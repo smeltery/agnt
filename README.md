@@ -1,5 +1,7 @@
 # agnt
 
+<img width="800" height="521" alt="CleanShot 2026-05-18 at 05 14 33" src="https://github.com/user-attachments/assets/404619a3-bfc4-4a2d-8be4-8f92793100a3" />
+
 [![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE) [![Built with Blacksmith](https://img.shields.io/badge/Built%20with-Blacksmith-2f2f2f?logo=github&logoColor=white)](https://blacksmith.sh)
 
 [![Bridge Check](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml/badge.svg)](https://github.com/dotbrains/agnt/actions/workflows/bridge-check.yml)
