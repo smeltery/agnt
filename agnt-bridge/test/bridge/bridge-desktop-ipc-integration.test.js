@@ -2,7 +2,7 @@
 // Purpose: Verifies the bridge wires phone-origin replies to Codex Desktop IPC actions.
 // Layer: Integration test
 // Exports: node:test suite
-// Depends on: node:test, ws, net, ../src/bridge with mocked runtime transports
+// Depends on: node:test, optional ws, net, ../src/bridge with mocked runtime transports
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -12,9 +12,12 @@ const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
 const { setTimeout: wait } = require("node:timers/promises");
-const WebSocket = require("ws");
 
 test("bridge forwards desktop IPC actions to the phone and routes replies back to Codex Desktop", async (t) => {
+  const WebSocket = requireOptionalWebSocket(t);
+  if (!WebSocket) {
+    return;
+  }
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-bridge-ipc-"));
   const ipcSocketPath = path.join(tempDir, "ipc.sock");
   const relayServer = new WebSocket.Server({ port: 0 });
@@ -71,7 +74,9 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
   });
 
   t.after(() => {
+    const previousExitCode = process.exitCode;
     fakeCodex?.emitClose();
+    process.exitCode = previousExitCode;
     relaySocket?.close();
     relayServer.close();
     ipcServer.close();
@@ -161,6 +166,18 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
   );
   assert.equal(resolvedMessage.params.threadId, "thread-ipc");
 });
+
+function requireOptionalWebSocket(t) {
+  try {
+    return require("ws");
+  } catch (error) {
+    if (error?.code === "MODULE_NOT_FOUND") {
+      t.skip("ws dependency is not installed; run npm install in agnt-bridge to execute this integration test.");
+      return null;
+    }
+    throw error;
+  }
+}
 
 // Loads bridge.js with plaintext test transports while leaving the production module untouched.
 function loadBridgeWithTestDoubles({ createCodexTransportImpl }) {
