@@ -2,11 +2,10 @@ package com.dotbrains.agnt.mobile.ui.settings
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.Manifest
 import android.net.Uri
-import android.provider.Settings
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
@@ -72,6 +71,7 @@ import com.dotbrains.agnt.mobile.core.model.AppThemePreference
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.notification.LocalNotificationSettings
+import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.AppFontPreferences
 import com.dotbrains.agnt.mobile.data.CodexRepository
@@ -692,18 +692,7 @@ private fun settingsLanguageSubtitleRes(option: AppLanguagePreference): Int =
     }
 
 private fun readAppVersionName(context: Context): String =
-    try {
-        val pm = context.packageManager
-        val pkg = context.packageName
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0)).versionName ?: "0.1.2"
-        } else {
-            @Suppress("DEPRECATION")
-            pm.getPackageInfo(pkg, 0).versionName ?: "0.1.2"
-        }
-    } catch (_: Exception) {
-        "0.1.2"
-    }
+    readAgntAppVersionName(context)
 
 private fun openSystemNotificationSettings(context: Context) {
     val appPackage = Uri.fromParts("package", context.packageName, null)

@@ -1,25 +1,14 @@
 package com.dotbrains.agnt.mobile.beta
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import java.security.MessageDigest
 
 object BetaDeviceInfo {
     fun appVersionName(context: Context): String =
-        try {
-            val pm = context.packageManager
-            val pkg = context.packageName
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0)).versionName ?: "0.1.2"
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getPackageInfo(pkg, 0).versionName ?: "0.1.2"
-            }
-        } catch (_: Exception) {
-            "0.1.2"
-        }
+        readAgntAppVersionName(context)
 
     fun coarseDeviceModel(): String {
         val manufacturer = Build.MANUFACTURER.trim()
@@ -46,4 +35,3 @@ object BetaDeviceInfo {
         return digest.joinToString("") { b -> "%02x".format(b) }
     }
 }
-

@@ -1,7 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.about
 
 import android.content.Context
-import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.dotbrains.agnt.mobile.R
+import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import com.dotbrains.agnt.mobile.ui.theme.agntScreenTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,15 +101,4 @@ internal fun LocalInfoSection(
 }
 
 private fun readAppVersionName(context: Context): String =
-    try {
-        val pm = context.packageManager
-        val pkg = context.packageName
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0)).versionName ?: "0.1.2"
-        } else {
-            @Suppress("DEPRECATION")
-            pm.getPackageInfo(pkg, 0).versionName ?: "0.1.2"
-        }
-    } catch (_: Exception) {
-        "0.1.2"
-    }
+    readAgntAppVersionName(context)

@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.services
 
 import android.util.Log
-import android.content.pm.PackageManager
+import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import com.dotbrains.agnt.mobile.core.error.CodexServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
@@ -191,15 +191,4 @@ internal suspend fun CodexService.rpcRequestWhileHandshaking(
 }
 
 internal fun CodexService.readAppVersion(): String =
-    try {
-        val pm = appContext.packageManager
-        val pkg = appContext.packageName
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            pm.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0)).versionName ?: "0.1.2"
-        } else {
-            @Suppress("DEPRECATION")
-            pm.getPackageInfo(pkg, 0).versionName ?: "0.1.2"
-        }
-    } catch (_: Exception) {
-        "0.1.2"
-    }
+    readAgntAppVersionName(appContext)
