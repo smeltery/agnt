@@ -159,12 +159,15 @@ extension CodexService {
         }
 
         do {
-            let activeThreads = try await fetchServerThreads(limit: recentActiveThreadListLimit)
+            let activeThreads = try await fetchCoalescedServerThreads(limit: recentActiveThreadListLimit)
 
             // Also fetch server-archived threads so they survive app restarts.
             var archivedThreads: [CodexThread] = []
             do {
-                archivedThreads = try await fetchServerThreads(limit: recentArchivedThreadListLimit, archived: true)
+                archivedThreads = try await fetchCoalescedServerThreads(
+                    limit: recentArchivedThreadListLimit,
+                    archived: true
+                )
             } catch {
                 debugSyncLog("thread/list archived fetch failed (non-fatal): \(error.localizedDescription)")
             }

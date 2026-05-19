@@ -26,6 +26,7 @@ enum TurnCacheManager {
         ThinkingDisclosureContentCache.reset()
         DiffBlockDetectionCache.reset()
         FileChangeGroupingCache.reset()
+        UserBubbleInlineMarkdownRenderer.reset()
         MermaidMarkdownContentCache.reset()
         MermaidMarkdownContentCache.resetRenderedSnapshots()
     }

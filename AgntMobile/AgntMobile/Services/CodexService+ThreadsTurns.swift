@@ -80,17 +80,11 @@ extension CodexService {
 
         let activeLimit = limit ?? recentActiveThreadListLimit
         let archivedLimit = limit ?? recentArchivedThreadListLimit
-        let activeThreads = try await fetchServerThreads(limit: activeLimit) { _, accumulatedThreads in
-            self.reconcileLocalThreadsWithServer(accumulatedThreads, serverArchivedThreads: [])
-
-            if self.activeThreadId == nil {
-                self.activeThreadId = self.firstLiveThreadID()
-            }
-        }
+        let activeThreads = try await fetchCoalescedServerThreads(limit: activeLimit)
 
         var archivedThreads: [CodexThread] = []
         do {
-            archivedThreads = try await fetchServerThreads(limit: archivedLimit, archived: true)
+            archivedThreads = try await fetchCoalescedServerThreads(limit: archivedLimit, archived: true)
         } catch {
             debugSyncLog("thread/list archived fetch failed (non-fatal): \(error.localizedDescription)")
         }
@@ -793,6 +787,27 @@ enum CodexThreadStartProjectBinding {
 }
 
 extension CodexService {
+    // Reuses an in-flight thread/list request for matching caps so launch sync and sidebar refresh share one RPC.
+    func fetchCoalescedServerThreads(limit: Int, archived: Bool = false) async throws -> [CodexThread] {
+        let key = "\(archived ? "archived" : "active"):\(limit)"
+        if let existingFetch = threadListFetchTaskByLimit[key] {
+            return try await existingFetch.task.value
+        }
+
+        let fetchID = UUID()
+        let task = Task { @MainActor in
+            defer {
+                if threadListFetchTaskByLimit[key]?.id == fetchID {
+                    threadListFetchTaskByLimit[key] = nil
+                }
+            }
+            return try await fetchServerThreads(limit: limit, archived: archived)
+        }
+        threadListFetchTaskByLimit[key] = (id: fetchID, task: task)
+
+        return try await task.value
+    }
+
     func fetchServerThreads(
         limit: Int? = nil,
         archived: Bool = false,

@@ -4,7 +4,7 @@
 //          wake cycles:
 //          1. The relay watchdog pings the upstream every 10 s and forces
 //             a reconnect when the last inbound activity is older than the
-//             stale-after threshold (default 70 s).
+//             stale-after threshold (default 25 s).
 //          2. The bridge status heartbeat re-publishes the last bridge
 //             status every 5 s, downgrading "connected" → "disconnected"
 //             when the watchdog's timestamp says the socket is stale.
@@ -21,8 +21,8 @@
 //     BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS, STALE_RELAY_STATUS_MESSAGE
 
 const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
-// Keep the watchdog above the relay heartbeat cadence so quiet healthy sockets survive idle gaps.
-const RELAY_WATCHDOG_STALE_AFTER_MS = 70_000;
+// Keep the watchdog tight enough to recover quickly from sleep/wake zombie sockets.
+const RELAY_WATCHDOG_STALE_AFTER_MS = 25_000;
 const BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS = 5_000;
 const STALE_RELAY_STATUS_MESSAGE = "Relay heartbeat stalled; reconnect pending.";
 

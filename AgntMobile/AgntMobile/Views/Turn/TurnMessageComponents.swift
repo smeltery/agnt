@@ -1292,23 +1292,29 @@ struct MessageRow: View, Equatable {
         }
     }
 
-    // Renders inline @file/plugin and $skill mentions inside one AttributedString so large
-    // messages do not build an arbitrarily deep SwiftUI Text concatenation chain.
-    private func userBubbleText(_ rawText: String) -> Text {
+    @ViewBuilder
+    private func userBubbleText(_ rawText: String) -> some View {
         let normalizedRawText = SkillReferenceFormatter.replacingSkillReferences(
             in: rawText,
             style: .mentionToken
         )
+
+        if normalizedRawText.contains("@") || normalizedRawText.contains("$") {
+            userBubbleMentionText(normalizedRawText)
+        } else {
+            UserBubbleInlineMarkdownText(normalizedRawText, foreground: .primary)
+        }
+    }
+
+    // Renders inline @file/plugin and $skill mentions inside one AttributedString so large
+    // messages do not build an arbitrarily deep SwiftUI Text concatenation chain.
+    private func userBubbleMentionText(_ normalizedRawText: String) -> Text {
         let confirmedFileMentions = Set(
             message.fileMentions
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .map(TurnMessageRegexCache.removingTrailingLineColumnSuffix)
                 .filter { !$0.isEmpty }
         )
-
-        guard normalizedRawText.contains("@") || normalizedRawText.contains("$") else {
-            return Text(normalizedRawText)
-        }
 
         guard let mentionRegex = TurnMessageRegexCache.userMentionToken else {
             return Text(normalizedRawText)
