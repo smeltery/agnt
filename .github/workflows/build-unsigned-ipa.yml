@@ -74,10 +74,3 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$payload_root/Payload" "$ipa_path"
 
           echo "Unsigned IPA created at $ipa_path"
-
-      - name: Upload unsigned IPA artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: agnt-unsigned-ipa
-          path: build/unsigned-ipa/agnt-unsigned-release.ipa
-          if-no-files-found: error
