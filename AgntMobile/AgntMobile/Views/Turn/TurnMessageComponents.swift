@@ -1176,13 +1176,33 @@ struct MessageRow: View, Equatable {
 
     // Computed once per body evaluation and reused by all sub-views.
     private var displayText: String {
-        if message.role == .assistant,
-           message.isStreaming,
-           let throttledAssistantDisplayText {
-            return throttledAssistantDisplayText
+        if message.role == .assistant, message.isStreaming {
+            if let throttledAssistantDisplayText {
+                return throttledAssistantDisplayText
+            }
+
+            // Let the first small chunk appear immediately so a fresh send does not
+            // feel stalled, while still blocking recovered/coalesced large buffers.
+            let liveText = timelineDisplayText(for: message)
+            return shouldShowInitialStreamingText(liveText) ? liveText : ""
         }
 
         return timelineDisplayText(for: message)
+    }
+
+    private func shouldShowInitialStreamingText(_ text: String) -> Bool {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        return text.utf8.count <= 512
+    }
+
+    private func shouldSynchronizeAssistantDisplayImmediately() -> Bool {
+        guard message.isStreaming else { return true }
+        if showsStreamingAnimations {
+            return true
+        }
+        return shouldShowInitialStreamingText(timelineDisplayText(for: message))
     }
 
     var body: some View {
@@ -1220,7 +1240,7 @@ struct MessageRow: View, Equatable {
             synchronizeAssistantDisplayText(immediate: true)
         }
         .onChange(of: message.text) { _, _ in
-            synchronizeAssistantDisplayText(immediate: !message.isStreaming)
+            synchronizeAssistantDisplayText(immediate: shouldSynchronizeAssistantDisplayImmediately())
         }
         .onChange(of: message.isStreaming) { _, isStreaming in
             synchronizeAssistantDisplayText(immediate: !isStreaming)
@@ -1588,13 +1608,10 @@ struct MessageRow: View, Equatable {
                         }
                     }
                 } else if message.isStreaming {
-                    if hasVisibleAssistantText {
-                        StreamingAssistantMarkdownTextView(
-                            text: visibleAssistantTextWithoutImageSyntax,
-                            enablesSelection: enablesInlineMarkdownSelectionInTimeline,
-                            constrainsToAvailableWidth: true
-                        )
-                    }
+                    streamingAssistantContent(
+                        hasVisibleAssistantText: hasVisibleAssistantText,
+                        visibleAssistantTextWithoutImageSyntax: visibleAssistantTextWithoutImageSyntax
+                    )
                 } else {
                     if hasVisibleAssistantText {
                         MarkdownTextView(
@@ -1636,6 +1653,20 @@ struct MessageRow: View, Equatable {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
             selectableTextActions(text: text, usesMarkdownSelection: true)
+        }
+    }
+
+    @ViewBuilder
+    private func streamingAssistantContent(
+        hasVisibleAssistantText: Bool,
+        visibleAssistantTextWithoutImageSyntax: String
+    ) -> some View {
+        if hasVisibleAssistantText {
+            StreamingAssistantMarkdownTextView(
+                text: visibleAssistantTextWithoutImageSyntax,
+                enablesSelection: enablesInlineMarkdownSelectionInTimeline,
+                constrainsToAvailableWidth: true
+            )
         }
     }
 
