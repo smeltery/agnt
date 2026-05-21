@@ -1,0 +1,41 @@
+agnt-host
+=========
+
+This directory is derived from the desktop host (`remodex-host`) in the
+Remodex project, originally authored by Stivy-01 and licensed under
+the ISC License.
+
+Upstream source: Stivy-01/remodex (https://github.com/Stivy-01/remodex)
+Imported from:   Stivy-01/remodex@main, directory `remodex-host/`
+
+Modifications relative to upstream:
+  - Crate / package renamed from `remodex-host` to `agnt-host`; app
+    identifier `com.remodex.host` -> `com.dotbrains.agnt.host`.
+  - Bundled bridge directory renamed `phodex-bridge` -> `agnt-bridge`;
+    entry script `bin/remodex.js` -> `bin/agnt.js`; bundle manifest
+    `remodex-bundle.json` -> `agnt-bundle.json`.
+  - copy-bundled.mjs sources `../agnt-bridge` and `../relay` from this
+    repository rather than the upstream layout.
+  - Env-var prefixes updated:
+      REMODEX_RELAY                     -> AGNT_RELAY
+      REMODEX_PRINT_PAIRING_JSON        -> AGNT_PRINT_PAIRING_JSON
+      REMODEX_HOST_UPDATE_TAG           -> AGNT_HOST_UPDATE_TAG
+      REMODEX_HOST_UPDATE_BASE_URL      -> AGNT_HOST_UPDATE_BASE_URL
+      REMODEX_HOST_UPDATE_INSTALLER_NAME -> AGNT_HOST_UPDATE_INSTALLER_NAME
+  - Default remote-relay URL `wss://relay.remodex.app` replaced with the
+    local-loopback default `ws://127.0.0.1:9000` (host is local-first;
+    a hosted relay must be opted into explicitly).
+  - Tauri updater endpoint repointed to `dotbrains/agnt` releases. The
+    minisign `pubkey` in `src-tauri/tauri.conf.json` is a placeholder —
+    a fresh keypair must be generated before any signed release.
+  - License migrated from ISC to Apache-2.0 to match the rest of this
+    repository.
+  - User-facing strings rebranded to "Agnt Host" / "Agnt Pet".
+
+The animated relay sprite under `public/pets/relay/` and the asset-
+generation pipeline under `run-pet/` are copied as-is from upstream;
+the sprite art remains attributable to its original author.
+
+Application icons under `src-tauri/icons/` are inherited from upstream
+and must be replaced with agnt-branded artwork before any public
+release.

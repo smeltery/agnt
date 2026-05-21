@@ -20,7 +20,7 @@ This repo is local-first and multi-provider. Do not reintroduce hosted-service a
 
 ## Provider plugin guardrails
 
-- agnt brokers between three clients (the iOS app under `AgntMobile/`, the Android app under `AgntAndroid/`, and the browser client under `agnt-web/`) and any supported coding-agent CLI (Codex, Claude Code, opencode, Cursor, ...). All three clients speak the same E2EE-wrapped JSON-RPC protocol; provider modules don't know or care which client is connected. New providers go under `agnt-bridge/src/providers/<id>/index.js` and are registered in `agnt-bridge/src/providers/index.js`.
+- agnt brokers between three clients (the iOS app under `AgntMobile/`, the Android app under `AgntAndroid/`, and the browser client under `agnt-web/`) — plus an optional desktop supervisor (`agnt-host/`, Tauri) for users who'd rather not keep `agnt up` in a terminal — and any supported coding-agent CLI (Codex, Claude Code, opencode, Cursor, ...). All three clients speak the same E2EE-wrapped JSON-RPC protocol; provider modules don't know or care which client is connected. New providers go under `agnt-bridge/src/providers/<id>/index.js` and are registered in `agnt-bridge/src/providers/index.js`.
 - Provider modules must conform to the contract in `agnt-bridge/src/providers/types.js` (`defineProvider`). Required: `id`, `displayName`, `createTransport`, `homeDir`, `sessionsDir`, `capabilities`. Optional: `bootstrap`, `createDesktopRefresher`, `parseRolloutLine`, `isInstalled`, `createTranslator`.
 - If the agent CLI does not speak Codex JSON-RPC natively (Claude stream-json, opencode REST/SSE, Cursor stream-json, …), the protocol shim lives in `providers/<id>/translate.js` and is wired via `createTranslator(ctx)`. The shim can `ctx.injectInbound(line)` to synthesize JSON-RPC responses without round-tripping the CLI — use this for `thread/start`, `thread/read`, `thread/turns/list`, and any other Codex-only methods the upstream CLI does not implement.
 - Per-turn provider flags (model, effort, plan mode) flow through `transport.setTurnArgs(args)`. Translators publish them from `turn/start.params`. The Claude transport restarts the CLI when the arg list changes and uses `--resume <session_id>` (published via `setResumeSessionId`) to keep history. Don't read `params.model` directly in transports — keep that mapping inside `translate.js` so the spawn/REST layer stays mechanical.
@@ -114,6 +114,15 @@ Contract tests for the abstractions:
 - The `CodexService*` class names and `CODEX_*` constants are upstream holdovers — the class hierarchy is protocol-agnostic in practice. Don't add Codex-specific assumptions inside them; the rename is deferred (ROADMAP P3) but the contract is provider-agnostic now.
 - Long-running parity work tracked in `AgntAndroid/PARITY.md` and `AgntAndroid/ROADMAP.md`. Update both whenever a surface lands or its scope changes.
 - Do not run Android emulator/device tests unless the user explicitly asks. Prefer `./gradlew :app:testDebugUnitTest` and inspection over emulator runs.
+
+## Desktop host guardrails (`agnt-host/`)
+
+- `agnt-host` is a Tauri 2 desktop app (Rust + React 19 + Vite) that supervises the local `agnt-bridge` and `relay` processes and presents a system-tray + popup UI for pairing. Ported from upstream `Stivy-01/remodex` `remodex-host`; see `agnt-host/README.md` for the branding-deltas table.
+- `agnt-host/src-tauri/bundled/` is generated at build time by `copy-bundled.mjs`, which snapshots `../agnt-bridge` and `../relay`. Do not commit `bundled/`; it's gitignored. Do not edit files inside it — change the source dirs instead.
+- The Tauri updater is preconfigured with placeholder pubkey + endpoint. Before publishing a release: generate a minisign keypair, replace the `pubkey` in `src-tauri/tauri.conf.json`, and verify the `endpoints` URL points at the dotbrains/agnt release manifest. Never commit the private key.
+- The bundled bridge entry point is `agnt-bridge/bin/agnt.js` and the bundle manifest is `agnt-bundle.json`. Env-var prefix for the host is `AGNT_HOST_*` (e.g. `AGNT_HOST_UPDATE_TAG`); env-vars consumed by the spawned bridge follow the `AGNT_*` convention (e.g. `AGNT_RELAY`, `AGNT_PRINT_PAIRING_JSON`).
+- The animated relay companion (`agnt-host/public/pets/relay/`) is opt-in cosmetic UI. `agnt-host/run-pet/` is the asset-generation toolchain — historical inputs, not loaded at runtime. Keep both, but they're optional to maintain.
+- Inherited Stivy-01 app icons in `agnt-host/src-tauri/icons/` must be replaced with agnt-branded artwork before public release.
 
 ## Local quick runbook
 

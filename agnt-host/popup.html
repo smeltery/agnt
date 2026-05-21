@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, sans-serif;
+    }
+    .bubble {
+      position: relative;
+      width: 244px;
+      height: 192px;
+      background: #fff;
+      border: 4px solid #050608;
+      border-radius: 24px;
+      padding: 18px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .bubble::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -31px;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 28px solid transparent;
+      border-right: 28px solid transparent;
+      border-top: 31px solid #050608;
+    }
+    .bubble::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -23px;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 21px solid transparent;
+      border-right: 21px solid transparent;
+      border-top: 24px solid #fff;
+    }
+    h1 {
+      color: #050608;
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+    .rule {
+      width: 100px;
+      height: 1px;
+      background: #b8b8b8;
+    }
+    #qr-area {
+      width: 128px;
+      height: 128px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #qr-area canvas {
+      display: block;
+    }
+    .note {
+      color: #333;
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="bubble">
+    <h1>scan me!</h1>
+    <div class="rule"></div>
+    <div id="qr-area"><span class="note">loading...</span></div>
+  </div>
+  <script type="module" src="/src/popup.ts"></script>
+</body>
+</html>
