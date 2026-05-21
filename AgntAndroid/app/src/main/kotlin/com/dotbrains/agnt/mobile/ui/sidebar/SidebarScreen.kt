@@ -1,5 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.sidebar
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,7 +26,6 @@ import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +45,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
@@ -62,6 +65,7 @@ import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeNewChatDefaults
 import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
 import com.dotbrains.agnt.mobile.ui.shared.ThreadRenameDialog
+import com.dotbrains.agnt.mobile.ui.theme.AgntDropdownMenu
 import kotlinx.coroutines.launch
 
 private const val SIDEBAR_THREADS_PER_GROUP = 5
@@ -75,6 +79,7 @@ private enum class SidebarTopAction {
 @Composable
 fun SidebarScreen(
     repository: CodexRepository,
+    activeChatMetadata: SidebarActiveChatMetadata? = null,
     onOpenArchivedChats: () -> Unit = {},
     onThreadSelected: suspend () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -87,6 +92,7 @@ fun SidebarScreen(
     val protectedRunningFallback by repository.protectedRunningFallbackThreadIds.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val sidebarColors = rememberSidebarColorPalette()
 
     var query by remember { mutableStateOf("") }
     var newChatBusy by remember { mutableStateOf(false) }
@@ -94,6 +100,8 @@ fun SidebarScreen(
     var showProjectPicker by remember { mutableStateOf(false) }
     var projectPickerInitialPath by remember { mutableStateOf<String?>(null) }
     var projectPickerFoldersCollapsed by remember { mutableStateOf(false) }
+    var showWorktreeSheet by remember { mutableStateOf(false) }
+    var worktreeSheetBasePath by remember { mutableStateOf<String?>(null) }
     var worktreeChatBusy by remember { mutableStateOf(false) }
     var worktreeChatError by remember { mutableStateOf<String?>(null) }
     var worktreeGitSyncAlert by remember { mutableStateOf<TurnGitSyncAlert?>(null) }
@@ -128,6 +136,9 @@ fun SidebarScreen(
         }
 
     fun startManagedWorktreeChat(
+        baseProjectPath: String? = null,
+        selectedBaseBranch: String? = null,
+        changeTransfer: GitWorktreeChangeTransferMode = GitWorktreeChangeTransferMode.none,
         preselected: PendingSidebarWorktreeChat? = null,
         skipPreflight: Boolean = false,
     ) {
@@ -137,6 +148,7 @@ fun SidebarScreen(
             try {
                 val base =
                     preselected?.baseProjectPath
+                        ?: baseProjectPath?.trim()?.takeIf { it.isNotEmpty() }
                         ?: WorktreeNewChatDefaults.baseProjectPath(activeId, threads)
                         ?: run {
                             worktreeChatError =
@@ -145,6 +157,7 @@ fun SidebarScreen(
                         }
                 val branch =
                     preselected?.baseBranch
+                        ?: selectedBaseBranch?.trim()?.takeIf { it.isNotEmpty() }
                         ?: run {
                             val loaded = loadGitBranchesWithStatus(repository, base)
                             val gitResult =
@@ -154,33 +167,41 @@ fun SidebarScreen(
                                             ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)
                                     return@launch
                                 }
-                            val summary = GitBranchDisplayMapper.summaryFrom(gitResult)
-                            val resolvedBranch =
-                                WorktreeNewChatDefaults.baseBranch(summary) ?: run {
+                            WorktreeNewChatDefaults.baseBranch(GitBranchDisplayMapper.summaryFrom(gitResult))
+                                ?: run {
                                     worktreeChatError =
                                         context.getString(R.string.sidebar_worktree_chat_no_base_branch)
                                     return@launch
                                 }
-                            if (!skipPreflight) {
-                                val alert =
-                                    TurnGitPreflightPolicy.alertFor(
-                                        status = gitResult.status,
-                                        branches = gitResult,
-                                        operation =
-                                            TurnGitPreflightOperation.createManagedWorktree(
-                                                baseBranch = resolvedBranch,
-                                                changeTransfer = GitWorktreeChangeTransferMode.none,
-                                            ),
-                                    )
-                                if (alert != null) {
-                                    pendingWorktreeChat = PendingSidebarWorktreeChat(base, resolvedBranch)
-                                    worktreeGitSyncAlert = alert
-                                    return@launch
-                                }
-                            }
-                            resolvedBranch
                         }
-                WorktreeFlowCoordinator(repository).startNewManagedWorktreeChat(base, branch)
+                if (!skipPreflight) {
+                    val loaded = loadGitBranchesWithStatus(repository, base)
+                    val gitResult =
+                        loaded.getOrNull() ?: run {
+                            worktreeChatError =
+                                loaded.exceptionOrNull()?.let { GitBranchDisplayMapper.userVisibleMessage(it) }
+                                    ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)
+                            return@launch
+                        }
+                    val alert =
+                        TurnGitPreflightPolicy.alertFor(
+                            status = gitResult.status,
+                            branches = gitResult,
+                            operation =
+                                TurnGitPreflightOperation.createManagedWorktree(
+                                    baseBranch = branch,
+                                    changeTransfer = changeTransfer,
+                                ),
+                        )
+                    if (alert != null) {
+                        pendingWorktreeChat = PendingSidebarWorktreeChat(base, branch, changeTransfer)
+                        worktreeGitSyncAlert = alert
+                        return@launch
+                    }
+                }
+                WorktreeFlowCoordinator(repository).startNewManagedWorktreeChat(base, branch, changeTransfer)
+                showWorktreeSheet = false
+                worktreeSheetBasePath = null
                 onThreadSelected()
             } catch (e: Exception) {
                 worktreeChatError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
@@ -211,6 +232,7 @@ fun SidebarScreen(
             modifier
                 .fillMaxHeight()
                 .fillMaxWidth()
+                .background(sidebarColors.background)
                 .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -242,20 +264,12 @@ fun SidebarScreen(
             busy = false,
             onClick = onOpenArchivedChats,
             leading = {
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Archive,
-                        contentDescription = stringResource(R.string.nav_archived_chats),
-                        modifier =
-                            Modifier
-                                .padding(horizontal = 7.dp, vertical = 7.dp)
-                                .size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Outlined.Archive,
+                    contentDescription = stringResource(R.string.nav_archived_chats),
+                    modifier = Modifier.size(21.dp),
+                    tint = sidebarColors.secondaryText,
+                )
             },
         )
         newChatError?.let { err ->
@@ -279,9 +293,11 @@ fun SidebarScreen(
             groups.filter { it.kind != SidebarThreadGroupKind.Archived }.forEach { group ->
                 item(key = "hdr-${group.id}") {
                     val isCollapsed = group.id in collapsedGroupIds
-                    SidebarGroupHeaderRow(
+                    RepoHeader(
                         group = group,
                         newChatBusy = newChatBusy,
+                        worktreeChatBusy = worktreeChatBusy,
+                        colors = sidebarColors,
                         collapsed = isCollapsed,
                         onToggleCollapse = {
                             collapsedGroupIds =
@@ -298,6 +314,20 @@ fun SidebarScreen(
                                     projectPickerInitialPath = group.projectPath
                                     projectPickerFoldersCollapsed = true
                                     showProjectPicker = true
+                                }
+                            } else {
+                                null
+                            },
+                        onNewWorktreeInProject =
+                            if (
+                                group.kind == SidebarThreadGroupKind.Project &&
+                                group.projectPath != null &&
+                                worktreeEntryEnabled
+                            ) {
+                                {
+                                    worktreeChatError = null
+                                    worktreeSheetBasePath = group.projectPath
+                                    showWorktreeSheet = true
                                 }
                             } else {
                                 null
@@ -327,27 +357,43 @@ fun SidebarScreen(
                     items = if (group.id in collapsedGroupIds) emptyList() else group.visibleThreads,
                     key = { it.id },
                 ) { thread ->
-                    SidebarThreadRow(
-                        thread = thread,
-                        selected = thread.id == activeId,
-                        isRunning =
-                            runningTurnByThread.containsKey(thread.id) ||
-                                protectedRunningFallback.contains(thread.id),
-                        onSelect = {
-                            scope.launch {
-                                repository.setActiveThreadId(thread.id)
-                                onThreadSelected()
-                            }
-                        },
-                        onRenameRequest = {
-                            renameTarget = thread
-                            renameError = null
-                        },
-                        onDeleteLocalRequest = {
-                            deleteLocalTarget = thread
-                            deleteLocalError = null
-                        },
-                    )
+                    val isActive = thread.id == activeId
+                    val isRunning =
+                        runningTurnByThread.containsKey(thread.id) ||
+                            protectedRunningFallback.contains(thread.id)
+                    val onSelectThread = {
+                        scope.launch {
+                            repository.setActiveThreadId(thread.id)
+                            onThreadSelected()
+                        }
+                        Unit
+                    }
+                    val onRenameThread = {
+                        renameTarget = thread
+                        renameError = null
+                    }
+                    val onDeleteThread = {
+                        deleteLocalTarget = thread
+                        deleteLocalError = null
+                    }
+                    if (isActive) {
+                        ActiveChatRow(
+                            thread = thread,
+                            isRunning = isRunning,
+                            activeMetadata = activeChatMetadata,
+                            onSelect = onSelectThread,
+                            onRenameRequest = onRenameThread,
+                            onDeleteLocalRequest = onDeleteThread,
+                        )
+                    } else {
+                        ChatRow(
+                            thread = thread,
+                            isRunning = isRunning,
+                            onSelect = onSelectThread,
+                            onRenameRequest = onRenameThread,
+                            onDeleteLocalRequest = onDeleteThread,
+                        )
+                    }
                 }
                 if (group.id !in collapsedGroupIds &&
                     (
@@ -356,9 +402,10 @@ fun SidebarScreen(
                     )
                 ) {
                     item(key = "more-${group.id}") {
-                        SidebarGroupShowMoreRow(
+                        ShowAllRow(
                             expanded = group.id in expandedGroupIds,
                             totalCount = group.totalCount,
+                            colors = sidebarColors,
                             onClick = {
                                 expandedGroupIds =
                                     if (group.id in expandedGroupIds) {
@@ -605,7 +652,28 @@ fun SidebarScreen(
             onStartBusyChange = { newChatBusy = it },
             onStartThread = { cwd -> startSidebarNewChat(repository, cwd) },
             initialFoldersCollapsed = projectPickerFoldersCollapsed,
+            threads = threads,
+            activeThreadId = activeId,
+            activeChatMetadata = activeChatMetadata,
             onThreadStarted = onThreadSelected,
+        )
+        SidebarNewWorktreeSheet(
+            repository = repository,
+            visible = showWorktreeSheet,
+            baseProjectPath = worktreeSheetBasePath,
+            busy = worktreeChatBusy,
+            onDismiss = {
+                showWorktreeSheet = false
+                worktreeSheetBasePath = null
+                worktreeChatError = null
+            },
+            onCreate = { basePath, baseBranch, transfer ->
+                startManagedWorktreeChat(
+                    baseProjectPath = basePath,
+                    selectedBaseBranch = baseBranch,
+                    changeTransfer = transfer,
+                )
+            },
         )
         worktreeGitSyncAlert?.let { alert ->
             fun dismissWorktreeAlert() {
@@ -631,7 +699,11 @@ fun SidebarScreen(
                                                 val pending = pendingWorktreeChat
                                                 dismissWorktreeAlert()
                                                 if (pending != null) {
-                                                    startManagedWorktreeChat(pending, skipPreflight = true)
+                                                    startManagedWorktreeChat(
+                                                        preselected = pending,
+                                                        changeTransfer = pending.changeTransfer,
+                                                        skipPreflight = true,
+                                                    )
                                                 }
                                             }
                                             TurnGitSyncAlertAction.pullRebase -> {
@@ -691,6 +763,7 @@ fun SidebarScreen(
 private data class PendingSidebarWorktreeChat(
     val baseProjectPath: String,
     val baseBranch: String,
+    val changeTransfer: GitWorktreeChangeTransferMode,
 )
 
 @Composable
@@ -787,10 +860,13 @@ private fun SidebarTopActionButton(
 }
 
 @Composable
-private fun SidebarGroupHeaderRow(
+private fun RepoHeader(
     group: SidebarThreadGroup,
     newChatBusy: Boolean,
+    worktreeChatBusy: Boolean,
+    colors: SidebarColorPalette,
     onNewChatInProject: (() -> Unit)?,
+    onNewWorktreeInProject: (() -> Unit)? = null,
     onArchiveProjectGroup: (() -> Unit)? = null,
     onDeleteLocalGroup: (() -> Unit)? = null,
     onOpenArchivedChats: (() -> Unit)? = null,
@@ -798,13 +874,16 @@ private fun SidebarGroupHeaderRow(
     onToggleCollapse: (() -> Unit)? = null,
 ) {
     var showOverflow by remember { mutableStateOf(false) }
+    var showCreateMenu by remember { mutableStateOf(false) }
     val hasActions = onArchiveProjectGroup != null || onDeleteLocalGroup != null
+    val hasCreateActions = onNewChatInProject != null || onNewWorktreeInProject != null
     val canCollapse = group.kind == SidebarThreadGroupKind.Project
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 2.dp),
+                .heightIn(min = 46.dp)
+                .padding(top = 7.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -830,39 +909,84 @@ private fun SidebarGroupHeaderRow(
                         if (collapsed) Icons.AutoMirrored.Filled.KeyboardArrowRight
                         else Icons.Filled.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    tint = colors.mutedText,
+                    modifier = Modifier.size(18.dp),
                 )
             }
             Icon(
                 imageVector = group.leadingIcon(),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = colors.mutedText,
+                modifier = Modifier.size(19.dp),
             )
             Text(
                 text = group.label,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                color = colors.primaryText,
                 maxLines = 1,
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            if (onNewChatInProject != null) {
-                IconButton(
-                    onClick = onNewChatInProject,
-                    enabled = !newChatBusy,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    if (newChatBusy) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.sidebar_new_chat),
-                        )
+            if (hasCreateActions) {
+                Box {
+                    IconButton(
+                        onClick = {
+                            if (onNewWorktreeInProject != null) {
+                                showCreateMenu = true
+                            } else {
+                                onNewChatInProject?.invoke()
+                            }
+                        },
+                        enabled = !newChatBusy && !worktreeChatBusy,
+                        modifier = Modifier.size(28.dp),
+                    ) {
+                        if (newChatBusy || worktreeChatBusy) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = stringResource(R.string.sidebar_new_chat),
+                                tint = colors.primaryText,
+                            )
+                        }
+                    }
+                    AgntDropdownMenu(
+                        expanded = showCreateMenu,
+                        onDismissRequest = { showCreateMenu = false },
+                    ) {
+                        onNewChatInProject?.let { action ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.sidebar_new_chat)) },
+                                onClick = {
+                                    showCreateMenu = false
+                                    action()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Add,
+                                        contentDescription = null,
+                                    )
+                                },
+                            )
+                        }
+                        onNewWorktreeInProject?.let { action ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.sidebar_new_managed_worktree_chat)) },
+                                onClick = {
+                                    showCreateMenu = false
+                                    action()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(LucideR.drawable.lucide_ic_git_branch),
+                                        contentDescription = null,
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -870,14 +994,15 @@ private fun SidebarGroupHeaderRow(
                 Box {
                     IconButton(
                         onClick = { showOverflow = true },
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(28.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.MoreVert,
                             contentDescription = stringResource(R.string.sidebar_thread_actions_cd),
+                            tint = colors.mutedText,
                         )
                     }
-                    DropdownMenu(
+                    AgntDropdownMenu(
                         expanded = showOverflow,
                         onDismissRequest = { showOverflow = false },
                     ) {
@@ -925,9 +1050,10 @@ private fun SidebarGroupHeaderRow(
 }
 
 @Composable
-private fun SidebarGroupShowMoreRow(
+private fun ShowAllRow(
     expanded: Boolean,
     totalCount: Int,
+    colors: SidebarColorPalette,
     onClick: () -> Unit,
 ) {
     Row(
@@ -935,7 +1061,8 @@ private fun SidebarGroupShowMoreRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(start = 32.dp, end = 10.dp, top = 5.dp, bottom = 7.dp),
+                .heightIn(min = 36.dp)
+                .padding(start = 48.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -945,8 +1072,8 @@ private fun SidebarGroupShowMoreRow(
                 } else {
                     stringResource(R.string.sidebar_group_show_all, totalCount)
                 },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+            color = colors.mutedText,
         )
     }
 }

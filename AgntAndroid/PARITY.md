@@ -52,6 +52,7 @@ applicable iOS commits ported, 1 partial, and 7 iOS-only. Notable areas:
 | Composer features (skill mentions, runtime overrides, autocomplete) | done |
 | Project/git flow (picker, dir mgmt, git init) | done |
 | iOS-style navigation, composer, settings, picker, onboarding, and grouped form chrome | done |
+| Sidebar redesign (color palette, active-chat metadata, new-worktree sheet, recent-workspaces carousel) — upstream 8de65e2 + f35c4c6 | done — `SidebarColorPalette`/`AgntPopupChrome` ported, `SidebarActiveChatMetadata` threaded through screen → row + picker, `SidebarNewWorktreeSheet` added, project picker now surfaces current workspace + recent-workspaces carousel + `NewThreadSessionType` selector. `Theme.kt` `SystemBars` helper deferred (separate behavior). |
 | On-device SSH terminal (xterm.js + sshj) | done — sidebar entry → full-screen `TerminalScreen` powered by `sshj` and an xterm.js WebView; bridge advertises `hostCapabilities.terminal: true`. iOS-only per-turn "Open Terminal Here" toolbar entry not ported. |
 | End-to-end local flow validation    | done            |
 | Markdown / message pixel polish (upstream commit c7843aa) | pending |
