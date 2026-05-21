@@ -39,8 +39,61 @@ struct SidebarView: View {
     @State private var projectlessChatRootPaths: [String] = []
 
     var body: some View {
-        let diffTotalsByThreadID = cachedDiffTotals
+        mainStack
+            .frame(maxHeight: .infinity)
+            .background(Color(.systemBackground))
+            .task { await runInitialSidebarTask() }
+            .onChange(of: codex.threads) { _, _ in handleThreadsChanged() }
+            .onChange(of: searchText) { _, _ in handleSearchTextChanged() }
+            .onChange(of: codex.pinnedThreadIDs) { _, _ in handlePinnedThreadsChanged() }
+            .onChange(of: diffFingerprint) { _, _ in handleDiffFingerprintChanged() }
+            .onChange(of: badgeFingerprint) { _, _ in handleBadgeFingerprintChanged() }
+            .onChange(of: isVisible) { _, visible in handleVisibilityChanged(to: visible) }
+            .onChange(of: codex.isConnected) { _, connected in handleConnectionChanged(connected: connected) }
+            .overlay { loadingOverlay }
+            .sheet(item: $activeSidebarSheet) { sheet in sidebarSheetContent(sheet) }
+            .confirmationDialog(
+                "Archive \"\(pendingArchiveProjectLabel)\"?",
+                isPresented: archiveProjectDialogBinding,
+                titleVisibility: .visible
+            ) {
+                Button("Archive Project") { confirmArchivePendingProjectGroup() }
+                Button("Cancel", role: .cancel) { cancelPendingArchive() }
+            } message: {
+                Text("All active chats in this project will be archived.")
+            }
+            .alert(
+                "Remove \"\(pendingDeleteProjectLabel)\" from this phone?",
+                isPresented: deleteProjectAlertBinding
+            ) {
+                Button("Remove from Phone", role: .destructive) { confirmDeletePendingProjectGroup() }
+                Button("Cancel", role: .cancel) { cancelPendingDeleteProject() }
+            } message: {
+                Text("Chats for this project will be deleted only from agnt on this phone. Nothing is removed from your computer or Codex observer.")
+            }
+            .alert(
+                "Remove \"\(pendingDeleteThreadLabel)\" from this phone?",
+                isPresented: deleteThreadAlertBinding
+            ) {
+                Button("Remove from Phone", role: .destructive) { confirmDeletePendingThread() }
+                Button("Cancel", role: .cancel) { cancelPendingDeleteThread() }
+            } message: {
+                Text("This only removes the chat from agnt on this phone. Nothing is removed from your computer or Codex observer.")
+            }
+            .alert(
+                "Action failed",
+                isPresented: actionFailedAlertBinding,
+                actions: {
+                    Button("OK", role: .cancel) { dismissActionFailedAlert() }
+                },
+                message: {
+                    Text(actionFailedMessage)
+                }
+            )
+    }
 
+    @ViewBuilder
+    private var mainStack: some View {
         VStack(alignment: .leading, spacing: 0) {
             SidebarHeaderView(
                 showsCloseButton: showsInlineCloseButton,
@@ -62,196 +115,220 @@ struct SidebarView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
 
-            SidebarThreadListView(
-                isFiltering: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                isConnected: codex.isConnected,
-                isCreatingThread: isCreatingThread,
-                threads: codex.threads,
-                groups: groupedThreads,
-                selectedThread: selectedThread,
-                bottomContentInset: 0,
-                timingLabelProvider: { SidebarRelativeTimeFormatter.compactLabel(for: $0) },
-                diffTotalsByThreadID: diffTotalsByThreadID,
-                runBadgeStateByThreadID: cachedRunBadges,
-                onSelectThread: selectThread,
-                onCreateThreadInProjectGroup: { group in
-                    handleNewChatTap(preferredProjectPath: group.projectPath)
-                },
-                onArchiveProjectGroup: { group in
-                    projectGroupPendingArchive = group
-                },
-                onDeleteProjectGroup: { group in
-                    projectGroupPendingDeletion = group
-                },
-                onRenameThread: { thread, newName in
-                    codex.renameThread(thread.id, name: newName)
-                },
-                onPinToggleThread: { thread in
-                    if codex.isThreadPinned(thread.id) {
-                        codex.unpinThread(thread.id)
-                    } else {
-                        codex.pinThread(thread.id)
-                    }
-                    rebuildGroupedThreads()
-                },
-                onArchiveToggleThread: { thread in
-                    if thread.syncState == .archivedLocal {
-                        codex.unarchiveThread(thread.id)
-                    } else {
-                        codex.archiveThread(thread.id)
-                        if selectedThread?.id == thread.id {
-                            selectedThread = nil
-                        }
-                    }
-                },
-                onDeleteThread: { thread in
-                    threadPendingDeletion = thread
-                }
-            )
-            .refreshable {
-                await refreshThreads()
-            }
+            threadListView
 
-            HStack(spacing: 10) {
-                SidebarFloatingSettingsButton(colorScheme: colorScheme, action: openSettings)
-                SidebarFloatingTerminalButton(colorScheme: colorScheme, action: openTerminal)
-                Spacer(minLength: 0)
-                if let trustedPairPresentation = codex.trustedPairPresentation {
-                    SidebarComputerConnectionStatusView(
-                        name: trustedPairPresentation.name,
-                        systemName: trustedPairPresentation.systemName,
-                        isConnected: codex.isConnected
-                    )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
+            sidebarFooter
         }
-        .frame(maxHeight: .infinity)
-        .background(Color(.systemBackground))
-        .task {
-            debugSidebarLog("task start visible=\(isVisible) threadCount=\(codex.threads.count)")
-            rebuildGroupedThreads()
-            rebuildCachedSidebarState()
-            await refreshProjectlessChatRoots()
-            if codex.isConnected, codex.threads.isEmpty {
-                await refreshThreads()
-            }
-        }
-        .onChange(of: codex.threads) { _, _ in
-            debugSidebarLog(
-                "threads changed while \(isVisible ? "visible" : "hidden-prewarmed") "
-                    + "threadCount=\(codex.threads.count)"
-            )
-            rebuildGroupedThreads()
-            rebuildCachedSidebarState()
-        }
-        .onChange(of: searchText) { _, _ in
-            debugSidebarLog("search changed queryLength=\(searchText.count)")
-            rebuildGroupedThreads()
-        }
-        .onChange(of: codex.pinnedThreadIDs) { _, _ in
-            debugSidebarLog("pinned threads changed count=\(codex.pinnedThreadIDs.count)")
-            rebuildGroupedThreads()
-        }
-        .onChange(of: diffFingerprint) { _, _ in
-            debugSidebarLog("diff fingerprint changed visible=\(isVisible)")
-            rebuildCachedDiffTotals()
-        }
-        .onChange(of: badgeFingerprint) { _, _ in
-            debugSidebarLog("badge fingerprint changed visible=\(isVisible)")
-            rebuildCachedRunBadges()
-        }
-        .onChange(of: isVisible) { _, visible in
-            debugSidebarLog("visibility changed visible=\(visible)")
-        }
-        .onChange(of: codex.isConnected) { _, connected in
-            guard connected else { return }
-            Task { await refreshProjectlessChatRoots() }
-        }
-        .overlay {
-            if SidebarThreadsLoadingPresentation.shouldShowOverlay(
-                isLoadingThreads: codex.isLoadingThreads,
-                threadCount: codex.threads.count
-            ) {
-                ProgressView()
-                    .padding()
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }
-        }
-        .sheet(item: $activeSidebarSheet) { sheet in
-            sidebarSheetContent(sheet)
-        }
-        .confirmationDialog(
-            "Archive \"\(projectGroupPendingArchive?.label ?? "project")\"?",
-            isPresented: Binding(
-                get: { projectGroupPendingArchive != nil },
-                set: { if !$0 { projectGroupPendingArchive = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Archive Project") {
-                archivePendingProjectGroup()
-            }
-            Button("Cancel", role: .cancel) {
-                projectGroupPendingArchive = nil
-            }
-        } message: {
-            Text("All active chats in this project will be archived.")
-        }
-        .alert(
-            "Remove \"\(projectGroupPendingDeletion?.label ?? "project")\" from this phone?",
-            isPresented: Binding(
-                get: { projectGroupPendingDeletion != nil },
-                set: { if !$0 { projectGroupPendingDeletion = nil } }
-            )
-        ) {
-            Button("Remove from Phone", role: .destructive) {
-                deletePendingProjectGroupLocally()
-            }
-            Button("Cancel", role: .cancel) {
-                projectGroupPendingDeletion = nil
-            }
-        } message: {
-            Text("Chats for this project will be deleted only from agnt on this phone. Nothing is removed from your computer or Codex observer.")
-        }
-        .alert(
-            "Remove \"\(threadPendingDeletion?.displayTitle ?? "conversation")\" from this phone?",
-            isPresented: Binding(
-                get: { threadPendingDeletion != nil },
-                set: { if !$0 { threadPendingDeletion = nil } }
-            )
-        ) {
-            Button("Remove from Phone", role: .destructive) {
-                if let thread = threadPendingDeletion {
-                    if selectedThread?.id == thread.id {
-                        selectedThread = nil
-                    }
-                    codex.deleteThreadLocally(thread.id)
-                }
-                threadPendingDeletion = nil
-            }
-            Button("Cancel", role: .cancel) {
-                threadPendingDeletion = nil
-            }
-        } message: {
-            Text("This only removes the chat from agnt on this phone. Nothing is removed from your computer or Codex observer.")
-        }
-        .alert(
-            "Action failed",
-            isPresented: Binding(
-                get: { createThreadErrorMessage != nil },
-                set: { if !$0 { createThreadErrorMessage = nil } }
-            ),
-            actions: {
-                Button("OK", role: .cancel) {
-                    createThreadErrorMessage = nil
-                }
+    }
+
+    @ViewBuilder
+    private var threadListView: some View {
+        SidebarThreadListView(
+            isFiltering: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            isConnected: codex.isConnected,
+            isCreatingThread: isCreatingThread,
+            threads: codex.threads,
+            groups: groupedThreads,
+            selectedThread: selectedThread,
+            bottomContentInset: 0,
+            timingLabelProvider: { SidebarRelativeTimeFormatter.compactLabel(for: $0) },
+            diffTotalsByThreadID: cachedDiffTotals,
+            runBadgeStateByThreadID: cachedRunBadges,
+            onSelectThread: selectThread,
+            onCreateThreadInProjectGroup: { group in
+                handleNewChatTap(preferredProjectPath: group.projectPath)
             },
-            message: {
-                Text(createThreadErrorMessage ?? "Please try again.")
+            onArchiveProjectGroup: { group in
+                projectGroupPendingArchive = group
+            },
+            onDeleteProjectGroup: { group in
+                projectGroupPendingDeletion = group
+            },
+            onRenameThread: { thread, newName in
+                codex.renameThread(thread.id, name: newName)
+            },
+            onPinToggleThread: { thread in
+                togglePinnedState(for: thread)
+            },
+            onArchiveToggleThread: { thread in
+                toggleArchivedState(for: thread)
+            },
+            onDeleteThread: { thread in
+                threadPendingDeletion = thread
             }
         )
+        .refreshable {
+            await refreshThreads()
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarFooter: some View {
+        HStack(spacing: 10) {
+            SidebarFloatingSettingsButton(colorScheme: colorScheme, action: openSettings)
+            SidebarFloatingTerminalButton(colorScheme: colorScheme, action: openTerminal)
+            Spacer(minLength: 0)
+            if let trustedPairPresentation = codex.trustedPairPresentation {
+                SidebarComputerConnectionStatusView(
+                    name: trustedPairPresentation.name,
+                    systemName: trustedPairPresentation.systemName,
+                    isConnected: codex.isConnected
+                )
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+    }
+
+    @ViewBuilder
+    private var loadingOverlay: some View {
+        if SidebarThreadsLoadingPresentation.shouldShowOverlay(
+            isLoadingThreads: codex.isLoadingThreads,
+            threadCount: codex.threads.count
+        ) {
+            ProgressView()
+                .padding()
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    // MARK: - Lifecycle handlers
+
+    private func runInitialSidebarTask() async {
+        debugSidebarLog("task start visible=\(isVisible) threadCount=\(codex.threads.count)")
+        rebuildGroupedThreads()
+        rebuildCachedSidebarState()
+        await refreshProjectlessChatRoots()
+        if codex.isConnected, codex.threads.isEmpty {
+            await refreshThreads()
+        }
+    }
+
+    private func handleThreadsChanged() {
+        debugSidebarLog(
+            "threads changed while \(isVisible ? "visible" : "hidden-prewarmed") "
+                + "threadCount=\(codex.threads.count)"
+        )
+        rebuildGroupedThreads()
+        rebuildCachedSidebarState()
+    }
+
+    private func handleSearchTextChanged() {
+        debugSidebarLog("search changed queryLength=\(searchText.count)")
+        rebuildGroupedThreads()
+    }
+
+    private func handlePinnedThreadsChanged() {
+        debugSidebarLog("pinned threads changed count=\(codex.pinnedThreadIDs.count)")
+        rebuildGroupedThreads()
+    }
+
+    private func handleDiffFingerprintChanged() {
+        debugSidebarLog("diff fingerprint changed visible=\(isVisible)")
+        rebuildCachedDiffTotals()
+    }
+
+    private func handleBadgeFingerprintChanged() {
+        debugSidebarLog("badge fingerprint changed visible=\(isVisible)")
+        rebuildCachedRunBadges()
+    }
+
+    private func handleVisibilityChanged(to visible: Bool) {
+        debugSidebarLog("visibility changed visible=\(visible)")
+    }
+
+    private func handleConnectionChanged(connected: Bool) {
+        guard connected else { return }
+        Task { await refreshProjectlessChatRoots() }
+    }
+
+    private func togglePinnedState(for thread: CodexThread) {
+        if codex.isThreadPinned(thread.id) {
+            codex.unpinThread(thread.id)
+        } else {
+            codex.pinThread(thread.id)
+        }
+        rebuildGroupedThreads()
+    }
+
+    private func toggleArchivedState(for thread: CodexThread) {
+        if thread.syncState == .archivedLocal {
+            codex.unarchiveThread(thread.id)
+        } else {
+            codex.archiveThread(thread.id)
+            if selectedThread?.id == thread.id {
+                selectedThread = nil
+            }
+        }
+    }
+
+    // MARK: - Dialog / alert bindings
+
+    private var archiveProjectDialogBinding: Binding<Bool> {
+        Binding(
+            get: { projectGroupPendingArchive != nil },
+            set: { if !$0 { projectGroupPendingArchive = nil } }
+        )
+    }
+
+    private var deleteProjectAlertBinding: Binding<Bool> {
+        Binding(
+            get: { projectGroupPendingDeletion != nil },
+            set: { if !$0 { projectGroupPendingDeletion = nil } }
+        )
+    }
+
+    private var deleteThreadAlertBinding: Binding<Bool> {
+        Binding(
+            get: { threadPendingDeletion != nil },
+            set: { if !$0 { threadPendingDeletion = nil } }
+        )
+    }
+
+    private var actionFailedAlertBinding: Binding<Bool> {
+        Binding(
+            get: { createThreadErrorMessage != nil },
+            set: { if !$0 { createThreadErrorMessage = nil } }
+        )
+    }
+
+    private var pendingArchiveProjectLabel: String { projectGroupPendingArchive?.label ?? "project" }
+    private var pendingDeleteProjectLabel: String { projectGroupPendingDeletion?.label ?? "project" }
+    private var pendingDeleteThreadLabel: String { threadPendingDeletion?.displayTitle ?? "conversation" }
+    private var actionFailedMessage: String { createThreadErrorMessage ?? "Please try again." }
+
+    private func confirmArchivePendingProjectGroup() {
+        archivePendingProjectGroup()
+    }
+
+    private func cancelPendingArchive() {
+        projectGroupPendingArchive = nil
+    }
+
+    private func confirmDeletePendingProjectGroup() {
+        deletePendingProjectGroupLocally()
+    }
+
+    private func cancelPendingDeleteProject() {
+        projectGroupPendingDeletion = nil
+    }
+
+    private func confirmDeletePendingThread() {
+        if let thread = threadPendingDeletion {
+            if selectedThread?.id == thread.id {
+                selectedThread = nil
+            }
+            codex.deleteThreadLocally(thread.id)
+        }
+        threadPendingDeletion = nil
+    }
+
+    private func cancelPendingDeleteThread() {
+        threadPendingDeletion = nil
+    }
+
+    private func dismissActionFailedAlert() {
+        createThreadErrorMessage = nil
     }
 
     // MARK: - Actions
