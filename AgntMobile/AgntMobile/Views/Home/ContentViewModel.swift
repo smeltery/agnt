@@ -13,12 +13,14 @@ final class ContentViewModel {
     private var hasAttemptedInitialAutoConnect = false
     private var lastSidebarOpenSyncAt: Date = .distantPast
     private let autoReconnectBackoffNanoseconds: [UInt64] = [1_000_000_000, 3_000_000_000]
+    private let launchReconnectAttemptLimit = 10
     private let reconnectSleepChunkNanoseconds: UInt64 = 100_000_000
     private(set) var isRunningAutoReconnect = false
     private(set) var isRunningManualReconnect = false
     private var shouldCancelManualReconnect = false
     // Test hooks keep reconnect verification fast without changing production retry behavior.
     @ObservationIgnored var reconnectAttemptLimitOverride: Int?
+    @ObservationIgnored var launchReconnectAttemptLimitOverride: Int?
     @ObservationIgnored var connectOverride: ((CodexService, String) async throws -> Void)?
     @ObservationIgnored var reconnectSleepOverride: ((UInt64) async -> Void)?
     @ObservationIgnored var reconnectSleepChunkNanosecondsOverride: UInt64?
@@ -156,19 +158,32 @@ final class ContentViewModel {
             return
         }
 
-        do {
-            try await connectWithAutoRecovery(
-                codex: codex,
-                performAutoRetry: true,
-                serverURLProvider: { await self.preferredReconnectURL(codex: codex) }
-            )
-        } catch {
-            // Keep the saved pairing so temporary Mac/relay outages can recover on the next retry.
+        guard codex.hasReconnectCandidate else {
+            return
         }
+
+        // Cold launches after device sleep often start before the bridge has re-registered
+        // its fresh relay session, so use the foreground recovery loop instead of one short attempt.
+        codex.shouldAutoReconnectOnForeground = true
+        await attemptAutoReconnectOnForegroundIfNeeded(
+            codex: codex,
+            maxAttempts: launchReconnectAttemptLimitOverride ?? launchReconnectAttemptLimit
+        )
     }
 
     // Reconnects after benign background disconnects.
     func attemptAutoReconnectOnForegroundIfNeeded(codex: CodexService) async {
+        await attemptAutoReconnectOnForegroundIfNeeded(
+            codex: codex,
+            maxAttempts: reconnectAttemptLimitOverride ?? 50
+        )
+    }
+
+    // Reconnects after wake/cold-launch while allowing trusted session resolve to become live.
+    private func attemptAutoReconnectOnForegroundIfNeeded(
+        codex: CodexService,
+        maxAttempts: Int
+    ) async {
         guard codex.shouldAutoReconnectOnForeground, !isRunningAutoReconnect else {
             return
         }
@@ -178,12 +193,11 @@ final class ContentViewModel {
 
         var attempt = 0
 
-        let maxAttempts = reconnectAttemptLimitOverride ?? 50
-
         // Keep retryable reconnects alive until the socket recovers or the pairing becomes invalid.
         while codex.shouldAutoReconnectOnForeground, attempt < maxAttempts {
 
-            guard let fullURL = await preferredReconnectURL(codex: codex) else {
+            let reconnectResolution = await autoRecoveryReconnectURLResolution(codex: codex)
+            guard reconnectResolution.shouldKeepRetrying else {
                 codex.shouldAutoReconnectOnForeground = false
                 codex.connectionRecoveryState = .idle
                 return
@@ -203,6 +217,22 @@ final class ContentViewModel {
                 }
                 await sleepForReconnectBackoff(
                     300_000_000,
+                    continueWhile: { codex.shouldAutoReconnectOnForeground }
+                )
+                continue
+            }
+
+            guard let fullURL = reconnectResolution.url else {
+                codex.lastErrorMessage = nil
+                codex.connectionRecoveryState = .retrying(
+                    attempt: max(1, attempt + 1),
+                    message: "Reconnecting..."
+                )
+                let backoffIndex = min(attempt, autoReconnectBackoffNanoseconds.count - 1)
+                let backoff = autoReconnectBackoffNanoseconds[backoffIndex]
+                attempt += 1
+                await sleepForReconnectBackoff(
+                    backoff,
                     continueWhile: { codex.shouldAutoReconnectOnForeground }
                 )
                 continue
@@ -277,7 +307,13 @@ extension ContentViewModel {
     private enum ReconnectURLResolution {
         case use(String)
         case fallbackToSaved
+        case retryLater
         case stop
+    }
+
+    private struct AutoRecoveryReconnectURLResolution {
+        let url: String?
+        let shouldKeepRetrying: Bool
     }
 
     func connect(codex: CodexService, serverURL: String) async throws {
@@ -396,8 +432,30 @@ extension ContentViewModel {
             return resolvedURL
         case .fallbackToSaved:
             return savedReconnectURL(codex: codex)
+        case .retryLater:
+            return nil
         case .stop:
             return nil
+        }
+    }
+
+    // Keeps launch/foreground recovery alive while the bridge is still re-registering after sleep.
+    private func autoRecoveryReconnectURLResolution(codex: CodexService) async -> AutoRecoveryReconnectURLResolution {
+        switch await trustedReconnectResolution(codex: codex) {
+        case .use(let resolvedURL):
+            return AutoRecoveryReconnectURLResolution(url: resolvedURL, shouldKeepRetrying: true)
+        case .fallbackToSaved:
+            if let savedURL = savedReconnectURL(codex: codex) {
+                return AutoRecoveryReconnectURLResolution(url: savedURL, shouldKeepRetrying: true)
+            }
+            return AutoRecoveryReconnectURLResolution(
+                url: nil,
+                shouldKeepRetrying: codex.hasTrustedMacReconnectCandidate
+            )
+        case .retryLater:
+            return AutoRecoveryReconnectURLResolution(url: nil, shouldKeepRetrying: true)
+        case .stop:
+            return AutoRecoveryReconnectURLResolution(url: nil, shouldKeepRetrying: false)
         }
     }
 
@@ -453,9 +511,8 @@ extension ContentViewModel {
                 codex.lastErrorMessage = nil
                 return .fallbackToSaved
             }
-            codex.connectionRecoveryState = .idle
             codex.lastErrorMessage = message
-            return .stop
+            return .retryLater
         case .rePairRequired(let message):
             codex.connectionRecoveryState = .idle
             codex.shouldAutoReconnectOnForeground = false

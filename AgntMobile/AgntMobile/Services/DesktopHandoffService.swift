@@ -173,7 +173,7 @@ final class DesktopHandoffService {
         if codex.hasTrustedMacReconnectCandidate {
             do {
                 let resolved = try await codex.resolveTrustedMacSession()
-                guard let relayURL = codex.normalizedRelayURL else {
+                guard let relayURL = codex.normalizedRelayURL ?? codex.preferredWakeRelayURL else {
                     return nil
                 }
                 return "\(relayURL)/\(resolved.sessionId)"

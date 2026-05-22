@@ -443,6 +443,7 @@ final class CodexService {
     @ObservationIgnored var trustedSessionResolverOverride: (() async throws -> CodexTrustedSessionResolveResponse)?
     // Test hooks: exercise keepalive lifecycle without waiting 25s or opening a real socket.
     @ObservationIgnored var webSocketKeepAliveIntervalOverrideNanoseconds: UInt64?
+    @ObservationIgnored var webSocketForegroundProbeTimeoutOverrideNanoseconds: UInt64?
     @ObservationIgnored var webSocketKeepAlivePingOverride: (() async throws -> Void)?
     // Keeps the trusted-session HTTP lookup cancellable so manual retry can preempt a stuck resolve.
     @ObservationIgnored var trustedSessionResolveTask: Task<CodexTrustedSessionResolveResponse, Error>?
@@ -933,18 +934,26 @@ final class CodexService {
         hasSavedRelaySession || hasTrustedMacReconnectCandidate
     }
 
-    // Chooses the relay base URL only when a saved live session can actually carry a wake request.
+    // Chooses the best relay base URL for a one-shot display wake before reconnecting.
     var preferredWakeRelayURL: String? {
         guard !isConnected,
-              secureConnectionState != .rePairRequired,
-              hasTrustedReconnectContext else {
+              secureConnectionState != .rePairRequired else {
             return nil
         }
 
-        return normalizedRelayURL
+        if hasTrustedReconnectContext {
+            return normalizedRelayURL
+        }
+
+        let trimmedRelayURL = visibleTrustedMacRecord?.relayURL?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmedRelayURL, !trimmedRelayURL.isEmpty {
+            return trimmedRelayURL
+        }
+        return nil
     }
 
-    // Wake needs a concrete live-session URL; trusted-Mac-only recovery should show Reconnect, not Wake Screen.
+    // Wake can use either a saved live session or a freshly resolved trusted session.
     var canWakePreferredMacDisplay: Bool {
         guard !isConnected,
               secureConnectionState != .rePairRequired else {
