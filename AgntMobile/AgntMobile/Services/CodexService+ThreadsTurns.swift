@@ -76,7 +76,10 @@ extension CodexService {
 
     func listThreads(limit: Int? = nil) async throws {
         isLoadingThreads = true
-        defer { isLoadingThreads = false }
+        defer {
+            isLoadingThreads = false
+            flushPendingRuntimeOptionRefreshIfPossible()
+        }
 
         let activeLimit = limit ?? recentActiveThreadListLimit
         let archivedLimit = limit ?? recentArchivedThreadListLimit

@@ -372,6 +372,10 @@ final class CodexService {
     // Holds the most recent account-specific error without colliding with transport-level failures.
     var gptAccountErrorMessage: String?
     var isLoadingModels = false
+    // Coalesces post-connect model refreshes behind thread hydration so composer metadata cannot be skipped.
+    @ObservationIgnored var pendingRuntimeOptionRefresh = false
+    @ObservationIgnored var runtimeOptionRefreshTask: Task<Void, Never>?
+    @ObservationIgnored var runtimeOptionRefreshToken: UUID?
     var modelsErrorMessage: String?
     var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     var pendingNotificationOpenThreadID: String?
