@@ -949,7 +949,7 @@ final class CodexService {
             return normalizedRelayURL
         }
 
-        let trimmedRelayURL = visibleTrustedMacRecord?.relayURL?
+        let trimmedRelayURL = preferredTrustedMacRecord?.relayURL?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if let trimmedRelayURL, !trimmedRelayURL.isEmpty {
             return trimmedRelayURL
