@@ -162,6 +162,7 @@ struct ContentView: View {
                             return
                         }
 
+                        await codex.probeForegroundConnectionIfNeeded()
                         await attemptSavedMacReconnectRecoveryIfNeeded()
                         await subscriptionRefresh
                         scheduleSidebarPrewarmIfNeeded()

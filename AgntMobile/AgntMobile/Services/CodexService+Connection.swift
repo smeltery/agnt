@@ -143,6 +143,10 @@ extension CodexService {
         isInitialized = false
         isLoadingThreads = false
         isLoadingModels = false
+        pendingRuntimeOptionRefresh = false
+        runtimeOptionRefreshTask?.cancel()
+        runtimeOptionRefreshTask = nil
+        runtimeOptionRefreshToken = nil
         clearPendingApprovals()
         finalizeAllStreamingState()
         messagePersistenceDebounceTask?.cancel()
@@ -503,12 +507,12 @@ extension CodexService {
         }
     }
 
-    // Runs the post-connect sync work that is useful but not required to mark the socket usable.
+    // Paint chats first; runtime metadata is useful composer chrome but must
+    // never block thread sync on bridges where model/list is slow.
     func performPostConnectSyncPass(preferredThreadId: String? = nil) async {
-        // Thread metadata drives the visible app shell, so do it before slower runtime option sync.
         try? await listThreads()
-        scheduleRuntimeOptionRefresh()
         if await routePendingNotificationOpenIfPossible(refreshIfNeeded: false) {
+            scheduleRuntimeOptionRefresh()
             return
         }
         let resolvedPreferredThreadId = normalizedInterruptIdentifier(preferredThreadId)
@@ -539,6 +543,7 @@ extension CodexService {
                 )
             }
         }
+        scheduleRuntimeOptionRefresh()
     }
 
     // Checks optional plan-mode metadata after the socket is usable so reconnect is not gated by it.
@@ -555,11 +560,52 @@ extension CodexService {
         }
     }
 
-    // Refreshes model/reasoning options in parallel with chat catch-up; the composer has its own loading state.
+    // Keep model/reasoning metadata off the critical reconnect path. Some bridge
+    // runtimes can answer chats while model/list is still slow or unavailable.
     private func scheduleRuntimeOptionRefresh() {
-        Task { @MainActor [weak self] in
-            guard let self, self.isConnected, self.isInitialized else { return }
+        pendingRuntimeOptionRefresh = true
+        flushPendingRuntimeOptionRefreshIfPossible(delayNanoseconds: 1_000_000_000)
+    }
+
+    // Runs a queued runtime metadata refresh once thread hydration is no longer busy.
+    func flushPendingRuntimeOptionRefreshIfPossible(delayNanoseconds: UInt64 = 0) {
+        guard pendingRuntimeOptionRefresh,
+              runtimeOptionRefreshTask == nil,
+              isConnected,
+              isInitialized,
+              !isLoadingThreads else {
+            return
+        }
+
+        pendingRuntimeOptionRefresh = false
+        let refreshToken = UUID()
+        runtimeOptionRefreshToken = refreshToken
+        runtimeOptionRefreshTask = Task { @MainActor [weak self] in
+            if delayNanoseconds > 0 {
+                do {
+                    try await Task.sleep(nanoseconds: delayNanoseconds)
+                } catch {
+                    return
+                }
+            }
+            guard !Task.isCancelled else { return }
+            guard let self else { return }
+            guard self.runtimeOptionRefreshToken == refreshToken else { return }
+            defer {
+                if self.runtimeOptionRefreshToken == refreshToken {
+                    self.runtimeOptionRefreshTask = nil
+                    self.runtimeOptionRefreshToken = nil
+                }
+            }
+            guard self.isConnected, self.isInitialized else { return }
+            guard !self.isLoadingThreads else {
+                self.pendingRuntimeOptionRefresh = true
+                return
+            }
             try? await self.listModels()
+            if self.runtimeOptionRefreshToken == refreshToken {
+                self.pendingRuntimeOptionRefresh = false
+            }
         }
     }
 
@@ -574,6 +620,10 @@ extension CodexService {
         currentOutput = ""
         lastErrorMessage = nil
         isLoadingModels = false
+        pendingRuntimeOptionRefresh = false
+        runtimeOptionRefreshTask?.cancel()
+        runtimeOptionRefreshTask = nil
+        runtimeOptionRefreshToken = nil
         modelsErrorMessage = nil
         assistantCompletionFingerprintByThread.removeAll()
         recentActivityLineByThread.removeAll()

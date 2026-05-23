@@ -239,6 +239,7 @@ function startBridge({
     sessionId,
     relayUrl: relayBaseUrl,
     deviceState,
+    displayName: os.hostname(),
     onTrustedPhoneUpdate(nextDeviceState) {
       deviceState = nextDeviceState;
       sendRelayRegistrationUpdate(nextDeviceState);
