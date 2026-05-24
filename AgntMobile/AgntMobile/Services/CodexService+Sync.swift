@@ -1026,8 +1026,6 @@ extension CodexService {
 
     // MARK: - Persisted archive/delete sets
 
-    private static let locallyDeletedThreadIDsKey = "codex.locallyDeletedThreadIDs"
-
     var locallyArchivedThreadIDs: Set<String> {
         Set(defaults.stringArray(forKey: Self.locallyArchivedThreadIDsKey) ?? [])
     }

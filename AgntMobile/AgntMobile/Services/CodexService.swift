@@ -584,7 +584,12 @@ final class CodexService {
     var pendingHandshake: CodexPendingHandshake?
     var phoneIdentityState: CodexPhoneIdentityState
     var trustedMacRegistry: CodexTrustedMacRegistry
+    var currentTrustedMacDeviceId: String?
     var lastTrustedMacDeviceId: String?
+    var previousTrustedMacDeviceId: String?
+    @ObservationIgnored var macScopedContextOverrideDeviceId: String?
+    @ObservationIgnored var suspendAutomaticMacScopedPersistence = false
+    @ObservationIgnored var isApplyingMacScopedState = false
     var pendingSecureControlContinuations: [String: [CodexSecureControlWaiter]] = [:]
     var bufferedSecureControlMessages: [String: [String]] = [:]
     // Assistant-scoped patch ledger used by the revert-changes flow.
@@ -640,6 +645,7 @@ final class CodexService {
     static let planSessionSourcesDefaultsKey = "codex.planSessionSources"
     static let selectedAccessModeDefaultsKey = "codex.selectedAccessMode"
     static let locallyArchivedThreadIDsKey = "codex.locallyArchivedThreadIDs"
+    static let locallyDeletedThreadIDsKey = "codex.locallyDeletedThreadIDs"
     static let forkedThreadOriginsDefaultsKey = "codex.forkedThreadOrigins"
     static let renamedThreadNamesDefaultsKey = "codex.renamedThreadNames"
     static let pinnedThreadIDsDefaultsKey = "codex.pinnedThreadIDs"
@@ -664,32 +670,14 @@ final class CodexService {
         self.remoteNotificationRegistrar = remoteNotificationRegistrar
         self.phoneIdentityState = codexPhoneIdentityStateFromSecureStore()
         self.trustedMacRegistry = codexTrustedMacRegistryFromSecureStore()
+        self.currentTrustedMacDeviceId = SecureStore.readString(for: CodexSecureKeys.currentTrustedMacDeviceId)
         self.lastTrustedMacDeviceId = SecureStore.readString(for: CodexSecureKeys.lastTrustedMacDeviceId)
-        let loadedMessages = messagePersistence.load().mapValues { messages in
-            messages.map { message in
-                var value = message
-                // Streaming cannot survive app relaunch; clear stale flags loaded from disk.
-                value.isStreaming = false
-                return value
-            }
-        }
-        CodexMessageOrderCounter.seed(from: loadedMessages)
-        self.messagesByThread = loadedMessages
-        self.composerDraftsByThreadID = composerDraftPersistence.load()
+        self.messagesByThread = [:]
+        self.composerDraftsByThreadID = [:]
         rebuildSubagentIdentityDirectory()
-
-        let loadedChangeSets = aiChangeSetPersistence.load()
-        self.aiChangeSetsByID = loadedChangeSets.reduce(into: [:]) { partialResult, changeSet in
-            partialResult[changeSet.id] = changeSet
-        }
-        self.aiChangeSetIDByTurnID = loadedChangeSets.reduce(into: [:]) { partialResult, changeSet in
-            partialResult[changeSet.turnId] = changeSet.id
-        }
-        self.aiChangeSetIDByAssistantMessageID = loadedChangeSets.reduce(into: [:]) { partialResult, changeSet in
-            if let assistantMessageId = changeSet.assistantMessageId {
-                partialResult[assistantMessageId] = changeSet.id
-            }
-        }
+        self.aiChangeSetsByID = [:]
+        self.aiChangeSetIDByTurnID = [:]
+        self.aiChangeSetIDByAssistantMessageID = [:]
 
         let savedModelId = defaults.string(forKey: Self.selectedModelIdDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -718,73 +706,14 @@ final class CodexService {
             self.enableWebTerminalOnBridge = false
         }
 
-        if let savedThreadRuntimeOverrides = defaults.data(forKey: Self.threadRuntimeOverridesDefaultsKey),
-           let decodedThreadRuntimeOverrides = try? decoder.decode(
-               [String: CodexThreadRuntimeOverride].self,
-               from: savedThreadRuntimeOverrides
-           ) {
-            self.threadRuntimeOverridesByThreadID = decodedThreadRuntimeOverrides
-        } else {
-            self.threadRuntimeOverridesByThreadID = [:]
-        }
-
-        if let savedPlanSessionSources = defaults.data(forKey: Self.planSessionSourcesDefaultsKey),
-           let decodedPlanSessionSources = try? decoder.decode(
-               [String: CodexPlanSessionSource].self,
-               from: savedPlanSessionSources
-           ) {
-            self.planSessionSourceByThread = decodedPlanSessionSources
-        } else {
-            self.planSessionSourceByThread = [:]
-        }
-
-        if let savedForkOrigins = defaults.data(forKey: Self.forkedThreadOriginsDefaultsKey),
-           let decodedForkOrigins = try? decoder.decode([String: String].self, from: savedForkOrigins) {
-            self.forkedFromThreadIDByThreadID = decodedForkOrigins
-        } else {
-            self.forkedFromThreadIDByThreadID = [:]
-        }
-
-        if let savedRenamedThreadNames = defaults.data(forKey: Self.renamedThreadNamesDefaultsKey),
-           let decodedRenamedThreadNames = try? decoder.decode([String: String].self, from: savedRenamedThreadNames) {
-            self.renamedThreadNameByThreadID = decodedRenamedThreadNames
-        } else {
-            self.renamedThreadNameByThreadID = [:]
-        }
-
-        if let savedPinnedThreadIDs = defaults.data(forKey: Self.pinnedThreadIDsDefaultsKey),
-           let decodedPinnedThreadIDs = try? decoder.decode([String].self, from: savedPinnedThreadIDs) {
-            self.pinnedThreadIDs = decodedPinnedThreadIDs
-        } else {
-            self.pinnedThreadIDs = []
-        }
-
-        if let savedPinnedThreadSnapshots = defaults.data(forKey: Self.pinnedThreadSnapshotsDefaultsKey),
-           let decodedPinnedThreadSnapshots = try? decoder.decode([String: [CodexThread]].self, from: savedPinnedThreadSnapshots) {
-            self.pinnedThreadSnapshotsByRootID = decodedPinnedThreadSnapshots
-        } else {
-            self.pinnedThreadSnapshotsByRootID = [:]
-        }
-
-        if let savedAssociatedManagedWorktreePaths = defaults.data(forKey: Self.associatedManagedWorktreePathsDefaultsKey),
-           let decodedAssociatedManagedWorktreePaths = try? decoder.decode(
-               [String: String].self,
-               from: savedAssociatedManagedWorktreePaths
-           ) {
-            self.associatedManagedWorktreePathByThreadID = decodedAssociatedManagedWorktreePaths
-        } else {
-            self.associatedManagedWorktreePathByThreadID = [:]
-        }
-
-        if let savedTurnTerminalStates = defaults.data(forKey: Self.turnTerminalStatesDefaultsKey),
-           let decodedTurnTerminalStates = try? decoder.decode(
-               [String: CodexTurnTerminalState].self,
-               from: savedTurnTerminalStates
-           ) {
-            self.terminalStateByTurnID = decodedTurnTerminalStates
-        } else {
-            self.terminalStateByTurnID = [:]
-        }
+        self.threadRuntimeOverridesByThreadID = [:]
+        self.planSessionSourceByThread = [:]
+        self.forkedFromThreadIDByThreadID = [:]
+        self.renamedThreadNameByThreadID = [:]
+        self.pinnedThreadIDs = []
+        self.pinnedThreadSnapshotsByRootID = [:]
+        self.associatedManagedWorktreePathByThreadID = [:]
+        self.terminalStateByTurnID = [:]
 
         let savedServiceTier = defaults.string(forKey: Self.selectedServiceTierDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -804,31 +733,7 @@ final class CodexService {
             self.selectedAccessMode = .onRequest
         }
 
-        if let persistedGPTAccountSnapshot = loadPersistedGPTAccountSnapshot() {
-            self.gptAccountSnapshot = persistedGPTAccountSnapshot
-        } else {
-            self.gptAccountSnapshot = codexGPTAccountInitialSnapshot()
-        }
-
-        if let pendingLogin = gptPendingLoginState,
-           !self.gptAccountSnapshot.isAuthenticated,
-           self.gptAccountSnapshot.status != .loginPending {
-            self.gptAccountSnapshot = CodexGPTAccountSnapshot(
-                status: .loginPending,
-                authMethod: .chatgpt,
-                email: nil,
-                displayName: nil,
-                planType: nil,
-                hostPlatform: self.gptAccountSnapshot.hostPlatform,
-                hostCapabilities: self.gptAccountSnapshot.hostCapabilities,
-                loginInFlight: true,
-                needsReauth: false,
-                expiresAt: pendingLogin.expiresAt,
-                tokenReady: false,
-                tokenUnavailableSince: nil,
-                updatedAt: .now
-            )
-        }
+        self.gptAccountSnapshot = codexGPTAccountInitialSnapshot()
 
         // Restore relay session from Keychain
         self.relaySessionId = SecureStore.readString(for: CodexSecureKeys.relaySessionId)
@@ -845,12 +750,16 @@ final class CodexService {
            let parsedLastAppliedSeq = Int(rawLastAppliedSeq) {
             self.lastAppliedBridgeOutboundSeq = parsedLastAppliedSeq
         }
+        migrateCurrentTrustedMacDeviceIdIfNeeded()
+        migrateLegacyMacScopedDefaultsIfNeeded()
+        loadCurrentMacScopedDefaultsState()
+        loadCurrentMacScopedLocalState()
         self.remoteNotificationDeviceToken = SecureStore.readString(for: CodexSecureKeys.pushDeviceToken)
         if let relayMacDeviceId,
            let trustedMac = trustedMacRegistry.records[relayMacDeviceId] {
             self.secureConnectionState = .trustedMac
             self.secureMacFingerprint = codexSecureFingerprint(for: trustedMac.macIdentityPublicKey)
-        } else if let trustedMac = preferredTrustedMacRecord {
+        } else if let trustedMac = currentTrustedMacRecord {
             self.secureConnectionState = .liveSessionUnresolved
             self.secureMacFingerprint = codexSecureFingerprint(for: trustedMac.macIdentityPublicKey)
         }
@@ -930,6 +839,74 @@ final class CodexService {
         return trustedMacRegistry.records[preferredTrustedMacDeviceId]
     }
 
+    var normalizedCurrentTrustedMacDeviceId: String? {
+        currentTrustedMacDeviceId?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+    }
+
+    var currentTrustedMacRecord: CodexTrustedMacRecord? {
+        guard let normalizedCurrentTrustedMacDeviceId else {
+            return nil
+        }
+        return trustedMacRegistry.records[normalizedCurrentTrustedMacDeviceId]
+    }
+
+    var normalizedPreviousTrustedMacDeviceId: String? {
+        previousTrustedMacDeviceId?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+    }
+
+    func trustedMacRecord(for deviceId: String?) -> CodexTrustedMacRecord? {
+        guard let normalizedDeviceId = deviceId?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty else {
+            return nil
+        }
+
+        return trustedMacRegistry.records[normalizedDeviceId]
+    }
+
+    func setCurrentTrustedMacDeviceId(_ deviceId: String?) {
+        let normalizedDeviceId = deviceId?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+        currentTrustedMacDeviceId = normalizedDeviceId
+        if let normalizedDeviceId {
+            SecureStore.writeString(normalizedDeviceId, for: CodexSecureKeys.currentTrustedMacDeviceId)
+        } else {
+            SecureStore.deleteValue(for: CodexSecureKeys.currentTrustedMacDeviceId)
+        }
+    }
+
+    func setPreviousTrustedMacDeviceId(_ deviceId: String?) {
+        previousTrustedMacDeviceId = deviceId?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+    }
+
+    func clearPreviousTrustedMacDeviceId() {
+        previousTrustedMacDeviceId = nil
+    }
+
+    // Bootstraps the explicit current Mac selection from saved relay/last-paired ids when missing.
+    func migrateCurrentTrustedMacDeviceIdIfNeeded() {
+        if let normalizedCurrentTrustedMacDeviceId,
+           trustedMacRegistry.records[normalizedCurrentTrustedMacDeviceId] != nil {
+            return
+        }
+
+        let bootstrapDeviceId = [
+            normalizedRelayMacDeviceId,
+            normalizedLastTrustedMacDeviceId,
+        ]
+        .compactMap { $0 }
+        .first { trustedMacRegistry.records[$0] != nil }
+
+        setCurrentTrustedMacDeviceId(bootstrapDeviceId)
+    }
+
     var hasTrustedMacReconnectCandidate: Bool {
         preferredTrustedMacRecord?.relayURL?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
@@ -986,6 +963,26 @@ final class CodexService {
         }
 
         return .connected
+    }
+
+    var connectionPhaseDisplayLabel: String {
+        switch connectionPhase {
+        case .offline:
+            return "Offline"
+        case .connecting:
+            return "Connecting"
+        case .loadingChats:
+            return "Loading chats"
+        case .syncing:
+            return "Syncing"
+        case .connected:
+            return "Connected"
+        }
+    }
+
+    var secureConnectionDisplayLabel: String? {
+        let label = secureConnectionState.statusLabel
+        return label.isEmpty || secureConnectionState == .notPaired ? nil : label
     }
 }
 
