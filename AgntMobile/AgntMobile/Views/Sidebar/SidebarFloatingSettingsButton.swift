@@ -1,12 +1,16 @@
 // FILE: SidebarFloatingSettingsButton.swift
-// Purpose: Floating shortcuts used to open sidebar settings and terminal tools.
+// Purpose: Floating shortcuts used to open top-level sidebar destinations.
 // Layer: View Component
-// Exports: SidebarFloatingSettingsButton, SidebarFloatingTerminalButton, SidebarComputerConnectionStatusView
+// Exports: SidebarFloatingSettingsButton, SidebarFloatingMacsButton, SidebarFloatingTerminalButton, SidebarComputerConnectionStatusView
 
 import SwiftUI
 
-struct SidebarFloatingSettingsButton: View {
+// Shared shell so all sidebar footer buttons stay visually identical.
+// Adding a new entry-point becomes a thin wrapper over this view.
+private struct SidebarFloatingCircleButton: View {
     let colorScheme: ColorScheme
+    let systemImage: String
+    let accessibilityLabel: String
     let action: () -> Void
 
     var body: some View {
@@ -14,7 +18,7 @@ struct SidebarFloatingSettingsButton: View {
             HapticFeedback.shared.triggerImpactFeedback()
             action()
         }) {
-            Image(systemName: "gearshape.fill")
+            Image(systemName: systemImage)
                 .font(AppFont.system(size: 17, weight: .semibold))
                 .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
                 .frame(width: 44, height: 44)
@@ -22,7 +26,35 @@ struct SidebarFloatingSettingsButton: View {
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
-        .accessibilityLabel("Settings")
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+struct SidebarFloatingSettingsButton: View {
+    let colorScheme: ColorScheme
+    let action: () -> Void
+
+    var body: some View {
+        SidebarFloatingCircleButton(
+            colorScheme: colorScheme,
+            systemImage: "gearshape.fill",
+            accessibilityLabel: "Settings",
+            action: action
+        )
+    }
+}
+
+struct SidebarFloatingMacsButton: View {
+    let colorScheme: ColorScheme
+    let action: () -> Void
+
+    var body: some View {
+        SidebarFloatingCircleButton(
+            colorScheme: colorScheme,
+            systemImage: "desktopcomputer",
+            accessibilityLabel: "My Macs",
+            action: action
+        )
     }
 }
 
@@ -31,19 +63,12 @@ struct SidebarFloatingTerminalButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: {
-            HapticFeedback.shared.triggerImpactFeedback()
-            action()
-        }) {
-            Image(systemName: "terminal.fill")
-                .font(AppFont.system(size: 17, weight: .semibold))
-                .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
-                .frame(width: 44, height: 44)
-                .adaptiveGlass(.regular, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .contentShape(Circle())
-        .accessibilityLabel("Terminal")
+        SidebarFloatingCircleButton(
+            colorScheme: colorScheme,
+            systemImage: "terminal.fill",
+            accessibilityLabel: "Terminal",
+            action: action
+        )
     }
 }
 

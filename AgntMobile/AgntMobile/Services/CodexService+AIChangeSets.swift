@@ -399,6 +399,11 @@ extension CodexService {
             .first { isSameOrDescendantPath(normalizedWorkingDirectory, root: $0) }
         return matchingRoot ?? normalizedWorkingDirectory
     }
+
+    // Recovers legacy fallback change-set ledgers from persisted file-change message diff fences.
+    // No-op on agnt for now; full migration helper (depends on persistedFileChangePatches +
+    // unifiedDiffCodeBlocks) is not yet ported. Legacy users will need to recreate change sets.
+    func rehydrateLegacyFallbackChangeSetsFromPersistedMessages() {}
 }
 
 private extension CodexService {
@@ -601,7 +606,8 @@ private extension CodexService {
                     return $0.createdAt < $1.createdAt
                 }
                 return $0.id < $1.id
-            }
+            },
+            macDeviceId: currentMacScopedPersistenceDeviceId
         )
     }
 

@@ -342,6 +342,23 @@ function startBridge({
     reconnectScheduler.clear();
   }
 
+  // Consolidates the non-relay teardown sequence so SIGINT / SIGTERM and the
+  // codex.onClose handler all stop the same set of background work in the same
+  // order. The relay-socket-loop's own onShutdown callback intentionally keeps
+  // its inline teardown — its close-code-4000/4001 path is agnt-specific and
+  // owned by that module.
+  function prepareBridgeShutdown() {
+    isShuttingDown = true;
+    bridgeWakeAssertion.stop();
+    clearReconnectTimer();
+    clearRelayWatchdog();
+    clearBridgeStatusHeartbeat();
+    contextUsageWatcher.stop();
+    rolloutLiveMirror?.stopAll();
+    desktopIpcActionFollower?.stopAll();
+    terminalHandler.shutdown();
+  }
+
   // Periodically rewrites the latest bridge snapshot so CLI status does not stay frozen.
   function startBridgeStatusHeartbeat() {
     heartbeat.startStatusHeartbeat(({ wrapStatus }) => {
@@ -478,8 +495,6 @@ function startBridge({
   }));
 
   codex.onClose(() => {
-    clearRelayWatchdog();
-    clearBridgeStatusHeartbeat();
     logConnectionStatus("disconnected");
     publishBridgeStatus({
       state: "stopped",
@@ -487,12 +502,7 @@ function startBridge({
       pid: process.pid,
       lastError: "",
     });
-    isShuttingDown = true;
-    bridgeWakeAssertion.stop();
-    clearReconnectTimer();
-    contextUsageWatcher.stop();
-    rolloutLiveMirror?.stopAll();
-    desktopIpcActionFollower?.stopAll();
+    prepareBridgeShutdown();
     desktopRefresher.handleTransportReset();
     bridgeManagedCodex.failAll(new Error("Codex transport closed before the bridge request completed."));
     forwardedRequestTracker.clear();
@@ -502,22 +512,8 @@ function startBridge({
     }
   });
 
-  process.on("SIGINT", () => shutdown(codex, () => socketLoop.getSocket(), () => {
-    isShuttingDown = true;
-    bridgeWakeAssertion.stop();
-    clearReconnectTimer();
-    clearRelayWatchdog();
-    clearBridgeStatusHeartbeat();
-    terminalHandler.shutdown();
-  }));
-  process.on("SIGTERM", () => shutdown(codex, () => socketLoop.getSocket(), () => {
-    isShuttingDown = true;
-    bridgeWakeAssertion.stop();
-    clearReconnectTimer();
-    clearRelayWatchdog();
-    clearBridgeStatusHeartbeat();
-    terminalHandler.shutdown();
-  }));
+  process.on("SIGINT", () => shutdown(codex, () => socketLoop.getSocket(), prepareBridgeShutdown));
+  process.on("SIGTERM", () => shutdown(codex, () => socketLoop.getSocket(), prepareBridgeShutdown));
 
   // Routes decrypted app payloads through the same bridge handlers as before.
   // Stages run top-to-bottom; the first one that returns truthy claims the
