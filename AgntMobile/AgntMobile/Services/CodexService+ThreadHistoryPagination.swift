@@ -100,16 +100,6 @@ extension CodexService {
         return threadObject
     }
 
-    // Backward-compat shim retained for callers that still wrap a paginated page into a
-    // thread-shaped object before handing it to decodeMessagesFromThreadRead. New code
-    // should use chronologicalTurnsFromDescendingPage directly.
-    func threadObjectFromPaginatedHistoryPage(threadId: String, page: ThreadTurnsHistoryPage) -> RPCObject {
-        [
-            "id": .string(threadId),
-            "turns": .array(chronologicalTurnsFromDescendingPage(page.turns)),
-        ]
-    }
-
     // Loads the next older page after local rows have all been revealed by the timeline.
     func loadOlderThreadHistoryPage(threadId: String) async {
         guard let cursor = olderThreadHistoryCursorByThreadID[threadId],
