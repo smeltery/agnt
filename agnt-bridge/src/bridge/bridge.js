@@ -624,11 +624,11 @@ function startBridge({
     }));
   }
 
-  // Seeds the desktop IPC follower when it receives patches before a full snapshot.
+  // Seeds the desktop IPC follower without pulling huge turn history into baseline recovery.
   async function readDesktopConversationState(threadId) {
     const result = await bridgeManagedCodex.sendRequest("thread/read", {
       threadId,
-      includeTurns: true,
+      includeTurns: false,
     });
     return seedConversationStateFromThreadRead(result);
   }
