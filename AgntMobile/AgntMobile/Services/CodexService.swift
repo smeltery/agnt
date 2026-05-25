@@ -253,6 +253,51 @@ struct TurnTimelineRenderSnapshot: Equatable {
     let initialTurnsLoaded: Bool
     let olderHistoryLoadErrorMessage: String?
 
+    // Defaults let pre-pagination call sites compile while slice D1 wires the real
+    // cursor-driven values through. Once those sites pass explicit args the defaults
+    // here become inert.
+    init(
+        threadID: String,
+        messages: [CodexMessage],
+        messageIndexByID: [String: Int],
+        planMatchingMessages: [CodexMessage],
+        timelineChangeToken: Int,
+        activeTurnID: String?,
+        isThreadRunning: Bool,
+        latestTurnTerminalState: CodexTurnTerminalState?,
+        completedTurnIDs: Set<String>,
+        stoppedTurnIDs: Set<String>,
+        assistantRevertStatesByMessageID: [String: AssistantRevertPresentation],
+        repoRefreshSignal: String?,
+        hasOlderHistory: Bool = false,
+        hasRemoteOlderHistory: Bool = false,
+        hasLocallyProjectedOlderHistory: Bool = false,
+        usesPaginatedHistory: Bool = false,
+        isLoadingOlderHistory: Bool = false,
+        initialTurnsLoaded: Bool = false,
+        olderHistoryLoadErrorMessage: String? = nil
+    ) {
+        self.threadID = threadID
+        self.messages = messages
+        self.messageIndexByID = messageIndexByID
+        self.planMatchingMessages = planMatchingMessages
+        self.timelineChangeToken = timelineChangeToken
+        self.activeTurnID = activeTurnID
+        self.isThreadRunning = isThreadRunning
+        self.latestTurnTerminalState = latestTurnTerminalState
+        self.completedTurnIDs = completedTurnIDs
+        self.stoppedTurnIDs = stoppedTurnIDs
+        self.assistantRevertStatesByMessageID = assistantRevertStatesByMessageID
+        self.repoRefreshSignal = repoRefreshSignal
+        self.hasOlderHistory = hasOlderHistory
+        self.hasRemoteOlderHistory = hasRemoteOlderHistory
+        self.hasLocallyProjectedOlderHistory = hasLocallyProjectedOlderHistory
+        self.usesPaginatedHistory = usesPaginatedHistory
+        self.isLoadingOlderHistory = isLoadingOlderHistory
+        self.initialTurnsLoaded = initialTurnsLoaded
+        self.olderHistoryLoadErrorMessage = olderHistoryLoadErrorMessage
+    }
+
     static func empty(threadID: String) -> TurnTimelineRenderSnapshot {
         TurnTimelineRenderSnapshot(
             threadID: threadID,
