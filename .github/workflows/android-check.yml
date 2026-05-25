@@ -35,7 +35,7 @@ jobs:
       # by AGP via sdkmanager on the first ./gradlew run — pinning them here
       # is brittle because build-tools versions can lag the platform release.
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Run unit tests
         working-directory: AgntAndroid
