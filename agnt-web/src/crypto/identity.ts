@@ -2,7 +2,7 @@
 // Generated once per browser profile, reused across reconnects.
 // Mirrors codexPhoneIdentityState in CodexSecureTransportModels.swift.
 
-import { ed25519, x25519 } from "@noble/curves/ed25519";
+import { ed25519, x25519 } from "@noble/curves/ed25519.js";
 import { base64ToBytes, bytesToBase64 } from "./encoding";
 
 export interface PhoneIdentity {
@@ -12,7 +12,7 @@ export interface PhoneIdentity {
 }
 
 export function generatePhoneIdentity(): PhoneIdentity {
-  const privateKey = ed25519.utils.randomPrivateKey();
+  const privateKey = ed25519.utils.randomSecretKey();
   const publicKey = ed25519.getPublicKey(privateKey);
   return {
     phoneDeviceId: crypto.randomUUID(),
@@ -47,7 +47,7 @@ export interface EphemeralKeyPair {
 }
 
 export function generateEphemeralKeyPair(): EphemeralKeyPair {
-  const privateKey = x25519.utils.randomPrivateKey();
+  const privateKey = x25519.utils.randomSecretKey();
   const publicKey = x25519.getPublicKey(privateKey);
   return { privateKey, publicKey };
 }
