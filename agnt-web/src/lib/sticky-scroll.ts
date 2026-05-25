@@ -15,7 +15,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 const FOLLOW_THRESHOLD_PX = 48;
 
 export interface StickyScrollHandle {
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
   /** True when the next render should auto-scroll to the bottom. */
   isFollowing: boolean;
   /** True only when the user is meaningfully scrolled away from the bottom. */
