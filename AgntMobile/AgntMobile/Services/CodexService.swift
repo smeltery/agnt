@@ -36,6 +36,12 @@ struct CodexThreadResumeRequestSignature: Equatable, Sendable {
     let modelIdentifier: String?
 }
 
+struct CodexThreadHistoryPaginationState: Codable, Equatable, Sendable {
+    var olderCursor: JSONValue?
+    var exhaustedOlderCursor: JSONValue?
+    var hasAuthoritativeLocalHistoryStart: Bool
+}
+
 struct CodexSubagentIdentityEntry: Equatable, Sendable {
     var threadId: String?
     var agentId: String?
@@ -239,6 +245,58 @@ struct TurnTimelineRenderSnapshot: Equatable {
     let stoppedTurnIDs: Set<String>
     let assistantRevertStatesByMessageID: [String: AssistantRevertPresentation]
     let repoRefreshSignal: String?
+    let hasOlderHistory: Bool
+    let hasRemoteOlderHistory: Bool
+    let hasLocallyProjectedOlderHistory: Bool
+    let usesPaginatedHistory: Bool
+    let isLoadingOlderHistory: Bool
+    let initialTurnsLoaded: Bool
+    let olderHistoryLoadErrorMessage: String?
+
+    // Defaults let pre-pagination call sites compile while slice D1 wires the real
+    // cursor-driven values through. Once those sites pass explicit args the defaults
+    // here become inert.
+    init(
+        threadID: String,
+        messages: [CodexMessage],
+        messageIndexByID: [String: Int],
+        planMatchingMessages: [CodexMessage],
+        timelineChangeToken: Int,
+        activeTurnID: String?,
+        isThreadRunning: Bool,
+        latestTurnTerminalState: CodexTurnTerminalState?,
+        completedTurnIDs: Set<String>,
+        stoppedTurnIDs: Set<String>,
+        assistantRevertStatesByMessageID: [String: AssistantRevertPresentation],
+        repoRefreshSignal: String?,
+        hasOlderHistory: Bool = false,
+        hasRemoteOlderHistory: Bool = false,
+        hasLocallyProjectedOlderHistory: Bool = false,
+        usesPaginatedHistory: Bool = false,
+        isLoadingOlderHistory: Bool = false,
+        initialTurnsLoaded: Bool = false,
+        olderHistoryLoadErrorMessage: String? = nil
+    ) {
+        self.threadID = threadID
+        self.messages = messages
+        self.messageIndexByID = messageIndexByID
+        self.planMatchingMessages = planMatchingMessages
+        self.timelineChangeToken = timelineChangeToken
+        self.activeTurnID = activeTurnID
+        self.isThreadRunning = isThreadRunning
+        self.latestTurnTerminalState = latestTurnTerminalState
+        self.completedTurnIDs = completedTurnIDs
+        self.stoppedTurnIDs = stoppedTurnIDs
+        self.assistantRevertStatesByMessageID = assistantRevertStatesByMessageID
+        self.repoRefreshSignal = repoRefreshSignal
+        self.hasOlderHistory = hasOlderHistory
+        self.hasRemoteOlderHistory = hasRemoteOlderHistory
+        self.hasLocallyProjectedOlderHistory = hasLocallyProjectedOlderHistory
+        self.usesPaginatedHistory = usesPaginatedHistory
+        self.isLoadingOlderHistory = isLoadingOlderHistory
+        self.initialTurnsLoaded = initialTurnsLoaded
+        self.olderHistoryLoadErrorMessage = olderHistoryLoadErrorMessage
+    }
 
     static func empty(threadID: String) -> TurnTimelineRenderSnapshot {
         TurnTimelineRenderSnapshot(
@@ -253,7 +311,14 @@ struct TurnTimelineRenderSnapshot: Equatable {
             completedTurnIDs: [],
             stoppedTurnIDs: [],
             assistantRevertStatesByMessageID: [:],
-            repoRefreshSignal: nil
+            repoRefreshSignal: nil,
+            hasOlderHistory: false,
+            hasRemoteOlderHistory: false,
+            hasLocallyProjectedOlderHistory: false,
+            usesPaginatedHistory: false,
+            isLoadingOlderHistory: false,
+            initialTurnsLoaded: false,
+            olderHistoryLoadErrorMessage: nil
         )
     }
 }
@@ -278,6 +343,13 @@ final class ThreadTimelineState {
     var completedTurnIDs: Set<String>
     var stoppedTurnIDs: Set<String>
     var repoRefreshSignal: String?
+    var hasOlderHistory: Bool
+    var hasRemoteOlderHistory: Bool
+    var hasLocallyProjectedOlderHistory: Bool
+    var usesPaginatedHistory: Bool
+    var isLoadingOlderHistory: Bool
+    var initialTurnsLoaded: Bool
+    var olderHistoryLoadErrorMessage: String?
     var renderSnapshot: TurnTimelineRenderSnapshot
 
     init(threadID: String) {
@@ -290,6 +362,13 @@ final class ThreadTimelineState {
         self.completedTurnIDs = []
         self.stoppedTurnIDs = []
         self.repoRefreshSignal = nil
+        self.hasOlderHistory = false
+        self.hasRemoteOlderHistory = false
+        self.hasLocallyProjectedOlderHistory = false
+        self.usesPaginatedHistory = false
+        self.isLoadingOlderHistory = false
+        self.initialTurnsLoaded = false
+        self.olderHistoryLoadErrorMessage = nil
         self.renderSnapshot = TurnTimelineRenderSnapshot.empty(threadID: threadID)
     }
 }
@@ -389,6 +468,8 @@ final class CodexService {
     var supportsBridgeVoiceAuth = true
     // Runtime compatibility flag for native `thread/fork` conversation branching.
     var supportsThreadFork = true
+    // Runtime compatibility flag for `thread/turns/list` and `excludeTurns`.
+    var supportsTurnPagination = true
     // Seeds brand-new chats with one-shot composer actions like code review.
     var pendingComposerActionByThreadID: [String: CodexPendingThreadComposerAction] = [:]
     // In-memory identity directory for subagents, keyed by thread id and agent id.
@@ -483,6 +564,14 @@ final class CodexService {
     var threadIdByTurnID: [String: String] = [:]
     var hydratedThreadIDs: Set<String> = []
     var loadingThreadIDs: Set<String> = []
+    // Cursor-backed history pages let large chats open from the recent tail first.
+    var olderThreadHistoryCursorByThreadID: [String: JSONValue] = [:]
+    var exhaustedOlderThreadHistoryCursorByThreadID: [String: JSONValue] = [:]
+    var loadingOlderThreadHistoryIDs: Set<String> = []
+    var threadTimelineProjectionLimitByThreadID: [String: Int] = [:]
+    var initialTurnsLoadedByThreadID: Set<String> = []
+    var threadsWithAuthoritativeLocalHistoryStart: Set<String> = []
+    var olderHistoryLoadErrorByThreadID: [String: String] = [:]
     @ObservationIgnored var subagentMetadataLoadingThreadIDs: Set<String> = []
     var resumedThreadIDs: Set<String> = []
     // Coalesces per-thread thread/read history fetches so reconcile work can await the same RPC.
@@ -652,6 +741,7 @@ final class CodexService {
     static let pinnedThreadSnapshotsDefaultsKey = "codex.pinnedThreadSnapshots"
     static let associatedManagedWorktreePathsDefaultsKey = "codex.associatedManagedWorktreePaths"
     static let turnTerminalStatesDefaultsKey = "codex.turnTerminalStates"
+    static let threadHistoryPaginationStateDefaultsKey = "codex.threadHistoryPaginationState"
     static let notificationsPromptedDefaultsKey = "codex.notifications.prompted"
     static let keepMacAwakeWhileBridgeRunsDefaultsKey = "codex.keepMacAwakeWhileBridgeRuns"
     static let enableWebTerminalOnBridgeDefaultsKey = "codex.enableWebTerminalOnBridge"

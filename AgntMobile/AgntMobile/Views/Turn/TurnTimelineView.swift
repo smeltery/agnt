@@ -412,6 +412,12 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     let hidesErrorMessage: Bool
     let onReportError: (String) -> Void
     let onDismissError: () -> Void
+    let hasRemoteEarlierMessages: Bool
+    let hasLocallyProjectedEarlierMessages: Bool
+    let usesPaginatedHistory: Bool
+    let initialTurnsLoaded: Bool
+    let isLoadingRemoteEarlierMessages: Bool
+    let olderHistoryLoadErrorMessage: String?
 
     @Binding var shouldAnchorToAssistantResponse: Bool
     @Binding var isScrolledToBottom: Bool
@@ -421,6 +427,9 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     let onRetryUserMessage: (String) -> Void
     let onTapAssistantRevert: (CodexMessage) -> Void
     let onTapSubagent: (CodexSubagentThreadPresentation) -> Void
+    let onRevealEarlierMessages: (Int) -> Void
+    let onLoadRemoteEarlierMessages: () -> Void
+    let onRetryEarlierMessages: (@escaping () -> Void) -> Void
     let onTapOutsideComposer: () -> Void
     @ViewBuilder let emptyState: () -> EmptyState
     @ViewBuilder let composer: () -> Composer

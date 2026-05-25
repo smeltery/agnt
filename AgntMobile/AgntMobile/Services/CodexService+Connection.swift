@@ -165,6 +165,7 @@ extension CodexService {
         hasPresentedServiceTierBridgeUpdatePrompt = false
         supportsBridgeVoiceAuth = true
         supportsThreadFork = true
+        supportsTurnPagination = true
         hasPresentedThreadForkBridgeUpdatePrompt = false
         hasPresentedMinimumBridgePackageUpdatePrompt = false
         lastPresentedAvailableBridgePackageVersion = nil
@@ -358,7 +359,8 @@ extension CodexService {
         var shouldProbePlanCollaborationMode = false
 
         do {
-            _ = try await sendRequest(method: "initialize", params: modernParams)
+            let initializeResponse = try await sendRequest(method: "initialize", params: modernParams)
+            learnTurnPaginationSupportFromInitializeResponse(initializeResponse)
             // A successful modern initialize means the runtime accepted the experimental
             // capability negotiation. Keep plan-mode sends enabled unless the runtime
             // explicitly rejects `collaborationMode` on a turn request later.
@@ -378,7 +380,8 @@ extension CodexService {
                 "clientInfo": clientInfo,
             ])
             do {
-                _ = try await sendRequest(method: "initialize", params: legacyParams)
+                let initializeResponse = try await sendRequest(method: "initialize", params: legacyParams)
+                learnTurnPaginationSupportFromInitializeResponse(initializeResponse)
             } catch {
                 if let incompatibleAppVersionError = incompatibleBridgeAppVersionError(from: error) {
                     throw incompatibleAppVersionError
@@ -644,6 +647,7 @@ extension CodexService {
         hasPresentedServiceTierBridgeUpdatePrompt = false
         supportsBridgeVoiceAuth = true
         supportsThreadFork = true
+        supportsTurnPagination = true
         hasPresentedThreadForkBridgeUpdatePrompt = false
         hasPresentedMinimumBridgePackageUpdatePrompt = false
         lastPresentedAvailableBridgePackageVersion = nil
