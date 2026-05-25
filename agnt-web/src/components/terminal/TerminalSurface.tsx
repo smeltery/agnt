@@ -63,7 +63,7 @@ interface TerminalSurfaceProps {
   onResize: (cols: number, rows: number) => void;
 }
 
-export function TerminalSurface(props: TerminalSurfaceProps): JSX.Element {
+export function TerminalSurface(props: TerminalSurfaceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);

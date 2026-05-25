@@ -24,7 +24,7 @@ const FONT_SIZE_DEFAULT = 13;
 const FONT_SIZE_MIN = 9;
 const FONT_SIZE_MAX = 22;
 
-export function TerminalRoute({ onClose }: TerminalRouteProps): JSX.Element {
+export function TerminalRoute({ onClose }: TerminalRouteProps) {
   const connection = useConnectionStore((state) => state.connection);
   const themePreference = useThemeStore((state) => state.theme);
   const themeMode = useResolvedTheme(themePreference);
