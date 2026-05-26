@@ -848,8 +848,8 @@ enum MarkdownTextFormatter {
 
 private struct UserAttachmentThumbnailView: View {
     let attachment: CodexImageAttachment
-    private let side: CGFloat = 70
-    private let cornerRadius: CGFloat = 12
+    private let side = TurnAttachmentThumbnailMetrics.side
+    private let cornerRadius = TurnAttachmentThumbnailMetrics.cornerRadius
 
     var body: some View {
         if let image = thumbnailUIImage {

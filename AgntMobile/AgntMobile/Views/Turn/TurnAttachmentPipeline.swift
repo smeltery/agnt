@@ -55,8 +55,7 @@ enum TurnComposerImageAttachmentState: Codable, Equatable, Sendable {
 }
 
 enum TurnAttachmentPipeline {
-    static let thumbnailSide: CGFloat = 70
-    static let thumbnailCornerRadius: CGFloat = 12
+    private static let thumbnailSide = TurnAttachmentThumbnailMetrics.side
 
     private static let maxPayloadDimension: CGFloat = 1600
     private static let payloadCompressionQuality: CGFloat = 0.8
