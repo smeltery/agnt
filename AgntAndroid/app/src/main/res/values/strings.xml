@@ -539,4 +539,19 @@
     <string name="composer_runtime_menu_handoff_local">Hand off to local</string>
     <string name="composer_runtime_menu_local_disabled">Local (use bridge)</string>
     <string name="composer_worktree_preparing">Preparing worktree…</string>
+    <string name="terminal_windows_guide_title">Connect to Windows with SSH</string>
+    <string name="terminal_windows_guide_intro">Run these in an Administrator PowerShell on the Windows PC, then create a terminal profile in agnt.</string>
+    <string name="terminal_windows_guide_step_1_title">1. Install OpenSSH Server</string>
+    <string name="terminal_windows_guide_step_1_command">Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0</string>
+    <string name="terminal_windows_guide_step_2_title">2. Start SSH and enable it on boot</string>
+    <string name="terminal_windows_guide_step_2_command">Start-Service sshd\nSet-Service -Name sshd -StartupType Automatic</string>
+    <string name="terminal_windows_guide_step_3_title">3. Create a key on the device that will connect</string>
+    <string name="terminal_windows_guide_step_3_command">ssh-keygen -t ed25519 -f $HOME\\.ssh\\agnt_ed25519\n\nWhen asked, choose a passphrase for the recommended secure setup.</string>
+    <string name="terminal_windows_guide_step_4_title">4. Add that public key for the Windows user you will log in as</string>
+    <string name="terminal_windows_guide_step_4_command">mkdir $HOME\\.ssh -Force\nnotepad $HOME\\.ssh\\authorized_keys\n\nPaste the contents of agnt_ed25519.pub</string>
+    <string name="terminal_windows_guide_step_5_title">5. Find the PC IP, then use it in agnt</string>
+    <string name="terminal_windows_guide_step_5_command">ipconfig</string>
+    <string name="terminal_windows_guide_note">Recommended private-key format: OpenSSH Ed25519 with a passphrase, created by ssh-keygen above. agnt also accepts encrypted PKCS#8 and encrypted legacy PEM keys; unencrypted keys work only if you explicitly enable that option on the profile. In agnt use the Windows username, PC IPv4 address, port 22, and the matching private key. Administrator accounts use C:\\ProgramData\\ssh\\administrators_authorized_keys instead.</string>
+    <string name="terminal_windows_guide_disclosure_show">Need help setting up Windows?</string>
+    <string name="terminal_windows_guide_disclosure_hide">Hide Windows setup guide</string>
 </resources>
