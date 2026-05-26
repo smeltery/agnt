@@ -701,6 +701,29 @@ function startBridge({
     }));
   }
 
+  // External teardown hook for hosts and tests that need to ask the bridge to
+  // stop without nuking the process (the SIGINT/SIGTERM path uses `shutdown()`
+  // which exits). Idempotent.
+  function stopBridge() {
+    if (isShuttingDown) {
+      return;
+    }
+
+    prepareBridgeShutdown();
+    desktopRefresher.handleTransportReset();
+    bridgeManagedCodex.failAll(new Error("Bridge stopped before the request completed."));
+    forwardedRequestTracker.clear();
+
+    const live = socketLoop.getSocket();
+    if (live?.readyState === WebSocket.OPEN || live?.readyState === WebSocket.CONNECTING) {
+      live.close();
+    }
+    codex.shutdown();
+  }
+
+  return {
+    stop: stopBridge,
+  };
 }
 
 

@@ -644,6 +644,10 @@ function writeFrame(socket, payload, callback) {
 }
 
 function resolveDefaultIpcSocketPath() {
+  if (process.platform === "win32") {
+    return "\\\\.\\pipe\\codex-ipc";
+  }
+
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
   return path.join(os.tmpdir(), "codex-ipc", `ipc-${uid}.sock`);
 }
