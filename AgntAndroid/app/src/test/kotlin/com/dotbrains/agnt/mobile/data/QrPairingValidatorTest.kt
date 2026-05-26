@@ -116,6 +116,108 @@ class QrPairingValidatorTest {
     }
 
     @Test
+    fun resolvePairingCode_routesAroundExistingRelayPathSuffix() = runTest {
+        // The validator should strip a trailing /relay segment before
+        // appending /v1/pairing/code/resolve, otherwise a relay URL
+        // like ws://host/relay would POST to /relay/v1/pairing/code/resolve
+        // and 404.
+        val now = 1_700_000_000_000L
+        val expires = now + 3600_000L
+        MockWebServer().use { server ->
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("content-type", "application/json")
+                    .setBody(
+                        """
+                        {"ok":true,"v":$CODEX_PAIRING_QR_VERSION,"sessionId":"sess",
+                        "macDeviceId":"mac","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":$expires}
+                        """.trimIndent(),
+                    ),
+            )
+
+            server.start()
+            val relayUrl = "ws://127.0.0.1:${server.port}/relay"
+            val result =
+                resolvePairingCode(
+                    httpClient = OkHttpClient(),
+                    relayUrl = relayUrl,
+                    code = "AB23CD34EF",
+                    nowEpochMillis = now,
+                )
+
+            if (result is QrPairingValidationResult.ScanError) fail(result.message)
+            assertIs<QrPairingValidationResult.Success>(result)
+            val request = server.takeRequest()
+            assertEquals("/v1/pairing/code/resolve", request.path)
+        }
+    }
+
+    @Test
+    fun resolvePairingCode_surfacesExpiredCodeFromRelay() = runTest {
+        MockWebServer().use { server ->
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(410)
+                    .setHeader("content-type", "application/json")
+                    .setBody("""{"ok":false,"code":"pairing_code_expired","error":"expired"}"""),
+            )
+
+            server.start()
+            val result =
+                resolvePairingCode(
+                    httpClient = OkHttpClient(),
+                    relayUrl = "ws://127.0.0.1:${server.port}/relay",
+                    code = "AB23CD34EF",
+                )
+
+            val err = assertIs<QrPairingValidationResult.ScanError>(result)
+            assertTrue(err.message.contains("expired"))
+        }
+    }
+
+    @Test
+    fun resolvePairingCode_surfacesUnavailableCodeFromRelay() = runTest {
+        MockWebServer().use { server ->
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(404)
+                    .setHeader("content-type", "application/json")
+                    .setBody("""{"ok":false,"code":"pairing_code_unavailable","error":"unavailable"}"""),
+            )
+
+            server.start()
+            val result =
+                resolvePairingCode(
+                    httpClient = OkHttpClient(),
+                    relayUrl = "ws://127.0.0.1:${server.port}/relay",
+                    code = "AB23CD34EF",
+                )
+
+            val err = assertIs<QrPairingValidationResult.ScanError>(result)
+            assertTrue(err.message.contains("not available"))
+        }
+    }
+
+    @Test
+    fun resolvePairingCode_surfaces404WithoutErrorCodeAsRelayMissing() = runTest {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(404))
+
+            server.start()
+            val result =
+                resolvePairingCode(
+                    httpClient = OkHttpClient(),
+                    relayUrl = "ws://127.0.0.1:${server.port}/relay",
+                    code = "AB23CD34EF",
+                )
+
+            val err = assertIs<QrPairingValidationResult.ScanError>(result)
+            assertTrue(err.message.contains("does not support pairing codes"))
+        }
+    }
+
+    @Test
     fun resolvePairingCode_rejectsMalformedRelayResponseFields() = runTest {
         val now = 1_700_000_000_000L
         val expires = now + 3600_000L

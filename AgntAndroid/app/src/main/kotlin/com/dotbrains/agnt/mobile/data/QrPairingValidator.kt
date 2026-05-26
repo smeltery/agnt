@@ -135,19 +135,18 @@ suspend fun resolvePairingCode(
             return@withContext QrPairingValidationResult.ScanError("Enter the pairing code from your desktop.")
         }
 
-        val relayRoot =
-            relayHttpRootUrl(relayUrl)
+        val endpoint =
+            pairingCodeResolveRoute(relayUrl)
                 ?: return@withContext QrPairingValidationResult.ScanError(
-                    "Enter the relay URL shown on your desktop, for example ws://192.168.1.5:9000/relay.",
+                    "Pairing code resolver is unavailable. Scan the QR once, then try code pairing again.",
                 )
-        val endpoint = relayRoot.newBuilder().encodedPath("/v1/pairing/code/resolve").build()
         val body =
             pairingJson
                 .encodeToString(PairingCodeResolveRequest(trimmedCode))
                 .toRequestBody(pairingJsonMediaType)
         val request =
             Request.Builder()
-                .url(endpoint)
+                .url(endpoint.resolveUrl)
                 .post(body)
                 .build()
 
@@ -160,8 +159,23 @@ suspend fun resolvePairingCode(
                     }.getOrNull()
 
                 if (!response.isSuccessful || decoded?.ok != true) {
+                    if (decoded?.code == "pairing_code_expired") {
+                        return@withContext QrPairingValidationResult.ScanError(
+                            "This pairing code has expired. Generate a new one from the desktop bridge.",
+                        )
+                    }
+                    if (decoded?.code == "pairing_code_unavailable") {
+                        return@withContext QrPairingValidationResult.ScanError(
+                            "That pairing code is not available right now. Make sure your desktop bridge is running and try again.",
+                        )
+                    }
+                    if (response.code == 404) {
+                        return@withContext QrPairingValidationResult.ScanError(
+                            "This relay does not support pairing codes yet. Scan the QR code instead.",
+                        )
+                    }
                     return@withContext QrPairingValidationResult.ScanError(
-                        decoded?.error ?: "Pairing code unavailable. Check the code and relay URL.",
+                        decoded?.error ?: "Pairing code unavailable. Generate a fresh code from your desktop.",
                     )
                 }
 
@@ -189,7 +203,7 @@ suspend fun resolvePairingCode(
                         "The relay returned incomplete pairing metadata. Generate a new code from the desktop bridge.",
                     )
                 }
-                val resolvedRelay = relayPayloadUrl(relayRoot)
+                val resolvedRelay = endpoint.relayUrl
                 validatePairingFields(
                     relay = resolvedRelay,
                     sessionId = sessionId,
@@ -217,7 +231,7 @@ suspend fun resolvePairingCode(
             }
         }.getOrElse { error ->
             QrPairingValidationResult.ScanError(
-                error.message ?: "Could not reach the relay. Check that your phone and desktop are on the same network.",
+                error.message ?: "Could not reach the relay for this pairing code. Try again or scan the QR code.",
             )
         }
     }
@@ -277,20 +291,28 @@ private fun validatePairingFields(
 private fun containsUnsafePairingChars(value: String): Boolean =
     value.any { it.isISOControl() || it.isWhitespace() }
 
-private fun relayHttpRootUrl(rawRelayUrl: String): HttpUrl? {
-    val validation = validateRelayUrl(rawRelayUrl) ?: return null
-    return validation.httpUrl.newBuilder()
-        .encodedPath("/")
-        .query(null)
-        .fragment(null)
-        .build()
-}
+private data class PairingCodeResolveRoute(
+    val resolveUrl: HttpUrl,
+    val relayUrl: String,
+)
 
-private fun relayPayloadUrl(relayRoot: HttpUrl): String {
-    val relayHttpUrl = relayRoot.newBuilder().encodedPath("/relay").build().toString()
-    return when {
-        relayHttpUrl.startsWith("https://", ignoreCase = true) -> "wss://${relayHttpUrl.substring(8)}"
-        relayHttpUrl.startsWith("http://", ignoreCase = true) -> "ws://${relayHttpUrl.substring(7)}"
-        else -> relayHttpUrl
-    }
+// Handles relay URLs that already include a /relay suffix (e.g. ws://host:9000/relay)
+// by stripping it before appending /v1/pairing/code/resolve. validateRelayUrl already
+// surfaces the matching websocket URL the resolved code should pair against.
+private fun pairingCodeResolveRoute(rawRelayUrl: String): PairingCodeResolveRoute? {
+    val validation = validateRelayUrl(rawRelayUrl) ?: return null
+    val pathSegments = validation.httpUrl.pathSegments.filter { it.isNotEmpty() }
+    val resolveSegments =
+        if (pathSegments.lastOrNull() == "relay") {
+            pathSegments.dropLast(1) + listOf("v1", "pairing", "code", "resolve")
+        } else {
+            listOf("v1", "pairing", "code", "resolve")
+        }
+    val resolveUrl =
+        validation.httpUrl.newBuilder()
+            .encodedPath("/" + resolveSegments.joinToString("/"))
+            .query(null)
+            .fragment(null)
+            .build()
+    return PairingCodeResolveRoute(resolveUrl = resolveUrl, relayUrl = validation.websocketUrl)
 }
