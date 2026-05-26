@@ -50,7 +50,7 @@ internal object TurnComposerToolbarActionsBuilder {
         return TurnComposerToolbarActions(
             sendButtonEnabled = d.canSend,
             sendShowsProgress = d.showsSending,
-            stopButtonVisible = model.sending || model.threadRunning,
+            stopButtonVisible = model.sending || (model.threadRunning && !d.canSend),
             stopButtonEnabled = model.enabled && (model.sending || model.threadRunning),
             textFieldEnabled = d.canEditText,
             voiceControlEnabled = voiceControlEnabled,

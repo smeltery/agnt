@@ -275,6 +275,108 @@ suspend fun CodexService.startTurnForRepository(
     startTurnInternal(threadId, userText, attachments, skillMentions, fileMentions, collaborationMode)
 }
 
+internal suspend fun CodexService.steerTurnInternal(
+    threadId: String,
+    expectedTurnId: String,
+    userText: String,
+    attachments: List<CodexImageAttachment> = emptyList(),
+    skillMentions: List<CodexTurnSkillMention> = emptyList(),
+    fileMentions: List<CodexTurnMention> = emptyList(),
+) {
+    if (!sessionReady) throw CodexServiceError.Disconnected
+    val tid = threadId.trim()
+    val turnId = expectedTurnId.trim()
+    val trimmed = userText.trim()
+    val readyAttachments =
+        attachments.filter { attachment ->
+            !attachment.payloadDataURL.isNullOrBlank()
+        }
+    if (tid.isEmpty()) throw CodexServiceError.InvalidInput("Missing thread id")
+    if (turnId.isEmpty()) throw CodexServiceError.InvalidInput("Missing active turn id")
+    if (trimmed.isEmpty() && readyAttachments.isEmpty()) {
+        throw CodexServiceError.InvalidInput("Message is empty")
+    }
+
+    val pendingId = messageTimelineStore.appendPendingUserMessage(tid, trimmed, readyAttachments)
+    var imageUrlKey = "url"
+    var includeStructuredSkillItems = supportsStructuredSkillInput && skillMentions.isNotEmpty()
+    var includeStructuredMentionItems = supportsStructuredMentionInput && fileMentions.isNotEmpty()
+    try {
+        while (true) {
+            val params =
+                JSONValue.Obj(
+                    mapOf(
+                        "threadId" to JSONValue.Str(tid),
+                        "expectedTurnId" to JSONValue.Str(turnId),
+                        "input" to
+                            JSONValue.Arr(
+                                makeTurnInputPayload(
+                                    userText = trimmed,
+                                    attachments = readyAttachments,
+                                    imageUrlKey = imageUrlKey,
+                                    skillMentions = skillMentions,
+                                    fileMentions = fileMentions,
+                                    includeStructuredSkillItems = includeStructuredSkillItems,
+                                    includeStructuredMentionItems = includeStructuredMentionItems,
+                                ),
+                            ),
+                    ),
+                )
+            try {
+                sendRequestImpl("turn/steer", params)
+                messageTimelineStore.markUserMessageOutcome(
+                    threadId = tid,
+                    messageId = pendingId,
+                    deliveryState = CodexMessageDeliveryState.confirmed,
+                    turnId = turnId,
+                )
+                bumpThreadActivityAfterTurn(tid)
+                return
+            } catch (e: Throwable) {
+                if (imageUrlKey == "url" &&
+                    readyAttachments.isNotEmpty() &&
+                    shouldRetryTurnStartWithImageURLField(e)
+                ) {
+                    imageUrlKey = "image_url"
+                    continue
+                }
+                if (includeStructuredSkillItems && shouldRetryTurnStartWithoutSkillItems(e)) {
+                    supportsStructuredSkillInput = false
+                    includeStructuredSkillItems = false
+                    continue
+                }
+                if (includeStructuredMentionItems && shouldRetryTurnStartWithoutMentionItems(e)) {
+                    supportsStructuredMentionInput = false
+                    includeStructuredMentionItems = false
+                    continue
+                }
+                throw e
+            }
+        }
+    } catch (e: Throwable) {
+        runCatching {
+            messageTimelineStore.markUserMessageOutcome(
+                threadId = tid,
+                messageId = pendingId,
+                deliveryState = CodexMessageDeliveryState.failed,
+                turnId = turnId,
+            )
+        }
+        throw e
+    }
+}
+
+suspend fun CodexService.steerTurnForRepository(
+    threadId: String,
+    expectedTurnId: String,
+    userText: String,
+    attachments: List<CodexImageAttachment> = emptyList(),
+    skillMentions: List<CodexTurnSkillMention> = emptyList(),
+    fileMentions: List<CodexTurnMention> = emptyList(),
+) = withContext(Dispatchers.IO) {
+    steerTurnInternal(threadId, expectedTurnId, userText, attachments, skillMentions, fileMentions)
+}
+
 private fun CodexService.buildTurnStartRequestParams(
     threadId: String,
     userText: String,

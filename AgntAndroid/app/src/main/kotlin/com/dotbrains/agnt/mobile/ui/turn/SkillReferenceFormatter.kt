@@ -33,11 +33,51 @@ internal object SkillReferenceFormatter {
         return out.toString()
     }
 
+    fun extractSearchCitations(markdown: String): List<String> {
+        if (markdown.isBlank()) return emptyList()
+
+        val refs = linkedSetOf<String>()
+        var inFence = false
+        markdown.lineSequence().forEach { line ->
+            val trimmed = line.trimStart()
+            if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+                inFence = !inFence
+            } else if (!inFence) {
+                extractSearchCitationRefs(line, inlineCodeRanges(line), refs)
+            }
+        }
+        return refs.toList()
+    }
+
     private fun formatLine(line: String): String {
         val protectedRanges = inlineCodeRanges(line)
-        val withSkillLinks = replaceSkillMarkdownLinks(line, protectedRanges)
+        val withoutSearchCitations = removeSearchCitations(line, protectedRanges)
+        val withSkillLinks = replaceSkillMarkdownLinks(withoutSearchCitations, inlineCodeRanges(withoutSearchCitations))
         val withMentions = replaceMentionTokens(withSkillLinks, inlineCodeRanges(withSkillLinks))
         return replaceGenericSkillPaths(withMentions, inlineCodeRanges(withMentions))
+    }
+
+    private fun removeSearchCitations(
+        line: String,
+        protectedRanges: List<IntRange>,
+    ): String {
+        return searchCitationRegex.replace(line) { match ->
+            if (match.range.overlapsAny(protectedRanges)) match.value else ""
+        }
+    }
+
+    private fun extractSearchCitationRefs(
+        line: String,
+        protectedRanges: List<IntRange>,
+        refs: MutableSet<String>,
+    ) {
+        searchCitationRegex.findAll(line).forEach { match ->
+            if (!match.range.overlapsAny(protectedRanges)) {
+                searchCitationRefRegex.findAll(match.value).forEach { refMatch ->
+                    refs += refMatch.value
+                }
+            }
+        }
     }
 
     private fun replaceSkillMarkdownLinks(
@@ -161,4 +201,10 @@ internal object SkillReferenceFormatter {
     private val mentionRegex = Regex("""(?<![\w`])\$([A-Za-z0-9][A-Za-z0-9._/-]*)(?![\w`])""")
     private val markdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
     private val genericSkillPathRegex = Regex("""(?<![\w`])(?:[A-Za-z]:)?[A-Za-z0-9._~:/\\-]+/Skill\.md(?:\?[^\s)]*)?(?:#[^\s)]*)?""")
+    private val searchCitationRef = """turn\d+(?:search|news|fetch|view|open)\d+"""
+    private val searchCitationRefRegex = Regex(searchCitationRef)
+    private val searchCitationRegex =
+        Regex(
+            """(?:cite(?:$searchCitationRef)+)|(?:〖cite〗(?:(?:$searchCitationRef)|(?:〖$searchCitationRef〗?))+(?:〖/cite〗?)?)""",
+        )
 }
