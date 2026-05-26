@@ -247,7 +247,47 @@ test("voice/transcribe rejects malformed or non-WAV audio before contacting the 
   }
 });
 
-test("voice/transcribe rejects clips longer than two minutes before contacting the provider", async () => {
+test("voice/transcribe accepts large clips without overflowing base64 validation", async () => {
+  const responses = [];
+  let fetchCalls = 0;
+  const handler = createVoiceHandler({
+    sendCodexRequest: async () => ({
+      authMethod: "chatgpt",
+      authToken: "chatgpt-token",
+      requiresOpenaiAuth: false,
+    }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { text: "long clip transcript" };
+        },
+      };
+    },
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-large-valid",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/wav",
+      audioBase64: makeTestWavBase64({ durationSeconds: 150 }),
+      sampleRateHz: 24_000,
+      durationMs: 150_000,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await tick();
+
+  assert.equal(fetchCalls, 1);
+  assert.equal(responses[0].result?.text, "long clip transcript");
+});
+
+test("voice/transcribe rejects clips longer than 150 seconds before contacting the provider", async () => {
   const responses = [];
   let authRequests = 0;
   let fetchCalls = 0;
@@ -269,7 +309,7 @@ test("voice/transcribe rejects clips longer than two minutes before contacting t
       mimeType: "audio/wav",
       audioBase64: makeTestWavBase64(),
       sampleRateHz: 24_000,
-      durationMs: 120_100,
+      durationMs: 150_100,
     },
   }), (response) => {
     responses.push(JSON.parse(response));
@@ -280,7 +320,7 @@ test("voice/transcribe rejects clips longer than two minutes before contacting t
   assert.equal(authRequests, 0);
   assert.equal(fetchCalls, 0);
   assert.equal(responses[0].error?.data?.errorCode, "duration_too_long");
-  assert.match(responses[0].error?.message || "", /120 seconds/);
+  assert.match(responses[0].error?.message || "", /150 seconds/);
 });
 
 // ─── resolveVoiceAuth tests ─────────────────────────────────
@@ -336,22 +376,24 @@ function makeJWT(payload) {
   return `${header}.${body}.signature`;
 }
 
-function makeTestWavBase64() {
-  const wav = Buffer.alloc(46);
+function makeTestWavBase64({ sampleRateHz = 24_000, durationSeconds = null } = {}) {
+  const dataByteCount = durationSeconds == null
+    ? 2
+    : Math.max(2, Math.floor(durationSeconds * sampleRateHz * 2));
+  const wav = Buffer.alloc(44 + dataByteCount);
   wav.write("RIFF", 0, "ascii");
-  wav.writeUInt32LE(38, 4);
+  wav.writeUInt32LE(36 + dataByteCount, 4);
   wav.write("WAVE", 8, "ascii");
   wav.write("fmt ", 12, "ascii");
   wav.writeUInt32LE(16, 16);
   wav.writeUInt16LE(1, 20);
   wav.writeUInt16LE(1, 22);
-  wav.writeUInt32LE(24_000, 24);
-  wav.writeUInt32LE(48_000, 28);
+  wav.writeUInt32LE(sampleRateHz, 24);
+  wav.writeUInt32LE(sampleRateHz * 2, 28);
   wav.writeUInt16LE(2, 32);
   wav.writeUInt16LE(16, 34);
   wav.write("data", 36, "ascii");
-  wav.writeUInt32LE(2, 40);
-  wav.writeInt16LE(0, 44);
+  wav.writeUInt32LE(dataByteCount, 40);
   return wav.toString("base64");
 }
 
