@@ -143,7 +143,8 @@ bun run build    # static dist/ for deployment
 ```
 
 Tests import the sibling `agnt-bridge/src/secure-transport.js` to keep the wire
-crypto byte-for-byte aligned. Run them from the repo root or with the prefix:
+crypto byte-for-byte aligned. Run them from the repo root or with the prefix
+(npm works too — the `package.json` scripts are package-manager agnostic):
 
 ```bash
 npm test --prefix agnt-web
