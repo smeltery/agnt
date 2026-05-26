@@ -19,6 +19,9 @@
 const fs = require("fs");
 const path = require("path");
 
+const STATUS_UPSTREAM_FETCH_TTL_MS = 15_000;
+const statusUpstreamFetchCache = new Map();
+
 /**
  * @param {object} deps
  * @param {(cwd: string, ...args: string[]) => Promise<string>} deps.git
@@ -64,9 +67,8 @@ function createGitOps({
       return nonRepositoryStatus(cwd);
     }
 
-    const [porcelain, branchInfo, repoRoot] = await Promise.all([
+    const [porcelain, repoRoot] = await Promise.all([
       git(cwd, "status", "--porcelain=v1", "-b"),
-      revListCounts(cwd).catch(() => ({ ahead: 0, behind: 0 })),
       resolveRepoRoot(cwd).catch(() => null),
     ]);
 
@@ -80,6 +82,9 @@ function createGitOps({
       path: line.substring(3).trim(),
       status: line.substring(0, 2).trim(),
     }));
+
+    await refreshStatusUpstreamIfNeeded(cwd, tracking, repoRoot).catch(() => false);
+    const branchInfo = await revListCounts(cwd).catch(() => ({ ahead: 0, behind: 0 }));
 
     const dirty = files.length > 0;
     const { ahead, behind } = branchInfo;
@@ -462,6 +467,36 @@ function createGitOps({
     };
   }
 
+  // Keeps Update eligibility based on the current upstream ref, not stale local fetch data.
+  async function refreshStatusUpstreamIfNeeded(cwd, tracking, repoRoot) {
+    const parsedTracking = parseTrackingRef(tracking);
+    if (!parsedTracking) {
+      return false;
+    }
+
+    const cacheKey = `${repoRoot || cwd}\0${parsedTracking.remote}\0${parsedTracking.branch}`;
+    const now = Date.now();
+    const lastFetchAt = statusUpstreamFetchCache.get(cacheKey) || 0;
+    if (now - lastFetchAt < STATUS_UPSTREAM_FETCH_TTL_MS) {
+      return false;
+    }
+
+    statusUpstreamFetchCache.set(cacheKey, now);
+    if (statusUpstreamFetchCache.size > 200) {
+      statusUpstreamFetchCache.clear();
+      statusUpstreamFetchCache.set(cacheKey, now);
+    }
+
+    await git(
+      cwd,
+      "fetch",
+      "--quiet",
+      parsedTracking.remote,
+      `+refs/heads/${parsedTracking.branch}:refs/remotes/${parsedTracking.remote}/${parsedTracking.branch}`
+    );
+    return true;
+  }
+
   async function currentBranchFromStatus(cwd) {
     const output = await git(cwd, "status", "--porcelain=v1", "-b");
     const branchLine = output.trim().split("\n").filter(Boolean)[0] || "";
@@ -589,6 +624,22 @@ function trackingRemoteName(tracking) {
   const slashIndex = trimmed.indexOf("/");
   if (slashIndex <= 0) return null;
   return trimmed.slice(0, slashIndex);
+}
+
+function parseTrackingRef(tracking) {
+  if (typeof tracking !== "string") {
+    return null;
+  }
+
+  const separatorIndex = tracking.indexOf("/");
+  if (separatorIndex <= 0 || separatorIndex === tracking.length - 1) {
+    return null;
+  }
+
+  return {
+    remote: tracking.slice(0, separatorIndex),
+    branch: tracking.slice(separatorIndex + 1),
+  };
 }
 
 function parseOwnerRepo(remoteUrl) {
