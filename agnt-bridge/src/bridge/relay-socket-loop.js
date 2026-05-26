@@ -73,6 +73,15 @@ function createRelaySocketLoop({
 
     onStatus("connecting");
     const nextSocket = new WebSocketCtor(relaySessionUrl(), {
+      // Saves uplink bytes on long history payloads (thread/read,
+      // thread/turns/list) where the per-message overhead is small relative
+      // to the body. Threshold/concurrency-limit match the wss defaults so
+      // we don't trade memory for compression on tiny control frames.
+      perMessageDeflate: {
+        zlibDeflateOptions: { level: 6 },
+        threshold: 256,
+        concurrencyLimit: 4,
+      },
       headers: buildHeaders(),
     });
     socket = nextSocket;

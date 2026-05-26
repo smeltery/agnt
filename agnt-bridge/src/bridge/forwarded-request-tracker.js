@@ -26,6 +26,19 @@
 // without spinning up the whole bridge.
 
 const DEFAULT_TTL_MS = 2 * 60_000;
+const DEFAULT_MAX_TRACKED_REQUESTS = 500;
+
+function evictOldestEntries(map, maxSize) {
+  if (map.size <= maxSize) {
+    return;
+  }
+  const excess = map.size - maxSize;
+  const iterator = map.keys();
+  for (let i = 0; i < excess; i += 1) {
+    const key = iterator.next().value;
+    map.delete(key);
+  }
+}
 
 /**
  * @param {object} options
@@ -57,6 +70,7 @@ function createForwardedRequestTracker({
     "thread/list",
   ]),
   ttlMs = DEFAULT_TTL_MS,
+  maxTrackedRequests = DEFAULT_MAX_TRACKED_REQUESTS,
   now = Date.now,
 } = {}) {
   if (typeof parseJson !== "function") {
@@ -68,18 +82,33 @@ function createForwardedRequestTracker({
   /** request id → { method, createdAt } — drives relay payload sanitization. */
   const relaySanitizedResponseMethodsById = new Map();
 
+  // Collect-then-delete keeps the iteration deterministic; the LRU cap after
+  // prune protects against pathological producers (e.g. a misbehaving client
+  // pumping requests faster than the TTL window).
   function pruneExpired() {
     const cutoff = now();
+    const expiredForwarded = [];
     for (const [id, entry] of forwardedRequestMethodsById) {
       if (!entry || cutoff - entry.createdAt >= ttlMs) {
-        forwardedRequestMethodsById.delete(id);
+        expiredForwarded.push(id);
       }
     }
+    for (const id of expiredForwarded) {
+      forwardedRequestMethodsById.delete(id);
+    }
+
+    const expiredSanitized = [];
     for (const [id, entry] of relaySanitizedResponseMethodsById) {
       if (!entry || cutoff - entry.createdAt >= ttlMs) {
-        relaySanitizedResponseMethodsById.delete(id);
+        expiredSanitized.push(id);
       }
     }
+    for (const id of expiredSanitized) {
+      relaySanitizedResponseMethodsById.delete(id);
+    }
+
+    evictOldestEntries(forwardedRequestMethodsById, maxTrackedRequests);
+    evictOldestEntries(relaySanitizedResponseMethodsById, maxTrackedRequests);
   }
 
   /**
@@ -179,4 +208,5 @@ function createForwardedRequestTracker({
 module.exports = {
   createForwardedRequestTracker,
   DEFAULT_TTL_MS,
+  DEFAULT_MAX_TRACKED_REQUESTS,
 };

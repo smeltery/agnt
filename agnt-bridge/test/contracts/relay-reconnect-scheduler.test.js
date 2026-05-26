@@ -55,6 +55,7 @@ test("schedule() throws when onAttempt is not a function", () => {
   const scheduler = createRelayReconnectScheduler({
     setTimeoutImpl: env.setTimeoutImpl,
     clearTimeoutImpl: env.clearTimeoutImpl,
+    random: () => 0,
   });
   assert.throws(() => scheduler.schedule(), /requires a function/);
   assert.throws(() => scheduler.schedule(null), /requires a function/);
@@ -67,6 +68,7 @@ test("schedule() bumps attempt and computes a linear delay, capped at maxDelayMs
     maxDelayMs: 350,
     setTimeoutImpl: env.setTimeoutImpl,
     clearTimeoutImpl: env.clearTimeoutImpl,
+    random: () => 0,
   });
 
   // Attempt 1 → 100ms, fire to release the timer slot before scheduling again.
@@ -88,6 +90,7 @@ test("schedule() returns null and skips when a timer is already pending", () => 
   const scheduler = createRelayReconnectScheduler({
     setTimeoutImpl: env.setTimeoutImpl,
     clearTimeoutImpl: env.clearTimeoutImpl,
+    random: () => 0,
   });
 
   const firstDelay = scheduler.schedule(() => {});
@@ -105,6 +108,7 @@ test("the registered callback fires with the current attempt number", () => {
     baseDelayMs: 10,
     setTimeoutImpl: env.setTimeoutImpl,
     clearTimeoutImpl: env.clearTimeoutImpl,
+    random: () => 0,
   });
 
   const observed = [];
@@ -120,6 +124,7 @@ test("clear() stops a pending timer; subsequent fireAll is a no-op", () => {
   const scheduler = createRelayReconnectScheduler({
     setTimeoutImpl: env.setTimeoutImpl,
     clearTimeoutImpl: env.clearTimeoutImpl,
+    random: () => 0,
   });
 
   let fired = 0;
@@ -140,6 +145,7 @@ test("resetAttempt() restarts the backoff series at the base delay", () => {
     maxDelayMs: 5_000,
     setTimeoutImpl: env.setTimeoutImpl,
     clearTimeoutImpl: env.clearTimeoutImpl,
+    random: () => 0,
   });
 
   scheduler.schedule(() => {}); // attempt 1 → 100
@@ -155,11 +161,34 @@ test("resetAttempt() restarts the backoff series at the base delay", () => {
   assert.equal(scheduler.schedule(() => {}), 100);
 });
 
+test("schedule() adds bounded jitter on top of the linear delay", () => {
+  const env = makeFakeTimerEnv();
+  const scheduler = createRelayReconnectScheduler({
+    baseDelayMs: 100,
+    maxDelayMs: 5_000,
+    setTimeoutImpl: env.setTimeoutImpl,
+    clearTimeoutImpl: env.clearTimeoutImpl,
+    // Math.floor(0.5 * min(linear, 2000)) — deterministic jitter for the test.
+    random: () => 0.5,
+  });
+
+  // Attempt 1: linear 100, jitter floor(0.5 * 100) = 50 → 150.
+  assert.equal(scheduler.schedule(() => {}), 150);
+  env.fireAll();
+  // Attempt 4: linear 400, jitter floor(0.5 * 400) = 200 → 600.
+  scheduler.schedule(() => {});
+  env.fireAll();
+  scheduler.schedule(() => {});
+  env.fireAll();
+  assert.equal(scheduler.schedule(() => {}), 600);
+});
+
 test("isPending() flips with the timer lifecycle", () => {
   const env = makeFakeTimerEnv();
   const scheduler = createRelayReconnectScheduler({
     setTimeoutImpl: env.setTimeoutImpl,
     clearTimeoutImpl: env.clearTimeoutImpl,
+    random: () => 0,
   });
 
   assert.equal(scheduler.isPending(), false);

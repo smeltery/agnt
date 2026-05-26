@@ -18,13 +18,15 @@ function createRelayReconnectScheduler({
   maxDelayMs = DEFAULT_MAX_DELAY_MS,
   setTimeoutImpl = setTimeout,
   clearTimeoutImpl = clearTimeout,
+  random = Math.random,
 } = {}) {
   let attempt = 0;
   let timer = null;
 
-  // Schedules onAttempt to fire after the next linear-backoff delay. Returns
-  // the chosen delay (or null when a reconnect is already scheduled — the
-  // existing timer is left alone).
+  // Schedules onAttempt to fire after the next linear-backoff delay (+ jitter).
+  // Returns the chosen delay (or null when a reconnect is already scheduled —
+  // the existing timer is left alone). Jitter avoids a thundering-herd when many
+  // bridges reconnect to the same relay after a network blip.
   function schedule(onAttempt) {
     if (typeof onAttempt !== "function") {
       throw new Error("relay-reconnect-scheduler: schedule(onAttempt) requires a function.");
@@ -33,7 +35,9 @@ function createRelayReconnectScheduler({
       return null;
     }
     attempt += 1;
-    const delayMs = Math.min(baseDelayMs * attempt, maxDelayMs);
+    const linearDelayMs = Math.min(baseDelayMs * attempt, maxDelayMs);
+    const jitterMs = Math.floor(random() * Math.min(linearDelayMs, 2_000));
+    const delayMs = linearDelayMs + jitterMs;
     timer = setTimeoutImpl(() => {
       timer = null;
       onAttempt(attempt);
