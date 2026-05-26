@@ -680,7 +680,6 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                         )
                         recomputeRenderItemsIfNeeded()
                         recomputeBlockInfoIfNeeded()
-                        scheduleProgressiveTailRevealIfNeeded()
                         handleTimelineMutation(using: proxy)
                     }
                     .onChange(of: isThreadRunning) { _, _ in
