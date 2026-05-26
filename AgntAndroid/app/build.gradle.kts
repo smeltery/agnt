@@ -140,6 +140,12 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.0.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.0")
 
+    // Native terminal renderer used by TermuxTerminalSurface as a low-overhead
+    // alternative to the WebView+xterm.js path. Apache-2.0 (jackpal Android
+    // Terminal Emulator lineage); resolved via JitPack.
+    implementation("com.termux.termux-app:terminal-view:0.118.0")
+    implementation("com.termux.termux-app:terminal-emulator:0.118.0")
+
     val markdownRenderer = "0.39.2"
     implementation("com.mikepenz:multiplatform-markdown-renderer:$markdownRenderer")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:$markdownRenderer")

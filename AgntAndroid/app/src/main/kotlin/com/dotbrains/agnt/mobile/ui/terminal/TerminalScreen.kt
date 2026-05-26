@@ -36,6 +36,7 @@ import com.dotbrains.agnt.mobile.core.terminal.TerminalController
 import com.dotbrains.agnt.mobile.core.terminal.TerminalProfile
 import com.dotbrains.agnt.mobile.core.terminal.TerminalSnapshot
 import com.dotbrains.agnt.mobile.core.terminal.TerminalStatus
+import com.dotbrains.agnt.mobile.core.terminal.TerminalSize
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -322,12 +323,23 @@ fun TerminalScreen(
                     modifier = Modifier.fillMaxSize().padding(8.dp),
                 )
             } else {
-                TerminalFallbackSurface(
-                    snapshot = activeSnapshot,
-                    fontSize = fontSize,
-                    theme = theme,
-                    isRunning = isRunning,
-                    onInput = ::handleTextInput,
+                TermuxTerminalSurface(
+                    output =
+                        controller.outputEvents
+                            .filter { it.terminalId == activeTerminalId }
+                            .map { it.bytes },
+                    onInput = { bytes ->
+                        if (activeSnapshot.status != TerminalStatus.Running) return@TermuxTerminalSurface
+                        coroutineScope.launch {
+                            runCatching { controller.writeInput(activeTerminalId, bytes) }
+                        }
+                    },
+                    onResize = { size ->
+                        coroutineScope.launch {
+                            runCatching { controller.resize(activeTerminalId, size.cols, size.rows) }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
                 )
             }
         }

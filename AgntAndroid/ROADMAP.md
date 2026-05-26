@@ -54,10 +54,13 @@ Open follow-ups:
 - [ ] ECDSA + OpenSSH FIDO key support. sshj decodes Ed25519 / RSA / ECDSA
       out of the box, but the editor sheet only documents Ed25519/RSA. Verify
       ECDSA round-trips and document.
-- [ ] Termux-style native terminal renderer as an alternative to WebView. The
-      WebView path is faithful to Ghostty's rendering but heavier than a
-      `terminal-view`-based widget; revisit if perf or input latency complaints
-      arrive.
+- [x] Termux-style native terminal renderer (`TermuxTerminalSurface`, ported
+      from upstream Stivy-01/remodex 245ea8a). Apache-2.0 `terminal-view` +
+      `terminal-emulator` deps resolved via JitPack. Wired as the WebView
+      fallback — strictly better than the previous static-text fallback. To
+      promote Termux above WebView, add a user-facing toggle; for now WebView
+      remains the default unless `isUnavailableSignal` fires. Visual
+      verification on a device still pending.
 - [ ] Multi-tab session UI polish. The drop-down session list works but
       lacks the per-tab cwd / status badging the iOS menu has.
 
