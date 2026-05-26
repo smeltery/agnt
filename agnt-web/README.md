@@ -20,15 +20,21 @@ Tailscale, behind a self-hosted relay on a VPS, or just on the same Wi-Fi.
 
 ## Architecture
 
-```text
-+-----------------+  WSS  +--------+  WS  +-----------------+  spawn  +-------+
-|  agnt-web       | ----> | relay  | ---> |  agnt-bridge    | ------> | CLI   |
-|  (browser)      |       | (VPS / |      |  (your Mac)     |         | codex |
-|                 | <---- | LAN)   | <--- |                 | <------ | claude|
-+-----------------+       +--------+      +-----------------+         | …     |
-        ^                                                              +-------+
-        |  Same E2EE handshake the iOS app uses (Ed25519 + X25519 +
-        |  HKDF-SHA256 + AES-256-GCM). The relay is opaque transport.
+```mermaid
+flowchart LR
+    web["agnt-web<br/>(browser)"]
+    relay["relay<br/>(VPS / LAN)"]
+    bridge["agnt-bridge<br/>(your Mac)"]
+    cli["CLI<br/>codex / claude / …"]
+
+    web <-->|WSS| relay
+    relay <-->|WS| bridge
+    bridge -->|spawn| cli
+    cli -.->|stdio| bridge
+
+    classDef note fill:#fff,stroke:#bbb,stroke-dasharray:3 3,color:#555;
+    note["Same E2EE handshake the iOS app uses<br/>Ed25519 + X25519 + HKDF-SHA256 + AES-256-GCM<br/>The relay is opaque transport."]:::note
+    web -.- note
 ```
 
 ## Run it locally
