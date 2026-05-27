@@ -20,9 +20,12 @@ export interface ConnectionState {
   connection: Connection | null;
   saved: SavedRelayPairing | null;
   bootstrapping: boolean;
+  /** True while a Mac-switch is in flight (resolving session + opening new socket). */
+  switching: boolean;
   hydrate(): Promise<void>;
   pairWithPayload(payload: PairingPayload): Promise<void>;
   reconnect(): Promise<void>;
+  switchMac(targetDeviceId: string): Promise<void>;
   forget(): Promise<void>;
 }
 
@@ -35,6 +38,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   connection: null,
   saved: null,
   bootstrapping: true,
+  switching: false,
 
   async hydrate() {
     const saved = (await pairingStore.loadRelayPairing()) ?? null;
@@ -82,6 +86,58 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       }
     }
     await connect(saved, mode, set, get);
+  },
+
+  async switchMac(targetDeviceId) {
+    const current = get().saved;
+    if (current?.macDeviceId === targetDeviceId) return;
+
+    const registry = await pairingStore.loadRegistry();
+    const target = registry.records[targetDeviceId];
+    if (!target) {
+      useNoticesStore.getState().enqueue({
+        severity: "warn",
+        title: "Mac not found",
+        message: "This Mac is no longer in the trusted list. Re-pair from its QR code to reconnect.",
+        durationMs: 8_000,
+      });
+      return;
+    }
+
+    set({ switching: true, status: { kind: "connecting" } });
+    get().connection?.close("switch-mac");
+    useLatencyStore.getState().reset();
+
+    const newPairing: SavedRelayPairing = {
+      sessionId: target.lastResolvedSessionId ?? "",
+      relayUrl: target.relayUrl,
+      macDeviceId: target.macDeviceId,
+      macIdentityPublicKey: target.macIdentityPublicKey,
+      lastAppliedBridgeOutboundSeq: 0,
+      shouldForceQrBootstrap: false,
+    };
+
+    try {
+      await pairingStore.saveRelayPairing(newPairing);
+      await pairingStore.setLastTrustedMac(targetDeviceId);
+      set({ saved: newPairing });
+
+      const phoneIdentity = await loadOrCreatePhoneIdentity();
+      const resolved = await resolveTrustedSession({
+        relayUrl: newPairing.relayUrl,
+        macDeviceId: newPairing.macDeviceId,
+        phoneIdentity,
+      });
+      const updated: SavedRelayPairing = { ...newPairing, sessionId: resolved.sessionId };
+      await pairingStore.saveRelayPairing(updated);
+      set({ saved: updated });
+      await connect(updated, "trusted_reconnect", set, get);
+    } catch (error) {
+      const remote = error as TrustedSessionResolveError;
+      set({ status: { kind: "error", message: remote.message ?? "Could not resolve trusted session.", code: remote.code } });
+    } finally {
+      set({ switching: false });
+    }
   },
 
   async forget() {

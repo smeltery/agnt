@@ -53,7 +53,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `WorkspaceCheckpoints` | ✅ | 10 (preview + apply per turn; checkpointDiff + Copy not yet wired in UI but bridge-ready) |
 | `WorkspaceImages` | ✅ | 18 + 30 (workspace/readImage wrapper + cache; MarkdownContent resolves non-http image refs against thread cwd; click any inline image to open in the shared Lightbox) |
 | `ProjectFolders` | ✅ | 9 (project/quickLocations + listDirectory + searchDirectories + folder picker UI) |
-| `TrustedPairPresentation` | ✅ | 5 (Settings shows current Mac fingerprint + per-Mac forget; no inline sidebar badge) |
+| `TrustedPairPresentation` | ✅ | 5 + multi-Mac (Settings lists trusted Macs with per-Mac forget; sidebar `MacSwitcher` row surfaces the active Mac + lets the user switch between paired Macs via `useConnectionStore.switchMac` → `pairingStore.setLastTrustedMac` → `resolveTrustedSession` → reconnect. Threads stay shared across Macs by design.) |
 | `Helpers` | n/a | utility — port functions on demand |
 | `AssistantReplayDeduper` | ✅ | 2 |
 | `CodexMessagePersistence` | ✅ | 2 (IndexedDB-backed, debounced per thread) |

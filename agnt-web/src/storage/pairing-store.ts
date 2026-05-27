@@ -75,4 +75,15 @@ export const pairingStore = {
     await pairingStore.saveRegistry(registry);
     return registry;
   },
+  async setLastTrustedMac(macDeviceId: string): Promise<TrustedMacRegistry> {
+    const registry = await pairingStore.loadRegistry();
+    if (!registry.records[macDeviceId]) return registry;
+    registry.lastTrustedMacDeviceId = macDeviceId;
+    registry.records[macDeviceId] = {
+      ...registry.records[macDeviceId],
+      lastUsedAt: Date.now(),
+    };
+    await pairingStore.saveRegistry(registry);
+    return registry;
+  },
 };

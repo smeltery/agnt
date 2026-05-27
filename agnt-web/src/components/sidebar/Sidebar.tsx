@@ -34,6 +34,7 @@ import {
 import { EmptyState, SidebarSkeleton } from "../shared/Loading";
 import { MagnifyingGlass } from "../shared/Icon";
 import { ThreadContextMenu } from "./ThreadContextMenu";
+import { MacSwitcher } from "./MacSwitcher";
 
 interface SidebarProps {
   onNewChat(): void;
@@ -309,6 +310,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
           <Plus /> {t("sidebar.newChat")}
         </button>
       </div>
+      <MacSwitcher />
       {selectMode && (
         <div className="agnt-sidebar-select-bar">
           <span className="agnt-sidebar-select-count">{selectedIds.size} selected</span>
