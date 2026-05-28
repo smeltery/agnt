@@ -37,6 +37,7 @@ enum NewChatDraftLeadingControl {
 struct NewChatDraftView: View {
     @Environment(CodexService.self) private var codex
     @Environment(SubscriptionService.self) private var subscriptions
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let route: NewChatDraftRoute
     var leadingControl: NewChatDraftLeadingControl = .back
@@ -66,9 +67,13 @@ struct NewChatDraftView: View {
     var body: some View {
         // Keep the draft surface static while first send creates the real thread.
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            promptStack
-            Spacer(minLength: 0)
+            if let pendingDraftUserMessage {
+                pendingDraftUserMessageView(pendingDraftUserMessage)
+            } else {
+                Spacer(minLength: 0)
+                promptStack
+                Spacer(minLength: 0)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
@@ -184,6 +189,34 @@ struct NewChatDraftView: View {
                 viewModel.photoPickerItems = []
             }
         }
+        .animation(.easeInOut(duration: 0.18), value: pendingDraftUserMessage?.id)
+    }
+
+    // Shows the first user bubble while the app is still waiting for thread/start.
+    private var pendingDraftUserMessage: CodexMessage? {
+        codex.messages(for: route.id).last { message in
+            message.role == .user && message.deliveryState == .pending
+        }
+    }
+
+    private func pendingDraftUserMessageView(_ message: CodexMessage) -> some View {
+        VStack(spacing: 0) {
+            MessageRow(
+                message: message,
+                isRetryAvailable: false,
+                onRetryUserMessage: { _ in }
+            )
+            .padding(.horizontal, draftTimelineHorizontalPadding)
+            .padding(.top, 12)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .transition(.opacity)
+    }
+
+    private var draftTimelineHorizontalPadding: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 20 : 16
     }
 
     // Source-specific prompt UI:

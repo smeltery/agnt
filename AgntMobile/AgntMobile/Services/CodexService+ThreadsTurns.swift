@@ -11,6 +11,11 @@ private enum ThreadTurnStateSnapshotPolicy {
     static let requestTimeoutNanoseconds: UInt64 = 30_000_000_000
 }
 
+struct CodexPreAppendedTurnMessage: Sendable {
+    let messageID: String
+    let automaticTitleSeed: String?
+}
+
 extension CodexService {
     // Keeps sidebar/project loading focused on recent live conversations while
     // retaining a smaller archived slice for restart/recovery flows.
@@ -239,6 +244,8 @@ extension CodexService {
         mentionMentions: [CodexTurnMention] = [],
         fileMentions: [String] = [],
         shouldAppendUserMessage: Bool = true,
+        preAppendedUserMessageID: String? = nil,
+        automaticTitleSeedOverride: String? = nil,
         collaborationMode: CodexCollaborationModeKind? = nil,
         preservePlanSessionState: Bool = false
     ) async throws {
@@ -265,17 +272,27 @@ extension CodexService {
             skillMentions: skillMentions,
             mentionMentions: mentionMentions
         )
-        let preResumeTitleSeed = shouldAppendUserMessage
-            ? automaticThreadTitleSeedIfNeeded(
+        let normalizedPreAppendedUserMessageID = normalizedInterruptIdentifier(preAppendedUserMessageID)
+        let shouldAppendOnContinuation = shouldAppendUserMessage || normalizedPreAppendedUserMessageID != nil
+        let preResumeTitleSeed: String?
+        if let automaticTitleSeedOverride {
+            preResumeTitleSeed = automaticTitleSeedOverride
+        } else if shouldAppendUserMessage && normalizedPreAppendedUserMessageID == nil {
+            preResumeTitleSeed = automaticThreadTitleSeedIfNeeded(
                 userInput: outgoingDisplayText,
                 attachments: attachments,
                 threadId: initialThreadId
             )
-            : nil
+        } else {
+            preResumeTitleSeed = nil
+        }
         // Put the user's bubble in the timeline before any resume/network work so
         // sends feel instant while the runtime catches up in the background.
-        let preResumePendingMessageId = shouldAppendUserMessage
-            ? appendUserMessage(
+        let preResumePendingMessageId: String
+        if let normalizedPreAppendedUserMessageID {
+            preResumePendingMessageId = normalizedPreAppendedUserMessageID
+        } else if shouldAppendUserMessage {
+            preResumePendingMessageId = appendUserMessage(
                 threadId: initialThreadId,
                 text: outgoingDisplayText,
                 attachments: attachments,
@@ -290,7 +307,9 @@ extension CodexService {
                     return normalized.isEmpty ? nil : normalized
                 }
             )
-            : ""
+        } else {
+            preResumePendingMessageId = ""
+        }
 
         do {
             try await ensureThreadResumed(threadId: initialThreadId)
@@ -316,7 +335,7 @@ extension CodexService {
                     mentionMentions: mentionMentions,
                     fileMentions: fileMentions,
                     to: continuationThread.id,
-                    shouldAppendUserMessage: shouldAppendUserMessage,
+                    shouldAppendUserMessage: shouldAppendOnContinuation,
                     collaborationMode: effectiveCollaborationMode
                 )
                 activeThreadId = continuationThread.id
@@ -361,7 +380,7 @@ extension CodexService {
                     mentionMentions: mentionMentions,
                     fileMentions: fileMentions,
                     to: continuationThread.id,
-                    shouldAppendUserMessage: shouldAppendUserMessage,
+                    shouldAppendUserMessage: shouldAppendOnContinuation,
                     collaborationMode: effectiveCollaborationMode
                 )
                 activeThreadId = continuationThread.id
@@ -372,6 +391,117 @@ extension CodexService {
         }
 
         activeThreadId = initialThreadId
+    }
+
+    // Lets the New Chat handoff publish the first user row before the real
+    // TurnView appears, while `startTurn` still owns the single `turn/start`.
+    func preAppendOutgoingUserMessage(
+        userInput: String,
+        threadId: String,
+        attachments: [CodexImageAttachment] = [],
+        skillMentions: [CodexTurnSkillMention] = [],
+        mentionMentions: [CodexTurnMention] = [],
+        fileMentions: [String] = []
+    ) -> CodexPreAppendedTurnMessage? {
+        let normalizedThreadID = normalizedInterruptIdentifier(threadId) ?? threadId
+        let outgoingDisplayText = displayTextForOutgoingTurn(
+            userInput: userInput.trimmingCharacters(in: .whitespacesAndNewlines),
+            skillMentions: skillMentions,
+            mentionMentions: mentionMentions
+        )
+        let automaticTitleSeed = automaticThreadTitleSeedIfNeeded(
+            userInput: outgoingDisplayText,
+            attachments: attachments,
+            threadId: normalizedThreadID
+        )
+        let messageID = appendUserMessage(
+            threadId: normalizedThreadID,
+            text: outgoingDisplayText,
+            attachments: attachments,
+            fileMentions: fileMentions,
+            skillMentions: skillMentions.compactMap {
+                let rawName = $0.name ?? $0.id
+                let normalized = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+                return normalized.isEmpty ? nil : normalized
+            },
+            pluginMentions: mentionMentions.compactMap {
+                let normalized = $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                return normalized.isEmpty ? nil : normalized
+            }
+        )
+
+        guard !messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return CodexPreAppendedTurnMessage(
+            messageID: messageID,
+            automaticTitleSeed: automaticTitleSeed
+        )
+    }
+
+    // Carries a draft-thread pending row into the real thread created by thread/start.
+    func movePreAppendedOutgoingUserMessage(
+        _ preAppendedMessage: CodexPreAppendedTurnMessage?,
+        from sourceThreadID: String,
+        to targetThreadID: String
+    ) -> CodexPreAppendedTurnMessage? {
+        guard let preAppendedMessage,
+              let messageID = normalizedInterruptIdentifier(preAppendedMessage.messageID),
+              let normalizedSourceThreadID = normalizedInterruptIdentifier(sourceThreadID),
+              let normalizedTargetThreadID = normalizedInterruptIdentifier(targetThreadID) else {
+            return nil
+        }
+        guard normalizedSourceThreadID != normalizedTargetThreadID else {
+            return preAppendedMessage
+        }
+        guard var sourceMessages = messagesByThread[normalizedSourceThreadID],
+              let sourceIndex = sourceMessages.firstIndex(where: { $0.id == messageID }),
+              sourceMessages[sourceIndex].role == .user else {
+            return nil
+        }
+
+        let sourceMessage = sourceMessages.remove(at: sourceIndex)
+        let movedMessage = CodexMessage(
+            id: sourceMessage.id,
+            threadId: normalizedTargetThreadID,
+            role: sourceMessage.role,
+            kind: sourceMessage.kind,
+            assistantPhase: sourceMessage.assistantPhase,
+            text: sourceMessage.text,
+            fileMentions: sourceMessage.fileMentions,
+            skillMentions: sourceMessage.skillMentions,
+            pluginMentions: sourceMessage.pluginMentions,
+            createdAt: sourceMessage.createdAt,
+            turnId: sourceMessage.turnId,
+            itemId: sourceMessage.itemId,
+            isStreaming: sourceMessage.isStreaming,
+            deliveryState: sourceMessage.deliveryState,
+            attachments: sourceMessage.attachments,
+            planState: sourceMessage.planState,
+            planPresentation: sourceMessage.planPresentation,
+            proposedPlan: sourceMessage.proposedPlan,
+            subagentAction: sourceMessage.subagentAction,
+            structuredUserInputRequest: sourceMessage.structuredUserInputRequest,
+            orderIndex: sourceMessage.orderIndex
+        )
+
+        if sourceMessages.isEmpty {
+            messagesByThread.removeValue(forKey: normalizedSourceThreadID)
+        } else {
+            messagesByThread[normalizedSourceThreadID] = sourceMessages
+        }
+
+        var targetMessages = messagesByThread[normalizedTargetThreadID] ?? []
+        targetMessages.removeAll { $0.id == movedMessage.id }
+        targetMessages.append(movedMessage)
+        targetMessages.sort(by: { $0.orderIndex < $1.orderIndex })
+        messagesByThread[normalizedTargetThreadID] = targetMessages
+        messageIndexCacheByThread[normalizedSourceThreadID] = nil
+        messageIndexCacheByThread[normalizedTargetThreadID] = nil
+        persistMessages()
+        updateCurrentOutput(for: normalizedSourceThreadID)
+        updateCurrentOutput(for: normalizedTargetThreadID)
+        return preAppendedMessage
     }
 
     // Removes the optimistic row by id first because structured mention-only rows may not match raw composer text.
