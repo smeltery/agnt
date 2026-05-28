@@ -1694,6 +1694,13 @@ struct MessageRow: View, Equatable {
                     isRunning: assistantBlockAccessoryState.showsRunningIndicator
                 )
             }
+
+            if let timestampText = assistantTimestampText(text: visibleAssistantTextWithoutImageSyntax) {
+                Text(timestampText)
+                    .font(AppFont.caption2())
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
@@ -1879,6 +1886,21 @@ struct MessageRow: View, Equatable {
         }
     }
 
+    // Renders a confirmed assistant turn's timestamp beneath the response. The
+    // timestamp is sourced from `CodexMessage.formattedTimelineTime()` so it
+    // honors the originating desktop timezone when history provides one.
+    private func assistantTimestampText(text: String) -> String? {
+        guard message.role == .assistant,
+              !message.isStreaming,
+              message.deliveryState == .confirmed else {
+            return nil
+        }
+
+        let hasVisibleTimestampTarget = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !message.attachments.isEmpty
+        return hasVisibleTimestampTarget ? message.formattedTimelineTime() : nil
+    }
+
     private var deliveryStatusText: String? {
         guard message.role == .user else { return nil }
 
@@ -1888,7 +1910,7 @@ struct MessageRow: View, Equatable {
         case .failed:
             return "send failed"
         case .confirmed:
-            return message.createdAt.formatted(date: .omitted, time: .shortened)
+            return message.formattedTimelineTime()
         }
     }
 

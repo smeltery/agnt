@@ -1,5 +1,5 @@
 // FILE: CodexMessage.swift
-// Purpose: Defines chat messages rendered in each thread conversation timeline.
+// Purpose: Defines chat messages and timestamp metadata rendered in each thread timeline.
 // Layer: Model
 // Exports: CodexMessage, CodexMessageRole
 // Depends on: Foundation
@@ -40,6 +40,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
     var skillMentions: [String]
     var pluginMentions: [String]
     var createdAt: Date
+    var timeZoneIdentifier: String?
     var turnId: String?
     var itemId: String?
     var isStreaming: Bool
@@ -66,6 +67,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         skillMentions: [String] = [],
         pluginMentions: [String] = [],
         createdAt: Date = Date(),
+        timeZoneIdentifier: String? = nil,
         turnId: String? = nil,
         itemId: String? = nil,
         isStreaming: Bool = false,
@@ -88,6 +90,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         self.skillMentions = skillMentions
         self.pluginMentions = pluginMentions
         self.createdAt = createdAt
+        self.timeZoneIdentifier = Self.validatedTimeZoneIdentifier(timeZoneIdentifier)
         self.turnId = turnId
         self.itemId = itemId
         self.isStreaming = isStreaming
@@ -126,6 +129,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         case skillMentions
         case pluginMentions
         case createdAt
+        case timeZoneIdentifier
         case turnId
         case itemId
         case isStreaming
@@ -151,6 +155,9 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         skillMentions = try container.decodeIfPresent([String].self, forKey: .skillMentions) ?? []
         pluginMentions = try container.decodeIfPresent([String].self, forKey: .pluginMentions) ?? []
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+        timeZoneIdentifier = Self.validatedTimeZoneIdentifier(
+            try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
+        )
         turnId = try container.decodeIfPresent(String.self, forKey: .turnId)
         itemId = try container.decodeIfPresent(String.self, forKey: .itemId)
         isStreaming = try container.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
@@ -181,6 +188,31 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
             forKey: .structuredUserInputRequest
         )
         orderIndex = try container.decodeIfPresent(Int.self, forKey: .orderIndex) ?? CodexMessageOrderCounter.next()
+    }
+
+    // Formats timeline chrome in the originating desktop timezone when history provides it.
+    func formattedTimelineTime() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        if let timeZoneIdentifier,
+           let timeZone = TimeZone(identifier: timeZoneIdentifier) {
+            formatter.timeZone = timeZone
+        } else {
+            formatter.timeZone = .autoupdatingCurrent
+        }
+        return formatter.string(from: createdAt)
+    }
+
+    private static func validatedTimeZoneIdentifier(_ rawValue: String?) -> String? {
+        guard let rawValue else { return nil }
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty,
+              TimeZone(identifier: trimmedValue) != nil else {
+            return nil
+        }
+        return trimmedValue
     }
 
     private static func derivedProposedPlan(

@@ -77,6 +77,7 @@ extension CodexService {
     // Decodes app-server turn arrays into a chronological message timeline.
     func decodeMessagesFromThreadRead(threadId: String, threadObject: [String: JSONValue]) -> [CodexMessage] {
         let baseDate = decodeHistoryBaseDate(from: threadObject, threadId: threadId)
+        let threadTimeZoneIdentifier = decodeHistoryTimeZoneIdentifier(from: threadObject)
         let turns = threadObject["turns"]?.arrayValue ?? []
 
         var offset: TimeInterval = 0
@@ -86,6 +87,8 @@ extension CodexService {
             guard let turnObject = turnValue.objectValue else { continue }
             let turnID = historyTurnID(from: turnObject)
             let turnTimestamp = decodeHistoryTimestamp(from: turnObject)
+            let turnTimeZoneIdentifier = decodeHistoryTimeZoneIdentifier(from: turnObject)
+                ?? threadTimeZoneIdentifier
             let turnCompleted = historyTurnTerminalState(turnObject) == .completed
             let items = turnObject["items"]?.arrayValue ?? []
 
@@ -97,6 +100,8 @@ extension CodexService {
 
                 let syntheticTimestamp = (turnTimestamp ?? baseDate).addingTimeInterval(offset)
                 let timestamp = decodeHistoryTimestamp(from: itemObject) ?? syntheticTimestamp
+                let timeZoneIdentifier = decodeHistoryTimeZoneIdentifier(from: itemObject)
+                    ?? turnTimeZoneIdentifier
                 offset += 0.001
                 let itemID = itemObject["id"]?.stringValue
                 let decodedText = decodeItemText(from: itemObject)
@@ -114,6 +119,7 @@ extension CodexService {
                         turnId: turnID,
                         itemId: itemID,
                         createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier,
                         skillMentions: skillMentions,
                         pluginMentions: pluginMentions,
                         attachments: imageAttachments
@@ -130,6 +136,7 @@ extension CodexService {
                         turnId: turnID,
                         itemId: itemID,
                         createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier,
                         attachments: imageAttachments
                     )
 
@@ -149,6 +156,7 @@ extension CodexService {
                         turnId: turnID,
                         itemId: itemID,
                         createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier,
                         skillMentions: mappedRole == .user ? skillMentions : [],
                         pluginMentions: mappedRole == .user ? pluginMentions : [],
                         attachments: imageAttachments
@@ -166,7 +174,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "reasoning":
@@ -178,7 +187,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "filechange":
@@ -190,7 +200,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "toolcall":
@@ -203,7 +214,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "diff":
@@ -216,7 +228,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "commandexecution":
@@ -228,7 +241,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "enteredreviewmode":
@@ -245,7 +259,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "exitedreviewmode":
@@ -262,7 +277,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "contextcompaction":
@@ -274,7 +290,8 @@ extension CodexService {
                         threadId: threadId,
                         turnId: turnID,
                         itemId: itemID,
-                        createdAt: timestamp
+                        createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier
                     )
 
                 case "plan":
@@ -288,6 +305,7 @@ extension CodexService {
                         turnId: turnID,
                         itemId: itemID,
                         createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier,
                         planState: finalizedHistoryPlanState(decodedPlanState, turnCompleted: turnCompleted),
                         planPresentation: itemID == nil
                             ? .progress
@@ -313,6 +331,7 @@ extension CodexService {
                         turnId: turnID,
                         itemId: itemID,
                         createdAt: timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier,
                         subagentAction: subagentAction
                     )
 
@@ -948,6 +967,12 @@ extension CodexService {
         let numericKeys = [
             "createdAt",
             "created_at",
+            "startedAt",
+            "started_at",
+            "completedAt",
+            "completed_at",
+            "endedAt",
+            "ended_at",
             "timestamp",
             "time",
             "updatedAt",
@@ -972,6 +997,20 @@ extension CodexService {
             }
         }
 
+        return nil
+    }
+
+    func decodeHistoryTimeZoneIdentifier(from object: [String: JSONValue]) -> String? {
+        for key in ["timeZoneIdentifier", "timezoneIdentifier", "timeZone", "timezone", "time_zone"] {
+            guard let rawValue = object[key]?.stringValue else {
+                continue
+            }
+            let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedValue.isEmpty,
+               TimeZone(identifier: trimmedValue) != nil {
+                return trimmedValue
+            }
+        }
         return nil
     }
 
@@ -1807,6 +1846,7 @@ extension CodexService {
         turnId: String?,
         itemId: String?,
         createdAt: Date,
+        timeZoneIdentifier: String? = nil,
         skillMentions: [String] = [],
         pluginMentions: [String] = [],
         attachments: [CodexImageAttachment] = [],
@@ -1831,6 +1871,7 @@ extension CodexService {
                 skillMentions: skillMentions,
                 pluginMentions: pluginMentions,
                 createdAt: createdAt,
+                timeZoneIdentifier: timeZoneIdentifier,
                 turnId: turnId,
                 itemId: itemId,
                 isStreaming: false,
