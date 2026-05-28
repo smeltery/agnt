@@ -1752,7 +1752,7 @@ struct MessageRow: View, Equatable {
         return VStack(alignment: .leading, spacing: 4) {
             if !joined.isEmpty {
                 Text(joined)
-                    .font(AppFont.caption())
+                    .font(AppFont.body(weight: .regular))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

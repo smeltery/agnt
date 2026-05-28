@@ -98,6 +98,7 @@ struct TurnComposerView: View {
     var showsSecondaryBar: Bool = true
 
     @State private var composerInputHeight: CGFloat = 32
+    @State private var inputChangeTask: Task<Void, Never>?
 
     // ─── ENTRY POINT ─────────────────────────────────────────────
     var body: some View {
@@ -183,16 +184,18 @@ struct TurnComposerView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.top, accessoryState.topInputPadding + 4)
-                .padding(.bottom, 8)
+                .padding(.bottom, 4)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     guard !isComposerInteractionLocked else { return }
                     isInputFocused.wrappedValue = true
                 }
                 .onChange(of: input) { _, newValue in
-                    // Defer the observable-model mutation out of the .onChange action
-                    // to avoid AttributeGraph cycles when the parent re-renders.
-                    DispatchQueue.main.async {
+                    inputChangeTask?.cancel()
+                    // Coalesce fast typing into one autocomplete refresh per main-actor turn.
+                    inputChangeTask = Task { @MainActor in
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
                         onInputChangedForFileAutocomplete(newValue)
                         onInputChangedForSkillAutocomplete(newValue)
                         onInputChangedForPluginAutocomplete(newValue)

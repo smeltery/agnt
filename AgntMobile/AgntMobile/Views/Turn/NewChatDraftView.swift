@@ -101,16 +101,24 @@ struct NewChatDraftView: View {
                 }
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                draftGitActionsButton
-            }
+            // Match the real thread toolbar so the Git/menu controls stay in one visual group
+            // before and after the first message creates the runtime thread.
+            if hasSelectedProject {
+                ToolbarItem(placement: .topBarTrailing) {
+                    draftGitActionsButton
+                }
 
-            if #available(iOS 26.0, *) {
-                ToolbarSpacer(.fixed, placement: .topBarTrailing)
-            }
+                if #available(iOS 26.0, *) {
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                draftThreadActionsMenu
+                ToolbarItem(placement: .topBarTrailing) {
+                    draftThreadActionsMenu
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    draftThreadActionsMenu
+                }
             }
         }
         .task {
@@ -307,16 +315,20 @@ struct NewChatDraftView: View {
         TurnThreadActionsMenuButton(
             isLoading: false,
             isEnabled: !areDraftToolbarActionsDisabled,
-            actions: [
-                TurnThreadActionMenuItem(
-                    title: "Open Terminal Here",
-                    icon: .system("terminal"),
-                    isEnabled: !areDraftToolbarActionsDisabled && onOpenTerminal != nil
-                ) {
-                    onOpenTerminal?(selectedProjectPath)
-                },
-            ]
+            actions: draftThreadActions
         )
+    }
+
+    private var draftThreadActions: [TurnThreadActionMenuItem] {
+        [
+            TurnThreadActionMenuItem(
+                title: "Open Terminal Here",
+                icon: .system("terminal"),
+                isEnabled: !areDraftToolbarActionsDisabled && onOpenTerminal != nil
+            ) {
+                onOpenTerminal?(selectedProjectPath)
+            },
+        ]
     }
 
     private var areDraftToolbarActionsDisabled: Bool {
