@@ -1,5 +1,5 @@
 // FILE: TurnComposerSecondaryBar.swift
-// Purpose: Owns the secondary composer controls shown below the main input card.
+// Purpose: Owns the secondary composer controls shown above the main input card.
 // Layer: View Component
 // Exports: TurnComposerSecondaryBar
 // Depends on: SwiftUI, UIKit, TurnGitBranchSelector, ContextWindowProgressRing, CodexWorktreeIcon
@@ -42,7 +42,7 @@ struct TurnComposerSecondaryBar: View {
     let onTapCreateWorktree: () -> Void
 
     private let branchLabelColor = Color(.secondaryLabel)
-    private var branchTextFont: Font { AppFont.subheadline() }
+    private var branchTextFont: Font { AppFont.footnote() }
     private var branchChevronFont: Font { AppFont.system(size: 9, weight: .regular) }
     private var runtimeLabelTitle: String {
         if !hasWorkingDirectory {
