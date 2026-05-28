@@ -162,7 +162,7 @@ struct TurnToolbarContent: ToolbarContent {
     }
 }
 
-private struct TurnMacHandoffToolbarLabel: View {
+struct TurnMacHandoffToolbarLabel: View {
     let isLoading: Bool
 
     var body: some View {

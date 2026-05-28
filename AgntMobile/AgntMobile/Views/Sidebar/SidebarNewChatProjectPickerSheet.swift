@@ -8,6 +8,8 @@ import SwiftUI
 
 struct SidebarNewChatProjectPickerSheet: View {
     let choices: [SidebarProjectChoice]
+    var showsWithoutProjectOption: Bool = true
+    var showsWorktreeOptions: Bool = true
     let onSelectProject: (String) -> Void
     let onSelectWorktreeProject: (String) -> Void
     let onSelectWithoutProject: () -> Void
@@ -67,42 +69,46 @@ struct SidebarNewChatProjectPickerSheet: View {
                         }
                     }
 
-                    Section("Worktree") {
-                        ForEach(choices) { choice in
-                            Button {
-                                dismiss()
-                                onSelectWorktreeProject(choice.projectPath)
-                            } label: {
-                                projectRow(
-                                    icon: AnyView(
-                                        CodexWorktreeIcon(pointSize: 16, weight: .medium)
-                                            .foregroundStyle(.secondary)
-                                    ),
-                                    title: choice.label,
-                                    subtitle: "Detached worktree from the default branch."
-                                )
+                    if showsWorktreeOptions {
+                        Section("Worktree") {
+                            ForEach(choices) { choice in
+                                Button {
+                                    dismiss()
+                                    onSelectWorktreeProject(choice.projectPath)
+                                } label: {
+                                    projectRow(
+                                        icon: AnyView(
+                                            CodexWorktreeIcon(pointSize: 16, weight: .medium)
+                                                .foregroundStyle(.secondary)
+                                        ),
+                                        title: choice.label,
+                                        subtitle: "Detached worktree from the default branch."
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
 
-                Section {
-                    Button {
-                        dismiss()
-                        onSelectWithoutProject()
-                    } label: {
-                        projectRow(
-                            icon: AnyView(
-                                Image(systemName: "bubble.left.and.bubble.right")
-                                    .font(AppFont.body(weight: .medium))
-                                    .foregroundStyle(.secondary)
-                            ),
-                            title: "Quick Chat",
-                            subtitle: "Start a chat without a working directory."
-                        )
+                if showsWithoutProjectOption {
+                    Section {
+                        Button {
+                            dismiss()
+                            onSelectWithoutProject()
+                        } label: {
+                            projectRow(
+                                icon: AnyView(
+                                    Image(systemName: "bubble.left.and.bubble.right")
+                                        .font(AppFont.body(weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                ),
+                                title: "Quick Chat",
+                                subtitle: "Start a chat without a working directory."
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .listStyle(.insetGrouped)

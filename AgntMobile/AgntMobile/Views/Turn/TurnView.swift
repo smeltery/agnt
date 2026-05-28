@@ -1228,7 +1228,7 @@ struct TurnView: View {
             do {
                 _ = try await codex.startThreadIfReady(
                     preferredProjectPath: resolvedProjectPathForFollowUpThread(),
-                    pendingComposerAction: .codeReview(target: pendingCodeReviewTarget(for: target))
+                    pendingComposerAction: .codeReview(target: target.codexPendingTarget)
                 )
                 viewModel.clearComposerReviewSelection()
             } catch {
@@ -1237,17 +1237,6 @@ struct TurnView: View {
                     codex.lastErrorMessage = message
                 }
             }
-        }
-    }
-
-    private func pendingCodeReviewTarget(
-        for target: TurnComposerReviewTarget
-    ) -> CodexPendingCodeReviewTarget {
-        switch target {
-        case .uncommittedChanges:
-            return .uncommittedChanges
-        case .baseBranch:
-            return .baseBranch
         }
     }
 
@@ -1330,9 +1319,9 @@ struct TurnView: View {
             return nil
         }
         let fullPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        let folderName = (fullPath as NSString).lastPathComponent
+        let folderName = fullPath.pathDisplayName
         return TurnThreadNavigationContext(
-            folderName: folderName.isEmpty ? fullPath : folderName,
+            folderName: folderName,
             subtitle: fullPath,
             fullPath: fullPath
         )
@@ -1832,8 +1821,8 @@ struct TurnView: View {
     // MARK: - Empty State
 
     private var loadingState: some View {
-        chatPlaceholderState(
-            title: "Loading chat...",
+        ChatEmptyStatePlaceholder(
+            title: Text("Loading chat..."),
             subtitle: "Fetching the latest messages for this conversation."
         )
     }
@@ -1848,32 +1837,18 @@ struct TurnView: View {
     }
 
     private var emptyState: some View {
-        chatPlaceholderState(
-            title: "Hi! How can I help you?",
+        ChatEmptyStatePlaceholder(
+            title: ChatEmptyStateTitleBuilder.makeTitle(for: emptyStateFolderName),
             subtitle: "Chats are End-to-end encrypted"
         )
     }
 
-    private func chatPlaceholderState(title: String, subtitle: String) -> some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image("AppLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .adaptiveGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            Text(title)
-                .font(AppFont.title2(weight: .semibold))
-            Text(subtitle)
-                .font(AppFont.caption())
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 28)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+    private var emptyStateFolderName: String? {
+        guard let cwd = currentResolvedThread.gitWorkingDirectory else { return nil }
+        let display = cwd.pathDisplayName
+        // Defensive: pathDisplayName falls back to the input, so only nil out
+        // when there's no usable folder portion at all (empty cwd after split).
+        return display.isEmpty ? nil : display
     }
 }
 

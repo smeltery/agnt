@@ -73,6 +73,7 @@ struct ContentView: View {
     @State private var sidebarGestureAutoCommitted = false
     @State private var sidebarSelectionSuppressedUntil: Date?
     @State private var isOpeningNewChatFromSidebar = false
+    @State private var activeNewChatDraftRoute: NewChatDraftRoute?
     @AppStorage("codex.hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("codex.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion = ""
 
@@ -377,6 +378,9 @@ struct ContentView: View {
                         onOpenMyMacs: {
                             openMyMacsFromSidebar()
                         },
+                        onOpenNewChatDraft: { source, preferredProjectPath in
+                            openNewChatDraftFromSidebar(source: source, preferredProjectPath: preferredProjectPath)
+                        },
                         onNewChatCreationStateChange: { isCreating in
                             setNewChatOpeningState(isCreating)
                         },
@@ -456,7 +460,19 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        if isOpeningNewChatFromSidebar {
+        if let activeNewChatDraftRoute {
+            NewChatDraftView(
+                route: activeNewChatDraftRoute,
+                leadingControl: .hamburger(action: { setSidebar(open: true) }),
+                onOpenTerminal: { workingDirectory in
+                    openTerminal(preferredWorkingDirectory: workingDirectory)
+                },
+                onOpenThread: { thread in
+                    openThreadFromNewChatDraft(thread)
+                }
+            )
+            .id(activeNewChatDraftRoute.id)
+        } else if isOpeningNewChatFromSidebar {
             NewChatOpeningStateView()
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -789,6 +805,7 @@ struct ContentView: View {
             return
         }
 
+        activeNewChatDraftRoute = nil
         isOpeningNewChatFromSidebar = false
         if isSidebarOpen || sidebarDragOffset > 0 {
             closeSidebar()
@@ -833,9 +850,41 @@ struct ContentView: View {
     private func setNewChatOpeningState(_ isOpening: Bool) {
         isOpeningNewChatFromSidebar = isOpening
         if isOpening {
+            activeNewChatDraftRoute = nil
             selectedThread = nil
             codex.activeThreadId = nil
         }
+    }
+
+    // Keeps sidebar chat creation compose-first while preserving which affordance
+    // opened it, so the draft UI can distinguish general Chat from folder Chat.
+    private func openNewChatDraftFromSidebar(
+        source: NewChatDraftSource,
+        preferredProjectPath: String?
+    ) {
+        let route = NewChatDraftRoute(
+            id: "new-chat-draft-\(UUID().uuidString)",
+            preferredProjectPath: preferredProjectPath,
+            source: source
+        )
+        activeNewChatDraftRoute = route
+        isOpeningNewChatFromSidebar = false
+        selectedThread = nil
+        codex.activeThreadId = nil
+
+        if isSidebarOpen || sidebarDragOffset > 0 {
+            closeSidebar()
+        }
+    }
+
+    private func openThreadFromNewChatDraft(_ thread: CodexThread) {
+        activeNewChatDraftRoute = nil
+        isOpeningNewChatFromSidebar = false
+        selectedThread = thread
+        codex.activeThreadId = thread.id
+        codex.markThreadAsViewed(thread.id)
+
+        codex.requestImmediateActiveThreadSync(threadId: thread.id)
     }
 
     // Keeps first-run installs in the scanner by default, while still letting users back out later.

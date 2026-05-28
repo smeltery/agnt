@@ -265,7 +265,7 @@ private struct SidebarLocalFolderCurrentSection: View {
             if let currentPath {
                 SidebarLocalFolderRow(
                     iconSystemName: "folder.fill",
-                    title: Self.displayName(for: currentPath),
+                    title: currentPath.pathDisplayName,
                     subtitle: currentPath
                 )
             } else {
@@ -274,11 +274,6 @@ private struct SidebarLocalFolderCurrentSection: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private static func displayName(for path: String) -> String {
-        let lastComponent = (path as NSString).lastPathComponent
-        return lastComponent.isEmpty ? path : lastComponent
     }
 }
 

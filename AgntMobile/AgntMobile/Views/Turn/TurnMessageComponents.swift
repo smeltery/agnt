@@ -486,8 +486,7 @@ private struct CodeCommentFindingCard: View {
     }
 
     private var fileName: String {
-        let basename = (finding.file as NSString).lastPathComponent
-        return basename.isEmpty ? finding.file : basename
+        finding.file.pathDisplayName
     }
 
     private var lineLabel: String? {
@@ -1418,8 +1417,7 @@ struct MessageRow: View, Equatable {
                 let color: Color
 
                 if trigger == "@", isConfirmedFileMention {
-                    let fileName = (normalizedToken as NSString).lastPathComponent
-                    displayName = fileName.isEmpty ? normalizedToken : fileName
+                    displayName = normalizedToken.pathDisplayName
                     color = .blue
                 } else if trigger == "@" {
                     displayName = SkillDisplayNameFormatter.displayName(for: normalizedToken)

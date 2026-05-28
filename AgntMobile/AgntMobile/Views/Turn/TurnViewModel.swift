@@ -1273,62 +1273,16 @@ final class TurnViewModel {
         subscriptions: SubscriptionService? = nil,
         threadID: String
     ) {
-        let payload = buildPayloadWithMentions()
-        let attachments = readyComposerAttachments
-        let skillMentions = composerMentionedSkills.map {
-            CodexTurnSkillMention(id: $0.name, name: $0.name, path: $0.path)
-        }
-        let mentionMentions = composerMentionedPlugins.map {
-            CodexTurnMention(name: $0.name, path: $0.path)
-        }
-        let reviewSelection = composerReviewSelection
-
-        guard (!payload.isEmpty || !attachments.isEmpty || reviewSelection != nil || !skillMentions.isEmpty || !mentionMentions.isEmpty),
-              !isSending,
-              codex.isConnected,
-              !hasBlockingAttachmentState else {
+        guard let pendingSend = buildValidatedPendingSend(
+            codex: codex,
+            subscriptions: subscriptions
+        ) else {
             return
         }
 
-        if reviewSelection != nil, hasComposerContentConflictingWithReview {
-            codex.lastErrorMessage = "Clear text, files, skills, and images before starting a code review."
-            return
-        }
-
-        if let subscriptions, !subscriptions.hasAppAccess {
-            codex.lastErrorMessage = "Your 5 free messages are over. Unlock agnt Pro to keep chatting."
-            return
-        }
-
-        let queuedDraft = reviewSelection == nil ? QueuedTurnDraft(
-            id: UUID().uuidString,
-            text: payload,
-            attachments: attachments,
-            skillMentions: skillMentions,
-            mentionMentions: mentionMentions,
-            collaborationMode: isPlanModeArmed ? .plan : nil,
-            rawInput: input,
-            rawFileMentions: composerMentionedFiles,
-            rawSkillMentions: composerMentionedSkills,
-            rawPluginMentions: composerMentionedPlugins,
-            rawAttachments: composerAttachments,
-            rawSubagentsSelectionArmed: isSubagentsSelectionArmed,
-            createdAt: Date()
-        ) : nil
-        let pendingSend = PendingTurnSend(
-            payload: payload,
-            attachments: attachments,
-            skillMentions: skillMentions,
-            mentionMentions: mentionMentions,
-            collaborationMode: isPlanModeArmed ? .plan : nil,
-            rawInput: input,
-            rawFileMentions: composerMentionedFiles,
-            rawSkillMentions: composerMentionedSkills,
-            rawPluginMentions: composerMentionedPlugins,
-            rawAttachments: composerAttachments,
-            rawReviewSelection: reviewSelection,
-            rawSubagentsSelectionArmed: isSubagentsSelectionArmed
-        )
+        let queuedDraft = pendingSend.rawReviewSelection == nil
+            ? makeQueuedDraft(from: pendingSend)
+            : nil
         let threadBusy = isThreadBusy(codex: codex, threadID: threadID)
         let queuePaused = isQueuePaused(codex: codex, threadID: threadID)
 
@@ -1359,6 +1313,166 @@ final class TurnViewModel {
             }
 
             await performTurnSend(pendingSend, codex: codex, threadID: threadID)
+        }
+    }
+
+    // Starts a real thread only when the first draft message is sent from the New Chat screen.
+    func sendNewThread(
+        codex: CodexService,
+        subscriptions: SubscriptionService? = nil,
+        draftThreadID: String,
+        preferredProjectPath: String?,
+        onThreadCreated: @escaping @MainActor (CodexThread) -> Void
+    ) {
+        guard let pendingSend = buildValidatedPendingSend(
+            codex: codex,
+            subscriptions: subscriptions
+        ) else {
+            return
+        }
+
+        subscriptions?.consumeFreeSendAttemptIfNeeded()
+        isSending = true
+        Task { @MainActor in
+            defer { isSending = false }
+
+            isPlanModeArmed = false
+            shouldAnchorToAssistantResponse = true
+            clearComposer()
+
+            do {
+                let thread = try await codex.startThreadIfReady(preferredProjectPath: preferredProjectPath)
+                try await dispatchPendingSend(pendingSend, codex: codex, threadID: thread.id)
+                clearLocalDraft(codex: codex, threadID: draftThreadID, persistToDisk: true)
+                clearLocalDraft(codex: codex, threadID: thread.id, persistToDisk: true)
+                onThreadCreated(thread)
+            } catch {
+                restorePendingSendOnFailure(
+                    pendingSend,
+                    error: error,
+                    codex: codex,
+                    draftThreadID: draftThreadID
+                )
+            }
+        }
+    }
+
+    // Shared validation + payload assembly used by `sendTurn` and `sendNewThread`
+    // so the empty/connected/blocking/review/subscription guards stay in one place.
+    private func buildValidatedPendingSend(
+        codex: CodexService,
+        subscriptions: SubscriptionService?
+    ) -> PendingTurnSend? {
+        let payload = buildPayloadWithMentions()
+        let attachments = readyComposerAttachments
+        let skillMentions = composerMentionedSkills.map {
+            CodexTurnSkillMention(id: $0.name, name: $0.name, path: $0.path)
+        }
+        let mentionMentions = composerMentionedPlugins.map {
+            CodexTurnMention(name: $0.name, path: $0.path)
+        }
+        let reviewSelection = composerReviewSelection
+
+        guard (!payload.isEmpty || !attachments.isEmpty || reviewSelection != nil || !skillMentions.isEmpty || !mentionMentions.isEmpty),
+              !isSending,
+              codex.isConnected,
+              !hasBlockingAttachmentState else {
+            return nil
+        }
+
+        if reviewSelection != nil, hasComposerContentConflictingWithReview {
+            codex.lastErrorMessage = "Clear text, files, skills, and images before starting a code review."
+            return nil
+        }
+
+        if let subscriptions, !subscriptions.hasAppAccess {
+            codex.lastErrorMessage = "Your 5 free messages are over. Unlock agnt Pro to keep chatting."
+            return nil
+        }
+
+        return PendingTurnSend(
+            payload: payload,
+            attachments: attachments,
+            skillMentions: skillMentions,
+            mentionMentions: mentionMentions,
+            collaborationMode: isPlanModeArmed ? .plan : nil,
+            rawInput: input,
+            rawFileMentions: composerMentionedFiles,
+            rawSkillMentions: composerMentionedSkills,
+            rawPluginMentions: composerMentionedPlugins,
+            rawAttachments: composerAttachments,
+            rawReviewSelection: reviewSelection,
+            rawSubagentsSelectionArmed: isSubagentsSelectionArmed
+        )
+    }
+
+    // Mirrors a validated PendingTurnSend into the queued-draft shape used when
+    // sendTurn needs to defer the payload behind a busy thread or paused queue.
+    private func makeQueuedDraft(from pendingSend: PendingTurnSend) -> QueuedTurnDraft {
+        QueuedTurnDraft(
+            id: UUID().uuidString,
+            text: pendingSend.payload,
+            attachments: pendingSend.attachments,
+            skillMentions: pendingSend.skillMentions,
+            mentionMentions: pendingSend.mentionMentions,
+            collaborationMode: pendingSend.collaborationMode,
+            rawInput: pendingSend.rawInput,
+            rawFileMentions: pendingSend.rawFileMentions,
+            rawSkillMentions: pendingSend.rawSkillMentions,
+            rawPluginMentions: pendingSend.rawPluginMentions,
+            rawAttachments: pendingSend.rawAttachments,
+            rawSubagentsSelectionArmed: pendingSend.rawSubagentsSelectionArmed,
+            createdAt: Date()
+        )
+    }
+
+    // Routes a PendingTurnSend through the right runtime call (review vs turn)
+    // so sendNewThread doesn't have to duplicate the review branch from
+    // performTurnSend. Errors bubble to the caller for context-specific recovery.
+    private func dispatchPendingSend(
+        _ pendingSend: PendingTurnSend,
+        codex: CodexService,
+        threadID: String
+    ) async throws {
+        if let reviewSelection = pendingSend.rawReviewSelection {
+            try await codex.startReview(
+                threadId: threadID,
+                target: reviewSelection.target?.codexReviewTarget,
+                baseBranch: reviewBaseBranchName(for: reviewSelection)
+            )
+        } else {
+            try await codex.startTurn(
+                userInput: pendingSend.payload,
+                threadId: threadID,
+                attachments: pendingSend.attachments,
+                skillMentions: pendingSend.skillMentions,
+                mentionMentions: pendingSend.mentionMentions,
+                fileMentions: confirmedFileMentionPaths(from: pendingSend.rawFileMentions),
+                collaborationMode: pendingSend.collaborationMode
+            )
+        }
+    }
+
+    // Shared failure recovery for both performTurnSend and sendNewThread: restores
+    // the exact composer payload so the user can retry without re-typing, persists
+    // it under the right thread id, and rebuilds the footer error message.
+    private func restorePendingSendOnFailure(
+        _ pendingSend: PendingTurnSend,
+        error: Error,
+        codex: CodexService,
+        draftThreadID: String
+    ) {
+        shouldAnchorToAssistantResponse = false
+        restoreComposerState(from: pendingSend)
+        saveLocalDraft(codex: codex, threadID: draftThreadID, persistToDisk: true)
+        if pendingSend.collaborationMode == .plan,
+           shouldRearmPlanModeAfterSendFailure(error) {
+            isPlanModeArmed = true
+        }
+        let fallbackMessage = codex.userFacingTurnErrorMessage(from: error)
+        if (codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            && !fallbackMessage.isEmpty {
+            codex.lastErrorMessage = fallbackMessage
         }
     }
 
@@ -2200,37 +2314,15 @@ final class TurnViewModel {
         clearComposer()
 
         do {
-            if let reviewSelection = pendingSend.rawReviewSelection {
-                try await codex.startReview(
-                    threadId: threadID,
-                    target: reviewSelection.target?.codexReviewTarget,
-                    baseBranch: reviewBaseBranchName(for: reviewSelection)
-                )
-            } else {
-                try await codex.startTurn(
-                    userInput: pendingSend.payload,
-                    threadId: threadID,
-                    attachments: pendingSend.attachments,
-                    skillMentions: pendingSend.skillMentions,
-                    mentionMentions: pendingSend.mentionMentions,
-                    fileMentions: confirmedFileMentionPaths(from: pendingSend.rawFileMentions),
-                    collaborationMode: pendingSend.collaborationMode
-                )
-            }
+            try await dispatchPendingSend(pendingSend, codex: codex, threadID: threadID)
             clearLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
         } catch {
-            shouldAnchorToAssistantResponse = false
-            restoreComposerState(from: pendingSend)
-            saveLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
-            if pendingSend.collaborationMode == .plan,
-               shouldRearmPlanModeAfterSendFailure(error) {
-                isPlanModeArmed = true
-            }
-            let fallbackMessage = codex.userFacingTurnErrorMessage(from: error)
-            if (codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-                && !fallbackMessage.isEmpty {
-                codex.lastErrorMessage = fallbackMessage
-            }
+            restorePendingSendOnFailure(
+                pendingSend,
+                error: error,
+                codex: codex,
+                draftThreadID: threadID
+            )
         }
     }
 

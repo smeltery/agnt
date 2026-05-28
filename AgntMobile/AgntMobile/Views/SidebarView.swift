@@ -19,6 +19,7 @@ struct SidebarView: View {
     let onClose: () -> Void
     let onOpenTerminal: () -> Void
     let onOpenMyMacs: () -> Void
+    let onOpenNewChatDraft: (NewChatDraftSource, String?) -> Void
     let onNewChatCreationStateChange: (Bool) -> Void
     let onOpenThread: (CodexThread) -> Void
 
@@ -137,7 +138,8 @@ struct SidebarView: View {
             runBadgeStateByThreadID: cachedRunBadges,
             onSelectThread: selectThread,
             onCreateThreadInProjectGroup: { group in
-                handleNewChatTap(preferredProjectPath: group.projectPath)
+                prepareSidebarForChatNavigation()
+                onOpenNewChatDraft(.folderChat, group.projectPath)
             },
             onArchiveProjectGroup: { group in
                 projectGroupPendingArchive = group
@@ -354,15 +356,21 @@ struct SidebarView: View {
         }
     }
 
-    // Shows a native sheet so folder names and full paths stay readable on small screens.
+    // Opens a draft composer first; the real thread is created only after the first send.
     private func handleNewChatButtonTap() {
-        activeSidebarSheet = .newChatProjectPicker
+        prepareSidebarForChatNavigation()
+        onOpenNewChatDraft(.generalChat, defaultNewChatProjectPath)
     }
 
-    // Starts a chat without a working directory (cwd == nil) directly from the sidebar row.
+    // Quick Chat skips the picker and opens an unscoped draft so the user can
+    // start typing without committing to a project up front.
     private func handleQuickChatTap() {
-        pendingTopAction = .quickChat
-        handleNewChatTap(preferredProjectPath: nil)
+        prepareSidebarForChatNavigation()
+        onOpenNewChatDraft(.generalChat, nil)
+    }
+
+    private var defaultNewChatProjectPath: String? {
+        newChatProjectChoices.first?.projectPath
     }
 
     // Opens the local folder browser so the user can register a new project root.

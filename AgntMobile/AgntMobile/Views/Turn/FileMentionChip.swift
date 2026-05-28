@@ -183,15 +183,10 @@ struct UserMentionChipRow: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(mentions, id: \.self) { path in
-                    FileMentionChip(fileName: Self.fileName(from: path))
+                    FileMentionChip(fileName: path.pathDisplayName)
                 }
             }
         }
-    }
-
-    private static func fileName(from path: String) -> String {
-        let name = (path as NSString).lastPathComponent
-        return name.isEmpty ? path : name
     }
 }
 
