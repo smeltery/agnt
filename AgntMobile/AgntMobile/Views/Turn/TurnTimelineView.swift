@@ -578,7 +578,9 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         }
         return TurnTimelineRenderProjection.project(
             messages: Array(visibleMessages),
-            completedTurnIDs: completedTurnIDs
+            completedTurnIDs: completedTurnIDs,
+            activeTurnID: activeTurnID,
+            isThreadRunning: isThreadRunning
         )
     }
 
@@ -625,6 +627,8 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     private func renderItemsInputKey(for messages: ArraySlice<CodexMessage>) -> Int {
         var hasher = Hasher()
         hasher.combine(messages.count)
+        hasher.combine(activeTurnID)
+        hasher.combine(isThreadRunning)
         hasher.combine(completedTurnIDs)
         for message in messages {
             hasher.combine(message.id)
@@ -889,7 +893,9 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         cachedRenderItemsInputKey = key
         cachedRenderItems = TurnTimelineRenderProjection.project(
             messages: Array(visibleMessages),
-            completedTurnIDs: completedTurnIDs
+            completedTurnIDs: completedTurnIDs,
+            activeTurnID: activeTurnID,
+            isThreadRunning: isThreadRunning
         )
     }
 

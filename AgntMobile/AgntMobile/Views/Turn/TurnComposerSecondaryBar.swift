@@ -12,6 +12,7 @@ struct TurnComposerSecondaryBar: View {
     let isEmptyThread: Bool
     let hasWorkingDirectory: Bool
     let isWorktreeProject: Bool
+    var activeFileChangeStatus: FileChangeStatusSnapshot? = nil
 
     let selectedAccessMode: CodexAccessMode
     let contextWindowUsage: ContextWindowUsage?
@@ -61,6 +62,11 @@ struct TurnComposerSecondaryBar: View {
                     accessMenuLabel
                     Spacer()
 
+                    if let activeFileChangeStatus {
+                        FileChangeStatusCapsule(snapshot: activeFileChangeStatus)
+                            .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .trailing)))
+                    }
+
                     if showsGitBranchSelector {
                         TurnGitBranchSelector(
                             isEnabled: isGitBranchSelectorEnabled,
@@ -84,6 +90,7 @@ struct TurnComposerSecondaryBar: View {
                 }
 
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(response: 0.28, dampingFraction: 0.88), value: activeFileChangeStatus)
             }
         }
     }

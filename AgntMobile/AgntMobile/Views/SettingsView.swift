@@ -6,12 +6,20 @@
 import SwiftUI
 import UIKit
 
+private struct SettingsComputerNamePresentation: Identifiable {
+    let deviceId: String?
+    let currentName: String
+    let systemName: String
+
+    var id: String { deviceId ?? currentName }
+}
+
 struct SettingsView: View {
     @Environment(CodexService.self) private var codex
     @Environment(SubscriptionService.self) private var subscriptions
 
     @AppStorage("codex.appFontStyle") private var appFontStyleRawValue = AppFont.defaultStoredStyleRawValue
-    @State private var isShowingComputerNameSheet = false
+    @State private var computerNamePresentation: SettingsComputerNamePresentation?
 
     private let runtimeAutoValue = "__AUTO__"
     private let runtimeNormalValue = "__NORMAL__"
@@ -26,6 +34,7 @@ struct SettingsView: View {
                 SettingsGPTAccountCard()
                 SettingsSubscriptionCard()
                 SettingsBridgeVersionCard()
+                SettingsCommandReferenceCard()
                 runtimeDefaultsSection
                 SettingsAboutCard()
                 SettingsUsageCard()
@@ -35,14 +44,14 @@ struct SettingsView: View {
         }
         .font(AppFont.body())
         .navigationTitle("Settings")
-        .sheet(isPresented: $isShowingComputerNameSheet) {
-            if let trustedPairPresentation = codex.trustedPairPresentation {
-                SettingsComputerNameSheet(
-                    nickname: sidebarComputerNicknameBinding(for: trustedPairPresentation),
-                    currentName: trustedPairPresentation.name,
-                    systemName: trustedPairPresentation.systemName ?? trustedPairPresentation.name
-                )
-            }
+        // Own settings modals from the stable screen root; nested cards can be
+        // rebuilt while connection status changes and should not own sheets.
+        .sheet(item: $computerNamePresentation) { presentation in
+            SettingsComputerNameSheet(
+                nickname: sidebarComputerNicknameBinding(for: presentation.deviceId),
+                currentName: presentation.currentName,
+                systemName: presentation.systemName
+            )
         }
         .task {
             guard subscriptions.bootstrapState == .idle else {
@@ -178,7 +187,7 @@ struct SettingsView: View {
                     presentation: trustedPairPresentation,
                     connectionStatusLabel: connectionStatusLabel,
                     onEditName: {
-                        isShowingComputerNameSheet = true
+                        presentComputerNameSheet()
                     }
                 )
             } else {
@@ -365,11 +374,24 @@ struct SettingsView: View {
         )
     }
 
-    // Writes nicknames against the active trusted computer so switching pairs does not reuse the wrong alias.
-    private func sidebarComputerNicknameBinding(for presentation: CodexTrustedPairPresentation) -> Binding<String> {
+    // Captures the visible device details before presenting so reconnect updates cannot dismiss the editor.
+    private func presentComputerNameSheet() {
+        guard let trustedPairPresentation = codex.trustedPairPresentation else {
+            return
+        }
+
+        computerNamePresentation = SettingsComputerNamePresentation(
+            deviceId: trustedPairPresentation.deviceId,
+            currentName: trustedPairPresentation.name,
+            systemName: trustedPairPresentation.systemName ?? trustedPairPresentation.name
+        )
+    }
+
+    // Writes nicknames against the tapped trusted computer so switching pairs does not reuse the wrong alias.
+    private func sidebarComputerNicknameBinding(for deviceId: String?) -> Binding<String> {
         Binding(
-            get: { SidebarComputerNicknameStore.nickname(for: presentation.deviceId) },
-            set: { SidebarComputerNicknameStore.setNickname($0, for: presentation.deviceId) }
+            get: { SidebarComputerNicknameStore.nickname(for: deviceId) },
+            set: { SidebarComputerNicknameStore.setNickname($0, for: deviceId) }
         )
     }
 }
@@ -929,6 +951,88 @@ private struct SettingsBridgeVersionCard: View {
     }
 }
 
+private struct SettingsCommandReferenceCard: View {
+    private let commands = [
+        SettingsCommandReference(
+            command: "agnt up",
+            detail: "Starts agnt on your computer, refreshes the bridge service, and prints a pairing QR for first-time setup or recovery."
+        ),
+        SettingsCommandReference(
+            command: "agnt start",
+            detail: "Starts the background bridge service without printing a QR in the current Terminal window."
+        ),
+        SettingsCommandReference(
+            command: "agnt restart",
+            detail: "Restarts the background bridge service when the computer is paired but the app cannot reconnect cleanly."
+        ),
+        SettingsCommandReference(
+            command: "agnt qr / agnt pair",
+            detail: "Refreshes the bridge and prints a new QR code so this iPhone can scan and trust the computer again."
+        ),
+        SettingsCommandReference(
+            command: "agnt status",
+            detail: "Shows whether the computer bridge service is loaded and whether a recent pairing payload is available."
+        ),
+        SettingsCommandReference(
+            command: "agnt stop",
+            detail: "Stops the background bridge service on your computer and clears its transient runtime status."
+        ),
+        SettingsCommandReference(
+            command: "agnt reset-pairing",
+            detail: "Clears saved pairing trust so the next connection requires a fresh QR scan."
+        ),
+        SettingsCommandReference(
+            command: "agnt resume",
+            detail: "Reopens the last active agnt thread in the active coding agent on your computer."
+        ),
+        SettingsCommandReference(
+            command: "agnt watch [threadId]",
+            detail: "Tails a thread event log in real time from Terminal."
+        ),
+        SettingsCommandReference(
+            command: "agnt --version",
+            detail: "Prints the installed agnt CLI version."
+        )
+    ]
+
+    var body: some View {
+        SettingsCard(title: "Computer commands") {
+            Text("Run these in Terminal on your paired computer when you need to start, repair, or inspect the local agnt bridge.")
+                .font(AppFont.caption())
+                .foregroundStyle(.secondary)
+
+            ForEach(commands) { command in
+                SettingsCommandReferenceRow(command: command)
+            }
+        }
+    }
+}
+
+private struct SettingsCommandReference: Identifiable {
+    let command: String
+    let detail: String
+
+    var id: String { command }
+}
+
+private struct SettingsCommandReferenceRow: View {
+    let command: SettingsCommandReference
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(command.command)
+                .font(AppFont.mono(.caption))
+                .foregroundStyle(.primary)
+
+            Text(command.detail)
+                .font(AppFont.caption())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 private struct SettingsArchivedChatsCard: View {
     @Environment(CodexService.self) private var codex
 
@@ -961,20 +1065,20 @@ private struct SettingsArchivedChatsCard: View {
 }
 
 private struct SettingsAboutCard: View {
-    @State private var isShowingAbout = false
-
     var body: some View {
         SettingsCard(title: "About") {
             Text("Chats are End-to-end encrypted between your iPhone and your computer. The relay only sees ciphertext and connection metadata after the secure handshake completes.")
                 .font(AppFont.caption())
                 .foregroundStyle(.secondary)
 
-            Button {
-                HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                isShowingAbout = true
+            // Keep About inside the Settings navigation stack so card refreshes
+            // cannot dismiss a nested full-screen cover back to the app root.
+            NavigationLink {
+                AboutAgntView()
             } label: {
                 settingsAccessoryRow(
                     title: "How agnt Works",
+                    showsDisclosure: false,
                     leading: {
                         Image(systemName: "info.circle")
                             .font(AppFont.subheadline(weight: .medium))
@@ -982,6 +1086,9 @@ private struct SettingsAboutCard: View {
                 )
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                HapticFeedback.shared.triggerImpactFeedback(style: .light)
+            })
 
             Button {
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
@@ -1030,14 +1137,12 @@ private struct SettingsAboutCard: View {
             }
             .buttonStyle(.plain)
         }
-        .fullScreenCover(isPresented: $isShowingAbout) {
-            AboutAgntView()
-        }
     }
 
     // Keeps settings rows visually consistent while allowing SF Symbols or asset icons.
     private func settingsAccessoryRow<Leading: View>(
         title: String,
+        showsDisclosure: Bool = true,
         @ViewBuilder leading: () -> Leading
     ) -> some View {
         HStack(spacing: 8) {
@@ -1045,9 +1150,11 @@ private struct SettingsAboutCard: View {
             Text(title)
                 .font(AppFont.subheadline(weight: .medium))
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(.tertiary)
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .foregroundStyle(.primary)
         .padding(.vertical, 10)
