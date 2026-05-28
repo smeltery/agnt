@@ -39,8 +39,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dotbrains.agnt.mobile.R
 
-private const val ONBOARDING_PAGE_COUNT = 5
-
 /**
  * One-time intro before first QR scan. Mirrors the iOS paged, dark setup flow.
  */
@@ -50,7 +48,6 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier,
 ) {
     var page by remember { mutableIntStateOf(0) }
-    val isLastPage = page == ONBOARDING_PAGE_COUNT - 1
 
     Box(
         modifier =
@@ -86,10 +83,9 @@ fun OnboardingScreen(
             OnboardingPageDots(page = page)
             Button(
                 onClick = {
-                    if (isLastPage) {
-                        onContinue()
-                    } else {
-                        page += 1
+                    when (OnboardingFlowLogic.primaryActionForPage(page)) {
+                        OnboardingPrimaryAction.Advance -> page += 1
+                        OnboardingPrimaryAction.Finish -> onContinue()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -101,13 +97,7 @@ fun OnboardingScreen(
                     ),
             ) {
                 Text(
-                    text =
-                        when (page) {
-                            0 -> "Get Started"
-                            1 -> "Set Up"
-                            ONBOARDING_PAGE_COUNT - 1 -> stringResource(R.string.onboarding_continue)
-                            else -> "Continue"
-                        },
+                    text = stringResource(OnboardingFlowLogic.ctaLabelRes(page)),
                     style = MaterialTheme.typography.labelLarge,
                 )
             }

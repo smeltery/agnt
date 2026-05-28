@@ -10,6 +10,9 @@
     <string name="notification_approval_body">Approval needed to continue.</string>
     <string name="notification_structured_input_one">Input needed to continue.</string>
     <string name="notification_structured_input_many">%1$d inputs needed to continue.</string>
+    <string name="onboarding_cta_get_started">Get Started</string>
+    <string name="onboarding_cta_set_up">Set Up</string>
+    <string name="onboarding_cta_continue">Continue</string>
     <string name="root_placeholder_title">agnt</string>
     <string name="root_placeholder_body">Android shell — protocol and UI in later phases.</string>
     <string name="thread_list_title">Threads</string>
