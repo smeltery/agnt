@@ -220,8 +220,12 @@ struct NewChatDraftView: View {
     }
 
     // Source-specific prompt UI:
-    // - General Chat exposes the picker because the folder is still user-selectable.
+    // - Project-backed General Chat exposes the available-folder context menu
+    //   before first send; global/rootless Chat stays picker-free.
     // - Folder/project button keeps the normal title because that folder is already implied.
+    // Regression guard: the Projects general-chat empty state must stay as
+    // "What should we work on?" followed by the folder-only picker, while the
+    // global Chats pill stays just "What should we work on?" + input.
     private var promptStack: some View {
         Group {
             if isFromGeneralChat {
@@ -235,19 +239,18 @@ struct NewChatDraftView: View {
 
     private var generalChatPrompt: some View {
         VStack(spacing: 8) {
-            Image("AppLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 50, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .adaptiveGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            ChatLogoBadge()
                 .padding(.bottom, 4)
             Text("What should we work on?")
                 .font(AppFont.title2(weight: .regular))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 28)
-            folderPickerPill
+
+            if showsGeneralFolderPicker {
+                // Visible only for project-backed general chat; rootless global Chat stays bare.
+                folderPickerPill
+            }
             Text("Chats are End-to-end encrypted")
                 .font(AppFont.caption())
                 .foregroundStyle(.secondary)
@@ -258,12 +261,7 @@ struct NewChatDraftView: View {
 
     private var folderButtonPrompt: some View {
         VStack(spacing: 12) {
-            Image("AppLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 50, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .adaptiveGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            ChatLogoBadge()
             ChatEmptyStateTitleBuilder.makeTitle(for: placeholderFolderName)
                 .font(AppFont.title2(weight: .regular))
                 .multilineTextAlignment(.center)
@@ -280,8 +278,9 @@ struct NewChatDraftView: View {
         TurnChatToolbarTitleLabel(
             title: "New thread",
             subtitle: placeholderFolderName ?? trustedHostName,
-            onTap: { activeSheet = .projectPicker },
-            accessibilityHint: "Opens the project picker"
+            // General chat uses the inline context menu; folder-backed drafts can still open the sheet.
+            onTap: !isFromGeneralChat && hasSelectedProject ? { activeSheet = .projectPicker } : nil,
+            accessibilityHint: !isFromGeneralChat && hasSelectedProject ? "Opens the project picker" : nil
         )
     }
 
@@ -365,6 +364,11 @@ struct NewChatDraftView: View {
 
     private var hasSelectedProject: Bool {
         selectedProjectPath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
+    private var showsGeneralFolderPicker: Bool {
+        isFromGeneralChat
+            && CodexThreadStartProjectBinding.normalizedProjectPath(route.preferredProjectPath) != nil
     }
 
     private func handleDraftGitActionSelection(_ action: TurnGitActionKind) {
@@ -452,34 +456,57 @@ struct NewChatDraftView: View {
         placeholderFolderName ?? "Quick Chat"
     }
 
-    // Inline tap target: folder icon + name + chevron.up.chevron.down sized
-    // at body so it sits visually under the title3 prompt without competing
-    // with it for emphasis.
+    // Compact inline picker shown below the "What should we work on?" prompt.
+    // Regression guard: this is a context menu of available folders only, not
+    // the full new-chat sheet and not a Quick Chat selector.
     private var folderPickerPill: some View {
-        Button {
-            HapticFeedback.shared.triggerImpactFeedback(style: .light)
-            activeSheet = .projectPicker
+        Menu {
+            folderPickerMenuContent
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 pickerIcon
-                    .frame(width: 24, height: 24)
-
+                    .frame(width: 18, height: 18)
                 Text(folderPillLabel)
                     .font(AppFont.title2(weight: .regular))
                     .lineLimit(1)
                     .truncationMode(.middle)
-
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(AppFont.caption())
+                    .font(AppFont.body(weight: .regular))
             }
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .menuOrder(.fixed)
         .accessibilityLabel("Select folder")
-        .accessibilityHint("Opens the project picker")
+        .accessibilityHint("Opens available folders")
         .accessibilityValue(folderPillLabel)
+    }
+
+    // Builds the small folder-only menu used by the general-chat empty state.
+    @ViewBuilder
+    private var folderPickerMenuContent: some View {
+        if projectChoices.isEmpty {
+            Button {
+                // Disabled placeholder so the menu still opens with feedback.
+            } label: {
+                Label("No folders available", systemImage: "folder")
+            }
+            .disabled(true)
+        } else {
+            ForEach(projectChoices) { choice in
+                Button {
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    selectedProjectPath = choice.projectPath
+                } label: {
+                    if selectedProjectPath == choice.projectPath {
+                        Label(choice.label, systemImage: "checkmark")
+                    } else {
+                        Label(choice.label, systemImage: choice.iconSystemName)
+                    }
+                }
+            }
+        }
     }
 
     // SF Symbol fallbacks (the upstream RemodexCentralIcons asset set is not

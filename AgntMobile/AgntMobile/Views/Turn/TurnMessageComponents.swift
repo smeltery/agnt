@@ -1645,10 +1645,6 @@ struct MessageRow: View, Equatable {
                 }
             }
 
-            if !suppressNativeProposedPlanShell && message.isStreaming && showsStreamingAnimations {
-                TypingIndicator()
-            }
-
             if !suppressNativeProposedPlanShell && hasTurnEndActions {
                 turnEndActionButtons
             }
@@ -1743,9 +1739,6 @@ struct MessageRow: View, Equatable {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if message.isStreaming && showsStreamingAnimations {
-                TypingIndicator()
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 2)
@@ -1804,9 +1797,6 @@ struct MessageRow: View, Equatable {
                 }
             }
 
-            if showsStreamingAnimations {
-                TypingIndicator()
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {
@@ -1843,7 +1833,6 @@ struct MessageRow: View, Equatable {
             SubagentActionCard(
                 parentThreadId: message.threadId,
                 action: subagentAction,
-                isStreaming: message.isStreaming && showsStreamingAnimations,
                 onOpenSubagent: subagentOpenAction
             )
         } else {
@@ -3219,46 +3208,6 @@ struct DiffCountsLabel: View {
             Text("-\(deletions)")
                 .foregroundStyle(Color.red)
         }
-    }
-}
-
-// ─── Typing indicator ───────────────────────────────────────────────
-
-struct TypingIndicator: View {
-    private let trackWidth: CGFloat = 26
-    private let trackHeight: CGFloat = 6
-    private let highlightWidth: CGFloat = 16
-    private let duration: TimeInterval = 1.0
-    @State private var shimmerOffset: CGFloat = -21
-
-    var body: some View {
-        Capsule(style: .continuous)
-            .fill(Color.secondary.opacity(0.12))
-            .frame(width: trackWidth, height: trackHeight)
-            .overlay {
-                Capsule(style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.secondary.opacity(0.04),
-                                Color.secondary.opacity(0.42),
-                                Color.secondary.opacity(0.04),
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: highlightWidth, height: trackHeight)
-                    .offset(x: shimmerOffset)
-            }
-            .clipShape(Capsule(style: .continuous))
-        .onAppear {
-            guard shimmerOffset < 0 else { return }
-            withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
-                shimmerOffset = 21
-            }
-        }
-        .accessibilityHidden(true)
     }
 }
 
