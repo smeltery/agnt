@@ -528,6 +528,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     @State private var cachedNewestStreamingMessageID: String? = nil
     @State private var cachedRenderItems: [TurnTimelineRenderItem] = []
     @State private var cachedRenderItemsInputKey: Int = 0
+    @State private var cachedRenderItemsShapeSignature: Int?
     @State private var blockInfoInputKey: Int = 0
     @State private var scrollSessionThreadID: String?
     @State private var autoScrollMode: TurnAutoScrollMode = .followBottom
@@ -571,17 +572,48 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         return hasher.finalize()
     }
 
+    // Renders appended/removed rows immediately if SwiftUI reaches body before the
+    // lifecycle cache refresh. Assistant text-only deltas still use the cached rows.
     private var visibleRenderItems: [TurnTimelineRenderItem] {
-        let key = renderItemsInputKey(for: visibleMessages)
-        if key == cachedRenderItemsInputKey, !cachedRenderItems.isEmpty {
+        let visibleSlice = visibleMessages
+        guard renderItemsShapeSignature(for: visibleSlice) != cachedRenderItemsShapeSignature else {
             return cachedRenderItems
         }
         return TurnTimelineRenderProjection.project(
-            messages: Array(visibleMessages),
+            messages: Array(visibleSlice),
             completedTurnIDs: completedTurnIDs,
             activeTurnID: activeTurnID,
             isThreadRunning: isThreadRunning
         )
+    }
+
+    // Mirrors visibleMessagesBoundarySignature shape but adds the projection inputs
+    // so a body-time fallback can stay synchronous without rehashing streaming text.
+    private func renderItemsShapeSignature(for messages: ArraySlice<CodexMessage>) -> Int {
+        var hasher = Hasher()
+        hasher.combine(threadID)
+        hasher.combine(visibleTailCount)
+        hasher.combine(messages.count)
+        hasher.combine(activeTurnID)
+        hasher.combine(isThreadRunning)
+        hasher.combine(completedTurnIDs)
+
+        if let message = messages.first {
+            hasher.combine(message.id)
+            hasher.combine(message.orderIndex)
+        }
+
+        if let message = messages.last {
+            hasher.combine(message.id)
+            hasher.combine(message.role)
+            hasher.combine(message.kind)
+            hasher.combine(message.turnId)
+            hasher.combine(message.deliveryState)
+            hasher.combine(message.isStreaming)
+            hasher.combine(message.orderIndex)
+        }
+
+        return hasher.finalize()
     }
 
     private var hasEarlierMessages: Bool {
@@ -888,11 +920,19 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     }
 
     private func recomputeRenderItemsIfNeeded() {
-        let key = renderItemsInputKey(for: visibleMessages)
-        guard key != cachedRenderItemsInputKey || cachedRenderItems.isEmpty else { return }
+        let visibleSlice = visibleMessages
+        let key = renderItemsInputKey(for: visibleSlice)
+        let shapeSignature = renderItemsShapeSignature(for: visibleSlice)
+        guard key != cachedRenderItemsInputKey || cachedRenderItems.isEmpty else {
+            // Keep the body-time short-circuit in sync even when the full input key
+            // matches (e.g. streaming text deltas re-hit the same cached projection).
+            cachedRenderItemsShapeSignature = shapeSignature
+            return
+        }
         cachedRenderItemsInputKey = key
+        cachedRenderItemsShapeSignature = shapeSignature
         cachedRenderItems = TurnTimelineRenderProjection.project(
-            messages: Array(visibleMessages),
+            messages: Array(visibleSlice),
             completedTurnIDs: completedTurnIDs,
             activeTurnID: activeTurnID,
             isThreadRunning: isThreadRunning
