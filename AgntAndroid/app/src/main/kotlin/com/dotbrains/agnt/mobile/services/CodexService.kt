@@ -105,9 +105,21 @@ class CodexService(
     @Volatile
     internal var sessionReady = false
 
-    /** Cleared when the bridge reports unsupported `voice/resolveAuth` (parity iOS). */
-    @Volatile
-    internal var supportsBridgeVoiceAuth: Boolean = true
+    /**
+     * Cleared when the bridge reports unsupported `voice/resolveAuth` / `voice/transcribe`
+     * (e.g. non-Codex providers replying with `-32601` or the synthetic "managed externally"
+     * shape). The composer observes this through [bridgeSupportsVoiceTranscription] to hide
+     * the mic affordance once the bridge has confirmed it cannot service voice. Reset to
+     * `true` in [com.dotbrains.agnt.mobile.services.resetBridgeSession] (parity iOS).
+     */
+    internal val _bridgeSupportsVoiceTranscription = MutableStateFlow(true)
+    override val bridgeSupportsVoiceTranscription: StateFlow<Boolean> =
+        _bridgeSupportsVoiceTranscription.asStateFlow()
+    internal var supportsBridgeVoiceAuth: Boolean
+        get() = _bridgeSupportsVoiceTranscription.value
+        set(value) {
+            _bridgeSupportsVoiceTranscription.value = value
+        }
 
     /**
      * Cleared when a `turn/start` or `thread/start` error indicates the bridge does not support `serviceTier`

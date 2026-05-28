@@ -111,6 +111,15 @@ interface CodexRepository {
 
     val pendingStructuredInputRequest: StateFlow<PendingStructuredInputRequest?>
 
+    /**
+     * `false` once the bridge has reported `voice/resolveAuth` or `voice/transcribe` as
+     * unsupported for the active session (e.g. a non-Codex provider replying with `-32601`
+     * or the synthetic "managed externally" shape). The composer observes this to hide
+     * the mic affordance — there's no `ActiveProvider` state holder yet, so we rely on the
+     * bridge to fail-once and self-disable rather than gating up front. Reset on reconnect.
+     */
+    val bridgeSupportsVoiceTranscription: StateFlow<Boolean>
+
     /** Recoverable npm / pairing prompts from the service layer (bridge upgrade, unsupported runtime fields). */
     val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?>
 

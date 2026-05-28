@@ -22,14 +22,24 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
       `acceptForSession` is gated to command approvals only, matching iOS.
       Regression coverage: `IncomingEventRouterServerRequestTest`,
       `PendingApprovalTimelineFormatterTest`, `PendingRequestPresentationTest`.
-- [ ] **Codex-only RPC gating**. Verify all UI surfaces that call
-      `account/login/*`, `account/status/read`, `voice/transcribe`,
-      `voice/resolveAuth`, structured-JSON `thread/generateTitle`, and
-      `account/login/openOnMac` either:
-        - hide their affordance when `activeProvider.id != "codex"`, or
-        - tolerate the synthetic "managed externally" response.
-      Today the Codex UI in `CodexServiceVoice.kt`, `CodexServiceStatus.kt` and
-      `CodexServiceMessages.kt` calls these unconditionally.
+- [x] **Codex-only RPC gating**. Audit complete:
+        - `account/login/*`, `account/status/read`, `account/logout`,
+          `account/login/openOnMac`, `getAuthStatus` — **never called** from the
+          Android client. Account state is managed externally on the Mac/desktop
+          side; the Android client has no login UI to gate.
+        - `thread/generateTitle` — already tolerated. `generatedThreadTitleOrNull`
+          (`CodexServiceThreadTitles.kt`) wraps `sendRequestImpl` in
+          `runCatching { ... }.getOrNull()`; non-Codex providers' "managed
+          externally" reply falls through to whatever fallback the caller has.
+        - `voice/resolveAuth` / `voice/transcribe` — UI now self-disables.
+          `supportsBridgeVoiceAuth` was already cleared by
+          `consumeUnsupportedVoiceBridgeAuth` on the first negative response;
+          it's now exposed as `bridgeSupportsVoiceTranscription: StateFlow<Boolean>`
+          on `CodexRepository`, and `TurnConversationPane.voiceInteractionEnabled`
+          observes it so the composer hides the mic after the first failed
+          attempt. Self-resets on reconnect via `resetBridgeSession`.
+          Pre-emptive gating (hiding the mic *before* the first attempt) still
+          needs the `ActiveProvider` state holder below.
 - [ ] **Active provider awareness**. Surface the active provider id on
       `thread/started` / `bridge/status` and use it to drive the gates above.
       Add a `ActiveProvider` state holder in `core/` and observe it from

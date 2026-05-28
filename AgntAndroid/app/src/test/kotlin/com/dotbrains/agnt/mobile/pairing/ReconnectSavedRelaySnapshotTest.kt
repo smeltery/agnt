@@ -84,6 +84,7 @@ private class ReconnectTrackingRepository : CodexRepository {
     override val pendingApprovalRequest: StateFlow<PendingApprovalRequest?> = MutableStateFlow(null)
     override val pendingStructuredInputRequest: StateFlow<PendingStructuredInputRequest?> =
         MutableStateFlow(null)
+    override val bridgeSupportsVoiceTranscription: StateFlow<Boolean> = MutableStateFlow(true)
     override val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?> = MutableStateFlow(null)
 
     override suspend fun connect(

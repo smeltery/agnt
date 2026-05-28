@@ -146,6 +146,7 @@ fun TurnConversationPane(
     val olderHistoryErrorByThread by repository.olderHistoryErrorByThread.collectAsStateWithLifecycle()
     val threads by repository.threads.collectAsStateWithLifecycle()
     val connectionState by repository.connectionState.collectAsStateWithLifecycle()
+    val bridgeSupportsVoiceTranscription by repository.bridgeSupportsVoiceTranscription.collectAsStateWithLifecycle()
     val hasResolvedRateLimits by repository.hasResolvedRateLimitsSnapshot.collectAsStateWithLifecycle()
     val isLoadingRateLimits by repository.isLoadingRateLimits.collectAsStateWithLifecycle()
     val rateLimitsError by repository.rateLimitsErrorMessage.collectAsStateWithLifecycle()
@@ -454,9 +455,16 @@ fun TurnConversationPane(
         }
     }
 
+    // Hidden once the bridge confirms voice/resolveAuth / voice/transcribe is unsupported
+    // (e.g. non-Codex providers respond with -32601 or "managed externally"). The flag
+    // self-resets on reconnect via resetBridgeSession so a successful Codex re-pair
+    // brings the mic back without restart.
     val voiceInteractionEnabled =
-        remember(ready, connectionState, sending) {
-            ready && connectionState is ConnectionState.Connected && !sending
+        remember(ready, connectionState, sending, bridgeSupportsVoiceTranscription) {
+            ready &&
+                connectionState is ConnectionState.Connected &&
+                !sending &&
+                bridgeSupportsVoiceTranscription
         }
 
     fun remainingAttachmentSlots(): Int = (MAX_COMPOSER_ATTACHMENTS - composerAttachments.size).coerceAtLeast(0)

@@ -124,6 +124,7 @@ private abstract class TestRepository : CodexRepository {
     override val selectedServiceTier: StateFlow<CodexServiceTier?> = MutableStateFlow(null)
     override val pendingApprovalRequest: StateFlow<PendingApprovalRequest?> = MutableStateFlow(null)
     override val pendingStructuredInputRequest: StateFlow<PendingStructuredInputRequest?> = MutableStateFlow(null)
+    override val bridgeSupportsVoiceTranscription: StateFlow<Boolean> = MutableStateFlow(true)
     override val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?> = MutableStateFlow(null)
 
     override suspend fun connect(serverUrl: String, token: String, role: String?) = error("unused")
