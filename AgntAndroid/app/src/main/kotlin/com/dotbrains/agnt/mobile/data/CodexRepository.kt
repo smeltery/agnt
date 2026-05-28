@@ -1,5 +1,6 @@
 package com.dotbrains.agnt.mobile.data
 
+import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
@@ -115,10 +116,21 @@ interface CodexRepository {
      * `false` once the bridge has reported `voice/resolveAuth` or `voice/transcribe` as
      * unsupported for the active session (e.g. a non-Codex provider replying with `-32601`
      * or the synthetic "managed externally" shape). The composer observes this to hide
-     * the mic affordance — there's no `ActiveProvider` state holder yet, so we rely on the
-     * bridge to fail-once and self-disable rather than gating up front. Reset on reconnect.
+     * the mic affordance once the bridge has confirmed it. Reset on reconnect.
+     *
+     * Most pre-emptive gating now happens via [activeProvider] below; this flag remains a
+     * fail-once-then-hide fallback for the gap between connection and the first initialize
+     * response, and for older bridges that don't publish a provider id yet.
      */
     val bridgeSupportsVoiceTranscription: StateFlow<Boolean>
+
+    /**
+     * Which coding-agent backend the bridge is brokering. Sourced from the `initialize`
+     * response's `result.providerId` so the UI can gate Codex-only affordances (voice
+     * transcribe, account login, structured-JSON thread/generateTitle) before the first
+     * negative round-trip. Defaults to [ActiveProvider.Unknown] until initialize completes.
+     */
+    val activeProvider: StateFlow<ActiveProvider>
 
     /** Recoverable npm / pairing prompts from the service layer (bridge upgrade, unsupported runtime fields). */
     val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?>

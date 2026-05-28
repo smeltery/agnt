@@ -18,6 +18,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
+import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
@@ -120,6 +121,17 @@ class CodexService(
         set(value) {
             _bridgeSupportsVoiceTranscription.value = value
         }
+
+    /**
+     * Which coding-agent backend the bridge is brokering for the current session. Set from
+     * the `initialize` response's `result.providerId` (warm path). Defaults to
+     * [ActiveProvider.Unknown] before the first initialize lands and is cleared back to
+     * Unknown by `resetBridgeSession`. UI gates should treat Unknown as "don't pre-emptively
+     * hide" — the existing fail-once-then-hide fallbacks (bridgeSupportsVoiceTranscription,
+     * runCatching on thread/generateTitle) cover the gap.
+     */
+    internal val _activeProvider = MutableStateFlow(ActiveProvider.Unknown)
+    override val activeProvider: StateFlow<ActiveProvider> = _activeProvider.asStateFlow()
 
     /**
      * Cleared when a `turn/start` or `thread/start` error indicates the bridge does not support `serviceTier`

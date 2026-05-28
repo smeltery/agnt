@@ -65,10 +65,15 @@ function createHandshakeHandler({
   getDeviceState,
   setDeviceState,
   consoleImpl = console,
+  providerId = "",
 }) {
   // ── per-bridge state ───────────────────────────────────────────────────
   let codexHandshakeState = initialHandshakeWarm ? "warm" : "cold";
   let lastCompatibilityWarning = "";
+  // Published in every initialize response so the phone can pre-emptively
+  // gate Codex-only affordances (voice, account login, structured-JSON
+  // thread/generateTitle) instead of waiting for a -32601 failure round-trip.
+  const normalizedProviderId = typeof providerId === "string" ? providerId.trim() : "";
   /** Tracks `initialize` request ids the bridge forwarded to Codex; their
    *  responses flip the handshake to "warm" so future reconnects can be
    *  answered locally. */
@@ -110,7 +115,7 @@ function createHandshakeHandler({
 
       sendApplicationResponse(JSON.stringify({
         id: parsed.id,
-        result: { bridgeManaged: true },
+        result: buildInitializeResult({ bridgeManaged: true }),
       }));
       return true;
     }
@@ -175,6 +180,23 @@ function createHandshakeHandler({
   /** Test-and-debug helper. */
   function isWarm() {
     return codexHandshakeState === "warm";
+  }
+
+  /**
+   * Decorates a successful `initialize` result object with the active provider
+   * id so clients can gate Codex-only affordances (voice transcribe, account
+   * login, structured-JSON thread/generateTitle) pre-emptively. The cold path
+   * — where the codex transport answers `initialize` itself — relies on the
+   * client's next reconnect (always warm) to learn the provider; that's an
+   * acceptable trade-off because cold connections are rare and the existing
+   * fail-once-then-hide fallback covers the gap.
+   */
+  function buildInitializeResult(base) {
+    const result = (base && typeof base === "object") ? { ...base } : {};
+    if (normalizedProviderId) {
+      result.providerId = normalizedProviderId;
+    }
+    return result;
   }
 
   // ── private: builds the JSON-RPC error sent back when the phone is too old

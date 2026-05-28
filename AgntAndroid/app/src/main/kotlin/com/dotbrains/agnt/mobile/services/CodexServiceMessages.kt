@@ -149,16 +149,30 @@ internal suspend fun CodexService.initializeSession() {
                     ),
             ),
         )
-    try {
-        rpcRequestWhileHandshaking("initialize", modern)
-    } catch (e: Exception) {
-        if (!shouldRetryInitializeWithoutCapabilities(e)) {
-            throw e
+    val response =
+        try {
+            rpcRequestWhileHandshaking("initialize", modern)
+        } catch (e: Exception) {
+            if (!shouldRetryInitializeWithoutCapabilities(e)) {
+                throw e
+            }
+            val legacy = JSONValue.Obj(mapOf("clientInfo" to clientInfo))
+            rpcRequestWhileHandshaking("initialize", legacy)
         }
-        val legacy = JSONValue.Obj(mapOf("clientInfo" to clientInfo))
-        rpcRequestWhileHandshaking("initialize", legacy)
-    }
+    captureActiveProviderFromInitializeResponse(response)
     sendMessage(RPCMessage.notification(method = "initialized", params = null, includeJsonRpc = false))
+}
+
+// Reads the bridge-managed `result.providerId` so the UI can pre-emptively gate
+// Codex-only affordances (voice transcribe, account login, structured-JSON
+// thread/generateTitle) instead of waiting for a `-32601` round-trip. Older
+// bridges that don't publish providerId yield ActiveProvider.Unknown — the
+// existing fail-once-then-hide fallbacks (bridgeSupportsVoiceTranscription,
+// runCatching on thread/generateTitle) cover that gap.
+internal fun CodexService.captureActiveProviderFromInitializeResponse(response: RPCMessage) {
+    val resultObject = (response.result as? JSONValue.Obj)?.map ?: return
+    val providerId = resultObject["providerId"]?.stringValue
+    _activeProvider.value = com.dotbrains.agnt.mobile.core.model.ActiveProvider.fromBridgeId(providerId)
 }
 
 private fun shouldRetryInitializeWithoutCapabilities(e: Throwable): Boolean {

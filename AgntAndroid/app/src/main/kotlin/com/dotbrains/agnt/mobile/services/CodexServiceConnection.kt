@@ -105,6 +105,7 @@ internal suspend fun CodexService.resetBridgeSession(preservePresentationState: 
     supportsTurnCollaborationMode = true
     supportsThreadFork = true
     supportsBridgeVoiceAuth = true
+    _activeProvider.value = com.dotbrains.agnt.mobile.core.model.ActiveProvider.Unknown
     _bridgeUpdatePrompt.value = null
     hasPresentedServiceTierBridgeUpdatePrompt = false
     hasPresentedThreadForkBridgeUpdatePrompt = false

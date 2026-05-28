@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.BuildConfig
+import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.AIChangeSet
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
@@ -147,6 +148,7 @@ fun TurnConversationPane(
     val threads by repository.threads.collectAsStateWithLifecycle()
     val connectionState by repository.connectionState.collectAsStateWithLifecycle()
     val bridgeSupportsVoiceTranscription by repository.bridgeSupportsVoiceTranscription.collectAsStateWithLifecycle()
+    val activeProvider by repository.activeProvider.collectAsStateWithLifecycle()
     val hasResolvedRateLimits by repository.hasResolvedRateLimitsSnapshot.collectAsStateWithLifecycle()
     val isLoadingRateLimits by repository.isLoadingRateLimits.collectAsStateWithLifecycle()
     val rateLimitsError by repository.rateLimitsErrorMessage.collectAsStateWithLifecycle()
@@ -455,16 +457,27 @@ fun TurnConversationPane(
         }
     }
 
-    // Hidden once the bridge confirms voice/resolveAuth / voice/transcribe is unsupported
-    // (e.g. non-Codex providers respond with -32601 or "managed externally"). The flag
-    // self-resets on reconnect via resetBridgeSession so a successful Codex re-pair
-    // brings the mic back without restart.
+    // Provider-aware gating:
+    //   • activeProvider == Codex → mic shown immediately on connect.
+    //   • activeProvider in {Claude, Opencode, Cursor} → mic hidden pre-emptively
+    //     (voice/transcribe is a Codex-only RPC).
+    //   • activeProvider == Unknown → fall back to the legacy bridgeSupportsVoiceTranscription
+    //     flag so older bridges (no providerId on initialize) still get the fail-once-then-hide
+    //     behavior that landed before the provider state holder.
     val voiceInteractionEnabled =
-        remember(ready, connectionState, sending, bridgeSupportsVoiceTranscription) {
-            ready &&
-                connectionState is ConnectionState.Connected &&
-                !sending &&
-                bridgeSupportsVoiceTranscription
+        remember(ready, connectionState, sending, bridgeSupportsVoiceTranscription, activeProvider) {
+            if (!ready || connectionState !is ConnectionState.Connected || sending) {
+                false
+            } else {
+                when (activeProvider) {
+                    ActiveProvider.Codex -> bridgeSupportsVoiceTranscription
+                    ActiveProvider.Claude,
+                    ActiveProvider.Opencode,
+                    ActiveProvider.Cursor,
+                    -> false
+                    ActiveProvider.Unknown -> bridgeSupportsVoiceTranscription
+                }
+            }
         }
 
     fun remainingAttachmentSlots(): Int = (MAX_COMPOSER_ATTACHMENTS - composerAttachments.size).coerceAtLeast(0)

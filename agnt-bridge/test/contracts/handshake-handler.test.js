@@ -18,7 +18,7 @@ const { createHandshakeHandler } = require("../../src/bridge/handshake-handler")
 
 const BRIDGE_VERSION = "0.9.0";
 
-function makeHandler({ initialHandshakeWarm = false, bridgePackageVersion = BRIDGE_VERSION } = {}) {
+function makeHandler({ initialHandshakeWarm = false, bridgePackageVersion = BRIDGE_VERSION, providerId = "" } = {}) {
   const out = [];
   // Minimum shape `normalizeBridgeDeviceState` accepts. Bridge.js loads a
   // real one via loadOrCreateBridgeDeviceState; we synthesize the bare
@@ -39,6 +39,7 @@ function makeHandler({ initialHandshakeWarm = false, bridgePackageVersion = BRID
     getDeviceState: () => deviceState,
     setDeviceState: (next) => { deviceState = next; },
     consoleImpl: { warn: (msg) => warnings.push(msg) },
+    providerId,
   });
   return {
     handler,
@@ -83,6 +84,27 @@ test("a second `initialize` after warm is answered locally with bridgeManaged:tr
   assert.equal(out.length, 1);
   assert.deepEqual(JSON.parse(out[0]), {
     id: "req-2",
+    result: { bridgeManaged: true },
+  });
+});
+
+test("warm initialize publishes providerId so the phone can gate Codex-only RPCs", () => {
+  for (const providerId of ["codex", "claude", "opencode", "cursor"]) {
+    const { handler, out } = makeHandler({ initialHandshakeWarm: true, providerId });
+    handler.handlePhoneMessage(JSON.stringify({ id: "req-px", method: "initialize", params: {} }));
+    assert.equal(out.length, 1);
+    assert.deepEqual(JSON.parse(out[0]), {
+      id: "req-px",
+      result: { bridgeManaged: true, providerId },
+    });
+  }
+});
+
+test("warm initialize omits providerId when none is configured (older bridge shape)", () => {
+  const { handler, out } = makeHandler({ initialHandshakeWarm: true });
+  handler.handlePhoneMessage(JSON.stringify({ id: "req-p0", method: "initialize", params: {} }));
+  assert.deepEqual(JSON.parse(out[0]), {
+    id: "req-p0",
     result: { bridgeManaged: true },
   });
 });

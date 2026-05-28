@@ -40,10 +40,19 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
           attempt. Self-resets on reconnect via `resetBridgeSession`.
           Pre-emptive gating (hiding the mic *before* the first attempt) still
           needs the `ActiveProvider` state holder below.
-- [ ] **Active provider awareness**. Surface the active provider id on
-      `thread/started` / `bridge/status` and use it to drive the gates above.
-      Add a `ActiveProvider` state holder in `core/` and observe it from
-      `CodexService*` (rename of the latter is deferred — see below).
+- [x] **Active provider awareness**. The bridge now publishes `providerId` in
+      the `initialize` response (`agnt-bridge/src/bridge/handshake-handler.js`).
+      `core/model/ActiveProvider.kt` parses it via `fromBridgeId`, the
+      `CodexService` holds a `MutableStateFlow<ActiveProvider>`, and
+      `CodexRepository.activeProvider: StateFlow<ActiveProvider>` exposes it
+      to UI. `TurnConversationPane.voiceInteractionEnabled` now hides the mic
+      pre-emptively for Claude / opencode / Cursor; `Unknown` (older bridges
+      that don't publish providerId) falls back to the legacy
+      fail-once-then-hide path so nothing regresses. Reset to `Unknown` in
+      `resetBridgeSession`. Cold-path initialize (codex transport answers
+      directly) doesn't carry providerId yet — the client picks it up on the
+      next warm reconnect. Tracked: `ActiveProviderTest`,
+      `handshake-handler.test.js` providerId cases.
 - [ ] **`system/notice` toast surfacing**. Verify the `system/notice` JSON-RPC
       notification path renders an Android Snackbar/toast like opencode's
       `tui.toast.show` does on iOS.

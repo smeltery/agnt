@@ -233,6 +233,7 @@ function startBridge({
     initialHandshakeWarm: Boolean(config.codexEndpoint),
     getDeviceState: () => deviceState,
     setDeviceState: (next) => { deviceState = next; },
+    providerId: activeProvider.id,
   });
   handshakeHandler.logCompatibilityWarning(cachedIOSAppCompatibilityWarning);
   const secureTransport = createBridgeSecureTransport({
