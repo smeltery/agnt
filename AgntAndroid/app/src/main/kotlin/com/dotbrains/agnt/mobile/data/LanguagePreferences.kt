@@ -9,14 +9,20 @@ import com.dotbrains.agnt.mobile.core.model.AppLanguagePreference
 import java.util.Locale
 
 object LanguagePreferences {
-    private const val PREFS_NAME = "remodex_ui"
+    private const val PREFS_NAME = "agnt_ui"
+    private const val LEGACY_PREFS_NAME = "remodex_ui"
     private val englishLocale: Locale = Locale.forLanguageTag("en")
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    private fun legacyPrefs(context: Context) =
+        context.applicationContext.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
+
     fun read(context: Context): AppLanguagePreference {
-        val raw = prefs(context).getString(AppLanguagePreference.storageKey, null)
+        val raw =
+            prefs(context).getString(AppLanguagePreference.storageKey, null)
+                ?: legacyPrefs(context).getString(AppLanguagePreference.legacyStorageKey, null)
         return AppLanguagePreference.fromStorage(raw)
     }
 
