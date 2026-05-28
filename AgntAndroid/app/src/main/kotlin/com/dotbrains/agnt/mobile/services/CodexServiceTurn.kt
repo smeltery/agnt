@@ -432,7 +432,21 @@ private fun CodexService.buildTurnStartRequestParams(
     return JSONValue.Obj(params)
 }
 
-private fun buildCollaborationModePayload(
+// Builds the on-the-wire `params.collaborationMode` payload sent on `turn/start`.
+//
+// Producer parity:
+//   * Codex transport reads this nested shape directly.
+//   * Claude bridge translator
+//     (agnt-bridge/src/providers/claude/translate.js) checks
+//     `params.collaborationMode.mode === "plan"` and maps it to
+//     `--permission-mode plan` — that's how plan mode reaches Claude today.
+//   * Cursor / opencode read `permissionMode` separately; they ignore
+//     `collaborationMode` so plan mode is effectively a no-op there
+//     (which is correct — neither provider has a plan-mode equivalent).
+//
+// `internal` so JVM unit tests can pin the wire shape without spinning up a
+// CodexService instance.
+internal fun buildCollaborationModePayload(
     mode: CodexCollaborationModeKind,
     threadModel: String?,
     reasoningEffort: String?,

@@ -204,6 +204,27 @@ test("turn/start posts a message body and emits turn/started immediately", async
   assert.equal(turnStarted.params.turnId, ack.result.turnId);
 });
 
+test("turn/start accepts `params.model` as a fallback for `modelID` (Android wire shape)", async () => {
+  // Android always sends `params.model` (parity with how it talks to Claude /
+  // Cursor / Codex); opencode upstream prefers `modelID` but the translator
+  // already falls back. This pins the fallback so a future opencode upstream
+  // rename doesn't quietly break per-turn model overrides on Android.
+  const { translator, httpCalls } = setupTranslator();
+  translator.outbound(JSON.stringify({
+    id: "tu-model-fallback",
+    method: "turn/start",
+    params: {
+      threadId: "ses_x",
+      input: [{ type: "text", text: "hi" }],
+      providerID: "anthropic",
+      model: "claude-haiku-4-5",
+    },
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(httpCalls[0].body.modelID, "claude-haiku-4-5");
+});
+
 test("message.updated assistant + message.part.updated text emit item/started + agent delta", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({

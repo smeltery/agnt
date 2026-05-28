@@ -74,11 +74,27 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
 
 ### P2 — provider-flag plumbing
 
-- [ ] Surface Claude plan mode in the composer toolbar
-      (`TurnComposerToolbar*Builder.kt`). The bridge accepts
-      `params.permissionMode` per turn.
-- [ ] Verify per-turn `params.model` override is forwarded for all providers
-      (currently designed against the Codex shape).
+- [x] **Plan mode for Claude**. Already wired end-to-end via the existing
+      `collaborationMode` mechanism: the composer's plan-mode toggle
+      (`TurnComposerBar.isPlanModeEnabled`, in the attachment-menu dropdown)
+      sends `params.collaborationMode = { mode: "plan", settings: {...} }`
+      on `turn/start`, which the Claude bridge translator
+      (`agnt-bridge/src/providers/claude/translate.js`) maps to
+      `--permission-mode plan`. Producer pinned by
+      `CollaborationModePayloadTest`; consumer pinned by the Claude
+      translator's "turn/start params translate to per-turn CLI args"
+      test. Granular per-turn `permissionMode` values
+      (`acceptEdits`/`bypassPermissions`/`dontAsk`/...) aren't surfaced in
+      the composer — left as a follow-up if a user need surfaces.
+- [x] **Per-turn `params.model` override**. Already wired in
+      `CodexServiceTurn.buildTurnStartRequestParams` (always sends
+      `params["model"]` from `runtimeModelIdentifierForTurn`, which respects
+      the composer's `_selectedModelId` first and falls back to the
+      thread's persisted model). Confirmed against all three non-Codex
+      providers: Claude / Cursor read `params.model | modelId | modelID`;
+      opencode reads `params.modelID | params.model` — fallback path now
+      pinned by an opencode contract test
+      (`turn/start accepts params.model as a fallback for modelID`).
 
 ### P2.4 — terminal feature follow-ups
 
