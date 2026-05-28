@@ -552,6 +552,9 @@ extension CodexService {
                 discardTurnStartWorkspaceCheckpointCopyIfNeeded(turnId: resolvedTurnID)
             }
             requestImmediateSync(threadId: threadId)
+            if terminalState == .completed {
+                scheduleAppReviewPromptAfterSuccessfulRun(threadId: threadId, turnId: resolvedTurnID)
+            }
 
             guard let turnFailureMessage else {
                 return
@@ -578,6 +581,18 @@ extension CodexService {
         lastErrorMessage = shouldSuppressRuntimeMessageInChat(turnFailureMessage)
             ? nil
             : (userFacingRuntimeMessage(for: turnFailureMessage) ?? turnFailureMessage)
+    }
+
+    // Runs after turn completion bookkeeping so review prompting cannot affect runtime state.
+    private func scheduleAppReviewPromptAfterSuccessfulRun(threadId: String, turnId: String?) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.appReviewPromptCoordinator.noteSuccessfulRun(
+                threadId: threadId,
+                turnId: turnId,
+                isCurrentThreadVisible: self.activeThreadId == threadId
+            )
+        }
     }
 
     private func handleErrorNotification(_ paramsObject: IncomingParamsObject?) {
