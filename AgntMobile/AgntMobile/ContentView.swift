@@ -46,6 +46,11 @@ struct ContentView: View {
     @State private var isSidebarPrewarmed = false
     @State private var selectedThread: CodexThread?
     @State private var navigationPath = NavigationPath()
+    // Tracks whether the top of `navigationPath` is a terminal route so that
+    // re-opening the terminal from a different surface replaces the active page
+    // instead of stacking a near-identical one. Kept in sync with `navigationPath`
+    // pushes and decreases observed via `onChange(of: navigationPath)`.
+    @State private var topNavigationRouteIsTerminal = false
     @State private var showSettings = false
     @State private var isShowingManualScanner = false
     @State private var isShowingMyMacsScanner = false
@@ -116,6 +121,7 @@ struct ContentView: View {
             .onChange(of: showSettings) { _, show in
                 if show {
                     navigationPath.append("settings")
+                    topNavigationRouteIsTerminal = false
                     showSettings = false
                 }
             }
@@ -135,10 +141,16 @@ struct ContentView: View {
                     debugSidebarLog("sidebar open skips immediate sync prewarmed=\(isSidebarPrewarmed) connected=\(codex.isConnected)")
                 }
             }
-            .onChange(of: navigationPath) { _, _ in
-                debugSidebarLog("navigation path changed count=\(navigationPath.count) sidebarOpen=\(isSidebarOpen)")
+            .onChange(of: navigationPath) { previousPath, newPath in
+                debugSidebarLog("navigation path changed count=\(newPath.count) sidebarOpen=\(isSidebarOpen)")
                 if isSidebarOpen {
                     closeSidebar()
+                }
+                // Reset the terminal-route tracker whenever the stack shrinks (system
+                // back) or empties, so subsequent `openTerminal` calls don't pop a
+                // non-terminal route by mistake.
+                if newPath.count < previousPath.count {
+                    topNavigationRouteIsTerminal = false
                 }
             }
             .onChange(of: selectedThread) { previousThread, thread in
@@ -834,8 +846,14 @@ struct ContentView: View {
         }
     }
 
+    // Terminal can be opened from several surfaces with different cwd payloads;
+    // replace the active terminal route instead of stacking near-identical pages.
     private func openTerminal(preferredWorkingDirectory: String?) {
+        if topNavigationRouteIsTerminal, !navigationPath.isEmpty {
+            navigationPath.removeLast()
+        }
         navigationPath.append(TerminalNavigationRoute(preferredWorkingDirectory: preferredWorkingDirectory))
+        topNavigationRouteIsTerminal = true
     }
 
     // Prevents a close-swipe release from also activating whichever sidebar row was under the finger.
@@ -1537,6 +1555,7 @@ struct ContentView: View {
         let route = MyMacsNavigationRoute()
         closeSidebar()
         navigationPath.append(route)
+        topNavigationRouteIsTerminal = false
     }
 
     private func presentMyMacsScanner() {
