@@ -1041,6 +1041,12 @@ fun MainShell(
                                 }
                             }
                         },
+                        // Surface the menu item whenever the active thread has a repo-bound
+                        // cwd. Mirrors iOS `onTapTerminal = onOpenTerminal == nil ? nil : { onOpenTerminal?(gitWorkingDirectory) }`.
+                        showOpenTerminalHere = !gitCwd.isNullOrBlank(),
+                        onOpenTerminalHere = gitCwd?.takeIf { it.isNotBlank() }?.let { cwd ->
+                            { navController.navigate(AppRoutes.terminalRoute(cwd)) }
+                        },
                         modifier = Modifier.align(Alignment.TopCenter),
                     )
                 }

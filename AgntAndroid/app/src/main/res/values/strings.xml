@@ -211,6 +211,7 @@
     <string name="turn_open_desktop_opening">Opening…</string>
     <string name="turn_open_desktop_error_title">Desktop handoff</string>
     <string name="turn_open_desktop_failed_fallback">Could not open the desktop app.</string>
+    <string name="turn_open_terminal_here">Open Terminal Here</string>
     <string name="thread_continuation_from_archived">Continued from archived thread `%1$s`</string>
     <string name="turn_stop">Stop</string>
     <string name="turn_connected_locally">Connected locally</string>
@@ -554,7 +555,7 @@
     <string name="terminal_windows_guide_step_4_command">mkdir $HOME\\.ssh -Force\nnotepad $HOME\\.ssh\\authorized_keys\n\nPaste the contents of agnt_ed25519.pub</string>
     <string name="terminal_windows_guide_step_5_title">5. Find the PC IP, then use it in agnt</string>
     <string name="terminal_windows_guide_step_5_command">ipconfig</string>
-    <string name="terminal_windows_guide_note">Recommended private-key format: OpenSSH Ed25519 with a passphrase, created by ssh-keygen above. agnt also accepts encrypted PKCS#8 and encrypted legacy PEM keys; unencrypted keys work only if you explicitly enable that option on the profile. In agnt use the Windows username, PC IPv4 address, port 22, and the matching private key. Administrator accounts use C:\\ProgramData\\ssh\\administrators_authorized_keys instead.</string>
+    <string name="terminal_windows_guide_note">Recommended private-key format: OpenSSH Ed25519 with a passphrase, created by ssh-keygen above. ECDSA (P-256/384/521) and RSA keys also work — pass `-t ecdsa` or `-t rsa` to ssh-keygen instead. agnt accepts OpenSSH new-format keys, encrypted PKCS#8, and encrypted legacy PEM keys; unencrypted keys work only if you explicitly enable that option on the profile. In agnt use the Windows username, PC IPv4 address, port 22, and the matching private key. Administrator accounts use C:\\ProgramData\\ssh\\administrators_authorized_keys instead.</string>
     <string name="terminal_windows_guide_disclosure_show">Need help setting up Windows?</string>
     <string name="terminal_windows_guide_disclosure_hide">Hide Windows setup guide</string>
 </resources>

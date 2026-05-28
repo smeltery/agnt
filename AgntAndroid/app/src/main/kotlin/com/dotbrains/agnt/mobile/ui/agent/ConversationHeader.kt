@@ -106,11 +106,13 @@ fun ConversationHeader(
     onContinueDesktop: () -> Unit,
     onWorktreeHandoff: () -> Unit,
     onStopTurn: () -> Unit,
+    showOpenTerminalHere: Boolean = false,
+    onOpenTerminalHere: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var overflowExpanded by remember { mutableStateOf(false) }
     var gitMenuExpanded by remember { mutableStateOf(false) }
-    val showOverflow = showDesktopHandoff || showWorktreeHandoff || showTurnStop
+    val showOverflow = showDesktopHandoff || showWorktreeHandoff || showTurnStop || showOpenTerminalHere
     val diffCd = stringResource(R.string.cd_git_repo_diff_totals)
     val gitMenuCd = stringResource(R.string.cd_git_actions_menu)
     val chrome = isAgentLightChrome()
@@ -197,6 +199,8 @@ fun ConversationHeader(
                     showTurnStop = showTurnStop,
                     onContinueDesktop = onContinueDesktop,
                     onWorktreeHandoff = onWorktreeHandoff,
+                    showOpenTerminalHere = showOpenTerminalHere,
+                    onOpenTerminalHere = onOpenTerminalHere,
                     onStopTurn = onStopTurn,
                 )
             }
@@ -415,6 +419,8 @@ private fun HeaderActions(
     onContinueDesktop: () -> Unit,
     onWorktreeHandoff: () -> Unit,
     onStopTurn: () -> Unit,
+    showOpenTerminalHere: Boolean = false,
+    onOpenTerminalHere: (() -> Unit)? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -556,6 +562,17 @@ private fun HeaderActions(
                                 if (!handingOffWorktree) onWorktreeHandoff()
                             },
                             enabled = !handingOffWorktree,
+                        )
+                    }
+                    if (showOpenTerminalHere && onOpenTerminalHere != null) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(stringResource(R.string.turn_open_terminal_here))
+                            },
+                            onClick = {
+                                onSetOverflowExpanded(false)
+                                onOpenTerminalHere()
+                            },
                         )
                     }
                     if (showTurnStop) {

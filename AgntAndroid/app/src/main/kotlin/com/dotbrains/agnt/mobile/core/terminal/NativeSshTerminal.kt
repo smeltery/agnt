@@ -42,7 +42,7 @@ class NativeSshTerminal(
             TerminalError("The SSH host key changed. Check the host before reconnecting.")
 
         class UnsupportedPrivateKey(reason: String) :
-            TerminalError("This SSH key type is not supported yet: $reason. Use an Ed25519 or RSA private key.")
+            TerminalError("This SSH key type is not supported yet: $reason. Use an Ed25519, ECDSA, or RSA private key.")
 
         object SessionNotRunning :
             TerminalError("The SSH terminal is not running.")

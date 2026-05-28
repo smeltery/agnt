@@ -5,8 +5,10 @@ import com.dotbrains.agnt.mobile.core.config.FeatureFlags
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.ui.about.AboutScreen
 import com.dotbrains.agnt.mobile.ui.about.WhatsNewScreen
@@ -74,9 +76,25 @@ fun AppNavHost(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
-        composable(AppRoutes.Terminal) {
+        composable(
+            route = AppRoutes.Terminal,
+            arguments = listOf(
+                navArgument(AppRoutes.TerminalArgCwd) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            // Decoded by navigation-compose's StringType; URL-encoded by
+            // AppRoutes.terminalRoute. Blank → null so the screen falls back
+            // to the persisted profile cwd.
+            val preferredCwd = backStackEntry.arguments
+                ?.getString(AppRoutes.TerminalArgCwd)
+                ?.takeIf { it.isNotBlank() }
             TerminalScreen(
                 onNavigateBack = { navController.popBackStack() },
+                preferredWorkingDirectory = preferredCwd,
             )
         }
     }

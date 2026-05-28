@@ -276,7 +276,7 @@ fun SidebarDrawerContent(
                         onClick = {
                             drawerScope.launch {
                                 closeDrawer()
-                                navController.navigate(AppRoutes.Terminal)
+                                navController.navigate(AppRoutes.terminalRoute())
                             }
                         },
                     ) {

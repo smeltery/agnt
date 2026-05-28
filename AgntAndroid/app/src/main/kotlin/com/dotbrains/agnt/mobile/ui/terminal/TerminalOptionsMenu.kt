@@ -2,6 +2,7 @@ package com.dotbrains.agnt.mobile.ui.terminal
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -95,8 +96,38 @@ fun TerminalOptionsMenu(
         )
         HorizontalDivider()
         sessions.forEach { session ->
+            // Per-tab status dot + cwd subtitle. Mirrors the iOS multi-tab
+            // menu (TerminalScreen.swift), which shows the same status color
+            // and the cwd path under each tab label so users can pick the
+            // right session at a glance when several are running.
             DropdownMenuItem(
-                text = { Text(session.displayLabel) },
+                text = {
+                    androidx.compose.foundation.layout.Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
+                                drawCircle(color = toneFor(session.status))
+                            }
+                            Text(
+                                session.displayLabel,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        val cwdText = session.cwd.trim().takeIf { it.isNotEmpty() }
+                        if (cwdText != null) {
+                            Text(
+                                text = cwdText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 16.dp),
+                            )
+                        }
+                    }
+                },
                 trailingIcon = {
                     if (session.terminalId == activeTerminalId) {
                         Icon(

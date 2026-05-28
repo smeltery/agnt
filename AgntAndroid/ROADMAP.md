@@ -102,12 +102,25 @@ The on-device SSH terminal landed (parity with iOS Citadel/Ghostty surface)
 backed by `sshj` and an xterm.js WebView host (`assets/terminal/terminal.html`).
 Open follow-ups:
 
-- [ ] Per-turn "Open Terminal Here" toolbar entry (iOS lives in
-      `TurnToolbarContent.swift`); on Android this needs to land in the turn
-      action menu and pre-populate the terminal cwd from the active worktree.
-- [ ] ECDSA + OpenSSH FIDO key support. sshj decodes Ed25519 / RSA / ECDSA
-      out of the box, but the editor sheet only documents Ed25519/RSA. Verify
-      ECDSA round-trips and document.
+- [x] **Per-turn "Open Terminal Here" toolbar entry**. The
+      `ConversationHeader` overflow menu now exposes "Open Terminal Here"
+      whenever the active thread is bound to a git working directory; it
+      navigates to the terminal screen with the cwd pre-populated. Wired
+      through a new `AppRoutes.terminalRoute(cwd)` builder (URL-encodes the
+      path) → `composable(AppRoutes.Terminal, args = [cwd])` →
+      `TerminalScreen(preferredWorkingDirectory = cwd)`. Older sidebar
+      entry passes `cwd = null` and keeps the previous behavior. Tracked:
+      `AppRoutesTest`.
+- [x] **ECDSA SSH key support**. sshj's `client.loadKeys(...)` already
+      accepts ECDSA (P-256/384/521) keys — confirmed via a JVM regression
+      test (`EcdsaKeyDecodeTest`) that generates a P-256 keypair, PEM-wraps
+      it as PKCS#8, and asserts `PKCS8KeyFile` round-trips it to
+      `KeyType.ECDSA256`. Doc strings updated:
+      `TerminalError.UnsupportedPrivateKey` now mentions ECDSA, and the
+      Windows setup guide note documents `-t ecdsa` / `-t rsa` alongside
+      Ed25519. OpenSSH FIDO (`-t ed25519-sk` / `-t ecdsa-sk`) keys still
+      require a hardware token round-trip that sshj doesn't support — out
+      of scope.
 - [x] Termux-style native terminal renderer (`TermuxTerminalSurface`, ported
       from upstream Stivy-01/remodex 245ea8a). Apache-2.0 `terminal-view` +
       `terminal-emulator` deps resolved via JitPack. Wired as the WebView
@@ -115,8 +128,12 @@ Open follow-ups:
       promote Termux above WebView, add a user-facing toggle; for now WebView
       remains the default unless `isUnavailableSignal` fires. Visual
       verification on a device still pending.
-- [ ] Multi-tab session UI polish. The drop-down session list works but
-      lacks the per-tab cwd / status badging the iOS menu has.
+- [x] **Multi-tab session UI polish**. Each session row in
+      `TerminalOptionsMenu` now renders a status dot (using the same tone
+      palette as the title pill) and the session's cwd as a secondary line
+      under the label, matching iOS's `TerminalScreen.swift` multi-tab
+      menu. Empty cwd is hidden so unconnected/idle tabs don't show a
+      stray subtitle.
 
 ### P2.5 — beta tester module
 
