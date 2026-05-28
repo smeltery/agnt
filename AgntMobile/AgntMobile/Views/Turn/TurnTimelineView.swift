@@ -542,6 +542,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     @State private var userScrollCooldownUntil: Date?
     @State private var scrollGeometryCoalescer = ScrollGeometryCoalescer()
     @State private var lastTimelineGeometryLogBucket: Int?
+    @State private var timelineChangeCoalescer = MainQueueUpdateCoalescer()
 
     /// The tail slice of messages currently rendered in the timeline.
     private var visibleMessages: ArraySlice<CodexMessage> {
@@ -821,48 +822,60 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                             "timelineChangeToken changed token=\(timelineChangeToken) "
                                 + "messageCount=\(messages.count) visibleTail=\(visibleTailCount)"
                         )
-                        recomputeRenderItemsIfNeeded()
-                        recomputeBlockInfoIfNeeded()
-                        handleTimelineMutation(using: proxy)
+                        timelineChangeCoalescer.schedule {
+                            recomputeRenderItemsIfNeeded()
+                            recomputeBlockInfoIfNeeded()
+                            handleTimelineMutation(using: proxy)
+                        }
                     }
                     .onChange(of: isThreadRunning) { _, _ in
                         debugTimelineLog("isThreadRunning changed value=\(isThreadRunning)")
                         // Run-state changes alter the sticky pending row and bottom inset before
                         // the first assistant item exists, so treat them like a timeline mutation.
-                        recomputeRenderItemsIfNeeded()
-                        recomputeBlockInfoIfNeeded()
-                        handleTimelineMutation(using: proxy)
+                        DispatchQueue.main.async {
+                            recomputeRenderItemsIfNeeded()
+                            recomputeBlockInfoIfNeeded()
+                            handleTimelineMutation(using: proxy)
+                        }
                     }
                     .onChange(of: isSendInFlight) { _, _ in
                         debugTimelineLog("isSendInFlight changed value=\(isSendInFlight)")
                         // Sending mode is the optimistic-user-row gap between tap and turn/start.
                         // Re-run normal mutation handling so the row is measured while still pending.
-                        recomputeRenderItemsIfNeeded()
-                        recomputeBlockInfoIfNeeded()
-                        handleTimelineMutation(using: proxy)
+                        DispatchQueue.main.async {
+                            recomputeRenderItemsIfNeeded()
+                            recomputeBlockInfoIfNeeded()
+                            handleTimelineMutation(using: proxy)
+                        }
                     }
                     .onChange(of: visibleMessagesBoundarySignature) { _, _ in
                         debugTimelineLog(
                             "visible messages changed token=\(timelineChangeToken) "
                                 + "messageCount=\(messages.count) visibleTail=\(visibleTailCount)"
                         )
-                        recomputeRenderItemsIfNeeded()
-                        recomputeBlockInfoIfNeeded()
-                        scheduleProgressiveTailRevealIfNeeded()
-                        handleTimelineMutation(using: proxy)
+                        DispatchQueue.main.async {
+                            recomputeRenderItemsIfNeeded()
+                            recomputeBlockInfoIfNeeded()
+                            scheduleProgressiveTailRevealIfNeeded()
+                            handleTimelineMutation(using: proxy)
+                        }
                     }
                     .onChange(of: threadID) { _, _ in
                         debugTimelineLog("threadID changed to=\(threadID)")
-                        beginScrollSessionIfNeeded(force: true)
-                        recomputeRenderItemsIfNeeded()
-                        recomputeBlockInfoIfNeeded()
-                        scheduleProgressiveTailRevealIfNeeded()
-                        handleTimelineMutation(using: proxy)
+                        DispatchQueue.main.async {
+                            beginScrollSessionIfNeeded(force: true)
+                            recomputeRenderItemsIfNeeded()
+                            recomputeBlockInfoIfNeeded()
+                            scheduleProgressiveTailRevealIfNeeded()
+                            handleTimelineMutation(using: proxy)
+                        }
                     }
                     .onChange(of: activeTurnID) { _, _ in
                         debugTimelineLog("activeTurnID changed to=\(activeTurnID ?? "nil")")
-                        recomputeBlockInfoIfNeeded()
-                        handleTimelineMutation(using: proxy)
+                        DispatchQueue.main.async {
+                            recomputeBlockInfoIfNeeded()
+                            handleTimelineMutation(using: proxy)
+                        }
                     }
                     .onChange(of: latestTurnTerminalState) { _, _ in
                         debugTimelineLog("latestTurnTerminalState changed to=\(String(describing: latestTurnTerminalState))")
@@ -1870,5 +1883,24 @@ private struct TurnFloatingButtonPressStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.9 : 1)
             .opacity(configuration.isPressed ? 0.82 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+// Coalesces high-frequency observer callbacks without mutating SwiftUI state from onChange.
+private final class MainQueueUpdateCoalescer {
+    private var isScheduled = false
+    private var pendingAction: (() -> Void)?
+
+    func schedule(_ action: @escaping () -> Void) {
+        pendingAction = action
+        guard !isScheduled else { return }
+        isScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let action = pendingAction
+            pendingAction = nil
+            isScheduled = false
+            action?()
+        }
     }
 }
