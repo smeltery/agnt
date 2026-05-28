@@ -106,7 +106,8 @@ extension CodexService {
     func sendRequest(
         method: String,
         params: JSONValue?,
-        timeoutNanoseconds: UInt64? = nil
+        timeoutNanoseconds: UInt64? = nil,
+        timeoutMessage: String? = nil
     ) async throws -> RPCMessage {
         if let requestTransportOverride {
             return try await requestTransportOverride(method, params)
@@ -141,7 +142,8 @@ extension CodexService {
                 scheduleRequestTimeoutIfNeeded(
                     requestKey: requestKey,
                     method: method,
-                    timeoutNanoseconds: timeoutNanoseconds
+                    timeoutNanoseconds: timeoutNanoseconds,
+                    timeoutMessage: timeoutMessage
                 )
 
                 Task {
@@ -176,7 +178,8 @@ extension CodexService {
     func scheduleRequestTimeoutIfNeeded(
         requestKey: String,
         method: String,
-        timeoutNanoseconds: UInt64?
+        timeoutNanoseconds: UInt64?,
+        timeoutMessage: String? = nil
     ) {
         guard let timeoutNanoseconds, timeoutNanoseconds > 0 else {
             return
@@ -188,8 +191,9 @@ extension CodexService {
                   let continuation = self.pendingRequests.removeValue(forKey: requestKey) else {
                 return
             }
+            let message = timeoutMessage ?? "\(method) timed out while loading this chat."
             continuation.resume(
-                throwing: CodexServiceError.invalidInput("\(method) timed out while loading this chat.")
+                throwing: CodexServiceError.invalidInput(message)
             )
         }
     }

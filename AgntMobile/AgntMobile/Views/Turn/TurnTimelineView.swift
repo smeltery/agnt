@@ -548,6 +548,29 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         return messages[startIndex...]
     }
 
+    // Catches delayed tail updates without hashing the whole render window each body pass.
+    private var visibleMessagesBoundarySignature: Int {
+        let visibleSlice = visibleMessages
+        var hasher = Hasher()
+        hasher.combine(threadID)
+        hasher.combine(visibleTailCount)
+        hasher.combine(visibleSlice.count)
+        if let message = visibleSlice.first {
+            hasher.combine(message.id)
+            hasher.combine(message.orderIndex)
+        }
+        if let message = visibleSlice.last {
+            hasher.combine(message.id)
+            hasher.combine(message.role)
+            hasher.combine(message.kind)
+            hasher.combine(message.turnId)
+            hasher.combine(message.deliveryState)
+            hasher.combine(message.isStreaming)
+            hasher.combine(message.orderIndex)
+        }
+        return hasher.finalize()
+    }
+
     private var visibleRenderItems: [TurnTimelineRenderItem] {
         let key = renderItemsInputKey(for: visibleMessages)
         if key == cachedRenderItemsInputKey, !cachedRenderItems.isEmpty {
@@ -768,7 +791,29 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                     }
                     .onChange(of: isThreadRunning) { _, _ in
                         debugTimelineLog("isThreadRunning changed value=\(isThreadRunning)")
+                        // Run-state changes alter the sticky pending row and bottom inset before
+                        // the first assistant item exists, so treat them like a timeline mutation.
+                        recomputeRenderItemsIfNeeded()
                         recomputeBlockInfoIfNeeded()
+                        handleTimelineMutation(using: proxy)
+                    }
+                    .onChange(of: isSendInFlight) { _, _ in
+                        debugTimelineLog("isSendInFlight changed value=\(isSendInFlight)")
+                        // Sending mode is the optimistic-user-row gap between tap and turn/start.
+                        // Re-run normal mutation handling so the row is measured while still pending.
+                        recomputeRenderItemsIfNeeded()
+                        recomputeBlockInfoIfNeeded()
+                        handleTimelineMutation(using: proxy)
+                    }
+                    .onChange(of: visibleMessagesBoundarySignature) { _, _ in
+                        debugTimelineLog(
+                            "visible messages changed token=\(timelineChangeToken) "
+                                + "messageCount=\(messages.count) visibleTail=\(visibleTailCount)"
+                        )
+                        recomputeRenderItemsIfNeeded()
+                        recomputeBlockInfoIfNeeded()
+                        scheduleProgressiveTailRevealIfNeeded()
+                        handleTimelineMutation(using: proxy)
                     }
                     .onChange(of: threadID) { _, _ in
                         debugTimelineLog("threadID changed to=\(threadID)")

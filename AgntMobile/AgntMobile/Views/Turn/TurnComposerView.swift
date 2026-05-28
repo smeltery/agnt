@@ -311,6 +311,7 @@ private struct TurnComposerAutocompletePanels: View {
                     items: state.skillAutocompleteItems,
                     isLoading: state.isSkillAutocompleteLoading,
                     query: state.skillAutocompleteQuery,
+                    trigger: state.skillAutocompleteTrigger,
                     onSelect: onSelectSkillAutocomplete
                 )
             }
@@ -684,6 +685,7 @@ private struct ComposerPreviewContent: View {
                 isSkillAutocompleteVisible: false,
                 isSkillAutocompleteLoading: false,
                 skillAutocompleteQuery: "",
+                skillAutocompleteTrigger: "$",
                 pluginAutocompleteItems: [],
                 isPluginAutocompleteVisible: false,
                 isPluginAutocompleteLoading: false,

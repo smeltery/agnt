@@ -60,7 +60,7 @@ private struct FileChangeInlineActionRow: View {
                     .truncationMode(.middle)
 
                 DiffCountsLabel(additions: entry.additions, deletions: entry.deletions)
-                    .font(AppFont.mono(.caption))
+                    .font(AppFont.subheadline())
             }
             .font(AppFont.body())
         }
@@ -110,7 +110,7 @@ private struct FileChangeSummaryBox: View {
 
                                 if entry.additions > 0 || entry.deletions > 0 {
                                     DiffCountsLabel(additions: entry.additions, deletions: entry.deletions)
-                                        .font(AppFont.mono(.caption))
+                                        .font(AppFont.subheadline())
                                 }
                             }
                             .padding(.horizontal, 12)
@@ -1526,13 +1526,19 @@ struct MessageRow: View, Equatable {
         let assistantInlineContentSegments = usesCachedAssistantImageContent
             ? renderModel.assistantInlineContentSegments
             : []
-        let trailingAssistantImageReferences = assistantImageReferences.filter { !$0.isTemporaryScreenshotImage }
+        let trailingAssistantImageReferences = assistantImageReferences.filter {
+            !$0.isTemporaryScreenshotImage
+                && $0.canPreview(currentWorkingDirectory: currentWorkingDirectory)
+        }
         let visibleAssistantTextWithoutImageSyntax = assistantImageReferences.isEmpty
             ? visibleAssistantText
             : (renderModel.assistantTextWithoutImageSyntax ?? visibleAssistantText)
         let trimmedVisibleAssistantText = visibleAssistantTextWithoutImageSyntax
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let hasVisibleAssistantText = !trimmedVisibleAssistantText.isEmpty
+        let assistantImageAttachments = message.isStreaming
+            ? []
+            : message.attachments.filter(\.hasPreviewPayload)
         let rendersTemporaryImagesInline = !assistantInlineContentSegments.isEmpty
             && !message.isStreaming
             && mermaidContent == nil
@@ -1542,6 +1548,7 @@ struct MessageRow: View, Equatable {
             || proposedPlan != nil
             || !trailingAssistantImageReferences.isEmpty
             || rendersTemporaryImagesInline
+            || !assistantImageAttachments.isEmpty
         // Copy only the visible prose. Image-only artifact rows should not expose a
         // second copy affordance for the hidden markdown image syntax.
         let assistantCopyText: String? = {
@@ -1611,10 +1618,12 @@ struct MessageRow: View, Equatable {
                                 constrainsToAvailableWidth: true
                             )
                         case .image(let reference):
-                            AssistantMarkdownImagePreviewButton(
-                                reference: reference,
-                                currentWorkingDirectory: currentWorkingDirectory
-                            )
+                            if reference.canPreview(currentWorkingDirectory: currentWorkingDirectory) {
+                                AssistantMarkdownImagePreviewButton(
+                                    reference: reference,
+                                    currentWorkingDirectory: currentWorkingDirectory
+                                )
+                            }
                         }
                     }
                 } else if message.isStreaming {
@@ -1642,6 +1651,15 @@ struct MessageRow: View, Equatable {
                             )
                         }
                     }
+                }
+
+                if !assistantImageAttachments.isEmpty {
+                    UserAttachmentStrip(attachments: assistantImageAttachments) { tappedAttachment in
+                        if let image = AttachmentPreviewImageResolver.resolve(tappedAttachment) {
+                            previewImage = PreviewImagePayload(image: image)
+                        }
+                    }
+                    .padding(.top, trailingAssistantImageReferences.isEmpty ? 0 : 4)
                 }
             }
 

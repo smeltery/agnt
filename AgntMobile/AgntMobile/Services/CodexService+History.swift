@@ -13,6 +13,16 @@ private enum RunningThreadHistoryCatchupPolicy {
     static let cancellationCheckInterval = 32
 }
 
+fileprivate struct UserMessageSemanticKey: Equatable {
+    let text: String
+    let skillMentions: Set<String>
+    let pluginMentions: Set<String>
+
+    var hasMentions: Bool {
+        !skillMentions.isEmpty || !pluginMentions.isEmpty
+    }
+}
+
 extension CodexService {
     nonisolated static func shouldPreferRecentHistoryWindow(
         existingCount: Int,
@@ -66,7 +76,7 @@ extension CodexService {
 
     // Decodes app-server turn arrays into a chronological message timeline.
     func decodeMessagesFromThreadRead(threadId: String, threadObject: [String: JSONValue]) -> [CodexMessage] {
-        let baseDate = decodeHistoryBaseDate(from: threadObject)
+        let baseDate = decodeHistoryBaseDate(from: threadObject, threadId: threadId)
         let turns = threadObject["turns"]?.arrayValue ?? []
 
         var offset: TimeInterval = 0
@@ -74,7 +84,7 @@ extension CodexService {
 
         for turnValue in turns {
             guard let turnObject = turnValue.objectValue else { continue }
-            let turnID = turnObject["id"]?.stringValue
+            let turnID = historyTurnID(from: turnObject)
             let turnTimestamp = decodeHistoryTimestamp(from: turnObject)
             let turnCompleted = historyTurnTerminalState(turnObject) == .completed
             let items = turnObject["items"]?.arrayValue ?? []
@@ -90,6 +100,8 @@ extension CodexService {
                 offset += 0.001
                 let itemID = itemObject["id"]?.stringValue
                 let decodedText = decodeItemText(from: itemObject)
+                let skillMentions = decodeHistorySkillMentions(from: itemObject)
+                let pluginMentions = decodeHistoryPluginMentions(from: itemObject)
                 let imageAttachments = decodeImageAttachments(from: itemObject)
 
                 switch normalizedItemType(itemType) {
@@ -102,6 +114,8 @@ extension CodexService {
                         turnId: turnID,
                         itemId: itemID,
                         createdAt: timestamp,
+                        skillMentions: skillMentions,
+                        pluginMentions: pluginMentions,
                         attachments: imageAttachments
                     )
 
@@ -135,6 +149,8 @@ extension CodexService {
                         turnId: turnID,
                         itemId: itemID,
                         createdAt: timestamp,
+                        skillMentions: mappedRole == .user ? skillMentions : [],
+                        pluginMentions: mappedRole == .user ? pluginMentions : [],
                         attachments: imageAttachments
                     )
 
@@ -316,7 +332,7 @@ extension CodexService {
 
         for turnValue in turns {
             guard let turnObject = turnValue.objectValue,
-                  let turnID = turnObject["id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let turnID = historyTurnID(from: turnObject),
                   !turnID.isEmpty,
                   let terminalState = historyTurnTerminalState(turnObject) else {
                 continue
@@ -327,41 +343,61 @@ extension CodexService {
         return result
     }
 
-    func decodeHistoryBaseDate(from threadObject: [String: JSONValue]) -> Date {
+    func decodeHistoryBaseDate(from threadObject: [String: JSONValue], threadId: String? = nil) -> Date {
         if let rawCreatedAt = threadObject["createdAt"]?.doubleValue {
-            return CodexTimestampParser.decodeUnixTimestamp(rawCreatedAt)
+            if let date = trustedHistoryDate(CodexTimestampParser.decodeUnixTimestamp(rawCreatedAt)) {
+                return date
+            }
         }
         if let rawCreatedAt = threadObject["created_at"]?.doubleValue {
-            return CodexTimestampParser.decodeUnixTimestamp(rawCreatedAt)
+            if let date = trustedHistoryDate(CodexTimestampParser.decodeUnixTimestamp(rawCreatedAt)) {
+                return date
+            }
         }
 
         if let rawUpdatedAt = threadObject["updatedAt"]?.doubleValue {
-            return CodexTimestampParser.decodeUnixTimestamp(rawUpdatedAt)
+            if let date = trustedHistoryDate(CodexTimestampParser.decodeUnixTimestamp(rawUpdatedAt)) {
+                return date
+            }
         }
         if let rawUpdatedAt = threadObject["updated_at"]?.doubleValue {
-            return CodexTimestampParser.decodeUnixTimestamp(rawUpdatedAt)
+            if let date = trustedHistoryDate(CodexTimestampParser.decodeUnixTimestamp(rawUpdatedAt)) {
+                return date
+            }
         }
 
         if let rawCreatedAt = threadObject["createdAt"]?.stringValue,
-           let parsed = CodexTimestampParser.parseString(rawCreatedAt) {
+           let parsed = trustedHistoryDate(CodexTimestampParser.parseString(rawCreatedAt)) {
             return parsed
         }
         if let rawCreatedAt = threadObject["created_at"]?.stringValue,
-           let parsed = CodexTimestampParser.parseString(rawCreatedAt) {
+           let parsed = trustedHistoryDate(CodexTimestampParser.parseString(rawCreatedAt)) {
             return parsed
         }
 
         if let rawUpdatedAt = threadObject["updatedAt"]?.stringValue,
-           let parsed = CodexTimestampParser.parseString(rawUpdatedAt) {
+           let parsed = trustedHistoryDate(CodexTimestampParser.parseString(rawUpdatedAt)) {
             return parsed
         }
         if let rawUpdatedAt = threadObject["updated_at"]?.stringValue,
-           let parsed = CodexTimestampParser.parseString(rawUpdatedAt) {
+           let parsed = trustedHistoryDate(CodexTimestampParser.parseString(rawUpdatedAt)) {
             return parsed
         }
 
-        // Deterministic fallback avoids reshuffling on every sync when server omits timestamps.
-        return Date(timeIntervalSince1970: 0)
+        if let threadId,
+           let localAnchor = existingHistoryFallbackDate(for: threadId) {
+            return localAnchor
+        }
+
+        // Use a current local anchor rather than epoch, which renders as 1:00 in CET.
+        return Date()
+    }
+
+    private func existingHistoryFallbackDate(for threadId: String) -> Date? {
+        messagesByThread[threadId]?
+            .map(\.createdAt)
+            .filter { CodexTimestampParser.isTrustworthyServerDate($0) }
+            .min()
     }
 
     func decodeUnixTimestamp(_ rawValue: Double) -> Date {
@@ -393,6 +429,17 @@ extension CodexService {
                 }
             }
 
+            if inputType == "mention" {
+                let resolved = firstNonEmptyString([
+                    object["name"]?.stringValue,
+                    object["id"]?.stringValue,
+                    object["path"]?.stringValue,
+                ])
+                if let resolved, !resolved.isEmpty {
+                    return "@\(resolved)"
+                }
+            }
+
             if inputType == "text",
                let dataText = object["data"]?.objectValue?["text"]?.stringValue {
                 return dataText
@@ -417,6 +464,59 @@ extension CodexService {
         }
 
         return ""
+    }
+
+    func decodeHistorySkillMentions(from itemObject: [String: JSONValue]) -> [String] {
+        let contentItems = itemObject["content"]?.arrayValue ?? []
+        var mentions: [String] = []
+        var seen: Set<String> = []
+
+        for value in contentItems {
+            guard let object = value.objectValue else { continue }
+            let inputType = normalizedItemType(object["type"]?.stringValue?.lowercased() ?? "")
+            guard inputType == "skill" else { continue }
+
+            let rawSkill = firstNonEmptyString([
+                object["id"]?.stringValue,
+                object["name"]?.stringValue,
+            ])
+            guard let rawSkill else { continue }
+
+            let mention = rawSkill.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = Self.normalizedUserMentionName(mention)
+            guard !mention.isEmpty, !seen.contains(normalized) else { continue }
+            seen.insert(normalized)
+            mentions.append(mention)
+        }
+
+        return mentions
+    }
+
+    func decodeHistoryPluginMentions(from itemObject: [String: JSONValue]) -> [String] {
+        let contentItems = itemObject["content"]?.arrayValue ?? []
+        var mentions: [String] = []
+        var seen: Set<String> = []
+
+        for value in contentItems {
+            guard let object = value.objectValue else { continue }
+            let inputType = normalizedItemType(object["type"]?.stringValue?.lowercased() ?? "")
+            guard inputType == "mention" else { continue }
+
+            let rawMention = firstNonEmptyString([
+                object["name"]?.stringValue,
+                object["id"]?.stringValue,
+                object["path"]?.stringValue,
+            ])
+            guard let rawMention else { continue }
+
+            let mention = rawMention.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = Self.normalizedUserMentionName(mention)
+            guard !mention.isEmpty, !seen.contains(normalized) else { continue }
+            seen.insert(normalized)
+            mentions.append(mention)
+        }
+
+        return mentions
     }
 
     func decodeGeneratedImageMarkdown(from itemObject: [String: JSONValue]) -> String? {
@@ -458,7 +558,8 @@ extension CodexService {
         return trimmed
     }
 
-    // Extracts user images from history payload and converts them into renderable thumbnail attachments.
+    // Extracts history image payloads into attachments. Small inline data URLs are preserved
+    // so mobile can preview images that are outside the workspace allowlist.
     func decodeImageAttachments(from itemObject: [String: JSONValue]) -> [CodexImageAttachment] {
         let contentItems = itemObject["content"]?.arrayValue ?? []
         var attachments: [CodexImageAttachment] = []
@@ -496,11 +597,18 @@ extension CodexService {
                     payloadDataURL: payloadDataURL,
                     sourceURL: sourceURL
                 )
-                .sanitizedForStorage(preservingPayloadDataURL: false)
+                .sanitizedForStorage(
+                    preservingPayloadDataURL: shouldPreserveHistoryImagePayload(payloadDataURL)
+                )
             )
         }
 
         return attachments
+    }
+
+    private func shouldPreserveHistoryImagePayload(_ payloadDataURL: String?) -> Bool {
+        guard let payloadDataURL else { return false }
+        return payloadDataURL.utf8.count <= Self.historyInlineImagePayloadStorageByteLimit
     }
 
     func mergeHistoryMessages(_ existing: [CodexMessage], _ history: [CodexMessage]) -> [CodexMessage] {
@@ -747,6 +855,30 @@ extension CodexService {
                 continue
             }
 
+            if message.role == .user {
+                let fallbackCandidates = fallbackUserHistoryMergeIndices(
+                    in: merged,
+                    message: message
+                )
+                if fallbackCandidates.count == 1,
+                   let index = fallbackCandidates.first {
+                    merged[index] = reconcileExistingMessage(
+                        merged[index],
+                        with: message,
+                        activeThreadIDs: activeThreadIDs,
+                        runningThreadIDs: runningThreadIDs
+                    )
+                    continue
+                }
+
+                // Identifier-less history rows with epoch timestamps are already
+                // represented locally; appending them creates the visible 1:00 echo.
+                if hasFallbackHistoryTimestamp(message.createdAt),
+                   !fallbackCandidates.isEmpty {
+                    continue
+                }
+            }
+
             if message.role == .user,
                let pendingIndex = uniquePendingUserHistoryMergeIndex(
                    in: merged,
@@ -824,13 +956,17 @@ extension CodexService {
 
         for key in numericKeys {
             if let value = object[key]?.doubleValue {
-                return CodexTimestampParser.decodeUnixTimestamp(value)
+                if let date = trustedHistoryDate(CodexTimestampParser.decodeUnixTimestamp(value)) {
+                    return date
+                }
             }
             if let value = object[key]?.intValue {
-                return CodexTimestampParser.decodeUnixTimestamp(Double(value))
+                if let date = trustedHistoryDate(CodexTimestampParser.decodeUnixTimestamp(Double(value))) {
+                    return date
+                }
             }
             if let value = object[key]?.stringValue {
-                if let parsed = CodexTimestampParser.parseString(value) {
+                if let parsed = trustedHistoryDate(CodexTimestampParser.parseString(value)) {
                     return parsed
                 }
             }
@@ -839,8 +975,24 @@ extension CodexService {
         return nil
     }
 
+    func trustedHistoryDate(_ date: Date?) -> Date? {
+        guard let date,
+              CodexTimestampParser.isTrustworthyServerDate(date) else {
+            return nil
+        }
+        return date
+    }
+
     func parseHistoryDateString(_ value: String) -> Date? {
         CodexTimestampParser.parseString(value)
+    }
+
+    func historyTurnID(from turnObject: [String: JSONValue]) -> String? {
+        firstNonEmptyString([
+            turnObject["id"]?.stringValue,
+            turnObject["turnId"]?.stringValue,
+            turnObject["turn_id"]?.stringValue,
+        ])
     }
 
     func reconcileExistingMessage(_ localMessage: CodexMessage, with serverMessage: CodexMessage) -> CodexMessage {
@@ -902,6 +1054,20 @@ extension CodexService {
         if value.attachments.isEmpty && !serverMessage.attachments.isEmpty {
             value.attachments = serverMessage.attachments
         }
+        if value.role == .user {
+            if value.fileMentions.isEmpty && !serverMessage.fileMentions.isEmpty {
+                value.fileMentions = serverMessage.fileMentions
+            }
+            if value.skillMentions.isEmpty && !serverMessage.skillMentions.isEmpty {
+                value.skillMentions = serverMessage.skillMentions
+            }
+            if value.pluginMentions.isEmpty && !serverMessage.pluginMentions.isEmpty {
+                value.pluginMentions = serverMessage.pluginMentions
+            }
+            if shouldPreferIncomingUserPresentationText(existing: value, incoming: serverMessage) {
+                value.text = serverMessage.text
+            }
+        }
 
         if value.role == .assistant {
             let serverText = normalizedMessageText(serverMessage.text)
@@ -946,13 +1112,214 @@ extension CodexService {
         return [
             message.role.rawValue,
             message.turnId ?? "no-turn",
-            message.text,
+            message.role == .user ? userSemanticHistoryTextKey(for: message) : historyTextKey(for: message.text),
             attachmentSignature(for: message.attachments),
         ].joined(separator: "|")
     }
 
+    nonisolated private static let historyInlineImagePayloadStorageByteLimit = 12_000_000
+    nonisolated private static let identitylessUserHistoryEchoWindow: TimeInterval = 2
+
     nonisolated static func normalizedMessageText(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated static func hasMeaningfulHistoryText(_ text: String) -> Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    nonisolated static func historyTextsMatch(_ lhs: String, _ rhs: String) -> Bool {
+        if normalizedMessageText(lhs) == normalizedMessageText(rhs) {
+            return true
+        }
+
+        let lhsKey = canonicalUserMessageKey(text: lhs)
+        let rhsKey = canonicalUserMessageKey(text: rhs)
+        return lhsKey.hasMentions && lhsKey == rhsKey
+    }
+
+    nonisolated static func userMessagesMatchForHistory(_ lhs: CodexMessage, _ rhs: CodexMessage) -> Bool {
+        userMessageMatchesTextForHistory(
+            lhs,
+            text: rhs.text,
+            skillMentions: rhs.skillMentions,
+            pluginMentions: rhs.pluginMentions
+        )
+    }
+
+    nonisolated static func userMessageMatchesTextForHistory(
+        _ message: CodexMessage,
+        text: String,
+        skillMentions: [String] = [],
+        pluginMentions: [String] = []
+    ) -> Bool {
+        if historyTextsMatch(message.text, text) {
+            return true
+        }
+
+        let lhsKey = canonicalUserMessageKey(
+            text: message.text,
+            skillMentions: message.skillMentions,
+            pluginMentions: message.pluginMentions
+        )
+        let rhsKey = canonicalUserMessageKey(
+            text: text,
+            skillMentions: skillMentions,
+            pluginMentions: pluginMentions
+        )
+        return lhsKey.hasMentions && lhsKey == rhsKey
+    }
+
+    nonisolated static func userSemanticHistoryTextKey(for message: CodexMessage) -> String {
+        let key = canonicalUserMessageKey(
+            text: message.text,
+            skillMentions: message.skillMentions,
+            pluginMentions: message.pluginMentions
+        )
+        guard key.hasMentions else {
+            return historyTextKey(for: message.text)
+        }
+
+        return [
+            key.text,
+            "skills:\(key.skillMentions.sorted().joined(separator: ","))",
+            "plugins:\(key.pluginMentions.sorted().joined(separator: ","))",
+        ].joined(separator: "|")
+    }
+
+    nonisolated static func historyTextKey(for text: String) -> String {
+        normalizedMessageText(text)
+    }
+
+    private nonisolated static func canonicalUserMessageKey(
+        text: String,
+        skillMentions: [String] = [],
+        pluginMentions: [String] = []
+    ) -> UserMessageSemanticKey {
+        var normalizedText = normalizedMessageText(text)
+        var skillSet = Set(skillMentions.map(normalizedUserMentionName).filter { !$0.isEmpty })
+        var pluginSet = Set(pluginMentions.map(normalizedUserMentionName).filter { !$0.isEmpty })
+
+        let extracted = extractInlineUserMentionTokens(from: normalizedText)
+        normalizedText = extracted.text
+        skillSet.formUnion(extracted.skillMentions)
+        pluginSet.formUnion(extracted.pluginMentions)
+
+        for skill in skillSet {
+            normalizedText = removingBoundedUserMentionPhrase("$\(skill)", from: normalizedText)
+            normalizedText = removingBoundedUserMentionPhrase("/\(skill)", from: normalizedText)
+            normalizedText = removingBoundedUserMentionPhrase(displayNameForUserMention(skill), from: normalizedText)
+        }
+        for plugin in pluginSet {
+            normalizedText = removingBoundedUserMentionPhrase("@\(plugin)", from: normalizedText)
+        }
+
+        return UserMessageSemanticKey(
+            text: canonicalUserMessageBodyText(normalizedText),
+            skillMentions: skillSet,
+            pluginMentions: pluginSet
+        )
+    }
+
+    nonisolated static func normalizedUserMentionName(_ rawName: String) -> String {
+        rawName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private nonisolated static func extractInlineUserMentionTokens(
+        from text: String
+    ) -> (text: String, skillMentions: Set<String>, pluginMentions: Set<String>) {
+        guard let regex = try? NSRegularExpression(
+                pattern: #"(?<!\S)([$/@])([A-Za-z0-9][A-Za-z0-9._-]*)(?=[\s,.;:!?)\]}>]|$)"#
+              ) else {
+            return (text, [], [])
+        }
+
+        let nsText = text as NSString
+        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+        var working = text
+        var skills: Set<String> = []
+        var plugins: Set<String> = []
+
+        for match in matches.reversed() {
+            guard match.numberOfRanges >= 3,
+                  let triggerRange = Range(match.range(at: 1), in: text),
+                  let nameRange = Range(match.range(at: 2), in: text),
+                  let fullRange = Range(match.range, in: working) else {
+                continue
+            }
+
+            let trigger = String(text[triggerRange])
+            let name = normalizedUserMentionName(String(text[nameRange]))
+            guard !name.isEmpty else { continue }
+
+            if trigger == "$" || trigger == "/" {
+                skills.insert(name)
+            } else if trigger == "@" {
+                plugins.insert(name)
+            }
+            working.replaceSubrange(fullRange, with: "")
+        }
+
+        return (working, skills, plugins)
+    }
+
+    private nonisolated static func removingBoundedUserMentionPhrase(_ phrase: String, from text: String) -> String {
+        let normalizedPhrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedPhrase.isEmpty,
+              let regex = try? NSRegularExpression(
+                pattern: #"(?<!\S)"# + NSRegularExpression.escapedPattern(for: normalizedPhrase) + #"(?=[\s,.;:!?)\]}>]|$)"#,
+                options: [.caseInsensitive]
+              ) else {
+            return text
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(
+            in: text,
+            options: [],
+            range: range,
+            withTemplate: ""
+        )
+    }
+
+    private nonisolated static func displayNameForUserMention(_ rawName: String) -> String {
+        let parts = rawName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(omittingEmptySubsequences: true) { $0 == "-" || $0 == "_" }
+            .map { part -> String in
+                let token = String(part)
+                return token.prefix(1).uppercased() + token.dropFirst().lowercased()
+            }
+        return parts.isEmpty ? rawName : parts.joined(separator: " ")
+    }
+
+    private nonisolated static func canonicalUserMessageBodyText(_ text: String) -> String {
+        text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .lowercased()
+    }
+
+    nonisolated static func shouldPreferIncomingUserPresentationText(
+        existing: CodexMessage,
+        incoming: CodexMessage
+    ) -> Bool {
+        guard existing.role == .user,
+              incoming.role == .user,
+              hasMeaningfulHistoryText(incoming.text),
+              userMessagesMatchForHistory(existing, incoming) else {
+            return false
+        }
+
+        let existingHasMentionMetadata = !existing.skillMentions.isEmpty || !existing.pluginMentions.isEmpty
+        let incomingHasMentionMetadata = !incoming.skillMentions.isEmpty || !incoming.pluginMentions.isEmpty
+        return !existingHasMentionMetadata && incomingHasMentionMetadata
+    }
+
+    nonisolated static func hasFallbackHistoryTimestamp(_ date: Date) -> Bool {
+        !CodexTimestampParser.isTrustworthyServerDate(date)
     }
 
     nonisolated static func normalizedHistoryIdentifier(_ value: String?) -> String? {
@@ -1246,7 +1613,7 @@ extension CodexService {
     ) -> Bool {
         guard candidate.role == .user,
               candidate.deliveryState != .failed,
-              normalizedMessageText(candidate.text) == normalizedMessageText(message.text) else {
+              userMessagesMatchForHistory(candidate, message) else {
             return false
         }
 
@@ -1269,7 +1636,7 @@ extension CodexService {
     ) -> Bool {
         guard candidate.role == .user,
               candidate.deliveryState == .pending,
-              normalizedMessageText(candidate.text) == normalizedMessageText(message.text),
+              userMessagesMatchForHistory(candidate, message),
               userMessageMetadataLooksCompatible(
                 localMessage: candidate,
                 serverMessage: message,
@@ -1286,16 +1653,25 @@ extension CodexService {
         message: CodexMessage,
         turnId: String
     ) -> Int? {
-        // Keep intentionally repeated sends separate when more than one local row fits.
         let matchingIndices = merged.indices.filter { index in
             shouldReconcileUserHistoryMessage(merged[index], with: message, turnId: turnId)
         }
 
-        guard matchingIndices.count == 1 else {
-            return nil
+        if matchingIndices.count == 1 {
+            return matchingIndices[0]
         }
 
-        return matchingIndices[0]
+        // If a previous reopen already persisted an epoch-timestamp echo, bind new
+        // history to the real-dated row so the duplicate does not keep multiplying.
+        let nonFallbackMatches = matchingIndices.filter { index in
+            !hasFallbackHistoryTimestamp(merged[index].createdAt)
+        }
+        if nonFallbackMatches.count == 1 {
+            return nonFallbackMatches[0]
+        }
+
+        // Keep intentionally repeated sends separate when more than one real row fits.
+        return nil
     }
 
     nonisolated static func uniquePendingUserHistoryMergeIndex(
@@ -1312,6 +1688,52 @@ extension CodexService {
         }
 
         return matchingIndices[0]
+    }
+
+    nonisolated static func fallbackUserHistoryMergeIndices(
+        in merged: [CodexMessage],
+        message: CodexMessage
+    ) -> [Int] {
+        guard message.role == .user,
+              normalizedHistoryIdentifier(message.itemId) == nil else {
+            return []
+        }
+
+        let incomingTurnId = normalizedHistoryIdentifier(message.turnId)
+        let incomingHasFallbackTimestamp = hasFallbackHistoryTimestamp(message.createdAt)
+
+        return merged.indices.filter { index in
+            let candidate = merged[index]
+            guard candidate.threadId == message.threadId,
+                  candidate.role == .user,
+                  candidate.deliveryState != .failed,
+                  userMessagesMatchForHistory(candidate, message),
+                  userMessageMetadataLooksCompatible(
+                    localMessage: candidate,
+                    serverMessage: message,
+                    allowAttachmentCountFallback: candidate.deliveryState == .pending
+                  ) else {
+                return false
+            }
+
+            let candidateTurnId = normalizedHistoryIdentifier(candidate.turnId)
+            if let incomingTurnId, let candidateTurnId {
+                return incomingTurnId == candidateTurnId
+            }
+            if incomingHasFallbackTimestamp {
+                return true
+            }
+            if incomingTurnId == nil,
+               abs(candidate.createdAt.timeIntervalSince(message.createdAt)) <= Self.identitylessUserHistoryEchoWindow {
+                return true
+            }
+            if incomingTurnId == nil,
+               !hasFallbackHistoryTimestamp(candidate.createdAt),
+               candidate.deliveryState != .pending {
+                return false
+            }
+            return true
+        }
     }
 
     func normalizedItemType(_ rawType: String) -> String {
@@ -1385,6 +1807,8 @@ extension CodexService {
         turnId: String?,
         itemId: String?,
         createdAt: Date,
+        skillMentions: [String] = [],
+        pluginMentions: [String] = [],
         attachments: [CodexImageAttachment] = [],
         planState: CodexPlanState? = nil,
         planPresentation: CodexPlanPresentation? = nil,
@@ -1404,6 +1828,8 @@ extension CodexService {
                 kind: kind,
                 assistantPhase: role == .assistant ? normalizedAssistantPhase(assistantPhase) : nil,
                 text: text,
+                skillMentions: skillMentions,
+                pluginMentions: pluginMentions,
                 createdAt: createdAt,
                 turnId: turnId,
                 itemId: itemId,

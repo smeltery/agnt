@@ -82,4 +82,13 @@ extension View {
     func adaptiveToolbarItem(in shape: some Shape) -> some View {
         modifier(AdaptiveToolbarItemModifier(shape: shape))
     }
+
+    @ViewBuilder
+    func adaptiveToolbarItem(if isEnabled: Bool, in shape: some Shape) -> some View {
+        if isEnabled {
+            adaptiveToolbarItem(in: shape)
+        } else {
+            self
+        }
+    }
 }

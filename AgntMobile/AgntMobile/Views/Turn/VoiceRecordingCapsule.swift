@@ -88,10 +88,12 @@ struct VoiceRecordingCapsule: View {
     private var cancelButton: some View {
         Button(action: onCancel) {
             Image(systemName: "xmark")
-                .font(AppFont.system(size: 8, weight: .bold))
+                .font(AppFont.system(size: 10, weight: .bold))
                 .foregroundStyle(.secondary)
-                .frame(width: 14, height: 14)
+                .frame(width: 22, height: 22)
                 .background(Color.primary.opacity(0.08), in: Circle())
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Cancel voice recording")
