@@ -290,6 +290,7 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
     private var metaTextFont: Font { AppFont.callout() }
     private var metaSymbolFont: Font { AppFont.system(size: 11, weight: .regular) }
     private var metaChevronFont: Font { AppFont.system(size: 9, weight: .regular) }
+    private let maxInlineRuntimeLabelWidth: CGFloat = 108
 
     static func == (lhs: ComposerRuntimeMenuControl, rhs: ComposerRuntimeMenuControl) -> Bool {
         lhs.orderedModelOptions == rhs.orderedModelOptions
@@ -382,27 +383,62 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
                 leadingImageName: runtimeState.showsSpeedBadgeInModelMenu ? "bolt.fill" : nil
             )
         }
-        .fixedSize(horizontal: true, vertical: false)
-        .layoutPriority(1)
+        .layoutPriority(-1)
         .tint(metaLabelColor)
+        .accessibilityLabel(runtimeAccessibilityLabel)
     }
 
     private var compactRuntimeTitle: String {
         if selectedModelID == nil {
             return isRuntimeSelectionLoading ? "Loading…" : "Select model"
         }
-        return "\(compactModelTitle) \(runtimeState.selectedReasoningTitle)"
+        if let effort = compactReasoningTitle(runtimeState.selectedReasoningTitle) {
+            return "\(compactModelTitle) \(effort)"
+        }
+        return compactModelTitle
     }
 
-    // Keeps the family suffix visible while shortening the common GPT prefix.
+    // Keeps inline runtime metadata short so stop + send controls do not move the composer.
     private var compactModelTitle: String {
-        let stripped: String
-        if selectedModelTitle.lowercased().hasPrefix("gpt-") {
-            stripped = String(selectedModelTitle.dropFirst("GPT-".count))
-        } else {
-            stripped = selectedModelTitle
+        let normalized = selectedModelTitle
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .map(String.init)
+
+        let words = normalized.filter { word in
+            let lowercased = word.lowercased()
+            return lowercased != "gpt" && lowercased != "codex"
         }
-        return stripped.replacingOccurrences(of: "-", with: " ")
+        let compact = words.isEmpty ? selectedModelTitle : words.joined(separator: " ")
+        return compact
+    }
+
+    private var runtimeAccessibilityLabel: String {
+        if selectedModelID == nil {
+            return isRuntimeSelectionLoading ? "Loading…" : "Select model"
+        }
+        let effort = runtimeState.selectedReasoningTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !effort.isEmpty {
+            return "\(selectedModelTitle), \(effort)"
+        }
+        return selectedModelTitle
+    }
+
+    private func compactReasoningTitle(_ title: String) -> String? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != "Select reasoning" else {
+            return nil
+        }
+
+        switch trimmed.lowercased() {
+        case "extra high":
+            return "XH"
+        case "medium":
+            return "Med"
+        default:
+            return trimmed
+        }
     }
 
     @ViewBuilder
@@ -469,6 +505,7 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
                 .font(metaTextFont)
                 .fontWeight(.regular)
                 .lineLimit(1)
+                .truncationMode(.tail)
 
             Image(systemName: "chevron.down")
                 .font(metaChevronFont)
@@ -476,7 +513,8 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
         .foregroundStyle(metaLabelColor)
-        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: maxInlineRuntimeLabelWidth, alignment: .leading)
+        .clipped()
         .contentShape(Rectangle())
     }
 }

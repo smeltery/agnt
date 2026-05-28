@@ -56,7 +56,7 @@ enum TurnDiffPresentationBuilder {
     }
 
     private static func splitUnifiedDiffByFile(_ diff: String) -> [UnifiedDiffChunk] {
-        let lines = diff.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let lines = diff.components(separatedBy: "\n")
         guard !lines.isEmpty else { return [] }
 
         var chunks: [UnifiedDiffChunk] = []
