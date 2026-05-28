@@ -102,6 +102,53 @@ class IncomingEventRouterServerRequestTest {
         }
 
     @Test
+    fun dispatchServerRequest_fileChangeApprovalRoutesThroughDecisionPayload() =
+        runBlocking {
+            val timeline = MessageTimelineStore()
+            val pending =
+                CompletableDeferred<Pair<PendingApprovalRequest, (PendingApprovalDecision) -> Unit>>()
+            val response = CompletableDeferred<RPCMessage>()
+            newRouter(
+                messageTimeline = timeline,
+                onApprovalRequest = { request, respond -> pending.complete(request to respond) },
+            ).dispatchServerRequest(
+                method = "item/fileChange/requestApproval",
+                requestId = JSONValue.Str("filechange-1"),
+                params =
+                    JSONValue.Obj(
+                        mapOf(
+                            "threadId" to JSONValue.Str("thr-fc"),
+                            "turnId" to JSONValue.Str("turn-fc"),
+                            "itemId" to JSONValue.Str("item-fc"),
+                            "reason" to JSONValue.Str("Write README.md"),
+                        ),
+                    ),
+                respond = { response.complete(it) },
+            )
+
+            val (request, respond) = withTimeout(ROUTER_TEST_TIMEOUT_MS) { pending.await() }
+            assertEquals("item/fileChange/requestApproval", request.method)
+            assertEquals("thr-fc", request.threadId)
+            assertEquals("turn-fc", request.turnId)
+            assertEquals("item-fc", request.itemId)
+            assertEquals("Write README.md", request.reason)
+            assertNull(request.command)
+
+            // Timeline marker carries the file-change fallback headline shape.
+            val row = timeline.messagesByThread.value["thr-fc"]?.singleOrNull()
+            assertNotNull(row)
+            assertEquals(CodexMessageKind.pendingApproval, row.kind)
+            assertEquals("Write README.md", row.text)
+
+            respond(PendingApprovalDecision.Accept)
+            val message = withTimeout(ROUTER_TEST_TIMEOUT_MS) { response.await() }
+            assertEquals(JSONValue.Str("filechange-1"), message.id)
+            assertEquals(JSONValue.Obj(mapOf("decision" to JSONValue.Str("accept"))), message.result)
+            assertNull(message.error)
+            assertNull(message.jsonrpc)
+        }
+
+    @Test
     fun dispatchServerRequest_commandApprovalAcceptForSessionUsesDecisionPayload() =
         runBlocking {
             val pending =

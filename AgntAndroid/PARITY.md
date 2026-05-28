@@ -31,8 +31,8 @@ get a synthetic "managed externally" response.
 | ---                                                        | ---               | ---               | ---               | ---   |
 | Tolerate Codex-only RPC `managed externally` replies       | yes               | yes               | partial           | see ROADMAP — UI hides the affected affordances when active provider != codex; needs audit |
 | Render `thread/initialized` skills/tools from any provider | yes               | yes               | yes (Codex shape) | parity for Codex/Claude `system.init`; opencode/Cursor default tool lists land via same RPC, should "just work" — needs runtime verification |
-| Handle opencode `item/commandExecution/requestApproval`    | yes               | yes               | **no**            | Approval UI not yet wired. Tracked in ROADMAP. |
-| Handle opencode `item/fileChange/requestApproval`          | yes               | yes               | **no**            | Same as above. |
+| Handle opencode `item/commandExecution/requestApproval`    | yes               | yes               | yes               | `IncomingEventRouter` matches → `pendingApprovalRequest` StateFlow → `MainShell` `AlertDialog` → `{decision: "accept"\|"decline"\|"acceptForSession"}`. |
+| Handle opencode `item/fileChange/requestApproval`          | yes               | yes               | yes               | Same matcher / dialog; `acceptForSession` 3-button mode is gated to command approvals only (matches iOS). |
 | Reject overlapping `turn/start` with code `-32003`         | n/a (bridge does) | n/a (bridge does) | n/a (bridge does) | The bridge-side translator enforces this. Client just surfaces the error. |
 | Surface `system/notice` toasts                             | yes               | yes               | needs verify      | UI plumbing exists; routing check pending. |
 | Render reasoning deltas (Claude / Codex)                   | yes               | yes               | yes               | Codex-style reasoning rendering ported from upstream. Claude `system.init` reasoning shape needs runtime verification. |

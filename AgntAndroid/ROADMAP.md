@@ -12,12 +12,16 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
 
 ### P1 — runtime correctness
 
-- [ ] **opencode approval flow**. Handle `item/commandExecution/requestApproval`
-      and `item/fileChange/requestApproval` JSON-RPC requests. Reply with
-      `{decision: "accept" | "decline"}`. iOS lives in
-      `AgntMobile/.../PendingRequestPresentation*`; mirror that. The Android
-      types (`StructuredInputDialogLogicTest`, `PendingRequestPresentationTest`)
-      already exist, so the data plumbing is partly in place.
+- [x] **opencode approval flow**. `IncomingEventRouter` matches both
+      `item/commandExecution/requestApproval` and `item/fileChange/requestApproval`
+      via `isApprovalServerRequestMethod`, exposes a
+      `pendingApprovalRequest: StateFlow<PendingApprovalRequest?>` from
+      `CodexService`, surfaces an `AlertDialog` (kind-aware title via
+      `PendingRequestPresentation.approvalKindTitleRes`), and replies with
+      `{decision: "accept"|"decline"|"acceptForSession"}` —
+      `acceptForSession` is gated to command approvals only, matching iOS.
+      Regression coverage: `IncomingEventRouterServerRequestTest`,
+      `PendingApprovalTimelineFormatterTest`, `PendingRequestPresentationTest`.
 - [ ] **Codex-only RPC gating**. Verify all UI surfaces that call
       `account/login/*`, `account/status/read`, `voice/transcribe`,
       `voice/resolveAuth`, structured-JSON `thread/generateTitle`, and
