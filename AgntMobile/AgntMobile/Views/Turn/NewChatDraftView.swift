@@ -110,10 +110,16 @@ struct NewChatDraftView: View {
         }
         .task {
             initializeProjectSelectionIfNeeded()
+            refreshDraftGitStateIfNeeded()
             await refreshProjectlessChatRoots()
+            refreshDraftGitStateIfNeeded()
         }
         .onChange(of: projectChoices) { _, _ in
             initializeProjectSelectionIfNeeded()
+        }
+        .onChange(of: codex.isConnected) { _, isConnected in
+            guard isConnected else { return }
+            refreshDraftGitStateIfNeeded()
         }
         .onChange(of: selectedProjectPath) { _, _ in
             // Defer the observable-model mutation out of the .onChange action
@@ -121,6 +127,7 @@ struct NewChatDraftView: View {
             DispatchQueue.main.async { [viewModel] in
                 viewModel.clearComposerAutocomplete()
             }
+            refreshDraftGitStateForSelectedProject()
         }
         .sheet(item: $activeSheet) { sheet in
             sheetContent(sheet)
@@ -265,24 +272,19 @@ struct NewChatDraftView: View {
     // Mirrors the regular chat ellipsis chrome. It is disabled only for the
     // general Chat draft, where the folder can still change before first send.
     private var draftThreadActionsMenu: some View {
-        Menu {
-            Button {
-                HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                onOpenTerminal?(selectedProjectPath)
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "terminal")
-                        .font(AppFont.system(size: 13, weight: .semibold))
-                    Text("Open Terminal Here")
-                }
-            }
-            .disabled(areDraftToolbarActionsDisabled || onOpenTerminal == nil)
-        } label: {
-            TurnMacHandoffToolbarLabel(isLoading: false)
-        }
-        .opacity(areDraftToolbarActionsDisabled ? 0.45 : 1)
-        .disabled(areDraftToolbarActionsDisabled)
-        .accessibilityLabel("Thread actions")
+        TurnThreadActionsMenuButton(
+            isLoading: false,
+            isEnabled: !areDraftToolbarActionsDisabled,
+            actions: [
+                TurnThreadActionMenuItem(
+                    title: "Open Terminal Here",
+                    icon: .system("terminal"),
+                    isEnabled: !areDraftToolbarActionsDisabled && onOpenTerminal != nil
+                ) {
+                    onOpenTerminal?(selectedProjectPath)
+                },
+            ]
+        )
     }
 
     private var areDraftToolbarActionsDisabled: Bool {
@@ -299,7 +301,8 @@ struct NewChatDraftView: View {
             )
     }
 
-    // Drafts avoid eager Git refreshes so first-send stays a simple thread/start handoff.
+    // Drafts refresh only the selected project's Git state so the secondary
+    // composer bar can show Local/branch controls before the first send.
     private func refreshDraftGitStateIfNeeded() {
         guard hasSelectedProject, codex.isConnected else {
             return
@@ -309,6 +312,22 @@ struct NewChatDraftView: View {
             workingDirectory: selectedProjectPath,
             threadID: route.id
         )
+    }
+
+    private func refreshDraftGitStateForSelectedProject() {
+        resetDraftGitState()
+        refreshDraftGitStateIfNeeded()
+    }
+
+    private func resetDraftGitState() {
+        viewModel.gitRepoSync = nil
+        viewModel.currentGitBranch = ""
+        viewModel.availableGitBranchTargets = []
+        viewModel.gitBranchesCheckedOutElsewhere = []
+        viewModel.gitWorktreePathsByBranch = [:]
+        viewModel.gitLocalCheckoutPath = nil
+        viewModel.gitDefaultBranch = ""
+        viewModel.selectedGitBaseBranch = ""
     }
 
     private var hasSelectedProject: Bool {
@@ -463,8 +482,26 @@ struct NewChatDraftView: View {
             reasoningDisplayOptions: reasoningDisplayOptions,
             showsGitControls: hasSelectedProject && viewModel.isGitRepositoryInitialized,
             isGitBranchSelectorEnabled: isDraftGitActionEnabled && viewModel.isGitRepositoryInitialized,
-            onSelectGitBranch: { _ in },
-            onCreateGitBranch: { _ in },
+            onSelectGitBranch: { branch in
+                guard hasSelectedProject else { return }
+                viewModel.requestSwitchGitBranch(
+                    to: branch,
+                    codex: codex,
+                    workingDirectory: selectedProjectPath,
+                    threadID: route.id,
+                    activeTurnID: nil
+                )
+            },
+            onCreateGitBranch: { branchName in
+                guard hasSelectedProject else { return }
+                viewModel.requestCreateGitBranch(
+                    named: branchName,
+                    codex: codex,
+                    workingDirectory: selectedProjectPath,
+                    threadID: route.id,
+                    activeTurnID: nil
+                )
+            },
             onRefreshGitBranches: {
                 guard hasSelectedProject, viewModel.isGitRepositoryInitialized else { return }
                 viewModel.refreshGitBranchTargets(
@@ -489,7 +526,7 @@ struct NewChatDraftView: View {
             onTapVoice: {},
             onCancelVoiceRecording: {},
             onSend: sendDraft,
-            showsSecondaryBar: false
+            showsSecondaryBar: true
         )
     }
 

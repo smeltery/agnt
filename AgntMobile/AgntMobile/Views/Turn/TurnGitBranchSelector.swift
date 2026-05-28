@@ -87,7 +87,6 @@ struct TurnGitBranchSelector: View, Equatable {
 
     private let branchLabelColor = Color(.secondaryLabel)
     private var branchSymbolSize: CGFloat { 12 }
-    private var branchChevronFont: Font { AppFont.system(size: 9, weight: .regular) }
     private var branchControlsDisabled: Bool { !isEnabled || isLoadingGitBranchTargets || isSwitchingGitBranch }
     private var normalizedDefaultBranch: String? {
         let value = defaultBranch.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -158,13 +157,9 @@ struct TurnGitBranchSelector: View, Equatable {
 
                 Text(visibleBranchLabel)
                     // Keep the inline label focused on the checked-out branch only.
-                    .font(AppFont.mono(.subheadline))
-                    .fontWeight(.medium)
+                    .font(AppFont.subheadline())
                     .lineLimit(1)
                     .layoutPriority(1)
-
-                Image(systemName: "chevron.down")
-                    .font(branchChevronFont)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)

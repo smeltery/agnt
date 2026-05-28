@@ -92,9 +92,8 @@ struct TurnComposerView: View {
     let onSteerQueuedDraft: (String) -> Void
     let onRemoveQueuedDraft: (String) -> Void
     let onSend: () -> Void
-    // The New Chat draft surface hides the runtime / git / access / context
-    // ring row because no real thread exists yet — there's no rate-limit
-    // status, no working dir, no git state to summarize.
+    // Call sites can hide the lower runtime/git/access row for constrained
+    // surfaces, but project-backed new-chat drafts keep it visible.
     var showsSecondaryBar: Bool = true
 
     @State private var composerInputHeight: CGFloat = 32

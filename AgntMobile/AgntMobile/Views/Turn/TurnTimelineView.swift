@@ -7,6 +7,32 @@
 import SwiftUI
 import UIKit
 
+enum TurnTimelinePendingAssistantState {
+    // The optimistic user row appears before the first assistant row; keep both
+    // the thinking indicator and bottom anchor active during that short gap.
+    static func isWaitingForAssistantResponse(
+        shouldAnchorToAssistantResponse: Bool,
+        messages: [CodexMessage]
+    ) -> Bool {
+        shouldAnchorToAssistantResponse
+            && messages.last?.role == .user
+    }
+
+    static func shouldTrackScrollGeometry(
+        shouldAnchorToAssistantResponse: Bool,
+        autoScrollMode: TurnAutoScrollMode,
+        isWaitingForAssistantResponse: Bool
+    ) -> Bool {
+        !shouldAnchorToAssistantResponse
+            && autoScrollMode != .anchorAssistantResponse
+            && !isWaitingForAssistantResponse
+    }
+
+    static func shouldShowIndicator(isRunStartingOrRunning: Bool) -> Bool {
+        return isRunStartingOrRunning
+    }
+}
+
 struct AssistantBlockAccessoryState: Equatable {
     let copyText: String?
     let showsRunningIndicator: Bool
@@ -16,6 +42,17 @@ struct AssistantBlockAccessoryState: Equatable {
     let blockRevertMessage: CodexMessage?
 
     func replacingCopyText(_ copyText: String?) -> AssistantBlockAccessoryState {
+        AssistantBlockAccessoryState(
+            copyText: copyText,
+            showsRunningIndicator: showsRunningIndicator,
+            blockDiffText: blockDiffText,
+            blockDiffEntries: blockDiffEntries,
+            blockRevertPresentation: blockRevertPresentation,
+            blockRevertMessage: blockRevertMessage
+        )
+    }
+
+    func replacingRunningIndicator(_ showsRunningIndicator: Bool) -> AssistantBlockAccessoryState {
         AssistantBlockAccessoryState(
             copyText: copyText,
             showsRunningIndicator: showsRunningIndicator,
@@ -39,6 +76,7 @@ private struct TurnTimelineMessageRow: View {
     let planMatchingFingerprint: Int
     let newestStreamingMessageID: String?
     let autoScrollMode: TurnAutoScrollMode
+    let showsGlobalRunningIndicator: Bool
     let onRetryUserMessage: (String) -> Void
     let onTapAssistantRevert: (CodexMessage) -> Void
     let onTapSubagent: (CodexSubagentThreadPresentation) -> Void
@@ -48,7 +86,7 @@ private struct TurnTimelineMessageRow: View {
             message: message,
             isRetryAvailable: isRetryAvailable,
             onRetryUserMessage: onRetryUserMessage,
-            assistantBlockAccessoryState: cachedBlockInfoByMessageID[message.id],
+            assistantBlockAccessoryState: assistantBlockAccessoryState,
             planSessionSource: planSessionSource,
             allowsAssistantPlanFallbackRecovery: allowsAssistantPlanFallbackRecovery,
             assistantTurnCompleted: message.turnId.map(completedTurnIDs.contains) ?? false,
@@ -62,6 +100,13 @@ private struct TurnTimelineMessageRow: View {
         )
         .equatable()
         .id(message.id)
+    }
+
+    private var assistantBlockAccessoryState: AssistantBlockAccessoryState? {
+        let state = cachedBlockInfoByMessageID[message.id]
+        return showsGlobalRunningIndicator
+            ? state?.replacingRunningIndicator(false)
+            : state
     }
 }
 
@@ -77,6 +122,7 @@ private struct TurnTimelineToolBurstView: View {
     let planMatchingFingerprint: Int
     let newestStreamingMessageID: String?
     let autoScrollMode: TurnAutoScrollMode
+    let showsGlobalRunningIndicator: Bool
     let onRetryUserMessage: (String) -> Void
     let onTapAssistantRevert: (CodexMessage) -> Void
     let onTapSubagent: (CodexSubagentThreadPresentation) -> Void
@@ -106,6 +152,7 @@ private struct TurnTimelineToolBurstView: View {
                     planMatchingFingerprint: planMatchingFingerprint,
                     newestStreamingMessageID: newestStreamingMessageID,
                     autoScrollMode: autoScrollMode,
+                    showsGlobalRunningIndicator: showsGlobalRunningIndicator,
                     onRetryUserMessage: onRetryUserMessage,
                     onTapAssistantRevert: onTapAssistantRevert,
                     onTapSubagent: onTapSubagent
@@ -153,6 +200,7 @@ private struct TurnTimelineToolBurstView: View {
                         planMatchingFingerprint: planMatchingFingerprint,
                         newestStreamingMessageID: newestStreamingMessageID,
                         autoScrollMode: autoScrollMode,
+                        showsGlobalRunningIndicator: showsGlobalRunningIndicator,
                         onRetryUserMessage: onRetryUserMessage,
                         onTapAssistantRevert: onTapAssistantRevert,
                         onTapSubagent: onTapSubagent
@@ -175,6 +223,7 @@ private struct TurnTimelinePreviousMessagesView: View {
     let planMatchingFingerprint: Int
     let newestStreamingMessageID: String?
     let autoScrollMode: TurnAutoScrollMode
+    let showsGlobalRunningIndicator: Bool
     let onRetryUserMessage: (String) -> Void
     let onTapAssistantRevert: (CodexMessage) -> Void
     let onTapSubagent: (CodexSubagentThreadPresentation) -> Void
@@ -183,6 +232,12 @@ private struct TurnTimelinePreviousMessagesView: View {
 
     private var title: String {
         group.hiddenCount == 1 ? "1 previous message" : "\(group.hiddenCount) previous messages"
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Color.secondary.opacity(0.18))
+            .frame(height: 1)
     }
 
     var body: some View {
@@ -201,12 +256,6 @@ private struct TurnTimelinePreviousMessagesView: View {
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     Spacer(minLength: 0)
-                }
-                .padding(.bottom, 8)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.18))
-                        .frame(height: 1)
                 }
                 .contentShape(Rectangle())
             }
@@ -228,12 +277,15 @@ private struct TurnTimelinePreviousMessagesView: View {
                         planMatchingFingerprint: planMatchingFingerprint,
                         newestStreamingMessageID: newestStreamingMessageID,
                         autoScrollMode: autoScrollMode,
+                        showsGlobalRunningIndicator: showsGlobalRunningIndicator,
                         onRetryUserMessage: onRetryUserMessage,
                         onTapAssistantRevert: onTapAssistantRevert,
                         onTapSubagent: onTapSubagent
                     )
                 }
             }
+
+            divider
         }
         .id(group.id)
     }
@@ -243,7 +295,7 @@ private struct TurnTimelineRowsSection: View {
     let shouldWarmRecentTailProgressively: Bool
     let hasEarlierMessages: Bool
     let renderItems: [TurnTimelineRenderItem]
-    let isThreadRunning: Bool
+    let showsPendingAssistantIndicator: Bool
     let isRetryAvailable: Bool
     let cachedBlockInfoByMessageID: [String: AssistantBlockAccessoryState]
     let planSessionSource: CodexPlanSessionSource?
@@ -297,6 +349,7 @@ private struct TurnTimelineRowsSection: View {
                     planMatchingFingerprint: planMatchingFingerprint,
                     newestStreamingMessageID: newestStreamingMessageID,
                     autoScrollMode: autoScrollMode,
+                    showsGlobalRunningIndicator: shouldShowPendingAssistantIndicator,
                     onRetryUserMessage: onRetryUserMessage,
                     onTapAssistantRevert: onTapAssistantRevert,
                     onTapSubagent: onTapSubagent
@@ -314,6 +367,7 @@ private struct TurnTimelineRowsSection: View {
                     planMatchingFingerprint: planMatchingFingerprint,
                     newestStreamingMessageID: newestStreamingMessageID,
                     autoScrollMode: autoScrollMode,
+                    showsGlobalRunningIndicator: shouldShowPendingAssistantIndicator,
                     onRetryUserMessage: onRetryUserMessage,
                     onTapAssistantRevert: onTapAssistantRevert,
                     onTapSubagent: onTapSubagent
@@ -331,6 +385,7 @@ private struct TurnTimelineRowsSection: View {
                     planMatchingFingerprint: planMatchingFingerprint,
                     newestStreamingMessageID: newestStreamingMessageID,
                     autoScrollMode: autoScrollMode,
+                    showsGlobalRunningIndicator: shouldShowPendingAssistantIndicator,
                     onRetryUserMessage: onRetryUserMessage,
                     onTapAssistantRevert: onTapAssistantRevert,
                     onTapSubagent: onTapSubagent
@@ -344,19 +399,10 @@ private struct TurnTimelineRowsSection: View {
         }
     }
 
-    // Bridges the gap between the optimistic user bubble and the first rendered
-    // assistant/system row, whose placeholder text may be intentionally hidden.
     private var shouldShowPendingAssistantIndicator: Bool {
-        guard isThreadRunning else { return false }
-
-        switch renderItems.last {
-        case .message(let message):
-            return message.role == .user
-        case .toolBurst, .previousMessages:
-            return false
-        case nil:
-            return false
-        }
+        TurnTimelinePendingAssistantState.shouldShowIndicator(
+            isRunStartingOrRunning: showsPendingAssistantIndicator
+        )
     }
 }
 
@@ -368,7 +414,7 @@ private struct PendingAssistantIndicatorRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
-        .padding(.top, 4)
+        .padding(.top, 6)
     }
 }
 
@@ -431,6 +477,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     let timelineChangeToken: Int
     let activeTurnID: String?
     let isThreadRunning: Bool
+    let isSendInFlight: Bool
     let latestTurnTerminalState: CodexTurnTerminalState?
     let completedTurnIDs: Set<String>
     let stoppedTurnIDs: Set<String>
@@ -611,7 +658,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                                 shouldWarmRecentTailProgressively: shouldWarmRecentTailProgressively,
                                 hasEarlierMessages: hasEarlierMessages,
                                 renderItems: visibleRenderItems,
-                                isThreadRunning: isThreadRunning,
+                                showsPendingAssistantIndicator: isThreadRunning || isSendInFlight,
                                 isRetryAvailable: isRetryAvailable,
                                 cachedBlockInfoByMessageID: cachedBlockInfoByMessageID,
                                 planSessionSource: planSessionSource,
@@ -923,15 +970,19 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     }
 
     private var shouldShowPendingAssistantResponse: Bool {
-        shouldAnchorToAssistantResponse
-            && messages.last?.role == .user
+        TurnTimelinePendingAssistantState.isWaitingForAssistantResponse(
+            shouldAnchorToAssistantResponse: shouldAnchorToAssistantResponse,
+            messages: messages
+        )
     }
 
-    // New sends stay static while waiting for the assistant anchor; geometry tracking resumes after anchoring.
+    // Scroll geometry resumes after the optimistic send gap and assistant anchor settle.
     private var shouldTrackScrollGeometry: Bool {
-        !shouldAnchorToAssistantResponse
-            && autoScrollMode != .anchorAssistantResponse
-            && !shouldShowPendingAssistantResponse
+        TurnTimelinePendingAssistantState.shouldTrackScrollGeometry(
+            shouldAnchorToAssistantResponse: shouldAnchorToAssistantResponse,
+            autoScrollMode: autoScrollMode,
+            isWaitingForAssistantResponse: shouldShowPendingAssistantResponse
+        )
     }
 
     private func handleLoadEarlierMessages() {

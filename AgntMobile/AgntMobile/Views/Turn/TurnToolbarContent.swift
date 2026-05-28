@@ -1,7 +1,8 @@
 // FILE: TurnToolbarContent.swift
 // Purpose: Encapsulates the TurnView navigation toolbar and thread-path sheet.
 // Layer: View Component
-// Exports: TurnToolbarContent, TurnThreadNavigationContext
+// Exports: TurnToolbarContent, TurnThreadNavigationContext,
+//          TurnThreadActionsMenuButton, TurnThreadActionMenuItem
 
 import SwiftUI
 import UIKit
@@ -77,56 +78,39 @@ struct TurnToolbarContent: ToolbarContent {
 
         if showsThreadActions {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    // Keeps all "branch from here" actions together behind the compact toolbar affordance.
-                    Button {
-                        HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                        onTapMacHandoff?()
-                    } label: {
-                        HStack(spacing: 10) {
-                            ResizableThreadActionSymbol(systemName: "arrow.left.arrow.right", pointSize: 13)
-                            Text("Continue on Desktop App")
-                        }
-                    }
-                    .disabled(!canTapMacHandoff)
-
-                    Button {
-                        HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                        onTapWorktreeHandoff?()
-                    } label: {
-                        CodexWorktreeMenuLabelRow(
+                TurnThreadActionsMenuButton(
+                    isLoading: isThreadActionLoading,
+                    actions: [
+                        TurnThreadActionMenuItem(
+                            title: "Continue on Desktop App",
+                            icon: .system("arrow.left.arrow.right"),
+                            isEnabled: canTapMacHandoff
+                        ) {
+                            onTapMacHandoff?()
+                        },
+                        TurnThreadActionMenuItem(
                             title: isCreatingGitWorktree ? "Preparing worktree..." : worktreeHandoffTitle,
-                            pointSize: 12,
-                            weight: .regular
-                        )
-                    }
-                    .disabled(!canTapWorktreeHandoff)
-
-                    Button {
-                        HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                        onTapNewChat?()
-                    } label: {
-                        HStack(spacing: 10) {
-                            ResizableThreadActionSymbol(systemName: "plus.app", pointSize: 13)
-                            Text("New chat")
-                        }
-                    }
-                    .disabled(!canTapNewChat)
-
-                    Button {
-                        HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                        onTapTerminal?()
-                    } label: {
-                        HStack(spacing: 10) {
-                            ResizableThreadActionSymbol(systemName: "terminal", pointSize: 13)
-                            Text("Open Terminal Here")
-                        }
-                    }
-                    .disabled(!canTapTerminal)
-                } label: {
-                    TurnMacHandoffToolbarLabel(isLoading: isThreadActionLoading)
-                }
-                .accessibilityLabel("Thread actions")
+                            icon: .worktree,
+                            isEnabled: canTapWorktreeHandoff
+                        ) {
+                            onTapWorktreeHandoff?()
+                        },
+                        TurnThreadActionMenuItem(
+                            title: "New chat",
+                            icon: .system("plus.app"),
+                            isEnabled: canTapNewChat
+                        ) {
+                            onTapNewChat?()
+                        },
+                        TurnThreadActionMenuItem(
+                            title: "Open Terminal Here",
+                            icon: .system("terminal"),
+                            isEnabled: canTapTerminal
+                        ) {
+                            onTapTerminal?()
+                        },
+                    ]
+                )
             }
         }
 
@@ -179,6 +163,136 @@ struct TurnMacHandoffToolbarLabel: View {
         }
         .contentShape(Circle())
         .adaptiveToolbarItem(in: Circle())
+    }
+}
+
+struct TurnThreadActionsMenuButton: View {
+    let isLoading: Bool
+    var isEnabled: Bool = true
+    let actions: [TurnThreadActionMenuItem]
+
+    var body: some View {
+        Group {
+            if isLoading {
+                TurnMacHandoffToolbarLabel(isLoading: true)
+            } else {
+                UIKitThreadActionsToolbarButton(
+                    isEnabled: isEnabled,
+                    actions: actions,
+                    triggerImage: Self.triggerImage
+                )
+                .frame(width: Self.triggerIconSize, height: Self.triggerIconSize)
+                .padding(.vertical, 4)
+                .frame(minWidth: Self.minToolbarButtonSize, minHeight: Self.minToolbarButtonSize)
+                .contentShape(Circle())
+                .adaptiveToolbarItem(in: Circle())
+            }
+        }
+        .opacity(isEnabled ? 1 : 0.45)
+        .disabled(!isEnabled)
+        .accessibilityLabel("Thread actions")
+    }
+
+    private static let triggerIconSize: CGFloat = 24
+    private static let minToolbarButtonSize: CGFloat = 28
+
+    // Keeps the toolbar trigger glyph aligned with the rest of the chrome.
+    private static var triggerImage: UIImage {
+        let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        return UIImage(systemName: "arrow.trianglehead.branch", withConfiguration: config) ?? UIImage()
+    }
+}
+
+struct TurnThreadActionMenuItem {
+    enum Icon {
+        case system(String)
+        case worktree
+
+        var uiImage: UIImage? {
+            switch self {
+            case .system(let systemName):
+                let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+                return UIImage(systemName: systemName, withConfiguration: config)
+            case .worktree:
+                return CodexWorktreeIcon.toolbarMenuUIImage()
+            }
+        }
+    }
+
+    let title: String
+    let icon: Icon
+    var isEnabled: Bool = true
+    let handler: () -> Void
+
+    func uiAction() -> UIAction {
+        let attributes: UIMenuElement.Attributes = isEnabled ? [] : .disabled
+        return UIAction(
+            title: title,
+            image: icon.uiImage,
+            attributes: attributes
+        ) { _ in
+            guard isEnabled else { return }
+            HapticFeedback.shared.triggerImpactFeedback(style: .light)
+            handler()
+        }
+    }
+}
+
+private struct UIKitThreadActionsToolbarButton: UIViewRepresentable {
+    let isEnabled: Bool
+    let actions: [TurnThreadActionMenuItem]
+    let triggerImage: UIImage
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(actions: actions)
+    }
+
+    func makeUIView(context: Context) -> UIButton {
+        var config = UIButton.Configuration.plain()
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+
+        let button = UIButton(configuration: config)
+        button.showsMenuAsPrimaryAction = true
+        button.tintColor = .label
+        button.accessibilityLabel = "Thread actions"
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentHuggingPriority(.required, for: .vertical)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        let coordinator = context.coordinator
+        button.menu = UIMenu(children: [
+            UIDeferredMenuElement.uncached { [weak coordinator] completion in
+                completion(coordinator?.makeMenu().children ?? [])
+            },
+        ])
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) {
+        var config = button.configuration ?? UIButton.Configuration.plain()
+        config.image = triggerImage.withRenderingMode(.alwaysTemplate)
+        button.configuration = config
+        button.isEnabled = isEnabled
+        button.accessibilityLabel = "Thread actions"
+        context.coordinator.actions = actions
+    }
+
+    final class Coordinator {
+        var actions: [TurnThreadActionMenuItem]
+
+        init(actions: [TurnThreadActionMenuItem]) {
+            self.actions = actions
+        }
+
+        // Builds fresh rows at presentation time so disabled/loading state stays current.
+        func makeMenu() -> UIMenu {
+            UIMenu(
+                title: "",
+                options: [.displayInline],
+                children: actions.map { $0.uiAction() }
+            )
+        }
     }
 }
 
