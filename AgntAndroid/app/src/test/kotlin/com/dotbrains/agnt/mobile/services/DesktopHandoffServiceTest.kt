@@ -11,6 +11,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.SystemNotice
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
@@ -194,6 +195,8 @@ private class HandoffFakeRepository(
     override val pendingStructuredInputRequest: StateFlow<PendingStructuredInputRequest?> = MutableStateFlow(null)
     override val bridgeSupportsVoiceTranscription: StateFlow<Boolean> = MutableStateFlow(true)
     override val activeProvider: StateFlow<ActiveProvider> = MutableStateFlow(ActiveProvider.Unknown)
+    override val systemNotices: StateFlow<List<SystemNotice>> = MutableStateFlow(emptyList())
+    override fun dismissSystemNotice(id: String) {}
     override val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?> = MutableStateFlow(null)
 
     override suspend fun connect(

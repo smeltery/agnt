@@ -11,6 +11,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.SystemNotice
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
@@ -127,6 +128,8 @@ private abstract class TestRepository : CodexRepository {
     override val pendingStructuredInputRequest: StateFlow<PendingStructuredInputRequest?> = MutableStateFlow(null)
     override val bridgeSupportsVoiceTranscription: StateFlow<Boolean> = MutableStateFlow(true)
     override val activeProvider: StateFlow<ActiveProvider> = MutableStateFlow(ActiveProvider.Unknown)
+    override val systemNotices: StateFlow<List<SystemNotice>> = MutableStateFlow(emptyList())
+    override fun dismissSystemNotice(id: String) {}
     override val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?> = MutableStateFlow(null)
 
     override suspend fun connect(serverUrl: String, token: String, role: String?) = error("unused")

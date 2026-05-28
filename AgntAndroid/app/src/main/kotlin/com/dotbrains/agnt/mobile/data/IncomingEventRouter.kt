@@ -77,6 +77,19 @@ internal class IncomingEventRouter(
         turnId: String?,
         kind: RunCompletionAttentionKind,
     ) -> Unit = { _, _, _ -> },
+    /**
+     * Toast surface for `system/notice` notifications (e.g. opencode
+     * `tui.toast.show` proxied through the bridge). Receives the parsed envelope
+     * fields; severity normalization + auto-dismiss live in the consumer.
+     */
+    private val onSystemNotice: (
+        severity: String?,
+        title: String?,
+        message: String?,
+        provider: String?,
+        threadId: String?,
+        durationMs: Long?,
+    ) -> Unit = { _, _, _, _, _, _ -> },
 ) {
     private val threadIdByTurnId = ConcurrentHashMap<String, String>()
 
@@ -164,6 +177,7 @@ internal class IncomingEventRouter(
             -> handleErrorNotification(obj)
             "account/rateLimits/updated" -> onRateLimitsUpdated(obj)
             "thread/tokenUsage/updated" -> handleThreadTokenUsagePush(obj)
+            "system/notice" -> handleSystemNotice(obj)
             else -> {
                 val nm = normalizeMethod(m)
                 when {
@@ -232,6 +246,23 @@ internal class IncomingEventRouter(
         val threadId = IncomingNotificationParsers.extractThreadId(p) ?: return
         val usage = ContextWindowUsageCodec.decodeFromIncomingUsageParams(p) ?: return
         onThreadContextUsageLive(threadId.trim(), usage)
+    }
+
+    // Parses the `system/notice` envelope shape emitted by the bridge's opencode
+    // translator (see agnt-bridge/src/providers/opencode/translate.js#handleToastShow):
+    //   { severity, title, message, provider, threadId, durationMs }
+    // Field-by-field nullable parsing keeps malformed envelopes from killing the
+    // notification pipeline — the consumer rejects empty payloads anyway.
+    private fun handleSystemNotice(params: Map<String, JSONValue>?) {
+        val p = params ?: return
+        val severity = p["severity"]?.stringValue
+        val title = p["title"]?.stringValue
+        val message = p["message"]?.stringValue
+        if (title.isNullOrBlank() && message.isNullOrBlank()) return
+        val provider = p["provider"]?.stringValue
+        val threadId = p["threadId"]?.stringValue
+        val durationMs = p["durationMs"]?.longValue ?: p["durationMs"]?.doubleValue?.toLong()
+        onSystemNotice(severity, title, message, provider, threadId, durationMs)
     }
 
     private fun handleLegacyTokenCountEvent(

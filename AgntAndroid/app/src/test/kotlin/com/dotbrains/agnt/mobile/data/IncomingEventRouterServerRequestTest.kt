@@ -395,6 +395,55 @@ class IncomingEventRouterServerRequestTest {
     }
 
     @Test
+    fun dispatchNotification_systemNoticeForwardsFullEnvelope() {
+        // Wire shape mirrors the bridge's opencode translator
+        // (agnt-bridge/src/providers/opencode/translate.js#handleToastShow).
+        var captured: Array<Any?>? = null
+        newRouter(
+            onSystemNotice = { severity, title, message, provider, threadId, durationMs ->
+                captured = arrayOf(severity, title, message, provider, threadId, durationMs)
+            },
+        ).dispatchNotification(
+            method = "system/notice",
+            params =
+                JSONValue.Obj(
+                    mapOf(
+                        "severity" to JSONValue.Str("warning"),
+                        "title" to JSONValue.Str("MCP auth"),
+                        "message" to JSONValue.Str("Re-auth required"),
+                        "provider" to JSONValue.Str("opencode"),
+                        "threadId" to JSONValue.Str("thr-fc"),
+                        "durationMs" to JSONValue.NumLong(2_500L),
+                    ),
+                ),
+        )
+
+        val fields = captured
+        assertNotNull(fields)
+        assertEquals("warning", fields[0])
+        assertEquals("MCP auth", fields[1])
+        assertEquals("Re-auth required", fields[2])
+        assertEquals("opencode", fields[3])
+        assertEquals("thr-fc", fields[4])
+        assertEquals(2_500L, fields[5])
+    }
+
+    @Test
+    fun dispatchNotification_systemNoticeDropsPayloadWithNoTitleOrMessage() {
+        // Bridge already guards this (handleToastShow returns early), but the
+        // dispatcher must not invoke the callback either so the UI store can
+        // assume non-empty input.
+        var invoked = false
+        newRouter(
+            onSystemNotice = { _, _, _, _, _, _ -> invoked = true },
+        ).dispatchNotification(
+            method = "system/notice",
+            params = JSONValue.Obj(mapOf("severity" to JSONValue.Str("info"))),
+        )
+        assertEquals(false, invoked)
+    }
+
+    @Test
     fun dispatchNotification_threadTokenUsageUpdated_emitsDecodedUsage() {
         var captured: Pair<String, ContextWindowUsage>? = null
         newRouter(
@@ -609,6 +658,14 @@ class IncomingEventRouterServerRequestTest {
         onThreadContextUsageLive: (String, ContextWindowUsage) -> Unit = { _, _ -> },
         resolveAmbiguousUsageThreadId: () -> String? = { null },
         persistedThreadRename: (String) -> String? = { null },
+        onSystemNotice: (
+            severity: String?,
+            title: String?,
+            message: String?,
+            provider: String?,
+            threadId: String?,
+            durationMs: Long?,
+        ) -> Unit = { _, _, _, _, _, _ -> },
     ): IncomingEventRouter =
         IncomingEventRouter(
             scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
@@ -627,5 +684,6 @@ class IncomingEventRouterServerRequestTest {
             onThreadContextUsageLive = onThreadContextUsageLive,
             resolveAmbiguousUsageThreadId = resolveAmbiguousUsageThreadId,
             persistedThreadRename = persistedThreadRename,
+            onSystemNotice = onSystemNotice,
         )
 }

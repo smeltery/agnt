@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
@@ -121,6 +122,7 @@ fun MainShell(
     val pendingApprovalRequest by repository.pendingApprovalRequest.collectAsStateWithLifecycle()
     val pendingStructuredInputRequest by repository.pendingStructuredInputRequest.collectAsStateWithLifecycle()
     val bridgeUpdatePrompt by repository.bridgeUpdatePrompt.collectAsStateWithLifecycle()
+    val systemNotices by repository.systemNotices.collectAsStateWithLifecycle()
     val connectionState by repository.connectionState.collectAsStateWithLifecycle()
     val reconnectUiState by viewModel.reconnectUiState.collectAsStateWithLifecycle()
     val messagesByThread by repository.messagesByThread.collectAsStateWithLifecycle()
@@ -1392,6 +1394,19 @@ fun MainShell(
             onOpenPairingScanner()
         },
     )
+
+    // Bottom-aligned toast queue for system/notice events (opencode tui.toast.show,
+    // future MCP-auth warnings). Auto-dismissed by SystemNoticesStore; manual
+    // close kills the timer eagerly.
+    Box(modifier = Modifier.fillMaxSize()) {
+        SystemNoticeHost(
+            notices = systemNotices,
+            onDismiss = { id -> repository.dismissSystemNotice(id) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues()),
+        )
+    }
 }
 
 private data class PendingGitOperation(

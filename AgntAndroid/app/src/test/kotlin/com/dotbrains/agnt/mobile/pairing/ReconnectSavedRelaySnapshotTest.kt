@@ -10,6 +10,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.SystemNotice
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
@@ -87,6 +88,8 @@ private class ReconnectTrackingRepository : CodexRepository {
         MutableStateFlow(null)
     override val bridgeSupportsVoiceTranscription: StateFlow<Boolean> = MutableStateFlow(true)
     override val activeProvider: StateFlow<ActiveProvider> = MutableStateFlow(ActiveProvider.Unknown)
+    override val systemNotices: StateFlow<List<SystemNotice>> = MutableStateFlow(emptyList())
+    override fun dismissSystemNotice(id: String) {}
     override val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?> = MutableStateFlow(null)
 
     override suspend fun connect(

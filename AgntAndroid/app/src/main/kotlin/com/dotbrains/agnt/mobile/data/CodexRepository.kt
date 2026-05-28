@@ -132,6 +132,17 @@ interface CodexRepository {
      */
     val activeProvider: StateFlow<ActiveProvider>
 
+    /**
+     * Toast queue sourced from `system/notice` JSON-RPC notifications (parity web
+     * `useNoticesStore` — opencode `tui.toast.show` is the primary producer today).
+     * Each notice auto-dismisses after `durationMs` (or severity-based default).
+     * Cleared on reconnect via [SystemNoticesStore.clear] in `resetBridgeSession`.
+     */
+    val systemNotices: StateFlow<List<com.dotbrains.agnt.mobile.core.model.SystemNotice>>
+
+    /** Dismiss a system notice ahead of its auto-dismiss timer (e.g. user-tapped X). */
+    fun dismissSystemNotice(id: String)
+
     /** Recoverable npm / pairing prompts from the service layer (bridge upgrade, unsupported runtime fields). */
     val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?>
 

@@ -53,9 +53,24 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
       directly) doesn't carry providerId yet — the client picks it up on the
       next warm reconnect. Tracked: `ActiveProviderTest`,
       `handshake-handler.test.js` providerId cases.
-- [ ] **`system/notice` toast surfacing**. Verify the `system/notice` JSON-RPC
-      notification path renders an Android Snackbar/toast like opencode's
-      `tui.toast.show` does on iOS.
+- [x] **`system/notice` toast surfacing**. End-to-end wired:
+        - Bridge already emits `system/notice` from opencode `tui.toast.show`
+          (`agnt-bridge/src/providers/opencode/translate.js#handleToastShow`).
+        - `IncomingEventRouter` dispatches `system/notice` → `onSystemNotice`
+          callback, dropping payloads with no title and no message.
+        - `SystemNoticesStore` (in `data/`) buffers notices with per-severity
+          default durations (info 5s / warn 8s / error 12s); supports
+          bridge-supplied `durationMs` overrides, manual dismiss, and `clear()`
+          on reconnect via `resetBridgeSession`.
+        - `CodexRepository.systemNotices: StateFlow<List<SystemNotice>>` +
+          `dismissSystemNotice(id)`.
+        - `MainShell` renders `SystemNoticeHost` (bottom-aligned, severity-
+          colored pills, animated slide-in/out, close button).
+        - Note: iOS PARITY row claimed "yes" but no iOS implementation
+          actually exists; PARITY corrected.
+        - Coverage: `SystemNoticeSeverityTest`, `SystemNoticesStoreTest`,
+          `IncomingEventRouterServerRequestTest` (system/notice envelope +
+          empty-payload guard).
 
 ### P2 — provider-flag plumbing
 

@@ -267,6 +267,12 @@ class CodexService(
             initialTailLimit = INITIAL_TIMELINE_TAIL_LIMIT,
         )
     internal val commandExecutionDetailsStore = CommandExecutionDetailsStore()
+    internal val systemNoticesStore = com.dotbrains.agnt.mobile.data.SystemNoticesStore(scope = scope)
+    override val systemNotices: StateFlow<List<com.dotbrains.agnt.mobile.core.model.SystemNotice>> =
+        systemNoticesStore.notices
+    override fun dismissSystemNotice(id: String) {
+        systemNoticesStore.dismiss(id)
+    }
 
     init {
         scope.launch {
@@ -383,6 +389,16 @@ class CodexService(
             remapThreadFromServer = { t -> applyPersistedThreadRename(applyAuthoritativeProjectPathToServerThread(t)) },
             persistedThreadRename = { tid -> persistedThreadRename(tid) },
             onRunCompletionAttention = { th, turn, kind -> notifyRunCompletionAttention(th, turn, kind) },
+            onSystemNotice = { severity, title, message, provider, threadId, durationMs ->
+                systemNoticesStore.enqueue(
+                    severity = com.dotbrains.agnt.mobile.core.model.SystemNoticeSeverity.fromBridgeValue(severity),
+                    title = title,
+                    message = message,
+                    provider = provider,
+                    threadId = threadId,
+                    durationMsOverride = durationMs,
+                )
+            },
         )
     }
 
