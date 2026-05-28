@@ -1091,25 +1091,31 @@ private struct UserBubbleTextBlock<Content: View>: View {
 
     let contentIdentity: String
     let rawText: String
+    var contentResetKey: String? = nil
     @ViewBuilder let content: () -> Content
 
     @State private var isExpanded = false
 
     private var canCollapse: Bool {
-        let newlineCount = rawText.reduce(into: 0) { count, character in
+        var characterCount = 0
+        var newlineCount = 0
+        for character in rawText {
+            characterCount += 1
+            if characterCount > Self.collapseCharacterThreshold {
+                return true
+            }
             if character == "\n" {
-                count += 1
+                newlineCount += 1
+                if newlineCount >= Self.collapseNewlineThreshold {
+                    return true
+                }
             }
         }
-        return rawText.count > Self.collapseCharacterThreshold
-            || newlineCount >= Self.collapseNewlineThreshold
+        return false
     }
 
-    private var collapseResetKey: Int {
-        var hasher = Hasher()
-        hasher.combine(contentIdentity)
-        hasher.combine(rawText)
-        return hasher.finalize()
+    private var collapseResetKey: String {
+        "\(contentIdentity)|\(contentResetKey ?? TurnTextCacheKey.stableFingerprint(for: rawText))"
     }
 
     var body: some View {
@@ -1251,7 +1257,8 @@ struct MessageRow: View, Equatable {
     }
 
     private func userBubble(text: String) -> some View {
-        HStack {
+        let renderModel = UserBubbleRenderModelCache.model(for: message, text: text)
+        return HStack {
             Spacer(minLength: 60)
             VStack(alignment: .trailing, spacing: 4) {
                 if !message.attachments.isEmpty {
@@ -1262,12 +1269,17 @@ struct MessageRow: View, Equatable {
                     }
                 }
 
-                if !text.isEmpty {
+                if !renderModel.chips.isEmpty {
+                    UserMentionChipStrip(chips: renderModel.chips)
+                }
+
+                if !renderModel.text.isEmpty {
                     UserBubbleTextBlock(
                         contentIdentity: message.id,
-                        rawText: text
+                        rawText: renderModel.text,
+                        contentResetKey: renderModel.textFingerprint
                     ) {
-                        userBubbleText(text)
+                        userBubbleText(renderModel.text)
                             .font(AppFont.body())
                     }
                         .padding(.vertical, 12)

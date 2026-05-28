@@ -287,7 +287,7 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
     @Binding var showsAllModelsSheet: Bool
 
     private let metaLabelColor = Color(.secondaryLabel)
-    private var metaTextFont: Font { AppFont.subheadline() }
+    private var metaTextFont: Font { AppFont.callout() }
     private var metaSymbolFont: Font { AppFont.system(size: 11, weight: .regular) }
     private var metaChevronFont: Font { AppFont.system(size: 9, weight: .regular) }
 

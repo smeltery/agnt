@@ -243,6 +243,7 @@ private struct TurnTimelineRowsSection: View {
     let shouldWarmRecentTailProgressively: Bool
     let hasEarlierMessages: Bool
     let renderItems: [TurnTimelineRenderItem]
+    let isThreadRunning: Bool
     let isRetryAvailable: Bool
     let cachedBlockInfoByMessageID: [String: AssistantBlockAccessoryState]
     let planSessionSource: CodexPlanSessionSource?
@@ -337,6 +338,37 @@ private struct TurnTimelineRowsSection: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+
+        if shouldShowPendingAssistantIndicator {
+            PendingAssistantIndicatorRow()
+        }
+    }
+
+    // Bridges the gap between the optimistic user bubble and the first rendered
+    // assistant/system row, whose placeholder text may be intentionally hidden.
+    private var shouldShowPendingAssistantIndicator: Bool {
+        guard isThreadRunning else { return false }
+
+        switch renderItems.last {
+        case .message(let message):
+            return message.role == .user
+        case .toolBurst, .previousMessages:
+            return false
+        case nil:
+            return false
+        }
+    }
+}
+
+private struct PendingAssistantIndicatorRow: View {
+    var body: some View {
+        HStack {
+            TerminalRunningIndicator()
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+        .padding(.top, 4)
     }
 }
 
@@ -420,7 +452,6 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     let olderHistoryLoadErrorMessage: String?
 
     @Binding var shouldAnchorToAssistantResponse: Bool
-    @Binding var isScrolledToBottom: Bool
     let isComposerFocused: Bool
     let isComposerAutocompletePresented: Bool
 
@@ -443,6 +474,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     private static var scrollToLatestButtonLift: CGFloat { 44 + 18 }
 
     @State private var visibleTailCount: Int = pageSize
+    @State private var isScrolledToBottom = true
     @State private var viewportHeight: CGFloat = 0
     // Cached per-render artifacts to avoid O(n) recomputation inside the body.
     @State private var cachedBlockInfoByMessageID: [String: AssistantBlockAccessoryState] = [:]
@@ -579,6 +611,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                                 shouldWarmRecentTailProgressively: shouldWarmRecentTailProgressively,
                                 hasEarlierMessages: hasEarlierMessages,
                                 renderItems: visibleRenderItems,
+                                isThreadRunning: isThreadRunning,
                                 isRetryAvailable: isRetryAvailable,
                                 cachedBlockInfoByMessageID: cachedBlockInfoByMessageID,
                                 planSessionSource: planSessionSource,
@@ -623,7 +656,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                         }
                     }
                     .frame(width: viewport.size.width)
-                    .defaultScrollAnchor(.bottom, for: .initialOffset)
+                    .defaultScrollAnchor(initialScrollAnchor, for: .initialOffset)
                     .defaultScrollAnchor(.bottom, for: .sizeChanges)
                     .scrollDismissesKeyboard(.interactively)
                     .simultaneousGesture(
@@ -653,6 +686,9 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                             contentHeight: geometry.contentSize.height
                         )
                     } action: { old, new in
+                        // New sends suppress geometry callbacks while waiting for the assistant
+                        // anchor so the optimistic user row is not snapped around mid-resume.
+                        guard shouldTrackScrollGeometry else { return }
                         logTimelineGeometryChangeIfNeeded(old: old, new: new)
                         // Coalesce into a single commit per runloop turn so SwiftUI
                         // sees at most one @State mutation instead of several per frame.
@@ -882,6 +918,22 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         )
     }
 
+    private var initialScrollAnchor: UnitPoint {
+        .bottom
+    }
+
+    private var shouldShowPendingAssistantResponse: Bool {
+        shouldAnchorToAssistantResponse
+            && messages.last?.role == .user
+    }
+
+    // New sends stay static while waiting for the assistant anchor; geometry tracking resumes after anchoring.
+    private var shouldTrackScrollGeometry: Bool {
+        !shouldAnchorToAssistantResponse
+            && autoScrollMode != .anchorAssistantResponse
+            && !shouldShowPendingAssistantResponse
+    }
+
     private func handleLoadEarlierMessages() {
         progressiveTailRevealTask?.cancel()
         progressiveTailRevealTask = nil
@@ -915,7 +967,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         isUserDraggingScroll = false
         userScrollCooldownUntil = nil
         autoScrollMode = shouldAnchorToAssistantResponse ? .anchorAssistantResponse : .followBottom
-        initialRecoverySnapPendingThreadID = threadID
+        initialRecoverySnapPendingThreadID = shouldAnchorToAssistantResponse ? nil : threadID
         isProgressivelyRevealingRecentTail = shouldStageHeavyThreadOpen
     }
 
@@ -1052,26 +1104,26 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
             return
         }
 
+        if !nextValue {
+            // Cancel queued app snaps once geometry confirms the viewport is away
+            // from bottom; transient content-growth frames are filtered above.
+            followBottomScrollTask?.cancel()
+            followBottomScrollTask = nil
+            progressiveTailRevealTask?.cancel()
+            progressiveTailRevealTask = nil
+            isProgressivelyRevealingRecentTail = false
+        }
+
+        isScrolledToBottom = nextValue
         if nextValue {
-            isScrolledToBottom = true
             if autoScrollMode != .anchorAssistantResponse {
                 autoScrollMode = .followBottom
             }
             scheduleProgressiveTailRevealIfNeeded()
         } else {
-            isScrolledToBottom = false
             autoScrollMode = TurnScrollStateTracker.modeAfterAcceptedNotBottomGeometry(
                 currentMode: autoScrollMode
             )
-            // Cancel queued app snaps once geometry confirms the viewport is away
-            // from bottom; transient content-growth frames are filtered above.
-            if autoScrollMode == .manual || autoScrollMode == .anchorAssistantResponse {
-                followBottomScrollTask?.cancel()
-                followBottomScrollTask = nil
-            }
-            progressiveTailRevealTask?.cancel()
-            progressiveTailRevealTask = nil
-            isProgressivelyRevealingRecentTail = false
         }
     }
 
@@ -1174,7 +1226,11 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             proxy.scrollTo(assistantMessageID, anchor: .top)
         }
-        shouldAnchorToAssistantResponse = false
+        // Break the .onChange chain by deferring the binding write to avoid
+        // AttributeGraph cycles when the parent re-renders in response.
+        DispatchQueue.main.async {
+            shouldAnchorToAssistantResponse = false
+        }
         autoScrollMode = .followBottom
         initialRecoverySnapPendingThreadID = nil
         return true
@@ -1186,7 +1242,12 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         performInitialRecoverySnapIfNeeded(using: proxy)
 
         if autoScrollMode == .anchorAssistantResponse {
-            _ = anchorToAssistantResponseIfNeeded(using: proxy)
+            if !anchorToAssistantResponseIfNeeded(using: proxy),
+               shouldShowPendingAssistantResponse {
+                // The assistant row does not exist yet; keep the optimistic user
+                // bubble and pending thinking indicator anchored at the bottom.
+                scrollToBottom(using: proxy, animated: true)
+            }
         }
     }
 
@@ -1217,23 +1278,12 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         )
     }
 
-    // Keeps the footer/timeline geometry transition stable while waiting for the first
-    // assistant row to exist, so sending a message cannot leave a temporarily blank viewport.
+    // Follow-bottom owns bottom pinning; assistant anchoring waits for a real assistant row
+    // so a new chat's first user bubble is not snapped around by geometry changes.
     private var shouldPinTimelineToBottomDuringGeometryChange: Bool {
-        let assistantAnchorTargetExists: Bool
-        if autoScrollMode == .anchorAssistantResponse {
-            assistantAnchorTargetExists = TurnTimelineReducer.assistantResponseAnchorMessageID(
-                in: Array(visibleMessages),
-                activeTurnID: activeTurnID
-            ) != nil
-        } else {
-            assistantAnchorTargetExists = false
-        }
         return TurnScrollStateTracker.shouldPinDuringGeometryChange(
             currentMode: autoScrollMode,
-            isScrolledToBottom: isScrolledToBottom,
-            isAutomaticScrollingPaused: shouldPauseAutomaticScrolling,
-            assistantAnchorTargetExists: assistantAnchorTargetExists
+            isAutomaticScrollingPaused: shouldPauseAutomaticScrolling
         )
     }
 
@@ -1478,29 +1528,31 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
             && autoScrollMode == .followBottom
         let viewportHeightChanged = new.viewportHeight > 0
             && abs(new.viewportHeight - old.viewportHeight) > 2
+        let shouldPinToBottom = shouldPinTimelineToBottomDuringGeometryChange
+        let shouldScheduleFollowBottom = viewportHeightChanged
+            && shouldPinToBottom
+            && !isSuppressingBottomCorrectionsForWarmup
+        let shouldCorrectForContentHeight = !isSuppressingBottomCorrectionsForWarmup
+            && TurnScrollStateTracker.shouldCorrectBottomAfterContentHeightChange(
+                previousHeight: old.contentHeight,
+                newHeight: new.contentHeight,
+                isPinnedToBottom: shouldPinToBottom
+            )
+        let bottomChanged = new.isAtBottom != old.isAtBottom
+            && !(isSuppressingBottomCorrectionsForWarmup && !new.isAtBottom)
+        let nextViewportHeight = new.viewportHeight
 
-        if new.viewportHeight > 0 {
-            if abs(new.viewportHeight - viewportHeight) > 1 {
-                viewportHeight = new.viewportHeight
+        Task { @MainActor in
+            if nextViewportHeight > 0, abs(nextViewportHeight - viewportHeight) > 1 {
+                viewportHeight = nextViewportHeight
+                performInitialRecoverySnapIfNeeded(using: proxy)
             }
-            performInitialRecoverySnapIfNeeded(using: proxy)
-            if viewportHeightChanged,
-               shouldPinTimelineToBottomDuringGeometryChange,
-               !isSuppressingBottomCorrectionsForWarmup {
+            if shouldScheduleFollowBottom || shouldCorrectForContentHeight {
                 scheduleFollowBottomScroll(using: proxy)
             }
-        }
-        if !isSuppressingBottomCorrectionsForWarmup,
-           TurnScrollStateTracker.shouldCorrectBottomAfterContentHeightChange(
-            previousHeight: old.contentHeight,
-            newHeight: new.contentHeight,
-            isPinnedToBottom: shouldPinTimelineToBottomDuringGeometryChange
-        ) {
-            scheduleFollowBottomScroll(using: proxy)
-        }
-        if new.isAtBottom != old.isAtBottom,
-           !(isSuppressingBottomCorrectionsForWarmup && !new.isAtBottom) {
-            handleScrolledToBottomChanged(new.isAtBottom)
+            if bottomChanged {
+                handleScrolledToBottomChanged(new.isAtBottom)
+            }
         }
         debugTimelineLog(
             "applyScrollGeometryUpdate oldBottom=\(old.isAtBottom) newBottom=\(new.isAtBottom) "

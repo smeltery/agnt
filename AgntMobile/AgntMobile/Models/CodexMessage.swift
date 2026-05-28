@@ -37,6 +37,8 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
     var assistantPhase: String?
     var text: String
     var fileMentions: [String]
+    var skillMentions: [String]
+    var pluginMentions: [String]
     var createdAt: Date
     var turnId: String?
     var itemId: String?
@@ -61,6 +63,8 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         assistantPhase: String? = nil,
         text: String,
         fileMentions: [String] = [],
+        skillMentions: [String] = [],
+        pluginMentions: [String] = [],
         createdAt: Date = Date(),
         turnId: String? = nil,
         itemId: String? = nil,
@@ -81,6 +85,8 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         self.assistantPhase = assistantPhase
         self.text = text
         self.fileMentions = fileMentions
+        self.skillMentions = skillMentions
+        self.pluginMentions = pluginMentions
         self.createdAt = createdAt
         self.turnId = turnId
         self.itemId = itemId
@@ -117,6 +123,8 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         case assistantPhase
         case text
         case fileMentions
+        case skillMentions
+        case pluginMentions
         case createdAt
         case turnId
         case itemId
@@ -140,6 +148,8 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         assistantPhase = try container.decodeIfPresent(String.self, forKey: .assistantPhase)
         text = try container.decode(String.self, forKey: .text)
         fileMentions = try container.decodeIfPresent([String].self, forKey: .fileMentions) ?? []
+        skillMentions = try container.decodeIfPresent([String].self, forKey: .skillMentions) ?? []
+        pluginMentions = try container.decodeIfPresent([String].self, forKey: .pluginMentions) ?? []
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         turnId = try container.decodeIfPresent(String.self, forKey: .turnId)
         itemId = try container.decodeIfPresent(String.self, forKey: .itemId)

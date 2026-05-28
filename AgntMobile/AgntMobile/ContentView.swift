@@ -74,6 +74,7 @@ struct ContentView: View {
     @State private var sidebarSelectionSuppressedUntil: Date?
     @State private var isOpeningNewChatFromSidebar = false
     @State private var activeNewChatDraftRoute: NewChatDraftRoute?
+    @State private var threadIDsPendingInitialAssistantAnchor: Set<String> = []
     @AppStorage("codex.hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("codex.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion = ""
 
@@ -483,6 +484,10 @@ struct ContentView: View {
             TurnView(
                 thread: thread,
                 isWakingMacDisplayRecovery: isWakingSavedMacDisplay,
+                initialShouldAnchorToAssistantResponse: threadIDsPendingInitialAssistantAnchor.contains(thread.id),
+                onInitialAssistantAnchorConsumed: {
+                    threadIDsPendingInitialAssistantAnchor.remove(thread.id)
+                },
                 onOpenTerminal: { workingDirectory in
                     openTerminal(preferredWorkingDirectory: workingDirectory)
                 }
@@ -878,13 +883,16 @@ struct ContentView: View {
     }
 
     private func openThreadFromNewChatDraft(_ thread: CodexThread) {
-        activeNewChatDraftRoute = nil
         isOpeningNewChatFromSidebar = false
+        threadIDsPendingInitialAssistantAnchor.insert(thread.id)
         selectedThread = thread
         codex.activeThreadId = thread.id
         codex.markThreadAsViewed(thread.id)
 
-        codex.requestImmediateActiveThreadSync(threadId: thread.id)
+        // We always render the thread inline (no nested NavigationStack split locally),
+        // so drop the legacy `activeNewChatDraftRoute` here rather than waiting for a
+        // navigationPath append. Matches upstream `else` branch in ba5c596.
+        activeNewChatDraftRoute = nil
     }
 
     // Keeps first-run installs in the scanner by default, while still letting users back out later.

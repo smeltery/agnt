@@ -41,7 +41,7 @@ struct NewChatDraftView: View {
     let route: NewChatDraftRoute
     var leadingControl: NewChatDraftLeadingControl = .back
     var onOpenTerminal: ((String?) -> Void)? = nil
-    let onOpenThread: (CodexThread) -> Void
+    let onOpenThread: @MainActor @Sendable (CodexThread) -> Void
 
     @State private var viewModel = TurnViewModel()
     @State private var isInputFocused = false
@@ -55,6 +55,7 @@ struct NewChatDraftView: View {
     @State private var isApprovalAlertPresented = false
     @State private var isShowingMacHandoffConfirm = false
     @State private var macHandoffErrorMessage: String?
+    @State private var isDeferringSendForFocusDismissal = false
 
     // UI-only check for layout experiments: true when opened from the general
     // sidebar Chat affordance, false when opened from a folder section button.
@@ -63,10 +64,7 @@ struct NewChatDraftView: View {
     }
 
     var body: some View {
-        // Original target layout: just title + folder pill, tightly stacked and
-        // biased toward the top half so the composer dominates the lower third.
-        // No AppLogo or encryption tagline here — that hero block is the chat
-        // empty state's job, not the draft's.
+        // Keep the draft surface static while first send creates the real thread.
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             promptStack
@@ -113,15 +111,16 @@ struct NewChatDraftView: View {
         .task {
             initializeProjectSelectionIfNeeded()
             await refreshProjectlessChatRoots()
-            refreshDraftGitStateIfNeeded()
         }
         .onChange(of: projectChoices) { _, _ in
             initializeProjectSelectionIfNeeded()
-            refreshDraftGitStateIfNeeded()
         }
         .onChange(of: selectedProjectPath) { _, _ in
-            viewModel.clearComposerAutocomplete()
-            refreshDraftGitStateIfNeeded()
+            // Defer the observable-model mutation out of the .onChange action
+            // to avoid AttributeGraph cycles when the parent re-renders.
+            DispatchQueue.main.async { [viewModel] in
+                viewModel.clearComposerAutocomplete()
+            }
         }
         .sheet(item: $activeSheet) { sheet in
             sheetContent(sheet)
@@ -171,8 +170,12 @@ struct NewChatDraftView: View {
             preferredItemEncoding: .automatic
         )
         .onChange(of: viewModel.photoPickerItems) { _, newItems in
-            viewModel.enqueuePhotoPickerItems(newItems, codex: codex, threadID: route.id)
-            viewModel.photoPickerItems = []
+            // Defer the observable-model mutation out of the .onChange action
+            // to avoid AttributeGraph cycles when the parent re-renders.
+            DispatchQueue.main.async { [viewModel] in
+                viewModel.enqueuePhotoPickerItems(newItems, codex: codex, threadID: route.id)
+                viewModel.photoPickerItems = []
+            }
         }
     }
 
@@ -296,9 +299,7 @@ struct NewChatDraftView: View {
             )
     }
 
-    // Preloads the same repo/branch status TurnView uses whenever there is an
-    // actual selected project. General Chat starts enabled too if it defaulted
-    // to the latest-used project; only Quick Chat stays blocked.
+    // Drafts avoid eager Git refreshes so first-send stays a simple thread/start handoff.
     private func refreshDraftGitStateIfNeeded() {
         guard hasSelectedProject, codex.isConnected else {
             return
@@ -488,7 +489,7 @@ struct NewChatDraftView: View {
             onTapVoice: {},
             onCancelVoiceRecording: {},
             onSend: sendDraft,
-            showsSecondaryBar: hasSelectedProject
+            showsSecondaryBar: false
         )
     }
 
@@ -584,15 +585,24 @@ struct NewChatDraftView: View {
     }
 
     private func sendDraft() {
+        guard !isDeferringSendForFocusDismissal else { return }
+        isDeferringSendForFocusDismissal = true
         isInputFocused = false
-        viewModel.clearComposerAutocomplete()
-        viewModel.sendNewThread(
-            codex: codex,
-            subscriptions: subscriptions,
-            draftThreadID: route.id,
-            preferredProjectPath: selectedProjectPath,
-            onThreadCreated: onOpenThread
-        )
+
+        let openThread: @MainActor @Sendable (CodexThread) -> Void = { thread in
+            onOpenThread(thread)
+        }
+        Task { @MainActor in
+            await Task.yield()
+            viewModel.sendNewThread(
+                codex: codex,
+                subscriptions: subscriptions,
+                draftThreadID: route.id,
+                preferredProjectPath: selectedProjectPath,
+                onThreadCreated: openThread
+            )
+            isDeferringSendForFocusDismissal = false
+        }
     }
 
     @ViewBuilder

@@ -1240,10 +1240,15 @@ extension CodexService {
         text: String,
         turnId: String? = nil,
         attachments: [CodexImageAttachment] = [],
-        fileMentions: [String] = []
+        fileMentions: [String] = [],
+        skillMentions: [String] = [],
+        pluginMentions: [String] = []
     ) -> String {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty || !attachments.isEmpty else {
+        guard !trimmedText.isEmpty
+                || !attachments.isEmpty
+                || !skillMentions.isEmpty
+                || !pluginMentions.isEmpty else {
             return ""
         }
 
@@ -1252,6 +1257,8 @@ extension CodexService {
             role: .user,
             text: trimmedText,
             fileMentions: fileMentions,
+            skillMentions: skillMentions,
+            pluginMentions: pluginMentions,
             turnId: turnId,
             isStreaming: false,
             deliveryState: .pending,
@@ -3903,6 +3910,25 @@ extension CodexService {
         messagesByThread[threadId] = threadMessages
         persistMessages()
         updateCurrentOutput(for: threadId)
+    }
+
+    // Removes a known optimistic user row when text matching is not reliable, such as mention-only sends.
+    @discardableResult
+    func removeUserMessage(threadId: String, messageId: String) -> Bool {
+        guard !messageId.isEmpty,
+              var threadMessages = messagesByThread[threadId],
+              let index = findMessageIndex(threadId: threadId, messageId: messageId),
+              threadMessages.indices.contains(index),
+              threadMessages[index].role == .user else {
+            return false
+        }
+
+        threadMessages.remove(at: index)
+        messagesByThread[threadId] = threadMessages
+        messageIndexCacheByThread[threadId] = nil
+        persistMessages()
+        updateCurrentOutput(for: threadId)
+        return true
     }
 
     // Marks streaming assistant state complete once turn/completed arrives.
