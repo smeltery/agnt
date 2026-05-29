@@ -5,6 +5,7 @@ import com.dotbrains.agnt.mobile.core.model.AIChangeSetSource
 import com.dotbrains.agnt.mobile.core.model.AIWorkspaceCheckpointMetadata
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
+import com.dotbrains.agnt.mobile.services.agent.review.AiChangeSetRevertService
 import kotlinx.coroutines.test.runTest
 import java.time.Instant
 import kotlin.test.Test

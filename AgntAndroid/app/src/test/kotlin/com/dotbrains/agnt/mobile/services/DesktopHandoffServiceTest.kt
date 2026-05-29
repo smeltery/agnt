@@ -21,6 +21,8 @@ import com.dotbrains.agnt.mobile.core.model.SystemNotice
 import com.dotbrains.agnt.mobile.core.persistence.RelaySessionSnapshot
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
+import com.dotbrains.agnt.mobile.services.agent.connection.DesktopHandoffError
+import com.dotbrains.agnt.mobile.services.agent.connection.DesktopHandoffService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest

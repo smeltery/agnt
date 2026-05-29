@@ -5,7 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
-import com.dotbrains.agnt.mobile.ui.turn.TurnCommandExecutionCard
+import com.dotbrains.agnt.mobile.ui.turn.subagent.TurnCommandExecutionCard
 
 /**
  * System row for command / tool execution. SwiftUI: dedicated tool row views in Turn timeline.

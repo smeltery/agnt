@@ -56,8 +56,8 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageDeliveryState
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
-import com.dotbrains.agnt.mobile.ui.turn.TurnMessageRow
-import com.dotbrains.agnt.mobile.ui.turn.TurnTimelineGroupedRunsRow
+import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnMessageRow
+import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnTimelineGroupedRunsRow
 import com.valentinilk.shimmer.shimmer
 import kotlinx.coroutines.launch
 import com.composables.icons.lucide.R as LucideR

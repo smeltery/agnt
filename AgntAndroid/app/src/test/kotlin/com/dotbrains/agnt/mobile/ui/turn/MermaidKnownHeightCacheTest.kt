@@ -1,6 +1,8 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
 import androidx.compose.ui.unit.dp
+import com.dotbrains.agnt.mobile.ui.turn.timeline.MermaidHeightCacheKey
+import com.dotbrains.agnt.mobile.ui.turn.timeline.MermaidKnownHeightCache
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

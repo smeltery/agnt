@@ -1,5 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import com.dotbrains.agnt.mobile.ui.turn.timeline.shouldFollowTimelineBottom
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

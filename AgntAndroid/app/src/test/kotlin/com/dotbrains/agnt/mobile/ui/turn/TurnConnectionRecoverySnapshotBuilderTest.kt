@@ -4,6 +4,9 @@ import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectAttempt
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
+import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
+import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoveryStatus
+import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoveryTrailing
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

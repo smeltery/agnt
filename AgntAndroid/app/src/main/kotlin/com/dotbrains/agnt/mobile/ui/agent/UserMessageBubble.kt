@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
-import com.dotbrains.agnt.mobile.ui.turn.TurnMessageRow
+import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnMessageRow
 
 /** User-authored bubble in the timeline (same layout as [TurnMessageRow] for [CodexMessageRole.user]). */
 @Composable

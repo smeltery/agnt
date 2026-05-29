@@ -1,5 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.SkillReferenceFormatter
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

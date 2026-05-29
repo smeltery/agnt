@@ -66,7 +66,7 @@ import com.dotbrains.agnt.mobile.core.model.GitRepoSyncResult
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnFileRow
 import com.dotbrains.agnt.mobile.ui.agent.truncatePathMiddle
 import com.dotbrains.agnt.mobile.ui.theme.AgntGitAddition
-import com.dotbrains.agnt.mobile.ui.turn.RepoMarkdownFileLink
+import com.dotbrains.agnt.mobile.ui.turn.timeline.RepoMarkdownFileLink
 import kotlinx.coroutines.delay
 import com.composables.icons.lucide.R as LucideR
 

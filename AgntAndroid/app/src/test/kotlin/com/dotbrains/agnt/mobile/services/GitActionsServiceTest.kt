@@ -21,6 +21,8 @@ import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import com.dotbrains.agnt.mobile.core.model.SystemNotice
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
+import com.dotbrains.agnt.mobile.services.git.GitActionsError
+import com.dotbrains.agnt.mobile.services.git.GitActionsService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest

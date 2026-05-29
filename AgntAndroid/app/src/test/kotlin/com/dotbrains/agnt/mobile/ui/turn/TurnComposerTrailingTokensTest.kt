@@ -1,5 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionKind
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

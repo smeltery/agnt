@@ -3,8 +3,10 @@ package com.dotbrains.agnt.mobile.services
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.RPCError
-import com.dotbrains.agnt.mobile.ui.turn.BranchPickerCloseCause
-import com.dotbrains.agnt.mobile.ui.turn.shouldConsumeBranchPickerOpenRequest
+import com.dotbrains.agnt.mobile.services.agent.threads.NewThreadOpenFlowSink
+import com.dotbrains.agnt.mobile.services.agent.threads.runNewThreadOpenFlow
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.BranchPickerCloseCause
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.shouldConsumeBranchPickerOpenRequest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

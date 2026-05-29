@@ -84,8 +84,8 @@ import com.dotbrains.agnt.mobile.ui.home.RootViewModel
 import com.dotbrains.agnt.mobile.ui.home.ThreadCompletionBanner
 import com.dotbrains.agnt.mobile.ui.navigation.AppNavHost
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
-import com.dotbrains.agnt.mobile.ui.turn.LocalOpenRepoDiffForMarkdownLink
-import com.dotbrains.agnt.mobile.ui.turn.RepoMarkdownFileLink
+import com.dotbrains.agnt.mobile.ui.turn.timeline.LocalOpenRepoDiffForMarkdownLink
+import com.dotbrains.agnt.mobile.ui.turn.timeline.RepoMarkdownFileLink
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

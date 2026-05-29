@@ -6,6 +6,12 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexPlanState
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStep
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStepStatus
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.PlanAccessorySnapshot
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.PlanAccessoryStatus
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectCompletedPlanAccessoryMessage
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectPinnedPlanAccessoryMessage
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.shouldDisplayCompletedPlanAccessory
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.shouldDisplayPinnedPlanAccessory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

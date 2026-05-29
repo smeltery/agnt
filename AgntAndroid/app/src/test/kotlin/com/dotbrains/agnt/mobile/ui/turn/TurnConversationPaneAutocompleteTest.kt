@@ -2,6 +2,17 @@ package com.dotbrains.agnt.mobile.ui.turn
 
 import com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.SkillAutocompleteSuggestion
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.buildComposerAutocompleteState
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToFileMentions
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToSkillMentions
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mergeMentionChipsIntoDraft
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.restoreMentionChips
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.stripMergedMentionPrefix
+import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionChipPayload
+import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionKind
+import com.dotbrains.agnt.mobile.ui.turn.composer.TrailingComposerMentionParse
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

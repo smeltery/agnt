@@ -188,9 +188,39 @@ Open follow-ups:
       cross sub-package boundaries now need explicit imports — they used
       to be in the same flat package). 562-test suite green, ktlint clean.
       Total churn: 34 files moved, ~150 source files touched, 0 behavioral
-      change. Skipped a parallel `ui/turn/` reorg (45 files) because that
-      surface still tracks upstream parity actively and any restructure
-      would add upstream-merge friction.
+      change.
+
+- [x] **44 flat `ui/turn/*.kt` files → 9 sub-packages.** Same script-driven
+      pattern as the services reorg, mirroring iOS's
+      `Features/Chat/{Autocomplete,Composer,Attachments,Subagent,Diff,Toolbar,Timeline,Recovery,Worktree}/`:
+      ```
+      ui/turn/
+      ├── TurnConversationPane.kt   (root — the top-level chat shell)
+      ├── autocomplete/             SkillReferenceFormatter / TurnComposerAutocompleteModels / TurnConversationPaneAutocomplete
+      ├── composer/                 TurnComposerBar / SecondaryBar / StateModel / RuntimeControls / RuntimeToolbarMenuBuilder / ToolbarActionsBuilder / ToolbarMenuModels / TrailingTokens / UnifiedModelRuntimeChip / UsageRing / UsageStrip / VoiceRecordingCapsule / TurnConversationPaneRuntime
+      ├── attachments/              TurnAttachmentViews / TurnConversationPaneAttachments
+      ├── subagent/                 ToolExecutionCard / ToolExecutionUiBuilder / TurnCommandExecutionCard / TurnCommandHumanizer / TurnSubagentActionCard
+      ├── diff/                     TurnFileChangeDetailCard
+      ├── toolbar/                  TurnGitBranchAccessory / TurnPlanAccessoryCard / TurnReviewAccessory / TurnUsageStatusSheet / BranchPickerOpenRequestPolicy / TurnConversationPaneAccessories
+      ├── timeline/                 TurnMessageRow / TurnMarkdownBody / TurnMarkdownRepoFileLink / TurnMermaid{Fallback,WebView}Card / TurnCodeCommentDirectiveCard / TurnThinkingTimelineRow / TurnTimeline{FollowBottom,GroupedRunsRow,RenderCaches} / TurnSmartScrollNavigation
+      ├── recovery/                 TurnConnectionRecovery / TurnFeedbackDialog
+      └── worktree/                 TurnWorktreeHandoffModels
+      ```
+      Same mechanics as services: `git mv` for files, `perl` for package
+      declarations (had to strip a UTF-8 BOM from 3 files first), then
+      ~170 cross-sub-package imports added (some auto-generated from the
+      compiler's unresolved-reference log, some by inspection).
+      Additional cleanup: an over-greedy regex for fully-qualified
+      reference rewriting briefly damaged ~56 files (turned
+      `com.dotbrains.agnt.mobile.ui.turn.composer.X` →
+      `composer.X` everywhere) — patched back with targeted scripts.
+      One private extension function (`SmartScrollAction.displayLabel`
+      in `timeline/TurnSmartScrollNavigation.kt`) had to be widened to
+      `internal` so it could be called from `autocomplete/`.
+      Final state: 562/562 tests green, ktlint clean. Note: the upstream
+      parity tax flagged in the previous note is now real — future
+      `ui/turn/` backports from Stivy-01/remodex will need path
+      translation through this layout.
 
 ### P2.5 — beta tester module
 

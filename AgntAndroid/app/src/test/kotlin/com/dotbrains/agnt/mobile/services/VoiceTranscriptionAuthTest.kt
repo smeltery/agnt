@@ -4,6 +4,9 @@ import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCError
 import com.dotbrains.agnt.mobile.core.voice.GptVoiceTranscriptionError
+import com.dotbrains.agnt.mobile.services.agent.voice.parseVoiceAuthTokenFromResult
+import com.dotbrains.agnt.mobile.services.agent.voice.rpcIndicatesUnsupportedVoiceBridgeAuth
+import com.dotbrains.agnt.mobile.services.agent.voice.transcribeWavWithSingleAuthRetry
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

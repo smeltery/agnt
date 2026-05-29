@@ -2,6 +2,8 @@ package com.dotbrains.agnt.mobile.ui.turn
 
 import com.dotbrains.agnt.mobile.core.model.ExecutionStatus
 import com.dotbrains.agnt.mobile.data.TurnCommandExecutionPresentation
+import com.dotbrains.agnt.mobile.ui.turn.subagent.buildToolExecutionUiPreview
+import com.dotbrains.agnt.mobile.ui.turn.subagent.mapExecutionStatusFromPreview
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

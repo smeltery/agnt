@@ -1,4 +1,4 @@
-﻿package com.dotbrains.agnt.mobile.ui.turn
+package com.dotbrains.agnt.mobile.ui.turn
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -83,6 +83,56 @@ import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.agent.MessageList
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
+import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachment
+import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachmentState
+import com.dotbrains.agnt.mobile.ui.turn.attachments.appendFileAttachmentsToDraft
+import com.dotbrains.agnt.mobile.ui.turn.attachments.toJpegByteArray
+import com.dotbrains.agnt.mobile.ui.turn.attachments.withFileAttachmentResult
+import com.dotbrains.agnt.mobile.ui.turn.attachments.withImageAttachmentResult
+import com.dotbrains.agnt.mobile.ui.turn.attachments.withLoadingAttachment
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.SkillAutocompleteSuggestion
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.buildComposerAutocompleteState
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.extractThreadFileAutocompleteCandidates
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.isPluginAutocompleteQuery
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.loadSkillAutocompleteSuggestions
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToFileMentions
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToSkillMentions
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mergeMentionChipsIntoDraft
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.restoreMentionChips
+import com.dotbrains.agnt.mobile.ui.turn.autocomplete.stripMergedMentionPrefix
+import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionChipPayload
+import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionKind
+import com.dotbrains.agnt.mobile.ui.turn.composer.ReasoningEffortTitleStrings
+import com.dotbrains.agnt.mobile.ui.turn.composer.TURN_COMPOSER_RUNTIME_AUTO_ID
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerBar
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerEvent
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerModel
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerReducer
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerReviewModeRules
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerSecondaryBar
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
+import com.dotbrains.agnt.mobile.ui.turn.composer.TurnVoicePhase
+import com.dotbrains.agnt.mobile.ui.turn.composer.buildRuntimeControlsState
+import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
+import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoveryCard
+import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
+import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnFeedbackDialog
+import com.dotbrains.agnt.mobile.ui.turn.timeline.SmartScrollNavigationCta
+import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnRichMarkdownBody
+import com.dotbrains.agnt.mobile.ui.turn.timeline.buildChatAnchors
+import com.dotbrains.agnt.mobile.ui.turn.timeline.buildSmartScrollNavigationState
+import com.dotbrains.agnt.mobile.ui.turn.timeline.shouldFollowTimelineBottom
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.ForkThreadActionSheet
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.GitBranchPaneState
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.PlanDetailsActionSheet
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.QueuedDraftsCard
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnPlanAccessoryCard
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnReviewAccessoryCard
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.WorktreeHandoffActionSheet
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.resolveReviewBaseBranch
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.reviewSelectableDefaultBranch
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectCompletedPlanAccessoryMessage
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectPinnedPlanAccessoryMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -657,8 +707,7 @@ fun TurnConversationPane(
         }
         availableSkills =
             runCatching {
-                com.dotbrains.agnt.mobile.ui.turn
-                    .loadSkillAutocompleteSuggestions(repository, activeThread?.cwd)
+                loadSkillAutocompleteSuggestions(repository, activeThread?.cwd)
             }.getOrDefault(emptyList())
     }
 
@@ -769,8 +818,7 @@ fun TurnConversationPane(
     }
     val fileAutocompleteCandidates =
         remember(messages) {
-            com.dotbrains.agnt.mobile.ui.turn
-                .extractThreadFileAutocompleteCandidates(messages)
+            extractThreadFileAutocompleteCandidates(messages)
         }
     val trailingToken =
         remember(draft) { TurnComposerTrailingTokens.parseTrailingToken(draft) }
@@ -855,7 +903,7 @@ fun TurnConversationPane(
             availableFileMatches,
             isThreadRunning,
         ) {
-            com.dotbrains.agnt.mobile.ui.turn.buildComposerAutocompleteState(
+            buildComposerAutocompleteState(
                 parse = trailingToken,
                 skillSuggestions = availableSkills,
                 pluginSuggestions = availablePlugins,
@@ -1025,18 +1073,15 @@ fun TurnConversationPane(
         }
     val draftWithMentions =
         remember(draft, mentionChips) {
-            com.dotbrains.agnt.mobile.ui.turn
-                .mergeMentionChipsIntoDraft(draft, mentionChips)
+            mergeMentionChipsIntoDraft(draft, mentionChips)
         }
     val structuredSkillMentions =
         remember(mentionChips) {
-            com.dotbrains.agnt.mobile.ui.turn
-                .mentionChipsToSkillMentions(mentionChips)
+            mentionChipsToSkillMentions(mentionChips)
         }
     val structuredFileMentions =
         remember(mentionChips) {
-            com.dotbrains.agnt.mobile.ui.turn
-                .mentionChipsToFileMentions(mentionChips)
+            mentionChipsToFileMentions(mentionChips)
         }
     val composerModel =
         remember(
@@ -1108,8 +1153,7 @@ fun TurnConversationPane(
                     mentionChips = emptyList()
                 }.onFailure { e ->
                     lastError =
-                        com.dotbrains.agnt.mobile.ui.turn
-                            .formatTurnSendError(e)
+                        formatTurnSendError(e)
                 }
             }
             return
@@ -1147,11 +1191,10 @@ fun TurnConversationPane(
                             prepend = true,
                         )
                     }
-                    lastError = "$queuedDraftSendFailedMessage: ${com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)}"
+                    lastError = "$queuedDraftSendFailedMessage: ${formatTurnSendError(e)}"
                 } else {
                     lastError =
-                        com.dotbrains.agnt.mobile.ui.turn
-                            .formatTurnSendError(e)
+                        formatTurnSendError(e)
                 }
             }
         }
@@ -1166,8 +1209,7 @@ fun TurnConversationPane(
                 )
             }.onFailure { e ->
                 lastError =
-                    com.dotbrains.agnt.mobile.ui.turn
-                        .formatTurnSendError(e)
+                    formatTurnSendError(e)
             }
         }
     }
@@ -1399,7 +1441,7 @@ fun TurnConversationPane(
                 )
             }
             if (queuedDraftCount > 0) {
-                com.dotbrains.agnt.mobile.ui.turn.QueuedDraftsCard(
+                QueuedDraftsCard(
                     previews = queuedDraftPreviews,
                     totalCount = queuedDraftCount,
                     canRestore = canRestoreQueuedDrafts,
@@ -1412,12 +1454,12 @@ fun TurnConversationPane(
                             val restored = runCatching { repository.removeQueuedTurnDraft(threadId, draftId) }.getOrNull()
                             if (restored == null) return@launch
                             mentionChips =
-                                com.dotbrains.agnt.mobile.ui.turn.restoreMentionChips(
+                                restoreMentionChips(
                                     skillMentions = restored.skillMentions,
                                     fileMentions = restored.fileMentions,
                                 )
                             draft =
-                                com.dotbrains.agnt.mobile.ui.turn.stripMergedMentionPrefix(
+                                stripMergedMentionPrefix(
                                     text = restored.text,
                                     skillMentions = restored.skillMentions,
                                     fileMentions = restored.fileMentions,
@@ -1442,7 +1484,7 @@ fun TurnConversationPane(
                 )
             }
             reviewTarget?.let { target ->
-                com.dotbrains.agnt.mobile.ui.turn.TurnReviewAccessoryCard(
+                TurnReviewAccessoryCard(
                     target = target,
                     selectedBaseBranch = resolvedReviewBaseBranch,
                     availableBranches = loadedGitBranchSummary?.branches.orEmpty(),
@@ -1890,14 +1932,13 @@ fun TurnConversationPane(
                             }.onFailure { e ->
                                 sending = false
                                 lastError =
-                                    com.dotbrains.agnt.mobile.ui.turn
-                                        .formatTurnSendError(e)
+                                    formatTurnSendError(e)
                             }
                         }
                         return@TurnComposerBar
                     }
                     val draftText =
-                        com.dotbrains.agnt.mobile.ui.turn.appendFileAttachmentsToDraft(
+                        appendFileAttachmentsToDraft(
                             baseText = draftWithMentions,
                             files = readyComposerFileAttachments,
                             binarySummary = attachmentFileBinarySummary,
@@ -1941,7 +1982,7 @@ fun TurnConversationPane(
             )
         }
     }
-    com.dotbrains.agnt.mobile.ui.turn.ForkThreadActionSheet(
+    ForkThreadActionSheet(
         visible = showForkThreadSheet,
         projectPath = activeThread?.cwd,
         inProgress = forkingThread,
@@ -1958,22 +1999,21 @@ fun TurnConversationPane(
                     lastError = null
                 }.onFailure { e ->
                     lastError =
-                        com.dotbrains.agnt.mobile.ui.turn
-                            .formatTurnSendError(e)
+                        formatTurnSendError(e)
                 }
                 forkingThread = false
             }
         },
     )
     if (showFeedbackDialog) {
-        com.dotbrains.agnt.mobile.ui.turn.TurnFeedbackDialog(
+        TurnFeedbackDialog(
             onDismiss = { showFeedbackDialog = false },
             onSubmit = {
                 showFeedbackDialog = false
             },
         )
     }
-    com.dotbrains.agnt.mobile.ui.turn.WorktreeHandoffActionSheet(
+    WorktreeHandoffActionSheet(
         visible = showWorktreeHandoffSheet,
         isWorktreeProject = activeThread?.isManagedWorktreeProject == true,
         inProgress = isHandingOffWorktree,
@@ -1992,7 +2032,7 @@ fun TurnConversationPane(
             handoffCurrentThread(selectedBaseBranch)
         },
     )
-    com.dotbrains.agnt.mobile.ui.turn.PlanDetailsActionSheet(
+    PlanDetailsActionSheet(
         visible = showPlanDetailsSheet,
         message = visiblePlanAccessoryMessage,
         canApplyPlan = !isThreadRunning && !sending,

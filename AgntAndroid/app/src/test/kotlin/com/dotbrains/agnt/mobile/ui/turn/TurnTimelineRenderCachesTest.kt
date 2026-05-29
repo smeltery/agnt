@@ -1,5 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnDirectiveRenderCache
+import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnMarkdownRenderCache
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame

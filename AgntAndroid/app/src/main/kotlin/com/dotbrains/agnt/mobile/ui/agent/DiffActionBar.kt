@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Horizontal cluster for undo / diff / commit-style actions (often under an assistant block).
- * Today, revert + metrics mostly live in [com.dotbrains.agnt.mobile.ui.turn.TurnUsageStatusSheet]; this row
+ * Today, revert + metrics mostly live in [TurnUsageStatusSheet]; this row
  * is the layout primitive for future inline actions aligned with iOS.
  */
 @Composable

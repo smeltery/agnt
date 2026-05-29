@@ -1,6 +1,10 @@
 package com.dotbrains.agnt.mobile.services
 
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.services.agent.threads.applyAutomaticThreadTitleSnapshot
+import com.dotbrains.agnt.mobile.services.agent.threads.automaticThreadTitleSeedCandidate
+import com.dotbrains.agnt.mobile.services.agent.threads.fallbackThreadTitle
+import com.dotbrains.agnt.mobile.services.agent.threads.mergeThreadListWithPersistedRenames
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

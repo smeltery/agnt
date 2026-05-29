@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Bottom “environment” strip: context usage + git / worktree controls (SwiftUI: [TurnComposerSecondaryBar]).
- * Slots stay composable so [com.dotbrains.agnt.mobile.ui.turn.TurnComposerBar] can hide them when the field is focused.
+ * Slots stay composable so [TurnComposerBar] can hide them when the field is focused.
  */
 @Composable
 fun EnvironmentBar(

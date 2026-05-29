@@ -3,6 +3,13 @@ package com.dotbrains.agnt.mobile.ui.turn
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
+import com.dotbrains.agnt.mobile.ui.turn.timeline.ChatAnchor
+import com.dotbrains.agnt.mobile.ui.turn.timeline.ChatAnchorType
+import com.dotbrains.agnt.mobile.ui.turn.timeline.SMART_SCROLL_LABEL_LATEST
+import com.dotbrains.agnt.mobile.ui.turn.timeline.SMART_SCROLL_LABEL_NEXT_USER
+import com.dotbrains.agnt.mobile.ui.turn.timeline.SMART_SCROLL_LABEL_PREV_USER
+import com.dotbrains.agnt.mobile.ui.turn.timeline.buildChatAnchors
+import com.dotbrains.agnt.mobile.ui.turn.timeline.buildSmartScrollNavigationState
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals

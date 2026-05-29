@@ -3,6 +3,10 @@ package com.dotbrains.agnt.mobile.services
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.RPCError
+import com.dotbrains.agnt.mobile.services.agent.threads.applyAuthoritativeProjectPathMerge
+import com.dotbrains.agnt.mobile.services.agent.threads.applyRequestedProjectPathForNewThread
+import com.dotbrains.agnt.mobile.services.agent.threads.confirmAuthoritativeProjectPathIfNeeded
+import com.dotbrains.agnt.mobile.services.agent.threads.shouldAllowProjectRebindWithoutResume
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

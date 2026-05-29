@@ -1,5 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import com.dotbrains.agnt.mobile.ui.turn.timeline.MarkdownFenceSegment
+import com.dotbrains.agnt.mobile.ui.turn.timeline.MarkdownFenceSegmentParser
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
