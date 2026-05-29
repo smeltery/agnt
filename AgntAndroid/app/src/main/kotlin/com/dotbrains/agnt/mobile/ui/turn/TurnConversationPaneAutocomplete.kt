@@ -9,7 +9,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.data.CodexRepository
-import com.dotbrains.agnt.mobile.services.CodexLookupService
+import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
 
 internal data class SkillAutocompleteSuggestion(
     val id: String,

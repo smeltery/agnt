@@ -3,7 +3,7 @@ package com.dotbrains.agnt.mobile.data
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.GitRepoSyncResult
-import com.dotbrains.agnt.mobile.services.GitActionsError
+import com.dotbrains.agnt.mobile.services.git.GitActionsError
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

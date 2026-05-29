@@ -2,8 +2,8 @@ package com.dotbrains.agnt.mobile.data
 
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
-import com.dotbrains.agnt.mobile.services.GitActionsError
-import com.dotbrains.agnt.mobile.services.GitActionsService
+import com.dotbrains.agnt.mobile.services.git.GitActionsError
+import com.dotbrains.agnt.mobile.services.git.GitActionsService
 
 /**
  * Resolves the bridge `cwd` for git JSON-RPC for this thread, or null when no reliable local project

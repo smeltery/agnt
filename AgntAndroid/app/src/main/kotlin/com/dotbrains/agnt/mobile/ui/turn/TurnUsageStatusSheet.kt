@@ -46,7 +46,7 @@ import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.QueuedTurnDraftPreview
-import com.dotbrains.agnt.mobile.services.AiChangeSetRevertService
+import com.dotbrains.agnt.mobile.services.agent.review.AiChangeSetRevertService
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import kotlinx.coroutines.launch
 import java.time.Instant

@@ -163,6 +163,35 @@ Open follow-ups:
       `resolvePairingCode_preservesRelayPathPrefix`); full suite
       562 unit tests green, ktlint clean.
 
+### P2.7 — services/ package reorganization
+
+- [x] **34 flat `services/*.kt` files → 9 sub-packages.** Mirrors the
+      iOS reorg of `Services/CodexService/{Account,Composer,Threads,...}/`
+      so the AgentService extension files are domain-grouped instead of
+      sitting at one level:
+      ```
+      services/
+      ├── agent/                      AgentService.kt (root)
+      │   ├── connection/             AgentServiceConnection / Transport / SecureTransport / Resume / DesktopHandoffService
+      │   ├── threads/                AgentServiceHistory / Messages / MissingThread / StartThread / Thread{Fork,GroupOperations,ProjectRouting,Removal,Titles} / Turn / Continuation / ContextWindow / CodexLookupService
+      │   ├── runtime/                AgentServiceRuntime / RuntimeTierCompat / Status / Sync / TurnStartRpcCompat / RateLimitPayloadCodec
+      │   ├── notifications/          AgentServiceLocalNotifications / PendingRequests
+      │   ├── review/                 AgentServiceReview / AiChangeSetRevertService
+      │   └── voice/                  AgentServiceVoice
+      ├── git/                        GitActionsService / ProjectFolderService
+      └── workspace/                  WorkspaceCheckpointService / WorkspaceImageService
+      ```
+      `git mv` for the files, `perl` rewrite for the `package`
+      declarations, `perl` rewrite for the 9 external import paths across
+      the codebase, plus ~70 new cross-sub-package imports added to the
+      moved files themselves (extension functions on `AgentService` that
+      cross sub-package boundaries now need explicit imports — they used
+      to be in the same flat package). 562-test suite green, ktlint clean.
+      Total churn: 34 files moved, ~150 source files touched, 0 behavioral
+      change. Skipped a parallel `ui/turn/` reorg (45 files) because that
+      surface still tracks upstream parity actively and any restructure
+      would add upstream-merge friction.
+
 ### P2.5 — beta tester module
 
 - [x] **Removed.** The `beta/` module and `TesterHqScreen` integrated with

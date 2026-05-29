@@ -10,7 +10,7 @@ import com.dotbrains.agnt.mobile.core.terminal.TerminalKnownHostStore
 import com.dotbrains.agnt.mobile.core.terminal.TerminalPrivateKeyStore
 import com.dotbrains.agnt.mobile.core.terminal.TerminalProfileStore
 import com.dotbrains.agnt.mobile.data.CodexRepository
-import com.dotbrains.agnt.mobile.services.AgentService
+import com.dotbrains.agnt.mobile.services.agent.AgentService
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 

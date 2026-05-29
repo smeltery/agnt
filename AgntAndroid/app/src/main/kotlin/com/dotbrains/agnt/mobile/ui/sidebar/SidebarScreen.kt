@@ -63,6 +63,7 @@ import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeNewChatDefaults
 import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
+import com.dotbrains.agnt.mobile.services.git.GitActionsService
 import com.dotbrains.agnt.mobile.ui.shared.ThreadRenameDialog
 import com.dotbrains.agnt.mobile.ui.theme.AgntDropdownMenu
 import kotlinx.coroutines.launch
@@ -713,11 +714,10 @@ fun SidebarScreen(
                                                     worktreeChatBusy = true
                                                     scope.launch {
                                                         runCatching {
-                                                            com.dotbrains.agnt.mobile.services
-                                                                .GitActionsService(
-                                                                    repository,
-                                                                    pending.baseProjectPath,
-                                                                ).pull()
+                                                            GitActionsService(
+                                                                repository,
+                                                                pending.baseProjectPath,
+                                                            ).pull()
                                                         }.onFailure { e ->
                                                             worktreeChatError =
                                                                 GitBranchDisplayMapper.userVisibleMessage(e)

@@ -339,8 +339,8 @@ class WorktreeFlowCoordinatorTest {
     private fun bridgeFailure(
         code: String,
         message: String,
-    ): com.dotbrains.agnt.mobile.services.GitActionsError.BridgeFailure =
-        com.dotbrains.agnt.mobile.services.GitActionsError
+    ): com.dotbrains.agnt.mobile.services.git.GitActionsError.BridgeFailure =
+        com.dotbrains.agnt.mobile.services.git.GitActionsError
             .BridgeFailure(errorCode = code, message = message)
 }
 

@@ -59,7 +59,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexProjectLocation
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.projectDisplayLabelFor
 import com.dotbrains.agnt.mobile.data.CodexRepository
-import com.dotbrains.agnt.mobile.services.ProjectFolderService
+import com.dotbrains.agnt.mobile.services.git.ProjectFolderService
 import kotlinx.coroutines.launch
 import java.time.Instant
 

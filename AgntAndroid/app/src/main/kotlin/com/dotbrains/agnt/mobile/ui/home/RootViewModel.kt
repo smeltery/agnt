@@ -9,7 +9,7 @@ import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.pairing.buildWebSocketConnectParams
 import com.dotbrains.agnt.mobile.pairing.reconnectUsingSavedRelaySnapshot
-import com.dotbrains.agnt.mobile.services.DesktopHandoffService
+import com.dotbrains.agnt.mobile.services.agent.connection.DesktopHandoffService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -48,7 +48,7 @@ import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexFileAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.data.TurnAttachmentCodec
-import com.dotbrains.agnt.mobile.services.WorkspaceImageService
+import com.dotbrains.agnt.mobile.services.workspace.WorkspaceImageService
 import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
 import java.util.UUID
 

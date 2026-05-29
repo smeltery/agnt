@@ -3,8 +3,8 @@ package com.dotbrains.agnt.mobile.data
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.GitWorktreeChangeTransferMode
-import com.dotbrains.agnt.mobile.services.GitActionsError
-import com.dotbrains.agnt.mobile.services.GitActionsService
+import com.dotbrains.agnt.mobile.services.git.GitActionsError
+import com.dotbrains.agnt.mobile.services.git.GitActionsService
 
 /**
  * Orchestrates managed-worktree creation + thread start, and managed handoff + project rebind.

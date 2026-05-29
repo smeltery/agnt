@@ -70,9 +70,9 @@ import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
 import com.dotbrains.agnt.mobile.data.agntBuildPullRequestUrl
 import com.dotbrains.agnt.mobile.data.agntResolveCommitMessage
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
-import com.dotbrains.agnt.mobile.services.DesktopHandoffService
-import com.dotbrains.agnt.mobile.services.GitActionsError
-import com.dotbrains.agnt.mobile.services.GitActionsService
+import com.dotbrains.agnt.mobile.services.agent.connection.DesktopHandoffService
+import com.dotbrains.agnt.mobile.services.git.GitActionsError
+import com.dotbrains.agnt.mobile.services.git.GitActionsService
 import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
 import com.dotbrains.agnt.mobile.ui.agent.ConversationHeader
 import com.dotbrains.agnt.mobile.ui.agent.SidebarDrawerContent

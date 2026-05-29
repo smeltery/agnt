@@ -75,10 +75,10 @@ import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
-import com.dotbrains.agnt.mobile.services.AiChangeSetRevertService
-import com.dotbrains.agnt.mobile.services.CodexLookupService
-import com.dotbrains.agnt.mobile.services.GitActionsService
-import com.dotbrains.agnt.mobile.services.isPluginListUnsupported
+import com.dotbrains.agnt.mobile.services.agent.review.AiChangeSetRevertService
+import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
+import com.dotbrains.agnt.mobile.services.agent.threads.isPluginListUnsupported
+import com.dotbrains.agnt.mobile.services.git.GitActionsService
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.agent.MessageList
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
