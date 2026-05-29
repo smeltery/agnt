@@ -458,6 +458,11 @@ test("trusted session resolve starts working immediately after a mac updates its
         trustedPhonePublicKey: phoneIdentity.phoneIdentityPublicKey,
       },
     }));
+    // mac.send is fire-and-forget — the server's WS `message` handler runs
+    // in a separate I/O slot from the upcoming HTTP request, so without a
+    // barrier the resolve fetch can race ahead of applyMacRegistrationMessage
+    // and see the still-empty trusted-phone fields (403 phone_not_trusted).
+    await delay(50);
 
     const response = await fetch(`http://127.0.0.1:${port}/v1/trusted/session/resolve`, {
       method: "POST",
@@ -752,8 +757,17 @@ function listen(server) {
 }
 
 function close(server, wss) {
+  // Force-terminate any still-open WS clients before calling server.close().
+  // Otherwise an assertion failure inside the withServer body (which skips the
+  // explicit mac.close() that normally drains the connection) would leave a
+  // live WebSocket attached and server.close() would hang waiting for it,
+  // turning a fast unit-test failure into a 6h CI job timeout (#26442150962).
   return new Promise((resolve, reject) => {
+    for (const ws of wss.clients) {
+      ws.terminate();
+    }
     wss.close();
+    server.closeAllConnections?.();
     server.close((error) => {
       if (error) {
         reject(error);
