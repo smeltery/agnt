@@ -7,7 +7,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 
 /**
  * Merges [thread/read] snapshots into the live timeline without duplicating stable rows.
- * Simplified vs iOS [CodexService.mergeHistoryMessages] but same keying idea.
+ * Simplified vs iOS [AgentService.mergeHistoryMessages] but same keying idea.
  */
 internal object HistoryMessageMerge {
     fun normalize(messages: List<CodexMessage>): List<CodexMessage> =

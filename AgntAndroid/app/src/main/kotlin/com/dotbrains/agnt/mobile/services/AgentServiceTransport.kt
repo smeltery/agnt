@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.services
 
 import android.util.Log
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.transport.validateRelayUrl
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -25,9 +25,9 @@ internal const val RELAY_WS_ROLE_ANDROID = "iphone"
 private const val REMODEX_WS_LOG_TAG = "RemodexWs"
 
 /**
- * Mirrors [CodexService+Transport.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Transport.swift).
+ * Mirrors [AgentService+Transport.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Transport.swift).
  */
-internal suspend fun CodexService.openWebSocketAwaitOpen(
+internal suspend fun AgentService.openWebSocketAwaitOpen(
     httpUrl: okhttp3.HttpUrl,
     token: String,
     role: String?,
@@ -51,7 +51,7 @@ internal suspend fun CodexService.openWebSocketAwaitOpen(
     }
 }
 
-internal fun CodexService.newRelayWebSocketListener(
+internal fun AgentService.newRelayWebSocketListener(
     handshakeCont: CancellableContinuation<Unit>?,
 ): WebSocketListener {
     val svc = this
@@ -118,11 +118,11 @@ internal fun CodexService.newRelayWebSocketListener(
     }
 }
 
-internal fun CodexService.sendRawText(text: String) {
-    val ws = webSocket ?: throw CodexServiceError.Disconnected
+internal fun AgentService.sendRawText(text: String) {
+    val ws = webSocket ?: throw AgentServiceError.Disconnected
     val bytes = text.toByteArray(Charsets.UTF_8)
     if (bytes.size > MAX_WS_PAYLOAD_BYTES) {
-        throw CodexServiceError.InvalidInput(
+        throw AgentServiceError.InvalidInput(
             "This payload is too large for the relay connection. Try fewer or smaller images and retry.",
         )
     }
@@ -131,7 +131,7 @@ internal fun CodexService.sendRawText(text: String) {
             REMODEX_WS_LOG_TAG,
             "websocket send returned false bytes=${bytes.size} sessionReady=$sessionReady queueSize=${ws.queueSize()}",
         )
-        throw CodexServiceError.InvalidInput("WebSocket send failed")
+        throw AgentServiceError.InvalidInput("WebSocket send failed")
     }
     Log.d(REMODEX_WS_LOG_TAG, "websocket send queued bytes=${bytes.size} queueSize=${ws.queueSize()}")
 }
@@ -139,5 +139,5 @@ internal fun CodexService.sendRawText(text: String) {
 /** OkHttp HttpUrl parses only http/https; relay URLs use ws/wss. */
 internal fun parseRelayHttpUrl(serverUrl: String): okhttp3.HttpUrl {
     val t = serverUrl.trim()
-    return validateRelayUrl(t)?.httpUrl ?: throw CodexServiceError.InvalidServerURL(t)
+    return validateRelayUrl(t)?.httpUrl ?: throw AgentServiceError.InvalidServerURL(t)
 }

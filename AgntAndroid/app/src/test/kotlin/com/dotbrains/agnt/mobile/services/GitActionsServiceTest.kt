@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
@@ -297,7 +297,7 @@ class GitActionsServiceTest {
         runTest {
             val repo =
                 GitActionsFakeRepository { _, _ ->
-                    throw CodexServiceError.Disconnected
+                    throw AgentServiceError.Disconnected
                 }
             val err = assertFailsWith<GitActionsError> { GitActionsService(repo, "/x").status() }
             assertTrue(err is GitActionsError.Disconnected)
@@ -308,7 +308,7 @@ class GitActionsServiceTest {
         runTest {
             val repo =
                 GitActionsFakeRepository { _, _ ->
-                    throw CodexServiceError.RpcFailure(
+                    throw AgentServiceError.RpcFailure(
                         RPCError(
                             code = -32000,
                             message = "failed",
@@ -329,7 +329,7 @@ class GitActionsServiceTest {
             suspend fun mappedMessage(code: String): String {
                 val repo =
                     GitActionsFakeRepository { _, _ ->
-                        throw CodexServiceError.RpcFailure(
+                        throw AgentServiceError.RpcFailure(
                             RPCError(
                                 code = -32000,
                                 message = "",

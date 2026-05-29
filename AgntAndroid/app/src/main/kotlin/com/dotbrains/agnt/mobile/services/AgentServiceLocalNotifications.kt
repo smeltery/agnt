@@ -5,14 +5,14 @@ import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
 import com.dotbrains.agnt.mobile.core.notification.RunCompletionAttentionKind
 
-private fun CodexService.threadDisplayTitleForNotification(threadId: String): String {
+private fun AgentService.threadDisplayTitleForNotification(threadId: String): String {
     val tid = threadId.trim()
     if (tid.isEmpty()) return appContext.getString(R.string.notification_default_thread_title)
     return _threads.value.firstOrNull { it.id == tid }?.displayTitle?.trim()?.takeIf { it.isNotEmpty() }
         ?: appContext.getString(R.string.notification_default_thread_title)
 }
 
-internal fun CodexService.notifyRunCompletionAttention(
+internal fun AgentService.notifyRunCompletionAttention(
     threadId: String,
     turnId: String?,
     kind: RunCompletionAttentionKind,
@@ -25,7 +25,7 @@ internal fun CodexService.notifyRunCompletionAttention(
     )
 }
 
-internal fun CodexService.notifyPendingApprovalAttention(request: PendingApprovalRequest) {
+internal fun AgentService.notifyPendingApprovalAttention(request: PendingApprovalRequest) {
     val th = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
     localNotificationPresenter.maybeNotifyPendingApproval(
         request = request,
@@ -33,7 +33,7 @@ internal fun CodexService.notifyPendingApprovalAttention(request: PendingApprova
     )
 }
 
-internal fun CodexService.notifyStructuredInputAttention(request: PendingStructuredInputRequest) {
+internal fun AgentService.notifyStructuredInputAttention(request: PendingStructuredInputRequest) {
     val th = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
     localNotificationPresenter.maybeNotifyStructuredInput(
         request = request,

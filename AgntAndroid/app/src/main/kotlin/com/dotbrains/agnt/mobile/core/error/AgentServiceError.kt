@@ -4,35 +4,35 @@ import com.dotbrains.agnt.mobile.core.model.RPCError
 
 /**
  * Taxonomy of failures from the bridge client layer (transport, RPC, validation).
- * Mirrors [CodexServiceError.swift](CodexMobile/CodexMobile/Services/CodexServiceError.swift).
+ * Mirrors [AgentServiceError.swift](CodexMobile/CodexMobile/Services/AgentServiceError.swift).
  */
-sealed class CodexServiceError(
+sealed class AgentServiceError(
     message: String,
 ) : Exception(message) {
     class InvalidServerURL(
         val value: String,
-    ) : CodexServiceError("Invalid server URL: $value")
+    ) : AgentServiceError("Invalid server URL: $value")
 
     class InvalidInput(
         reason: String,
-    ) : CodexServiceError(reason)
+    ) : AgentServiceError(reason)
 
     class InvalidResponse(
         reason: String,
-    ) : CodexServiceError(reason)
+    ) : AgentServiceError(reason)
 
-    data object EncodingFailed : CodexServiceError("Unable to encode JSON-RPC payload")
+    data object EncodingFailed : AgentServiceError("Unable to encode JSON-RPC payload")
 
-    data object Disconnected : CodexServiceError("WebSocket not connected")
+    data object Disconnected : AgentServiceError("WebSocket not connected")
 
-    data object NoPendingApproval : CodexServiceError("No pending approval request")
+    data object NoPendingApproval : AgentServiceError("No pending approval request")
 
     class RpcFailure(
         val rpcError: RPCError,
-    ) : CodexServiceError("RPC error ${rpcError.code}: ${rpcError.message}")
+    ) : AgentServiceError("RPC error ${rpcError.code}: ${rpcError.message}")
 
     /** After [com.dotbrains.agnt.mobile.services.handleMissingThread]; clearer than raw -32600 in UI. */
-    data object ThreadRemovedOnServer : CodexServiceError(
+    data object ThreadRemovedOnServer : AgentServiceError(
         "This conversation is no longer on the bridge. Choose another thread or start a new chat.",
     )
 }

@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexSkillMetadata
@@ -34,7 +34,7 @@ class CodexLookupService(
                 ),
             )
         return decodeFuzzyMatches(response.result)
-            ?: throw CodexServiceError.InvalidInput("fuzzyFileSearch response missing result.files")
+            ?: throw AgentServiceError.InvalidInput("fuzzyFileSearch response missing result.files")
     }
 
     suspend fun listSkills(
@@ -50,7 +50,7 @@ class CodexLookupService(
                 repository.sendRequest("skills/list", skillsListParams("cwd", listOf(normalizedCwds.first()), forceReload))
             }
         return decodeSkillMetadata(response.result)
-            ?: throw CodexServiceError.InvalidInput("skills/list response missing result.data[].skills")
+            ?: throw AgentServiceError.InvalidInput("skills/list response missing result.data[].skills")
     }
 
     suspend fun listPlugins(
@@ -61,7 +61,7 @@ class CodexLookupService(
         val response = repository.sendRequest("plugin/list", pluginsListParams(normalizedCwds, forceReload))
         return decodePluginMetadata(response.result)
             ?.let(::mentionablePluginMetadata)
-            ?: throw CodexServiceError.InvalidInput("plugin/list response missing result.marketplaces[].plugins")
+            ?: throw AgentServiceError.InvalidInput("plugin/list response missing result.marketplaces[].plugins")
     }
 
     private fun skillsListParams(
@@ -191,14 +191,14 @@ internal fun mentionablePluginMetadata(plugins: List<CodexPluginMetadata>): List
         .sortedBy { it.displayTitle.lowercase() }
 
 internal fun shouldRetrySkillsListWithCwdFallback(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     if (rpcFailure.rpcError.code != -32600 && rpcFailure.rpcError.code != -32602) return false
     val message = rpcFailure.rpcError.message.lowercase()
     return listOf("cwds", "cwd", "unknown field", "missing field", "invalid").any(message::contains)
 }
 
 internal fun isPluginListUnsupported(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val message = rpcFailure.rpcError.message.lowercase()
     return rpcFailure.rpcError.code == -32601 ||
         message.contains("method not found") ||

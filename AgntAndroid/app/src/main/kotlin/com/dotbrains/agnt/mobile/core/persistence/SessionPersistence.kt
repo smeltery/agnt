@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.core.persistence
 
 import android.content.Context
-import com.dotbrains.agnt.mobile.core.model.CODEX_SECURE_PROTOCOL_VERSION
+import com.dotbrains.agnt.mobile.core.model.AGNT_SECURE_PROTOCOL_VERSION
 import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
@@ -14,7 +14,7 @@ import java.time.Instant
 
 /**
  * Aggregates saved relay pairing and lightweight UI session hints (e.g. last open thread).
- * Relay fields mirror [CodexService.swift](CodexMobile/CodexMobile/Services/CodexService.swift) SecureStore usage;
+ * Relay fields mirror [AgentService.swift](CodexMobile/CodexMobile/Services/AgentService.swift) SecureStore usage;
  * iOS does not persist activeThreadId in Keychain; we keep it in private prefs for Android UX only.
  */
 class SessionPersistence(
@@ -84,7 +84,7 @@ class SessionPersistence(
         secureStore.writeString(CodexSecureKeys.relayMacIdentityPublicKey, payload.macIdentityPublicKey)
         secureStore.writeString(
             CodexSecureKeys.relayProtocolVersion,
-            CODEX_SECURE_PROTOCOL_VERSION.toString(),
+            AGNT_SECURE_PROTOCOL_VERSION.toString(),
         )
         secureStore.writeString(CodexSecureKeys.relayLastAppliedBridgeOutboundSeq, "0")
         setForceQrBootstrapOnNextHandshake(true)

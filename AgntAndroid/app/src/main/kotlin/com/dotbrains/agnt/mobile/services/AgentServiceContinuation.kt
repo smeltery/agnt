@@ -4,10 +4,10 @@ import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 
 /**
- * Parity with [CodexService.createContinuationThread] in
- * [CodexService+ThreadsTurns.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+ThreadsTurns.swift).
+ * Parity with [AgentService.createContinuationThread] in
+ * [AgentService+ThreadsTurns.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+ThreadsTurns.swift).
  */
-internal suspend fun CodexService.createContinuationThreadInternal(
+internal suspend fun AgentService.createContinuationThreadInternal(
     archivedThreadId: String,
     priorThread: CodexThread?,
 ): CodexThread {

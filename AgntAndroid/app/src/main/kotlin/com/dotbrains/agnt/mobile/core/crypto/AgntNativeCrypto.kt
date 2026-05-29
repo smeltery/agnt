@@ -17,7 +17,7 @@ import org.bouncycastle.crypto.generators.HKDFBytesGenerator
 
 /**
  * Curve25519 / Ed25519 / HKDF-SHA256 aligned with Swift CryptoKit usage in
- * [CodexService+SecureTransport.swift](CodexMobile/CodexMobile/Services/CodexService+SecureTransport.swift).
+ * [AgentService+SecureTransport.swift](CodexMobile/CodexMobile/Services/AgentService+SecureTransport.swift).
  */
 internal object AgntNativeCrypto {
     private val secureRandom = SecureRandom()

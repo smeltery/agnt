@@ -63,7 +63,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexThread
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
@@ -1760,7 +1760,7 @@ fun TurnConversationPane(
                                         if (isActive) {
                                             lastError =
                                                 when (e) {
-                                                    is CodexServiceError ->
+                                                    is AgentServiceError ->
                                                         e.message ?: voiceTranscriptionFailedMessage
                                                     else -> e.message ?: voiceTranscriptionFailedMessage
                                                 }

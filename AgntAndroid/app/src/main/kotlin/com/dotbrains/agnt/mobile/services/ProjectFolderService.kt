@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexProjectDirectoryEntry
 import com.dotbrains.agnt.mobile.core.model.CodexProjectDirectoryListing
 import com.dotbrains.agnt.mobile.core.model.CodexProjectLocation
@@ -19,7 +19,7 @@ class ProjectFolderService(
                     throw error
                 }
         val raw = response.result?.objectValue?.get("locations")?.arrayValue
-            ?: throw CodexServiceError.InvalidInput("project/quickLocations response missing locations")
+            ?: throw AgentServiceError.InvalidInput("project/quickLocations response missing locations")
         return raw.mapNotNull { it.objectValue?.let(CodexProjectLocation::fromOrNull) }
     }
 
@@ -40,7 +40,7 @@ class ProjectFolderService(
                 throw error
             }
         val obj = response.result?.objectValue
-            ?: throw CodexServiceError.InvalidInput("project/listDirectory response missing entries")
+            ?: throw AgentServiceError.InvalidInput("project/listDirectory response missing entries")
         return CodexProjectDirectoryListing.fromJson(obj)
     }
 
@@ -67,7 +67,7 @@ class ProjectFolderService(
                 throw error
             }
         val raw = response.result?.objectValue?.get("entries")?.arrayValue
-            ?: throw CodexServiceError.InvalidInput("project/searchDirectories response missing entries")
+            ?: throw AgentServiceError.InvalidInput("project/searchDirectories response missing entries")
         return raw.mapNotNull { it.objectValue?.let(CodexProjectDirectoryEntry::fromOrNull) }
     }
 
@@ -91,7 +91,7 @@ class ProjectFolderService(
                 throw error
             }
         return response.result?.objectValue?.get("path")?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
-            ?: throw CodexServiceError.InvalidInput("project/createDirectory response missing path")
+            ?: throw AgentServiceError.InvalidInput("project/createDirectory response missing path")
     }
 
     private suspend fun listDirectoryWithFsRpc(path: String): CodexProjectDirectoryListing {
@@ -106,7 +106,7 @@ class ProjectFolderService(
                 ?.mapNotNull { it.objectValue?.toProjectEntry(parentPath = normalizedPath) }
                 ?.filter { entry -> entry.name.isNotBlank() }
                 ?.sortedWith(compareBy<CodexProjectDirectoryEntry> { it.name.lowercase() }.thenBy { it.path })
-                ?: throw CodexServiceError.InvalidInput("fs/readDirectory response missing entries")
+                ?: throw AgentServiceError.InvalidInput("fs/readDirectory response missing entries")
         return CodexProjectDirectoryListing(
             path = normalizedPath,
             parentPath = parentPathOf(normalizedPath),
@@ -178,7 +178,7 @@ class ProjectFolderService(
     }
 
     private fun Throwable.isUnsupportedProjectMethod(): Boolean {
-        val rpcFailure = this as? CodexServiceError.RpcFailure ?: return false
+        val rpcFailure = this as? AgentServiceError.RpcFailure ?: return false
         val message = rpcFailure.rpcError.message.lowercase()
         return message.contains("unknown variant")
             && message.contains("project/")

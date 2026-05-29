@@ -1,13 +1,13 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal fun CodexService.enqueuePendingApprovalRequest(
+internal fun AgentService.enqueuePendingApprovalRequest(
     request: PendingApprovalRequest,
     responder: (PendingApprovalDecision) -> Unit,
 ) {
@@ -16,7 +16,7 @@ internal fun CodexService.enqueuePendingApprovalRequest(
     notifyPendingApprovalAttention(request)
 }
 
-internal fun CodexService.enqueuePendingStructuredInputRequest(
+internal fun AgentService.enqueuePendingStructuredInputRequest(
     request: PendingStructuredInputRequest,
     responder: (answersByQuestionId: Map<String, List<String>>) -> Unit,
 ) {
@@ -25,12 +25,12 @@ internal fun CodexService.enqueuePendingStructuredInputRequest(
     notifyStructuredInputAttention(request)
 }
 
-suspend fun CodexService.resolvePendingApprovalForRepository(
+suspend fun AgentService.resolvePendingApprovalForRepository(
     requestId: String,
     decision: PendingApprovalDecision,
 ) = withContext(Dispatchers.IO) {
     val id = requestId.trim()
-    val responder = pendingApprovalResponders.remove(id) ?: throw CodexServiceError.NoPendingApproval
+    val responder = pendingApprovalResponders.remove(id) ?: throw AgentServiceError.NoPendingApproval
     if (_pendingApprovalRequest.value?.id == id) {
         _pendingApprovalRequest.value = null
     }
@@ -38,13 +38,13 @@ suspend fun CodexService.resolvePendingApprovalForRepository(
     responder(decision)
 }
 
-suspend fun CodexService.resolvePendingStructuredInputForRepository(
+suspend fun AgentService.resolvePendingStructuredInputForRepository(
     requestId: String,
     answersByQuestionId: Map<String, List<String>>,
 ) = withContext(Dispatchers.IO) {
     val id = requestId.trim()
     val responder =
-        pendingStructuredInputResponders.remove(id) ?: throw CodexServiceError.NoPendingApproval
+        pendingStructuredInputResponders.remove(id) ?: throw AgentServiceError.NoPendingApproval
     if (_pendingStructuredInputRequest.value?.id == id) {
         _pendingStructuredInputRequest.value = null
     }
@@ -52,7 +52,7 @@ suspend fun CodexService.resolvePendingStructuredInputForRepository(
     responder(answersByQuestionId)
 }
 
-internal fun CodexService.clearPendingServerRequests() {
+internal fun AgentService.clearPendingServerRequests() {
     pendingApprovalResponders.clear()
     pendingStructuredInputResponders.clear()
     _pendingApprovalRequest.value = null

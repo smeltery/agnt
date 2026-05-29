@@ -1,9 +1,9 @@
 package com.dotbrains.agnt.mobile.core.voice
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 
 /**
- * Mirrors [CodexVoiceTranscriptionPreflight](CodexMobile/CodexMobile/Services/CodexService+Voice.swift).
+ * Mirrors [CodexVoiceTranscriptionPreflight](CodexMobile/CodexMobile/Services/AgentService+Voice.swift).
  */
 data class CodexVoiceTranscriptionPreflight(
     val byteCount: Int,
@@ -21,7 +21,7 @@ data class CodexVoiceTranscriptionPreflight(
 
     fun validate() {
         val msg = failureMessage ?: return
-        throw CodexServiceError.InvalidInput(msg)
+        throw AgentServiceError.InvalidInput(msg)
     }
 
     companion object {

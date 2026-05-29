@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.GitWorktreeChangeTransferMode
 import com.dotbrains.agnt.mobile.services.GitActionsService
@@ -349,13 +349,13 @@ class WorktreeFlowCoordinator(
 
         private fun failedNewWorktreeChatDisposition(error: Throwable): WorktreeFlowCleanupDisposition =
             when (error) {
-                CodexServiceError.Disconnected,
-                is CodexServiceError.InvalidResponse,
+                AgentServiceError.Disconnected,
+                is AgentServiceError.InvalidResponse,
                 -> WorktreeFlowCleanupDisposition.PreserveWorktree(
                     "The connection dropped after the chat request was sent, so the new worktree was kept in case the chat still appears after sync.",
                 )
 
-                is CodexServiceError.RpcFailure -> {
+                is AgentServiceError.RpcFailure -> {
                     val msg = error.rpcError.message.lowercase()
                     if (
                         msg.contains("timeout") ||
@@ -371,11 +371,11 @@ class WorktreeFlowCoordinator(
                     }
                 }
 
-                is CodexServiceError.InvalidServerURL,
-                is CodexServiceError.InvalidInput,
-                CodexServiceError.EncodingFailed,
-                CodexServiceError.NoPendingApproval,
-                CodexServiceError.ThreadRemovedOnServer,
+                is AgentServiceError.InvalidServerURL,
+                is AgentServiceError.InvalidInput,
+                AgentServiceError.EncodingFailed,
+                AgentServiceError.NoPendingApproval,
+                AgentServiceError.ThreadRemovedOnServer,
                 -> WorktreeFlowCleanupDisposition.CleanupSafe
 
                 else ->

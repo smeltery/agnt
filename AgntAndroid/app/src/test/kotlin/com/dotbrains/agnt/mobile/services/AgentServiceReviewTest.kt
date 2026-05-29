@@ -1,13 +1,13 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class CodexServiceReviewTest {
+class AgentServiceReviewTest {
     @Test
     fun buildReviewStartRequestParams_uncommittedChanges_usesInlineTargetShape() {
         val params =
@@ -38,14 +38,14 @@ class CodexServiceReviewTest {
         assertEquals("main", target.map["branch"]?.stringValue)
         assertEquals("main", normalizedReviewBaseBranch("  main  "))
 
-        assertFailsWith<CodexServiceError.InvalidInput> {
+        assertFailsWith<AgentServiceError.InvalidInput> {
             buildReviewStartRequestParams(
                 threadId = "thread-1",
                 target = CodexReviewTarget.baseBranch,
                 baseBranch = "   ",
             )
         }
-        assertFailsWith<CodexServiceError.InvalidInput> {
+        assertFailsWith<AgentServiceError.InvalidInput> {
             normalizedReviewBaseBranch(null)
         }
     }

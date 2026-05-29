@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexMessageDeliveryState
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
@@ -12,14 +12,14 @@ import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal suspend fun CodexService.startReviewInternal(
+internal suspend fun AgentService.startReviewInternal(
     threadId: String,
     target: CodexReviewTarget,
     baseBranch: String? = null,
 ) {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val tid = threadId.trim()
-    if (tid.isEmpty()) throw CodexServiceError.InvalidInput("Missing thread id")
+    if (tid.isEmpty()) throw AgentServiceError.InvalidInput("Missing thread id")
 
     var targetThreadId = tid
     val reviewPrompt = reviewPromptText(target, baseBranch)
@@ -41,7 +41,7 @@ internal suspend fun CodexService.startReviewInternal(
             try {
                 createContinuationThreadInternal(archivedId, prior)
             } catch (_: Throwable) {
-                throw CodexServiceError.ThreadRemovedOnServer
+                throw AgentServiceError.ThreadRemovedOnServer
             }
         targetThreadId = continuation.id
         ensureThreadResumedInternal(
@@ -54,7 +54,7 @@ internal suspend fun CodexService.startReviewInternal(
 
     try {
         resumeTargetOrThrow()
-    } catch (e: CodexServiceError.RpcFailure) {
+    } catch (e: AgentServiceError.RpcFailure) {
         if (!e.rpcError.isExplicitServerThreadMissing()) throw e
         continuationAfterExplicitMissing(targetThreadId)
     }
@@ -68,7 +68,7 @@ internal suspend fun CodexService.startReviewInternal(
         val response = sendReviewStart(targetThreadId, target, baseBranch)
         markReviewStartAccepted(targetThreadId, pendingId, response)
     } catch (e: Throwable) {
-        if (e is CodexServiceError.RpcFailure && e.rpcError.isExplicitServerThreadMissing()) {
+        if (e is AgentServiceError.RpcFailure && e.rpcError.isExplicitServerThreadMissing()) {
             noteProtectedRunningFallback(targetThreadId, false)
             messageTimelineStore.markUserMessageOutcome(
                 threadId = targetThreadId,
@@ -90,9 +90,9 @@ internal suspend fun CodexService.startReviewInternal(
                     deliveryState = CodexMessageDeliveryState.failed,
                     turnId = null,
                 )
-                if (e2 is CodexServiceError.RpcFailure && e2.rpcError.isExplicitServerThreadMissing()) {
+                if (e2 is AgentServiceError.RpcFailure && e2.rpcError.isExplicitServerThreadMissing()) {
                     handleMissingThread(targetThreadId)
-                    throw CodexServiceError.ThreadRemovedOnServer
+                    throw AgentServiceError.ThreadRemovedOnServer
                 }
                 throw e2
             }
@@ -110,7 +110,7 @@ internal suspend fun CodexService.startReviewInternal(
     }
 }
 
-suspend fun CodexService.startReviewForRepository(
+suspend fun AgentService.startReviewForRepository(
     threadId: String,
     target: CodexReviewTarget,
     baseBranch: String? = null,
@@ -130,7 +130,7 @@ private fun reviewPromptText(
         }
     }
 
-private suspend fun CodexService.sendReviewStart(
+private suspend fun AgentService.sendReviewStart(
     threadId: String,
     target: CodexReviewTarget,
     baseBranch: String?,
@@ -168,9 +168,9 @@ internal fun buildReviewStartRequestParams(
 
 internal fun normalizedReviewBaseBranch(baseBranch: String?): String =
     baseBranch?.trim()?.takeIf { it.isNotEmpty() }
-        ?: throw CodexServiceError.InvalidInput("Missing base branch")
+        ?: throw AgentServiceError.InvalidInput("Missing base branch")
 
-private suspend fun CodexService.markReviewStartAccepted(
+private suspend fun AgentService.markReviewStartAccepted(
     threadId: String,
     pendingMessageId: String,
     response: RPCMessage,
@@ -193,7 +193,7 @@ private suspend fun CodexService.markReviewStartAccepted(
     bumpThreadActivityAfterReview(threadId)
 }
 
-private fun CodexService.bumpThreadActivityAfterReview(threadId: String) {
+private fun AgentService.bumpThreadActivityAfterReview(threadId: String) {
     val list = _threads.value
     if (list.none { it.id == threadId }) return
     publishThreads(

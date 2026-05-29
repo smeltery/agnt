@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
@@ -10,12 +10,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal fun CodexService.persistedThreadRename(threadId: String?): String? {
+internal fun AgentService.persistedThreadRename(threadId: String?): String? {
     val tid = normalizedThreadTitleId(threadId) ?: return null
     return persistedThreadRenameById[tid]?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-internal fun CodexService.applyPersistedThreadRename(thread: CodexThread): CodexThread =
+internal fun AgentService.applyPersistedThreadRename(thread: CodexThread): CodexThread =
     thread.withPersistedThreadRename(persistedThreadRename(thread.id))
 
 internal fun CodexThread.withPersistedThreadRename(rename: String?): CodexThread {
@@ -41,13 +41,13 @@ internal fun mergeThreadListWithPersistedRenames(
     }
 }
 
-internal suspend fun CodexService.renameThreadInternal(
+internal suspend fun AgentService.renameThreadInternal(
     threadId: String,
     name: String,
 ) {
-    val tid = normalizedThreadTitleId(threadId) ?: throw CodexServiceError.InvalidInput("Missing thread id")
+    val tid = normalizedThreadTitleId(threadId) ?: throw AgentServiceError.InvalidInput("Missing thread id")
     val trimmedName = name.trim()
-    if (trimmedName.isEmpty()) throw CodexServiceError.InvalidInput("Thread name is empty")
+    if (trimmedName.isEmpty()) throw AgentServiceError.InvalidInput("Thread name is empty")
 
     persistThreadRename(tid, trimmedName)
     publishThreads(
@@ -63,14 +63,14 @@ internal suspend fun CodexService.renameThreadInternal(
     scope.launch { runCatching { refreshThreadsInternal() } }
 }
 
-internal suspend fun CodexService.renameThreadForRepository(
+internal suspend fun AgentService.renameThreadForRepository(
     threadId: String,
     name: String,
 ) = withContext(Dispatchers.IO) {
     renameThreadInternal(threadId, name)
 }
 
-internal fun CodexService.scheduleAutomaticThreadTitleGenerationIfNeeded(
+internal fun AgentService.scheduleAutomaticThreadTitleGenerationIfNeeded(
     seed: String?,
     threadId: String,
     attachments: List<CodexImageAttachment>,
@@ -92,7 +92,7 @@ internal fun CodexService.scheduleAutomaticThreadTitleGenerationIfNeeded(
     }
 }
 
-internal fun CodexService.automaticThreadTitleSeedIfNeeded(
+internal fun AgentService.automaticThreadTitleSeedIfNeeded(
     userInput: String,
     attachments: List<CodexImageAttachment>,
     threadId: String,
@@ -186,7 +186,7 @@ internal data class ThreadTitleApplyResult(
     val persistedName: String?,
 )
 
-private fun CodexService.applyAutomaticThreadTitle(
+private fun AgentService.applyAutomaticThreadTitle(
     threadId: String,
     title: String,
     allowedCurrentTitles: Set<String>,
@@ -206,7 +206,7 @@ private fun CodexService.applyAutomaticThreadTitle(
     return true
 }
 
-private suspend fun CodexService.generatedThreadTitleOrNull(
+private suspend fun AgentService.generatedThreadTitleOrNull(
     seed: String,
     threadId: String,
     attachmentCount: Int,
@@ -233,7 +233,7 @@ private suspend fun CodexService.generatedThreadTitleOrNull(
     }.getOrNull()
 }
 
-private suspend fun CodexService.sendThreadNameSetRpc(
+private suspend fun AgentService.sendThreadNameSetRpc(
     threadId: String,
     name: String,
 ) {
@@ -248,7 +248,7 @@ private suspend fun CodexService.sendThreadNameSetRpc(
     )
 }
 
-private fun CodexService.persistThreadRename(
+private fun AgentService.persistThreadRename(
     threadId: String,
     name: String,
 ) {
@@ -259,7 +259,7 @@ private fun CodexService.persistThreadRename(
     sessionPersistence.saveThreadRename(tid, trimmedName)
 }
 
-private fun CodexService.hasExistingUserChatMessage(threadId: String): Boolean =
+private fun AgentService.hasExistingUserChatMessage(threadId: String): Boolean =
     messageTimelineStore.messagesByThread.value[threadId].orEmpty().any { message ->
         message.role == CodexMessageRole.user && message.kind == CodexMessageKind.chat
     }

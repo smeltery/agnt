@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.sidebar
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import kotlinx.coroutines.flow.combine
@@ -24,7 +24,7 @@ internal suspend fun startSidebarNewChat(
             }.first { it }
         }
     if (opened != true) {
-        throw CodexServiceError.InvalidResponse("New thread did not become active.")
+        throw AgentServiceError.InvalidResponse("New thread did not become active.")
     }
     return repository.threads.value.firstOrNull { it.id == started.id } ?: started
 }

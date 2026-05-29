@@ -9,10 +9,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Mirrors [CodexService+Connection.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Connection.swift):
+ * Mirrors [AgentService+Connection.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Connection.swift):
  * connect / disconnect lifecycle and session reset.
  */
-internal suspend fun CodexService.connectImpl(
+internal suspend fun AgentService.connectImpl(
     serverUrl: String,
     token: String,
     role: String?,
@@ -76,7 +76,7 @@ internal suspend fun CodexService.connectImpl(
     Unit
 }
 
-internal suspend fun CodexService.disconnectImpl(preservePresentationState: Boolean = false) =
+internal suspend fun AgentService.disconnectImpl(preservePresentationState: Boolean = false) =
     withContext(Dispatchers.IO) {
         closingByClient = true
         try {
@@ -87,7 +87,7 @@ internal suspend fun CodexService.disconnectImpl(preservePresentationState: Bool
         }
     }
 
-internal suspend fun CodexService.setActiveThreadIdImpl(threadId: String?) {
+internal suspend fun AgentService.setActiveThreadIdImpl(threadId: String?) {
     _activeThreadId.value = threadId?.trim()?.takeIf { it.isNotEmpty() }
     val id = _activeThreadId.value
     sessionPersistence.saveLastActiveThreadId(id)
@@ -98,7 +98,7 @@ internal suspend fun CodexService.setActiveThreadIdImpl(threadId: String?) {
     }
 }
 
-internal suspend fun CodexService.resetBridgeSession(preservePresentationState: Boolean = false) {
+internal suspend fun AgentService.resetBridgeSession(preservePresentationState: Boolean = false) {
     sessionReady = false
     _isSessionReady.value = false
     supportsServiceTier = true
@@ -152,7 +152,7 @@ internal suspend fun CodexService.resetBridgeSession(preservePresentationState: 
     _contextWindowUsageErrorByThread.value = emptyMap()
 }
 
-internal fun CodexService.scheduleWireDrop(message: String) {
+internal fun AgentService.scheduleWireDrop(message: String) {
     if (closingByClient) return
     if (!wireDropHandling.compareAndSet(false, true)) return
     scope.launch(Dispatchers.IO) {

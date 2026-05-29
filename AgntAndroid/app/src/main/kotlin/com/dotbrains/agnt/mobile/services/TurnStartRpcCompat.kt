@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
@@ -8,7 +8,7 @@ import com.dotbrains.agnt.mobile.core.model.RPCMessage
 /**
  * Runtime RPC compatibility: `sandboxPolicy` → legacy `sandbox` → minimal payload, plus
  * [approvalPolicy] candidate retries — used for `turn/start`, `thread/start`, and `thread/resume`
- * (iOS [CodexService+RuntimeConfig.sendRequestWithSandboxFallback]).
+ * (iOS [AgentService+RuntimeConfig.sendRequestWithSandboxFallback]).
  */
 internal enum class TurnStartEffortWireMode {
     UseEffort,
@@ -42,7 +42,7 @@ internal fun mergeTurnStartParams(
 }
 
 internal fun shouldFallbackFromSandboxPolicy(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val code = rpcFailure.rpcError.code
     if (code != -32602 && code != -32600) return false
     val loweredMessage = rpcFailure.rpcError.message.lowercase()
@@ -59,7 +59,7 @@ internal fun shouldFallbackFromSandboxPolicy(error: Throwable): Boolean {
 }
 
 internal fun shouldRetryWithApprovalPolicyFallback(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val code = rpcFailure.rpcError.code
     if (code != -32600 && code != -32602) return false
     val message = rpcFailure.rpcError.message.lowercase()
@@ -72,7 +72,7 @@ internal fun shouldRetryWithApprovalPolicyFallback(error: Throwable): Boolean {
 
 /**
  * iOS `runtimeServiceTierForTurn`: omit the `serviceTier` field after the bridge has rejected it once this session
- * (`supportsServiceTier` on `CodexService`).
+ * (`supportsServiceTier` on `AgentService`).
  */
 internal fun shouldWireServiceTier(
     supportsBridgeServiceTier: Boolean,
@@ -84,7 +84,7 @@ internal fun shouldWireServiceTier(
  * `reasoningEffort` if the bridge rejects the param shape.
  */
 internal fun shouldRetryTurnStartWithoutServiceTier(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val code = rpcFailure.rpcError.code
     if (code != -32600 && code != -32602) return false
     val message = rpcFailure.rpcError.message.lowercase()
@@ -100,7 +100,7 @@ internal fun shouldRetryTurnStartWithoutServiceTier(error: Throwable): Boolean {
         message.contains("expected")
 }
 
-internal suspend fun CodexService.sendRequestWithApprovalPolicyFallback(
+internal suspend fun AgentService.sendRequestWithApprovalPolicyFallback(
     method: String,
     baseParams: JSONValue.Obj,
 ): RPCMessage {
@@ -119,10 +119,10 @@ internal suspend fun CodexService.sendRequestWithApprovalPolicyFallback(
             throw e
         }
     }
-    throw lastError ?: CodexServiceError.InvalidResponse("$method failed with unknown approvalPolicy error")
+    throw lastError ?: AgentServiceError.InvalidResponse("$method failed with unknown approvalPolicy error")
 }
 
-internal suspend fun CodexService.sendRequestWithSandboxAndApprovalFallback(
+internal suspend fun AgentService.sendRequestWithSandboxAndApprovalFallback(
     method: String,
     baseParams: JSONValue.Obj,
 ): RPCMessage {
@@ -158,7 +158,7 @@ internal fun shouldRetryTurnStartEffortKeyAlias(
     mode: TurnStartEffortWireMode,
 ): Boolean {
     if (mode != TurnStartEffortWireMode.UseEffort) return false
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val code = rpcFailure.rpcError.code
     if (code != -32600 && code != -32602) return false
     val m = rpcFailure.rpcError.message.lowercase()

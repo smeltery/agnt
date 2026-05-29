@@ -10,9 +10,9 @@ import kotlinx.coroutines.withTimeout
 
 /**
  * Thread context window via `thread/contextWindow/read`.
- * Parity with [CodexService+Status.swift](../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Status.swift) `refreshContextWindowUsage`.
+ * Parity with [AgentService+Status.swift](../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Status.swift) `refreshContextWindowUsage`.
  */
-internal suspend fun CodexService.refreshContextWindowUsageForRepository(threadId: String) =
+internal suspend fun AgentService.refreshContextWindowUsageForRepository(threadId: String) =
     withContext(Dispatchers.IO) {
         refreshContextWindowUsageInternal(threadId)
     }
@@ -21,7 +21,7 @@ internal suspend fun CodexService.refreshContextWindowUsageForRepository(threadI
  * Push updates from bridge notifications (`thread/tokenUsage/updated`, legacy token_count).
  * Dedupes identical snapshots to avoid churn.
  */
-internal fun CodexService.applyLiveContextWindowUsage(
+internal fun AgentService.applyLiveContextWindowUsage(
     threadId: String,
     usage: ContextWindowUsage,
 ) {
@@ -39,7 +39,7 @@ internal fun CodexService.applyLiveContextWindowUsage(
     _contextWindowUsageByThread.value = _contextWindowUsageByThread.value + (tid to usage)
 }
 
-internal suspend fun CodexService.refreshContextWindowUsageInternal(threadId: String) {
+internal suspend fun AgentService.refreshContextWindowUsageInternal(threadId: String) {
     val tid = threadId.trim()
     if (tid.isEmpty()) return
 

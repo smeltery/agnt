@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
@@ -68,14 +68,14 @@ internal class TurnDraftQueueStore {
         prepend: Boolean = false,
     ) {
         val tid = threadId.trim()
-        if (tid.isEmpty()) throw CodexServiceError.InvalidInput("Missing thread id")
+        if (tid.isEmpty()) throw AgentServiceError.InvalidInput("Missing thread id")
         val trimmed = text.trim()
         val readyAttachments =
             attachments.filter { attachment ->
                 !attachment.payloadDataURL.isNullOrBlank()
             }
         if (trimmed.isEmpty() && readyAttachments.isEmpty()) {
-            throw CodexServiceError.InvalidInput("Message is empty")
+            throw AgentServiceError.InvalidInput("Message is empty")
         }
         mutex.withLock {
             val q = queues.getOrPut(tid) { ArrayDeque() }

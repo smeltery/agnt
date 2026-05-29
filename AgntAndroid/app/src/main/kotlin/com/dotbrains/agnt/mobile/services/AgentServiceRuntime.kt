@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
@@ -9,8 +9,8 @@ import com.dotbrains.agnt.mobile.core.persistence.RuntimeSelectionSnapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal suspend fun CodexService.refreshModelsInternal() {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+internal suspend fun AgentService.refreshModelsInternal() {
+    if (!sessionReady) throw AgentServiceError.Disconnected
     _isLoadingModels.value = true
     try {
         val response =
@@ -26,7 +26,7 @@ internal suspend fun CodexService.refreshModelsInternal() {
                     ),
             )
         val result = response.result?.objectValue
-            ?: throw CodexServiceError.InvalidResponse("model/list missing result")
+            ?: throw AgentServiceError.InvalidResponse("model/list missing result")
         val items =
             result["items"]?.arrayValue
                 ?: result["data"]?.arrayValue
@@ -49,38 +49,38 @@ internal suspend fun CodexService.refreshModelsInternal() {
     }
 }
 
-suspend fun CodexService.refreshModelsForRepository() =
+suspend fun AgentService.refreshModelsForRepository() =
     withContext(Dispatchers.IO) {
         refreshModelsInternal()
     }
 
-suspend fun CodexService.setSelectedModelIdForRepository(modelId: String?) =
+suspend fun AgentService.setSelectedModelIdForRepository(modelId: String?) =
     withContext(Dispatchers.IO) {
         _selectedModelId.value = modelId?.trim()?.takeIf { it.isNotEmpty() }
         normalizeRuntimeSelectionsAfterModelsUpdate()
         persistRuntimeSelection()
     }
 
-suspend fun CodexService.setSelectedReasoningEffortForRepository(reasoningEffort: String?) =
+suspend fun AgentService.setSelectedReasoningEffortForRepository(reasoningEffort: String?) =
     withContext(Dispatchers.IO) {
         _selectedReasoningEffort.value = reasoningEffort?.trim()?.takeIf { it.isNotEmpty() }
         normalizeRuntimeSelectionsAfterModelsUpdate()
         persistRuntimeSelection()
     }
 
-suspend fun CodexService.setSelectedAccessModeForRepository(accessMode: CodexAccessMode) =
+suspend fun AgentService.setSelectedAccessModeForRepository(accessMode: CodexAccessMode) =
     withContext(Dispatchers.IO) {
         _selectedAccessMode.value = accessMode
         persistRuntimeSelection()
     }
 
-suspend fun CodexService.setSelectedServiceTierForRepository(serviceTier: CodexServiceTier?) =
+suspend fun AgentService.setSelectedServiceTierForRepository(serviceTier: CodexServiceTier?) =
     withContext(Dispatchers.IO) {
         _selectedServiceTier.value = serviceTier
         persistRuntimeSelection()
     }
 
-internal fun CodexService.selectedModelOption(): CodexModelOption? {
+internal fun AgentService.selectedModelOption(): CodexModelOption? {
     val models = _availableModels.value
     val selected = _selectedModelId.value?.trim()?.takeIf { it.isNotEmpty() }
     return when {
@@ -90,11 +90,11 @@ internal fun CodexService.selectedModelOption(): CodexModelOption? {
     } ?: models.firstOrNull { it.isDefault } ?: models.firstOrNull()
 }
 
-internal fun CodexService.runtimeModelIdentifierForTurn(threadId: String): String? =
+internal fun AgentService.runtimeModelIdentifierForTurn(threadId: String): String? =
     selectedModelOption()?.model?.trim()?.takeIf { it.isNotEmpty() }
         ?: _threads.value.firstOrNull { it.id == threadId }?.model?.trim()?.takeIf { it.isNotEmpty() }
 
-internal fun CodexService.selectedReasoningEffortForSelectedModel(): String? {
+internal fun AgentService.selectedReasoningEffortForSelectedModel(): String? {
     val model = selectedModelOption() ?: return null
     val supported = model.supportedReasoningEfforts.map { it.reasoningEffort }.filter { it.isNotBlank() }
     if (supported.isEmpty()) return null
@@ -108,7 +108,7 @@ internal fun CodexService.selectedReasoningEffortForSelectedModel(): String? {
     return if (supported.contains("medium")) "medium" else supported.firstOrNull()
 }
 
-internal fun CodexService.normalizeRuntimeSelectionsAfterModelsUpdate() {
+internal fun AgentService.normalizeRuntimeSelectionsAfterModelsUpdate() {
     val models = _availableModels.value
     if (models.isEmpty()) {
         persistRuntimeSelection()
@@ -131,7 +131,7 @@ internal fun CodexService.normalizeRuntimeSelectionsAfterModelsUpdate() {
     persistRuntimeSelection()
 }
 
-internal fun CodexService.persistRuntimeSelection() {
+internal fun AgentService.persistRuntimeSelection() {
     sessionPersistence.saveRuntimeSelection(
         RuntimeSelectionSnapshot(
             selectedModelId = _selectedModelId.value,

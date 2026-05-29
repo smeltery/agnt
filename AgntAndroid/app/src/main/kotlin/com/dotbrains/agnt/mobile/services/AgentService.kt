@@ -58,20 +58,20 @@ import okhttp3.WebSocket
 private const val INITIAL_TIMELINE_TAIL_LIMIT = 48
 
 /**
- * Android counterpart of [CodexService.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService.swift).
+ * Android counterpart of [AgentService.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService.swift).
  *
  * Split across Kotlin files mirroring Swift extensions:
- * - [CodexServiceConnection] ← CodexService+Connection.swift
- * - [CodexServiceTransport] ← CodexService+Transport.swift
- * - [CodexServiceSecureTransport] ← CodexService+SecureTransport.swift
- * - [CodexServiceMessages] ← CodexService+Messages.swift
- * - [CodexServiceSync] ← CodexService+Sync.swift
- * - [CodexServiceHistory] ← CodexService+History.swift
- * - [CodexServiceVoice] ← CodexService+Voice.swift (bridge auth + ChatGPT transcribe)
+ * - [AgentServiceConnection] ← AgentService+Connection.swift
+ * - [AgentServiceTransport] ← AgentService+Transport.swift
+ * - [AgentServiceSecureTransport] ← AgentService+SecureTransport.swift
+ * - [AgentServiceMessages] ← AgentService+Messages.swift
+ * - [AgentServiceSync] ← AgentService+Sync.swift
+ * - [AgentServiceHistory] ← AgentService+History.swift
+ * - [AgentServiceVoice] ← AgentService+Voice.swift (bridge auth + ChatGPT transcribe)
  *
- * Push routing remains in [com.dotbrains.agnt.mobile.data.IncomingEventRouter] (Swift: CodexService+Incoming.swift).
+ * Push routing remains in [com.dotbrains.agnt.mobile.data.IncomingEventRouter] (Swift: AgentService+Incoming.swift).
  */
-class CodexService(
+class AgentService(
     context: Context,
     internal val httpClient: OkHttpClient,
     internal val httpCallClient: OkHttpClient = httpClient,
@@ -327,7 +327,7 @@ class CodexService(
 
     /**
      * When set, [sendRequestImpl] (not handshake) uses this instead of the wire. Used for JVM tests.
-     * Parity: iOS [requestTransportOverride] on [CodexService] for `CodexThreadProjectRoutingTests`.
+     * Parity: iOS [requestTransportOverride] on [AgentService] for `CodexThreadProjectRoutingTests`.
      */
     @Volatile
     internal var testRpcRequestHandler: (suspend (String, JSONValue?) -> RPCMessage)? = null

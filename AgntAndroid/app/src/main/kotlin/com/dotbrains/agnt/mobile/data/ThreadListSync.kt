@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
 /**
- * Fetches `thread/list` pages (parity with [CodexService.fetchServerThreads] on iOS) and merges
+ * Fetches `thread/list` pages (parity with [AgentService.fetchServerThreads] on iOS) and merges
  * active + archived results for sidebar state.
  */
 internal object ThreadListSync {

@@ -13,7 +13,7 @@ import java.util.UUID
 
 /**
  * Owns the on-device SSH terminal state and routes UI calls into [NativeSshTerminal].
- * Mirrors the Swift `CodexService+Terminal` extension. Multiple concurrent terminals
+ * Mirrors the Swift `AgentService+Terminal` extension. Multiple concurrent terminals
  * are supported (terminal ids `term-1`, `term-2`, …).
  */
 class TerminalController(

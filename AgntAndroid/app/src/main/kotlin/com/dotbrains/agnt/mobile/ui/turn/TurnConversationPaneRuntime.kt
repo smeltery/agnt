@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
@@ -144,8 +144,8 @@ internal fun buildRuntimeControlsState(
 
 internal fun formatTurnSendError(e: Throwable): String =
     when (e) {
-        is CodexServiceError.ThreadRemovedOnServer -> e.message ?: ""
-        is CodexServiceError.RpcFailure -> "${e.rpcError.code}: ${e.rpcError.message}"
-        is CodexServiceError -> e.message ?: e.javaClass.simpleName
+        is AgentServiceError.ThreadRemovedOnServer -> e.message ?: ""
+        is AgentServiceError.RpcFailure -> "${e.rpcError.code}: ${e.rpcError.message}"
+        is AgentServiceError -> e.message ?: e.javaClass.simpleName
         else -> e.message ?: e.javaClass.simpleName
     }

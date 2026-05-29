@@ -4,7 +4,7 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 
 /**
  * Estrae `turnId` dalla risposta `turn/start` (subset di
- * [CodexService.extractTurnID](CodexMobile/CodexMobile/Services/CodexService+Incoming.swift)).
+ * [AgentService.extractTurnID](CodexMobile/CodexMobile/Services/AgentService+Incoming.swift)).
  */
 internal fun extractTurnIdFromRpcResult(result: JSONValue?): String? {
     val m = (result as? JSONValue.Obj)?.map ?: return null

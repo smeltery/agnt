@@ -271,7 +271,7 @@ interface CodexRepository {
     /**
      * Same-thread rebind: updates local [threads] + forces [thread/resume] with the preferred cwd
      * while [authoritative] guards prevent stale [thread/list]/[thread/read] from snapping cwd back
-     * until the runtime matches. Parity: iOS [CodexService.moveThreadToProjectPath].
+     * until the runtime matches. Parity: iOS [AgentService.moveThreadToProjectPath].
      */
     suspend fun moveThreadToProjectPath(
         threadId: String,

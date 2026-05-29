@@ -4,7 +4,7 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 
 /**
  * Estrae da `thread` (payload `thread/read`) il turno interrompibile corrente.
- * Port ridotto da [readThreadTurnStateSnapshot](CodexMobile/CodexMobile/Services/CodexService+ThreadsTurns.swift).
+ * Port ridotto da [readThreadTurnStateSnapshot](CodexMobile/CodexMobile/Services/AgentService+ThreadsTurns.swift).
  */
 internal data class ThreadTurnInterruptSnapshot(
     val interruptibleTurnId: String?,

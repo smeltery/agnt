@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
@@ -19,11 +19,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Invio turno utente via `turn/start` (parity con [CodexService.sendTurnStart] in
- * [CodexService+ThreadsTurns.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+ThreadsTurns.swift)).
+ * Invio turno utente via `turn/start` (parity con [AgentService.sendTurnStart] in
+ * [AgentService+ThreadsTurns.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+ThreadsTurns.swift)).
  * J.2/J.6/J.7a: testo + immagini; sandboxPolicy/sandbox/minimal + approvalPolicy candidates + effort key alias come iOS.
  */
-internal suspend fun CodexService.startTurnInternal(
+internal suspend fun AgentService.startTurnInternal(
     threadId: String,
     userText: String,
     attachments: List<CodexImageAttachment> = emptyList(),
@@ -31,16 +31,16 @@ internal suspend fun CodexService.startTurnInternal(
     fileMentions: List<CodexTurnMention> = emptyList(),
     collaborationMode: CodexCollaborationModeKind? = null,
 ) {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val tid = threadId.trim()
     val trimmed = userText.trim()
     val readyAttachments =
         attachments.filter { attachment ->
             !attachment.payloadDataURL.isNullOrBlank()
         }
-    if (tid.isEmpty()) throw CodexServiceError.InvalidInput("Missing thread id")
+    if (tid.isEmpty()) throw AgentServiceError.InvalidInput("Missing thread id")
     if (trimmed.isEmpty() && readyAttachments.isEmpty()) {
-        throw CodexServiceError.InvalidInput("Message is empty")
+        throw AgentServiceError.InvalidInput("Message is empty")
     }
 
     var targetThreadId = tid
@@ -67,7 +67,7 @@ internal suspend fun CodexService.startTurnInternal(
             try {
                 createContinuationThreadInternal(archivedId, prior)
             } catch (_: Throwable) {
-                throw CodexServiceError.ThreadRemovedOnServer
+                throw AgentServiceError.ThreadRemovedOnServer
             }
         targetThreadId = continuation.id
         try {
@@ -77,10 +77,10 @@ internal suspend fun CodexService.startTurnInternal(
                 preferredProjectPath = continuation.gitWorkingDirectory,
                 modelIdentifierOverride = continuation.model,
             )
-        } catch (e: CodexServiceError.RpcFailure) {
+        } catch (e: AgentServiceError.RpcFailure) {
             if (e.rpcError.isExplicitServerThreadMissing()) {
                 handleMissingThread(targetThreadId)
-                throw CodexServiceError.ThreadRemovedOnServer
+                throw AgentServiceError.ThreadRemovedOnServer
             }
             throw e
         }
@@ -88,7 +88,7 @@ internal suspend fun CodexService.startTurnInternal(
 
     try {
         resumeTargetOrThrow()
-    } catch (e: CodexServiceError.RpcFailure) {
+    } catch (e: AgentServiceError.RpcFailure) {
         if (!e.rpcError.isExplicitServerThreadMissing()) throw e
         continuationAfterExplicitMissing(targetThreadId)
     }
@@ -180,7 +180,7 @@ internal suspend fun CodexService.startTurnInternal(
         scheduleAutomaticThreadTitleGenerationIfNeeded(automaticTitleSeed, targetThreadId, readyAttachments)
     } catch (e: Throwable) {
         noteTurnFinished(targetThreadId)
-        if (e is CodexServiceError.RpcFailure && e.rpcError.isExplicitServerThreadMissing()) {
+        if (e is AgentServiceError.RpcFailure && e.rpcError.isExplicitServerThreadMissing()) {
             continuationAfterExplicitMissing(targetThreadId)
             val newId = targetThreadId
             val retryAutomaticTitleSeed = automaticThreadTitleSeedIfNeeded(trimmed, readyAttachments, newId)
@@ -202,9 +202,9 @@ internal suspend fun CodexService.startTurnInternal(
                         turnId = null,
                     )
                 }
-                if (e2 is CodexServiceError.RpcFailure && e2.rpcError.isExplicitServerThreadMissing()) {
+                if (e2 is AgentServiceError.RpcFailure && e2.rpcError.isExplicitServerThreadMissing()) {
                     handleMissingThread(newId)
-                    throw CodexServiceError.ThreadRemovedOnServer
+                    throw AgentServiceError.ThreadRemovedOnServer
                 }
                 throw e2
             }
@@ -222,7 +222,7 @@ internal suspend fun CodexService.startTurnInternal(
     }
 }
 
-private suspend fun CodexService.markTurnStartAccepted(
+private suspend fun AgentService.markTurnStartAccepted(
     threadId: String,
     pendingMessageId: String,
     response: RPCMessage,
@@ -245,7 +245,7 @@ private suspend fun CodexService.markTurnStartAccepted(
     bumpThreadActivityAfterTurn(threadId)
 }
 
-private fun CodexService.bumpThreadActivityAfterTurn(threadId: String) {
+private fun AgentService.bumpThreadActivityAfterTurn(threadId: String) {
     val list = _threads.value
     if (list.none { it.id == threadId }) return
     publishThreads(
@@ -264,7 +264,7 @@ private fun CodexService.bumpThreadActivityAfterTurn(threadId: String) {
     )
 }
 
-suspend fun CodexService.startTurnForRepository(
+suspend fun AgentService.startTurnForRepository(
     threadId: String,
     userText: String,
     attachments: List<CodexImageAttachment> = emptyList(),
@@ -275,7 +275,7 @@ suspend fun CodexService.startTurnForRepository(
     startTurnInternal(threadId, userText, attachments, skillMentions, fileMentions, collaborationMode)
 }
 
-internal suspend fun CodexService.steerTurnInternal(
+internal suspend fun AgentService.steerTurnInternal(
     threadId: String,
     expectedTurnId: String,
     userText: String,
@@ -283,7 +283,7 @@ internal suspend fun CodexService.steerTurnInternal(
     skillMentions: List<CodexTurnSkillMention> = emptyList(),
     fileMentions: List<CodexTurnMention> = emptyList(),
 ) {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val tid = threadId.trim()
     val turnId = expectedTurnId.trim()
     val trimmed = userText.trim()
@@ -291,10 +291,10 @@ internal suspend fun CodexService.steerTurnInternal(
         attachments.filter { attachment ->
             !attachment.payloadDataURL.isNullOrBlank()
         }
-    if (tid.isEmpty()) throw CodexServiceError.InvalidInput("Missing thread id")
-    if (turnId.isEmpty()) throw CodexServiceError.InvalidInput("Missing active turn id")
+    if (tid.isEmpty()) throw AgentServiceError.InvalidInput("Missing thread id")
+    if (turnId.isEmpty()) throw AgentServiceError.InvalidInput("Missing active turn id")
     if (trimmed.isEmpty() && readyAttachments.isEmpty()) {
-        throw CodexServiceError.InvalidInput("Message is empty")
+        throw AgentServiceError.InvalidInput("Message is empty")
     }
 
     val pendingId = messageTimelineStore.appendPendingUserMessage(tid, trimmed, readyAttachments)
@@ -366,7 +366,7 @@ internal suspend fun CodexService.steerTurnInternal(
     }
 }
 
-suspend fun CodexService.steerTurnForRepository(
+suspend fun AgentService.steerTurnForRepository(
     threadId: String,
     expectedTurnId: String,
     userText: String,
@@ -377,7 +377,7 @@ suspend fun CodexService.steerTurnForRepository(
     steerTurnInternal(threadId, expectedTurnId, userText, attachments, skillMentions, fileMentions)
 }
 
-private fun CodexService.buildTurnStartRequestParams(
+private fun AgentService.buildTurnStartRequestParams(
     threadId: String,
     userText: String,
     attachments: List<CodexImageAttachment>,
@@ -445,14 +445,14 @@ private fun CodexService.buildTurnStartRequestParams(
 //     (which is correct — neither provider has a plan-mode equivalent).
 //
 // `internal` so JVM unit tests can pin the wire shape without spinning up a
-// CodexService instance.
+// AgentService instance.
 internal fun buildCollaborationModePayload(
     mode: CodexCollaborationModeKind,
     threadModel: String?,
     reasoningEffort: String?,
 ): JSONValue.Obj {
     if (mode == CodexCollaborationModeKind.plan && threadModel.isNullOrBlank()) {
-        throw CodexServiceError.InvalidInput("Plan mode requires an available model before starting a plan turn.")
+        throw AgentServiceError.InvalidInput("Plan mode requires an available model before starting a plan turn.")
     }
 
     val settings = linkedMapOf<String, JSONValue>()
@@ -530,7 +530,7 @@ internal fun makeTurnInputPayload(
 }
 
 internal fun shouldRetryTurnStartWithoutSkillItems(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val code = rpcFailure.rpcError.code
     if (code != -32600 && code != -32602) return false
     val message = rpcFailure.rpcError.message.lowercase()
@@ -546,7 +546,7 @@ internal fun shouldRetryTurnStartWithoutSkillItems(error: Throwable): Boolean {
 }
 
 internal fun shouldRetryTurnStartWithoutMentionItems(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val code = rpcFailure.rpcError.code
     if (code != -32600 && code != -32602) return false
     val message = rpcFailure.rpcError.message.lowercase()
@@ -562,7 +562,7 @@ internal fun shouldRetryTurnStartWithoutMentionItems(error: Throwable): Boolean 
 }
 
 private fun shouldRetryTurnStartWithImageURLField(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val message = rpcFailure.rpcError.message.lowercase()
     if (!message.contains("image_url")) return false
     return message.contains("missing") ||
@@ -572,7 +572,7 @@ private fun shouldRetryTurnStartWithImageURLField(error: Throwable): Boolean {
 }
 
 private fun shouldRetryTurnStartWithoutCollaborationMode(error: Throwable): Boolean {
-    val rpcFailure = error as? CodexServiceError.RpcFailure ?: return false
+    val rpcFailure = error as? AgentServiceError.RpcFailure ?: return false
     val code = rpcFailure.rpcError.code
     if (code != -32600 && code != -32602) return false
     val message = rpcFailure.rpcError.message.lowercase()
@@ -585,13 +585,13 @@ private fun shouldRetryTurnStartWithoutCollaborationMode(error: Throwable): Bool
         message.contains("invalid")
 }
 
-internal suspend fun CodexService.interruptTurnInternal(
+internal suspend fun AgentService.interruptTurnInternal(
     threadId: String,
     hintTurnId: String?,
 ) {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val tid = threadId.trim()
-    if (tid.isEmpty()) throw CodexServiceError.InvalidInput("Missing thread id")
+    if (tid.isEmpty()) throw AgentServiceError.InvalidInput("Missing thread id")
 
     var turnId =
         hintTurnId?.trim()?.takeIf { it.isNotEmpty() }
@@ -601,11 +601,11 @@ internal suspend fun CodexService.interruptTurnInternal(
         turnId = snap.interruptibleTurnId
         if (turnId == null) {
             if (snap.hasInterruptibleTurnWithoutId) {
-                throw CodexServiceError.InvalidInput(
+                throw AgentServiceError.InvalidInput(
                     "The active run has not published an interruptible turn ID yet. Please try again in a moment.",
                 )
             }
-            throw CodexServiceError.InvalidInput("No active turn to interrupt")
+            throw AgentServiceError.InvalidInput("No active turn to interrupt")
         }
     }
 
@@ -613,12 +613,12 @@ internal suspend fun CodexService.interruptTurnInternal(
     try {
         sendInterruptRpc(resolvedTurnId, tid, snakeCase = false)
         return
-    } catch (e: CodexServiceError.RpcFailure) {
+    } catch (e: AgentServiceError.RpcFailure) {
         if (shouldRetryInterruptSnakeCase(e)) {
             try {
                 sendInterruptRpc(resolvedTurnId, tid, snakeCase = true)
                 return
-            } catch (e2: CodexServiceError.RpcFailure) {
+            } catch (e2: AgentServiceError.RpcFailure) {
                 if (shouldRetryInterruptRefreshTurn(e2)) {
                     tryRefreshAndInterrupt(tid, resolvedTurnId)
                     return
@@ -634,17 +634,17 @@ internal suspend fun CodexService.interruptTurnInternal(
     }
 }
 
-private suspend fun CodexService.tryRefreshAndInterrupt(
+private suspend fun AgentService.tryRefreshAndInterrupt(
     threadId: String,
     previousTurnId: String,
 ) {
     val snap = fetchThreadTurnInterruptSnapshotImpl(threadId)
     val refreshed =
         snap.interruptibleTurnId?.takeIf { it != previousTurnId }
-            ?: throw CodexServiceError.InvalidInput("Could not resolve an interruptible turn id")
+            ?: throw AgentServiceError.InvalidInput("Could not resolve an interruptible turn id")
     try {
         sendInterruptRpc(refreshed, threadId, snakeCase = false)
-    } catch (e: CodexServiceError.RpcFailure) {
+    } catch (e: AgentServiceError.RpcFailure) {
         if (shouldRetryInterruptSnakeCase(e)) {
             sendInterruptRpc(refreshed, threadId, snakeCase = true)
         } else {
@@ -654,7 +654,7 @@ private suspend fun CodexService.tryRefreshAndInterrupt(
     noteTurnStarted(threadId, refreshed)
 }
 
-private suspend fun CodexService.resolveInFlightTurnSnapshotForInterrupt(threadId: String): ThreadTurnInterruptSnapshot {
+private suspend fun AgentService.resolveInFlightTurnSnapshotForInterrupt(threadId: String): ThreadTurnInterruptSnapshot {
     val maxAttempts = 3
     var latest = fetchThreadTurnInterruptSnapshotImpl(threadId)
     repeat(maxAttempts - 1) {
@@ -667,7 +667,7 @@ private suspend fun CodexService.resolveInFlightTurnSnapshotForInterrupt(threadI
     return latest
 }
 
-private suspend fun CodexService.sendInterruptRpc(
+private suspend fun AgentService.sendInterruptRpc(
     turnId: String,
     threadId: String,
     snakeCase: Boolean,
@@ -687,7 +687,7 @@ private suspend fun CodexService.sendInterruptRpc(
     sendRequestImpl("turn/interrupt", JSONValue.Obj(params))
 }
 
-internal suspend fun CodexService.fetchThreadTurnInterruptSnapshotImpl(threadId: String): ThreadTurnInterruptSnapshot {
+internal suspend fun AgentService.fetchThreadTurnInterruptSnapshotImpl(threadId: String): ThreadTurnInterruptSnapshot {
     val camel =
         JSONValue.Obj(
             mapOf(
@@ -698,7 +698,7 @@ internal suspend fun CodexService.fetchThreadTurnInterruptSnapshotImpl(threadId:
     val response =
         try {
             sendRequestImpl("thread/read", camel)
-        } catch (e: CodexServiceError.RpcFailure) {
+        } catch (e: AgentServiceError.RpcFailure) {
             if (shouldRetryThreadReadSnakeCase(e)) {
                 sendRequestImpl(
                     "thread/read",
@@ -717,7 +717,7 @@ internal suspend fun CodexService.fetchThreadTurnInterruptSnapshotImpl(threadId:
     return ThreadTurnSnapshot.fromThreadObject(threadEl?.map ?: emptyMap())
 }
 
-private fun shouldRetryThreadReadSnakeCase(e: CodexServiceError.RpcFailure): Boolean {
+private fun shouldRetryThreadReadSnakeCase(e: AgentServiceError.RpcFailure): Boolean {
     val c = e.rpcError.code
     if (c != -32600 && c != -32602) return false
     val m = e.rpcError.message.lowercase()
@@ -726,7 +726,7 @@ private fun shouldRetryThreadReadSnakeCase(e: CodexServiceError.RpcFailure): Boo
     return hints.any { m.contains(it) }
 }
 
-private fun shouldRetryInterruptSnakeCase(e: CodexServiceError.RpcFailure): Boolean {
+private fun shouldRetryInterruptSnakeCase(e: AgentServiceError.RpcFailure): Boolean {
     val c = e.rpcError.code
     if (c != -32600 && c != -32602) return false
     val m = e.rpcError.message.lowercase()
@@ -734,7 +734,7 @@ private fun shouldRetryInterruptSnakeCase(e: CodexServiceError.RpcFailure): Bool
     return hints.any { m.contains(it) }
 }
 
-private fun shouldRetryInterruptRefreshTurn(e: CodexServiceError.RpcFailure): Boolean {
+private fun shouldRetryInterruptRefreshTurn(e: AgentServiceError.RpcFailure): Boolean {
     val m = e.rpcError.message.lowercase()
     val hints =
         listOf(
@@ -753,7 +753,7 @@ private fun shouldRetryInterruptRefreshTurn(e: CodexServiceError.RpcFailure): Bo
     return hints.any { m.contains(it) }
 }
 
-suspend fun CodexService.interruptTurnForRepository(
+suspend fun AgentService.interruptTurnForRepository(
     threadId: String,
     turnId: String?,
 ) = withContext(Dispatchers.IO) {

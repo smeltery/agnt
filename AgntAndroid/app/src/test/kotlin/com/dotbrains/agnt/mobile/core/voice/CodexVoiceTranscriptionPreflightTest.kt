@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.core.voice
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -14,7 +14,7 @@ class CodexVoiceTranscriptionPreflightTest {
                 byteCount = CodexVoiceTranscriptionPreflight.MAX_BYTE_COUNT + 1,
                 durationSeconds = 30.0,
             )
-        val err = assertFailsWith<CodexServiceError.InvalidInput> { preflight.validate() }
+        val err = assertFailsWith<AgentServiceError.InvalidInput> { preflight.validate() }
         assertEquals("Voice clips must be smaller than 10 MB.", err.message)
     }
 
@@ -25,7 +25,7 @@ class CodexVoiceTranscriptionPreflightTest {
                 byteCount = 2048,
                 durationSeconds = 120.5,
             )
-        val err = assertFailsWith<CodexServiceError.InvalidInput> { preflight.validate() }
+        val err = assertFailsWith<AgentServiceError.InvalidInput> { preflight.validate() }
         assertEquals("Voice clips must be 120 seconds or less.", err.message)
     }
 

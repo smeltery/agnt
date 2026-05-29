@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.services
 
 import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import com.dotbrains.agnt.mobile.core.model.UsageStatusRefreshPolicy
@@ -11,9 +11,9 @@ import kotlinx.coroutines.withContext
 
 /**
  * Account rate limits (`account/rateLimits/read`, `account/rateLimits/updated`).
- * Parity with [CodexService+Status.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Status.swift).
+ * Parity with [AgentService+Status.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Status.swift).
  */
-internal fun CodexService.applyRateLimitsPayload(
+internal fun AgentService.applyRateLimitsPayload(
     payloadObject: Map<String, JSONValue>,
     mergeWithExisting: Boolean,
 ) {
@@ -37,19 +37,19 @@ internal fun CodexService.applyRateLimitsPayload(
         }
 }
 
-internal fun CodexService.handleRateLimitsUpdatedParams(params: Map<String, JSONValue>?) {
+internal fun AgentService.handleRateLimitsUpdatedParams(params: Map<String, JSONValue>?) {
     if (params == null) return
     applyRateLimitsPayload(params, mergeWithExisting = true)
     _hasResolvedRateLimitsSnapshot.value = true
     _rateLimitsErrorMessage.value = null
 }
 
-internal suspend fun CodexService.refreshRateLimitsForRepository() =
+internal suspend fun AgentService.refreshRateLimitsForRepository() =
     withContext(Dispatchers.IO) {
         refreshRateLimitsInternal()
     }
 
-internal suspend fun CodexService.refreshUsageStatusForRepository(threadId: String?) =
+internal suspend fun AgentService.refreshUsageStatusForRepository(threadId: String?) =
     withContext(Dispatchers.IO) {
         val tid = threadId?.trim().orEmpty()
         if (tid.isNotEmpty()) {
@@ -58,7 +58,7 @@ internal suspend fun CodexService.refreshUsageStatusForRepository(threadId: Stri
         refreshRateLimitsInternal()
     }
 
-internal fun CodexService.shouldAutoRefreshUsageStatusForRepository(threadId: String?): Boolean =
+internal fun AgentService.shouldAutoRefreshUsageStatusForRepository(threadId: String?): Boolean =
     UsageStatusRefreshPolicy.shouldAutoRefresh(
         sessionReady = sessionReady,
         connected = _connectionState.value is ConnectionState.Connected,
@@ -67,7 +67,7 @@ internal fun CodexService.shouldAutoRefreshUsageStatusForRepository(threadId: St
         hasResolvedRateLimitsSnapshot = _hasResolvedRateLimitsSnapshot.value,
     )
 
-internal suspend fun CodexService.refreshRateLimitsInternal() {
+internal suspend fun AgentService.refreshRateLimitsInternal() {
     if (!sessionReady) {
         return
     }
@@ -76,7 +76,7 @@ internal suspend fun CodexService.refreshRateLimitsInternal() {
         val response = fetchRateLimitsWithCompatRetry()
         val resultObject = response.result?.objectValue
         if (resultObject == null) {
-            throw CodexServiceError.InvalidResponse("account/rateLimits/read response missing payload")
+            throw AgentServiceError.InvalidResponse("account/rateLimits/read response missing payload")
         }
         applyRateLimitsPayload(resultObject, mergeWithExisting = false)
         _hasResolvedRateLimitsSnapshot.value = true
@@ -96,7 +96,7 @@ internal suspend fun CodexService.refreshRateLimitsInternal() {
     }
 }
 
-private suspend fun CodexService.fetchRateLimitsWithCompatRetry(): RPCMessage {
+private suspend fun AgentService.fetchRateLimitsWithCompatRetry(): RPCMessage {
     return try {
         sendRequestImpl("account/rateLimits/read", JSONValue.Null)
     } catch (e: Exception) {
@@ -106,7 +106,7 @@ private suspend fun CodexService.fetchRateLimitsWithCompatRetry(): RPCMessage {
 }
 
 private fun shouldRetryRateLimitsWithEmptyParams(e: Throwable): Boolean {
-    val rpc = (e as? CodexServiceError.RpcFailure)?.rpcError ?: return false
+    val rpc = (e as? AgentServiceError.RpcFailure)?.rpcError ?: return false
     if (rpc.code != -32602 && rpc.code != -32600) return false
     val lowered = rpc.message.lowercase()
     return lowered.contains("invalid params") ||

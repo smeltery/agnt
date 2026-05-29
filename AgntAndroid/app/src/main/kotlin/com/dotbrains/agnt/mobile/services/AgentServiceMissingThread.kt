@@ -4,7 +4,7 @@ package com.dotbrains.agnt.mobile.services
  * When `thread/read` or `turn/start` reports the thread no longer exists on the bridge,
  * prune local state so the UI does not stay on a ghost conversation (parity iOS `handleMissingThread`).
  */
-internal suspend fun CodexService.handleMissingThread(threadId: String) {
+internal suspend fun AgentService.handleMissingThread(threadId: String) {
     val tid = threadId.trim()
     if (tid.isEmpty()) return
     noteTurnFinished(tid)

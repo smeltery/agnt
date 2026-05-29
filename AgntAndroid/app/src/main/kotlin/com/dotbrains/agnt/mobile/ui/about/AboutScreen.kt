@@ -41,7 +41,7 @@ fun AboutScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.about_remodex_title)) },
+                title = { Text(stringResource(R.string.about_agnt_title)) },
                 colors = agntScreenTopAppBarColors(),
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -68,17 +68,17 @@ fun AboutScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = stringResource(R.string.about_remodex_description),
+                text = stringResource(R.string.about_agnt_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LocalInfoSection(
-                title = stringResource(R.string.about_remodex_local_first_title),
-                body = stringResource(R.string.about_remodex_local_first_body),
+                title = stringResource(R.string.about_agnt_local_first_title),
+                body = stringResource(R.string.about_agnt_local_first_body),
             )
             LocalInfoSection(
-                title = stringResource(R.string.about_remodex_pairing_title),
-                body = stringResource(R.string.about_remodex_pairing_body),
+                title = stringResource(R.string.about_agnt_pairing_title),
+                body = stringResource(R.string.about_agnt_pairing_body),
             )
         }
     }

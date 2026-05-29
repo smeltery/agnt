@@ -153,18 +153,30 @@ Open follow-ups:
 
 ### P3 — cosmetics / rename
 
-- [ ] Rename `CodexService*` to `AgentService*` (or split provider-specific
-      shims). The current name is a holdover from the Codex-only upstream;
-      the class hierarchy is already protocol-agnostic in practice. Deferred
-      because it's a wide rename across ~30 files with high diff cost and zero
-      runtime impact. Worth doing once the P1/P2 work has settled.
-- [ ] Rename the `core/model/CODEX_*` constants similarly (e.g.
-      `CODEX_SECURE_HANDSHAKE_TAG` → `AGNT_SECURE_HANDSHAKE_TAG`). Value
-      already updated; only the symbol name still encodes the upstream's
-      Codex-only assumption.
-- [ ] Rename `nav_about_remodex`, `about_remodex_*`, `settings_about_remodex_hint`
-      string resource keys to drop the `remodex` prefix. Display values already
-      updated; keys kept for now to minimize the porting diff.
+- [x] **`CodexService*` → `AgentService*`.** Bulk-renamed `CodexService`
+      (the impl class), `CodexServiceError` (the sealed error), and all
+      `CodexService.Foo` extension files (28 files total) to their
+      `AgentService` counterparts via `git mv` + `sed`. `CodexServiceTier`
+      stayed as-is because it's a wire-protocol model for the
+      `serviceTier` field on `turn/start.params`, not a service-layer
+      name. Pure mechanical rename; behavior unchanged. All 600+ Android
+      unit tests still green.
+- [x] **`CODEX_*` constants → `AGNT_*`.** Bulk-renamed 8 constants
+      (`CODEX_SECURE_PROTOCOL_VERSION`,
+      `CODEX_PAIRING_QR_VERSION`,
+      `CODEX_SECURE_HANDSHAKE_TAG`,
+      `CODEX_SECURE_HANDSHAKE_LABEL`,
+      `CODEX_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS`,
+      `CODEX_TRUSTED_SESSION_RESOLVE_TAG`,
+      `CODEX_TRUSTED_SESSION_RESOLVE_RESPONSE_TAG`,
+      `CODEX_TRUSTED_SESSION_RESOLVE_CLOCK_SKEW_TOLERANCE_SECONDS`) +
+      their 36 references across 5 files.
+- [x] **`*_remodex` string-resource keys → `*_agnt`.** Renamed
+      `nav_about_remodex`, `settings_about_remodex_hint`, and 6
+      `about_remodex_*` keys plus their 8 `R.string.*` references in
+      `SettingsScreen` / `AboutScreen`. Display values were already
+      branded "About agnt" / "Pairing" / etc.; only the symbol names
+      moved.
 
 ## Build / CI
 

@@ -1,17 +1,17 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal suspend fun CodexService.deleteThreadLocallyForRepository(threadId: String) =
+internal suspend fun AgentService.deleteThreadLocallyForRepository(threadId: String) =
     withContext(Dispatchers.IO) {
         deleteThreadLocallyInternal(threadId)
     }
 
-internal suspend fun CodexService.deleteThreadLocallyInternal(threadId: String) {
+internal suspend fun AgentService.deleteThreadLocallyInternal(threadId: String) {
     val tid = threadId.trim().takeIf { it.isNotEmpty() }
-        ?: throw CodexServiceError.InvalidInput("Missing thread id")
+        ?: throw AgentServiceError.InvalidInput("Missing thread id")
 
     noteTurnFinished(tid)
     resumedThreadIds.remove(tid)

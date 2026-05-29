@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
@@ -41,7 +41,7 @@ class TurnStartRpcCompatTest {
     @Test
     fun shouldFallbackFromSandboxPolicy_falseForThreadNotFound() {
         val err =
-            CodexServiceError.RpcFailure(
+            AgentServiceError.RpcFailure(
                 RPCError(-32602, "Thread not found"),
             )
         assertFalse(shouldFallbackFromSandboxPolicy(err))
@@ -50,7 +50,7 @@ class TurnStartRpcCompatTest {
     @Test
     fun shouldFallbackFromSandboxPolicy_trueForUnknownField() {
         val err =
-            CodexServiceError.RpcFailure(
+            AgentServiceError.RpcFailure(
                 RPCError(-32602, "unknown field sandboxPolicy"),
             )
         assertTrue(shouldFallbackFromSandboxPolicy(err))
@@ -76,7 +76,7 @@ class TurnStartRpcCompatTest {
     @Test
     fun shouldRetryTurnStartWithoutServiceTier_trueForServiceTierUnknownField() {
         val err =
-            CodexServiceError.RpcFailure(
+            AgentServiceError.RpcFailure(
                 RPCError(-32602, "Unknown field serviceTier"),
             )
         assertTrue(shouldRetryTurnStartWithoutServiceTier(err))
@@ -84,7 +84,7 @@ class TurnStartRpcCompatTest {
 
     @Test
     fun shouldRetryTurnStartWithoutServiceTier_falseForUnrelatedRpc() {
-        val err = CodexServiceError.RpcFailure(RPCError(-32603, "method not found"))
+        val err = AgentServiceError.RpcFailure(RPCError(-32603, "method not found"))
         assertFalse(shouldRetryTurnStartWithoutServiceTier(err))
     }
 
@@ -127,7 +127,7 @@ class TurnStartRpcCompatTest {
 
     @Test
     fun shouldRetryTurnStartWithoutSkillItems_matchesLegacyRuntimeErrors() {
-        val err = CodexServiceError.RpcFailure(RPCError(-32602, "unsupported input item type skill"))
+        val err = AgentServiceError.RpcFailure(RPCError(-32602, "unsupported input item type skill"))
         assertTrue(shouldRetryTurnStartWithoutSkillItems(err))
     }
 
@@ -135,17 +135,17 @@ class TurnStartRpcCompatTest {
     fun structuredItemFallbacks_matchParserStyleBridgeErrors() {
         assertTrue(
             shouldRetryTurnStartWithoutSkillItems(
-                CodexServiceError.RpcFailure(RPCError(-32602, "failed to parse skill input item")),
+                AgentServiceError.RpcFailure(RPCError(-32602, "failed to parse skill input item")),
             ),
         )
         assertTrue(
             shouldRetryTurnStartWithoutMentionItems(
-                CodexServiceError.RpcFailure(RPCError(-32602, "missing field mention path")),
+                AgentServiceError.RpcFailure(RPCError(-32602, "missing field mention path")),
             ),
         )
         assertTrue(
             shouldRetryTurnStartWithoutServiceTier(
-                CodexServiceError.RpcFailure(RPCError(-32602, "failed to parse serviceTier")),
+                AgentServiceError.RpcFailure(RPCError(-32602, "failed to parse serviceTier")),
             ),
         )
     }

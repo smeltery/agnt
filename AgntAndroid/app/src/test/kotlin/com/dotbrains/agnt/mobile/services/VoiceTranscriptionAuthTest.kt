@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCError
 import com.dotbrains.agnt.mobile.core.voice.GptVoiceTranscriptionError
@@ -38,7 +38,7 @@ class VoiceTranscriptionAuthTest {
 
     @Test
     fun parseTokenInvalidThrows() {
-        assertFailsWith<CodexServiceError.InvalidResponse> {
+        assertFailsWith<AgentServiceError.InvalidResponse> {
             parseVoiceAuthTokenFromResult(JSONValue.Obj(mapOf("token" to JSONValue.Str("   "))))
         }
     }

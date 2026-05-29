@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCError
 import com.dotbrains.agnt.mobile.core.voice.CodexVoiceTranscriptionPreflight
@@ -10,16 +10,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Voice transcription transport (parity [CodexService+Voice.swift](CodexMobile/CodexMobile/Services/CodexService+Voice.swift)).
+ * Voice transcription transport (parity [AgentService+Voice.swift](CodexMobile/CodexMobile/Services/AgentService+Voice.swift)).
  * Bridge auth + ChatGPT multipart upload; no recorder/composer UI.
  */
 
 internal fun parseVoiceAuthTokenFromResult(result: JSONValue?): String {
     val root =
         result as? JSONValue.Obj
-            ?: throw CodexServiceError.InvalidResponse("voice/resolveAuth did not return a valid token")
+            ?: throw AgentServiceError.InvalidResponse("voice/resolveAuth did not return a valid token")
     return extractVoiceAuthToken(root.map)
-        ?: throw CodexServiceError.InvalidResponse("voice/resolveAuth did not return a valid token")
+        ?: throw AgentServiceError.InvalidResponse("voice/resolveAuth did not return a valid token")
 }
 
 private fun extractVoiceAuthToken(map: Map<String, JSONValue>): String? {
@@ -49,8 +49,8 @@ internal suspend fun transcribeWavWithSingleAuthRetry(
     }
 }
 
-internal fun CodexService.consumeUnsupportedVoiceBridgeAuth(error: Throwable): Boolean {
-    val rpc = (error as? CodexServiceError.RpcFailure)?.rpcError ?: return false
+internal fun AgentService.consumeUnsupportedVoiceBridgeAuth(error: Throwable): Boolean {
+    val rpc = (error as? AgentServiceError.RpcFailure)?.rpcError ?: return false
     if (!rpcIndicatesUnsupportedVoiceBridgeAuth(rpc)) return false
     supportsBridgeVoiceAuth = false
     return true
@@ -80,7 +80,7 @@ internal fun rpcIndicatesUnsupportedVoiceBridgeAuth(rpc: RPCError): Boolean {
     return mentionsUnsupportedRequest && mentionsBridgeVoiceMethod
 }
 
-private suspend fun CodexService.resolveVoiceAuthToken(): String {
+private suspend fun AgentService.resolveVoiceAuthToken(): String {
     val response =
         try {
             sendRequestImpl("voice/resolveAuth", null)
@@ -91,12 +91,12 @@ private suspend fun CodexService.resolveVoiceAuthToken(): String {
     return parseVoiceAuthTokenFromResult(response.result)
 }
 
-internal suspend fun CodexService.transcribeBridgeVoiceWavImpl(
+internal suspend fun AgentService.transcribeBridgeVoiceWavImpl(
     wavBytes: ByteArray,
     durationSeconds: Double,
 ): String =
     withContext(Dispatchers.IO) {
-        if (!sessionReady) throw CodexServiceError.Disconnected
+        if (!sessionReady) throw AgentServiceError.Disconnected
         CodexVoiceTranscriptionPreflight(
             byteCount = wavBytes.size,
             durationSeconds = durationSeconds,

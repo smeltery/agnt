@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Local-only notifications (no push). Shows when the app is backgrounded and posting is allowed.
- * Dedupes rapid repeats like iOS [CodexService+Notifications.swift].
+ * Dedupes rapid repeats like iOS [AgentService+Notifications.swift].
  */
 class AgntLocalNotificationPresenter(
     private val appContext: Context,

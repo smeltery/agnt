@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * FIFO delivery of secure wire control kinds, matching the buffer/waiter behavior in
- * [CodexService+SecureTransport.swift](CodexMobile/CodexMobile/Services/CodexService+SecureTransport.swift).
+ * [AgentService+SecureTransport.swift](CodexMobile/CodexMobile/Services/AgentService+SecureTransport.swift).
  */
 internal class SecureControlMultiplexer(
     private val json: Json,

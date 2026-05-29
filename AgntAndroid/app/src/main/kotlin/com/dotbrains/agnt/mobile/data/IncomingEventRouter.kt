@@ -32,7 +32,7 @@ private enum class ServerRequestKind {
 
 /**
  * Routes Mac→phone JSON-RPC notifications and server-initiated requests.
- * Parity with [CodexService.handleNotification] / [CodexService.handleServerRequest] (iOS).
+ * Parity with [AgentService.handleNotification] / [AgentService.handleServerRequest] (iOS).
  */
 internal class IncomingEventRouter(
     private val scope: CoroutineScope,

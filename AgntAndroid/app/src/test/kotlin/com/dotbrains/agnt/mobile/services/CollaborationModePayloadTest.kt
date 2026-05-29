@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import kotlin.test.Test
@@ -40,14 +40,14 @@ class CollaborationModePayloadTest {
         // Codex's plan mode is bound to a model; Android refuses to send a
         // collaborationMode envelope without one so the user gets a clean
         // composer-side error instead of an opaque bridge -32602.
-        assertFailsWith<CodexServiceError.InvalidInput> {
+        assertFailsWith<AgentServiceError.InvalidInput> {
             buildCollaborationModePayload(
                 mode = CodexCollaborationModeKind.plan,
                 threadModel = null,
                 reasoningEffort = "medium",
             )
         }
-        assertFailsWith<CodexServiceError.InvalidInput> {
+        assertFailsWith<AgentServiceError.InvalidInput> {
             buildCollaborationModePayload(
                 mode = CodexCollaborationModeKind.plan,
                 threadModel = "   ",

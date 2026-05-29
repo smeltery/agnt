@@ -12,7 +12,7 @@ internal object FileChangeItemBodyRenderer {
     )
 
     /**
-     * Swift parity: CodexService+Incoming.decodeFileChangeItemBody renders a file-change body from `changes: [...]`
+     * Swift parity: AgentService+Incoming.decodeFileChangeItemBody renders a file-change body from `changes: [...]`
      * so the UI can parse paths/totals even when history doesn't store unified diff text.
      */
     fun renderFromIncomingItem(itemObject: Map<String, JSONValue>): String? {

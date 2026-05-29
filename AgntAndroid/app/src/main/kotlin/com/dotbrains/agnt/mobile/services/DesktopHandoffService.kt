@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.persistence.RelaySessionSnapshot
 import com.dotbrains.agnt.mobile.data.CodexRepository
@@ -52,7 +52,7 @@ class DesktopHandoffService(
                     params = params,
                 ),
             )
-        } catch (error: CodexServiceError.RpcFailure) {
+        } catch (error: AgentServiceError.RpcFailure) {
             if (!shouldFallbackToLegacyMacMethod(error)) {
                 throw mapRpcFailure(error)
             }
@@ -64,10 +64,10 @@ class DesktopHandoffService(
                         params = params,
                     ),
                 )
-            } catch (legacyError: CodexServiceError) {
+            } catch (legacyError: AgentServiceError) {
                 throw mapServiceError(legacyError)
             }
-        } catch (error: CodexServiceError) {
+        } catch (error: AgentServiceError) {
             throw mapServiceError(error)
         }
     }
@@ -83,7 +83,7 @@ class DesktopHandoffService(
                     params = JSONValue.Obj(emptyMap()),
                 ),
             )
-        } catch (error: CodexServiceError) {
+        } catch (error: AgentServiceError) {
             throw mapServiceError(error)
         }
     }
@@ -95,7 +95,7 @@ class DesktopHandoffService(
         }
     }
 
-    private fun shouldFallbackToLegacyMacMethod(error: CodexServiceError.RpcFailure): Boolean {
+    private fun shouldFallbackToLegacyMacMethod(error: AgentServiceError.RpcFailure): Boolean {
         val message = error.rpcError.message.lowercase()
         return error.rpcError.code == -32601 ||
             message.contains("unknown desktop method") ||
@@ -103,10 +103,10 @@ class DesktopHandoffService(
             message.contains("method not found")
     }
 
-    private fun mapServiceError(error: CodexServiceError): DesktopHandoffError =
+    private fun mapServiceError(error: AgentServiceError): DesktopHandoffError =
         when (error) {
-            CodexServiceError.Disconnected -> DesktopHandoffError.Disconnected
-            is CodexServiceError.RpcFailure -> mapRpcFailure(error)
+            AgentServiceError.Disconnected -> DesktopHandoffError.Disconnected
+            is AgentServiceError.RpcFailure -> mapRpcFailure(error)
             else ->
                 DesktopHandoffError.BridgeFailure(
                     errorCode = null,
@@ -114,7 +114,7 @@ class DesktopHandoffService(
                 )
         }
 
-    private fun mapRpcFailure(error: CodexServiceError.RpcFailure): DesktopHandoffError {
+    private fun mapRpcFailure(error: AgentServiceError.RpcFailure): DesktopHandoffError {
         val errorCode = error.rpcError.data?.objectValue?.get("errorCode")?.stringValue
         val message =
             when (errorCode) {
@@ -151,7 +151,7 @@ class DesktopHandoffService(
             }
         try {
             repository.connect(serverUrl = url, token = token, role = null)
-        } catch (error: CodexServiceError) {
+        } catch (error: AgentServiceError) {
             throw mapServiceError(error)
         }
     }

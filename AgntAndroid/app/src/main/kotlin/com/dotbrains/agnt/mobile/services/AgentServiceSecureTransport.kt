@@ -2,8 +2,8 @@ package com.dotbrains.agnt.mobile.services
 
 import com.dotbrains.agnt.mobile.core.crypto.AgntNativeCrypto
 import com.dotbrains.agnt.mobile.core.crypto.SecureEnvelopeCipher
-import com.dotbrains.agnt.mobile.core.model.CODEX_SECURE_HANDSHAKE_TAG
-import com.dotbrains.agnt.mobile.core.model.CODEX_SECURE_PROTOCOL_VERSION
+import com.dotbrains.agnt.mobile.core.model.AGNT_SECURE_HANDSHAKE_TAG
+import com.dotbrains.agnt.mobile.core.model.AGNT_SECURE_PROTOCOL_VERSION
 import com.dotbrains.agnt.mobile.core.model.CodexSecureHandshakeMode
 import com.dotbrains.agnt.mobile.core.model.CodexSecureSession
 import com.dotbrains.agnt.mobile.core.model.CodexSecureTransportError
@@ -38,9 +38,9 @@ private const val MAX_TAG_BASE64_LENGTH = 64
 private const val MAX_SECURE_PLAINTEXT_BYTES = 1 * 1024 * 1024
 
 /**
- * Mirrors [CodexService+SecureTransport.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+SecureTransport.swift).
+ * Mirrors [AgentService+SecureTransport.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+SecureTransport.swift).
  */
-internal fun CodexService.secureWireText(plaintext: String): String {
+internal fun AgentService.secureWireText(plaintext: String): String {
     val sess =
         synchronized(secureSessionLock) {
             val current =
@@ -60,7 +60,7 @@ internal fun CodexService.secureWireText(plaintext: String): String {
     val env =
         SecureEnvelope(
             kind = "encryptedEnvelope",
-            v = CODEX_SECURE_PROTOCOL_VERSION,
+            v = AGNT_SECURE_PROTOCOL_VERSION,
             sessionId = sess.sessionId,
             keyEpoch = sess.keyEpoch,
             sender = SECURE_ENVELOPE_MOBILE_SENDER,
@@ -71,7 +71,7 @@ internal fun CodexService.secureWireText(plaintext: String): String {
     return json.encodeToString(SecureEnvelope.serializer(), env)
 }
 
-internal fun CodexService.handleEncryptedEnvelope(raw: String) {
+internal fun AgentService.handleEncryptedEnvelope(raw: String) {
     val sess = secureSession ?: return
     val envelope = runCatching { json.decodeFromString<SecureEnvelope>(raw) }.getOrNull() ?: return
     if (envelope.sessionId != sess.sessionId || envelope.keyEpoch != sess.keyEpoch) return
@@ -125,7 +125,7 @@ internal fun CodexService.handleEncryptedEnvelope(raw: String) {
     dispatchIncomingRpc(innerRpc)
 }
 
-internal suspend fun CodexService.performSecureHandshake() {
+internal suspend fun AgentService.performSecureHandshake() {
     val snapshot = sessionPersistence.loadRelaySnapshot()
     val sessionId =
         snapshot.relaySessionId?.trim()?.takeIf { it.isNotEmpty() }
@@ -163,7 +163,7 @@ internal suspend fun CodexService.performSecureHandshake() {
         }
 
     val relayProtocolVersion =
-        snapshot.relayProtocolVersion?.toIntOrNull() ?: CODEX_SECURE_PROTOCOL_VERSION
+        snapshot.relayProtocolVersion?.toIntOrNull() ?: AGNT_SECURE_PROTOCOL_VERSION
     val lastSeq = snapshot.relayLastAppliedBridgeOutboundSeq?.toIntOrNull() ?: 0
 
     val clientNonceBytes = AgntNativeCrypto.randomBytes(32)
@@ -195,7 +195,7 @@ internal suspend fun CodexService.performSecureHandshake() {
             phoneEphemeralPublicKey = phoneEphemeralPublicKeyB64,
         )
 
-    if (serverHello.protocolVersion != CODEX_SECURE_PROTOCOL_VERSION) {
+    if (serverHello.protocolVersion != AGNT_SECURE_PROTOCOL_VERSION) {
         throw CodexSecureTransportError.IncompatibleVersion(
             "This bridge is using a different secure transport version. Update Remodex on the phone or Mac and try again.",
         )
@@ -261,7 +261,7 @@ internal suspend fun CodexService.performSecureHandshake() {
         )
     val salt = AgntNativeCrypto.sha256(transcriptBytes)
     val infoPrefix =
-        "$CODEX_SECURE_HANDSHAKE_TAG|$sessionId|$macDeviceId|${phone.phoneDeviceId}|${serverHello.keyEpoch}"
+        "$AGNT_SECURE_HANDSHAKE_TAG|$sessionId|$macDeviceId|${phone.phoneDeviceId}|${serverHello.keyEpoch}"
     val phoneToMac =
         AgntNativeCrypto.hkdfSha256(
             shared,
@@ -313,7 +313,7 @@ internal suspend fun CodexService.performSecureHandshake() {
     sendRawText(json.encodeToString(SecureResumeState.serializer(), resume))
 }
 
-private fun CodexService.trustMacRecord(
+private fun AgentService.trustMacRecord(
     existing: CodexTrustedMacRegistry,
     deviceId: String,
     publicKey: String,
@@ -334,7 +334,7 @@ private fun CodexService.trustMacRecord(
     return CodexTrustedMacRegistry(existing.records + (deviceId to record))
 }
 
-private suspend fun CodexService.waitMatchingServerHello(
+private suspend fun AgentService.waitMatchingServerHello(
     expectedSessionId: String,
     expectedMacDeviceId: String,
     expectedMacIdentityPublicKey: String,
@@ -370,7 +370,7 @@ private suspend fun CodexService.waitMatchingServerHello(
     }
 }
 
-private fun CodexService.isMatchingLegacyServerHello(
+private fun AgentService.isMatchingLegacyServerHello(
     hello: SecureServerHello,
     expectedSessionId: String,
     expectedMacDeviceId: String,
@@ -380,7 +380,7 @@ private fun CodexService.isMatchingLegacyServerHello(
     phoneIdentityPublicKey: String,
     phoneEphemeralPublicKey: String,
 ): Boolean {
-    if (hello.protocolVersion != CODEX_SECURE_PROTOCOL_VERSION) return false
+    if (hello.protocolVersion != AGNT_SECURE_PROTOCOL_VERSION) return false
     if (hello.sessionId != expectedSessionId) return false
     if (hello.macDeviceId != expectedMacDeviceId) return false
     if (hello.macIdentityPublicKey != expectedMacIdentityPublicKey) return false
@@ -417,7 +417,7 @@ private fun decodeHandshakeBase64(
     base64DecodeOrNull(value)
         ?: throw CodexSecureTransportError.InvalidHandshake("The secure bridge sent invalid $fieldName metadata.")
 
-private suspend fun CodexService.waitMatchingSecureReady(
+private suspend fun AgentService.waitMatchingSecureReady(
     expectedSessionId: String,
     expectedKeyEpoch: Int,
     expectedMacDeviceId: String,
@@ -434,7 +434,7 @@ private suspend fun CodexService.waitMatchingSecureReady(
     }
 }
 
-private suspend fun CodexService.receiveSecureControl(kind: String): String {
+private suspend fun AgentService.receiveSecureControl(kind: String): String {
     val mux = controlMux ?: throw CodexSecureTransportError.InvalidHandshake("Secure transport is not initialized.")
     try {
         return mux.receive(kind)

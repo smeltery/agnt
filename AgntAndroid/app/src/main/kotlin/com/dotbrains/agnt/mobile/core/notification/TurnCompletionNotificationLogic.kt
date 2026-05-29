@@ -17,7 +17,7 @@ enum class RunCompletionAttentionKind {
 
 /**
  * Pure parsing for when to show a run-completion notification after `turn/completed`.
- * Mirrors [CodexService.parseTurnTerminalState] / [CodexService.parseTurnFailureMessage] (iOS).
+ * Mirrors [AgentService.parseTurnTerminalState] / [AgentService.parseTurnFailureMessage] (iOS).
  */
 object TurnCompletionNotificationLogic {
     fun normalizeThreadStatusType(raw: String): String =

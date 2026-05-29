@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsageCodec
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.JSONValue
@@ -17,12 +17,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Mirrors [CodexService+History.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+History.swift).
+ * Mirrors [AgentService+History.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+History.swift).
  */
 private const val INITIAL_HISTORY_TURN_LIMIT = 160
 private const val OLDER_HISTORY_TURN_LIMIT = 160
 
-internal suspend fun CodexService.syncThreadHistoryInternal(
+internal suspend fun AgentService.syncThreadHistoryInternal(
     threadId: String,
     force: Boolean,
 ) {
@@ -39,7 +39,7 @@ internal suspend fun CodexService.syncThreadHistoryInternal(
                     limit = INITIAL_HISTORY_TURN_LIMIT,
                     allowLegacyFallback = true,
                 )
-            } catch (e: CodexServiceError.RpcFailure) {
+            } catch (e: AgentServiceError.RpcFailure) {
                 if (e.rpcError.isExplicitServerThreadMissing()) {
                     handleMissingThread(tid)
                     return
@@ -88,7 +88,7 @@ internal suspend fun CodexService.syncThreadHistoryInternal(
     }
 }
 
-internal fun CodexService.rehydrateRunningTurnFromThreadRead(
+internal fun AgentService.rehydrateRunningTurnFromThreadRead(
     threadId: String,
     threadObject: Map<String, JSONValue>,
 ) {
@@ -104,7 +104,7 @@ internal fun CodexService.rehydrateRunningTurnFromThreadRead(
     }
 }
 
-internal suspend fun CodexService.loadOlderThreadHistoryInternal(threadId: String) {
+internal suspend fun AgentService.loadOlderThreadHistoryInternal(threadId: String) {
     if (!sessionReady) return
     val tid = threadId.trim().ifEmpty { return }
     val pageState = _threadHistoryPaginationByThread.value[tid] ?: return
@@ -137,7 +137,7 @@ internal suspend fun CodexService.loadOlderThreadHistoryInternal(threadId: Strin
     }
 }
 
-private suspend fun CodexService.sendThreadReadPage(
+private suspend fun AgentService.sendThreadReadPage(
     threadId: String,
     cursor: JSONValue?,
     limit: Int,
@@ -158,7 +158,7 @@ private suspend fun CodexService.sendThreadReadPage(
         }
     return try {
         sendRequestImpl("thread/read", JSONValue.Obj(fields))
-    } catch (e: CodexServiceError.RpcFailure) {
+    } catch (e: AgentServiceError.RpcFailure) {
         if (allowLegacyFallback && (e.rpcError.code == -32600 || e.rpcError.code == -32602)) {
             sendRequestImpl(
                 "thread/read",
@@ -175,7 +175,7 @@ private suspend fun CodexService.sendThreadReadPage(
     }
 }
 
-private fun CodexService.updatePaginationFromThreadRead(
+private fun AgentService.updatePaginationFromThreadRead(
     threadId: String,
     resultObject: Map<String, JSONValue>,
     threadObject: Map<String, JSONValue>,
@@ -197,7 +197,7 @@ private fun CodexService.updatePaginationFromThreadRead(
     )
 }
 
-private fun CodexService.markThreadHistoryPage(
+private fun AgentService.markThreadHistoryPage(
     threadId: String,
     olderCursor: JSONValue?,
     exhaustedOlderCursor: JSONValue?,
@@ -234,12 +234,12 @@ private fun firstBooleanValue(
     vararg keys: String,
 ): Boolean? = keys.firstNotNullOfOrNull { key -> map[key]?.boolValue }
 
-private fun isThreadReadNotMaterialized(e: CodexServiceError.RpcFailure): Boolean {
+private fun isThreadReadNotMaterialized(e: AgentServiceError.RpcFailure): Boolean {
     val message = e.rpcError.message.lowercase()
     return message.contains("not materialized") || message.contains("not yet materialized")
 }
 
-internal suspend fun CodexService.refreshInFlightTurnStateInternal(threadId: String): Boolean {
+internal suspend fun AgentService.refreshInFlightTurnStateInternal(threadId: String): Boolean {
     if (!sessionReady) return false
     val tid = threadId.trim().ifEmpty { return false }
     val snapshot =
@@ -265,7 +265,7 @@ internal suspend fun CodexService.refreshInFlightTurnStateInternal(threadId: Str
     }
 }
 
-internal suspend fun CodexService.catchUpThreadAfterSelectionOrReconnect(threadId: String) {
+internal suspend fun AgentService.catchUpThreadAfterSelectionOrReconnect(threadId: String) {
     val tid = threadId.trim().ifEmpty { return }
     val refreshed = refreshInFlightTurnStateInternal(tid)
     val isRunning =
@@ -278,7 +278,7 @@ internal suspend fun CodexService.catchUpThreadAfterSelectionOrReconnect(threadI
     }
 }
 
-internal suspend fun CodexService.refreshInactiveRunningThreadStatesInternal(limit: Int = 3) {
+internal suspend fun AgentService.refreshInactiveRunningThreadStatesInternal(limit: Int = 3) {
     if (!sessionReady) return
     val candidates =
         RunningThreadRefreshPolicy.inactiveRunningThreadIds(

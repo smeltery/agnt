@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.model.CODEX_PAIRING_QR_VERSION
-import com.dotbrains.agnt.mobile.core.model.CODEX_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS
+import com.dotbrains.agnt.mobile.core.model.AGNT_PAIRING_QR_VERSION
+import com.dotbrains.agnt.mobile.core.model.AGNT_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS
 import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
 import com.dotbrains.agnt.mobile.core.transport.validateRelayUrl
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +76,7 @@ fun validatePairingQrCode(
         }.getOrNull()
 
     if (payload != null) {
-        if (payload.v != CODEX_PAIRING_QR_VERSION) {
+        if (payload.v != AGNT_PAIRING_QR_VERSION) {
             return QrPairingValidationResult.BridgeUpdateRequired(
                 title = "Update Remodex on your Mac before scanning",
                 message =
@@ -100,7 +100,7 @@ fun validatePairingQrCode(
             macDeviceId = payload.macDeviceId,
             macIdentityPublicKey = payload.macIdentityPublicKey,
         )?.let { return it }
-        val skewMillis = (CODEX_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS * 1000).toLong()
+        val skewMillis = (AGNT_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS * 1000).toLong()
         if (nowEpochMillis > payload.expiresAt + skewMillis) {
             return QrPairingValidationResult.ScanError(
                 "This pairing QR code has expired. Generate a new one from the Mac bridge.",
@@ -180,7 +180,7 @@ suspend fun resolvePairingCode(
                 }
 
                 val version = decoded.v
-                if (version != CODEX_PAIRING_QR_VERSION) {
+                if (version != AGNT_PAIRING_QR_VERSION) {
                     return@withContext QrPairingValidationResult.BridgeUpdateRequired(
                         title = "Update Remodex on your desktop before pairing",
                         message =
@@ -211,7 +211,7 @@ suspend fun resolvePairingCode(
                     macIdentityPublicKey = macIdentityPublicKey,
                 )?.let { return@withContext it }
 
-                val skewMillis = (CODEX_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS * 1000).toLong()
+                val skewMillis = (AGNT_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS * 1000).toLong()
                 if (nowEpochMillis > expiresAt + skewMillis) {
                     return@withContext QrPairingValidationResult.ScanError(
                         "This pairing code has expired. Generate a new one from the desktop bridge.",

@@ -1,26 +1,26 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Mirrors [CodexService+Sync.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Sync.swift)
+ * Mirrors [AgentService+Sync.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Sync.swift)
  * archiveThreadGroup / deleteLocalThreadGroup.
  */
-internal suspend fun CodexService.archiveThreadGroupForRepository(threadIds: List<String>): List<String> =
+internal suspend fun AgentService.archiveThreadGroupForRepository(threadIds: List<String>): List<String> =
     withContext(Dispatchers.IO) {
         archiveThreadGroupInternal(threadIds)
     }
 
-internal suspend fun CodexService.deleteLocalThreadGroupForRepository(threadIds: List<String>): List<String> =
+internal suspend fun AgentService.deleteLocalThreadGroupForRepository(threadIds: List<String>): List<String> =
     withContext(Dispatchers.IO) {
         deleteLocalThreadGroupInternal(threadIds)
     }
 
-internal suspend fun CodexService.archiveThreadGroupInternal(threadIds: List<String>): List<String> {
+internal suspend fun AgentService.archiveThreadGroupInternal(threadIds: List<String>): List<String> {
     val rootThreadIds = collectRootThreadIds(threadIds)
     for (rootId in rootThreadIds) {
         archiveThreadInternal(rootId)
@@ -28,7 +28,7 @@ internal suspend fun CodexService.archiveThreadGroupInternal(threadIds: List<Str
     return rootThreadIds
 }
 
-internal suspend fun CodexService.deleteLocalThreadGroupInternal(threadIds: List<String>): List<String> {
+internal suspend fun AgentService.deleteLocalThreadGroupInternal(threadIds: List<String>): List<String> {
     val rootThreadIds = collectRootThreadIds(threadIds)
     val subtreeThreadIds = rootThreadIds.flatMap { collectSubtreeThreadIds(it) }
     val allIds = (subtreeThreadIds + rootThreadIds).distinct()
@@ -38,7 +38,7 @@ internal suspend fun CodexService.deleteLocalThreadGroupInternal(threadIds: List
     return rootThreadIds
 }
 
-private fun CodexService.collectRootThreadIds(threadIds: List<String>): List<String> {
+private fun AgentService.collectRootThreadIds(threadIds: List<String>): List<String> {
     val allThreads = _threads.value
     val inputSet = threadIds.toSet()
     return inputSet.filter { tid ->
@@ -47,7 +47,7 @@ private fun CodexService.collectRootThreadIds(threadIds: List<String>): List<Str
     }
 }
 
-private fun CodexService.collectSubtreeThreadIds(parentId: String): List<String> {
+private fun AgentService.collectSubtreeThreadIds(parentId: String): List<String> {
     val allThreads = _threads.value
     val queue = ArrayDeque<String>()
     queue.add(parentId)
@@ -65,7 +65,7 @@ private fun CodexService.collectSubtreeThreadIds(parentId: String): List<String>
     return descendants
 }
 
-private suspend fun CodexService.archiveThreadInternal(threadId: String) {
+private suspend fun AgentService.archiveThreadInternal(threadId: String) {
     val subtreeIds = collectSubtreeThreadIds(threadId)
     val allIds = listOf(threadId) + subtreeIds
     for (tid in allIds) {
@@ -74,7 +74,7 @@ private suspend fun CodexService.archiveThreadInternal(threadId: String) {
     sendThreadArchiveRpc(threadId, unarchive = false)
 }
 
-private suspend fun CodexService.sendThreadArchiveRpc(threadId: String, unarchive: Boolean) {
+private suspend fun AgentService.sendThreadArchiveRpc(threadId: String, unarchive: Boolean) {
     if (!sessionReady) return
     runCatching {
         sendRequestImpl(
@@ -86,7 +86,7 @@ private suspend fun CodexService.sendThreadArchiveRpc(threadId: String, unarchiv
     }
 }
 
-private suspend fun CodexService.setThreadArchivedLocally(
+private suspend fun AgentService.setThreadArchivedLocally(
     threadId: String,
     isArchived: Boolean,
 ) {

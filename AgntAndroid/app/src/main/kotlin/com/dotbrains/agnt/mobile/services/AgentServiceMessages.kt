@@ -2,7 +2,7 @@ package com.dotbrains.agnt.mobile.services
 
 import android.util.Log
 import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import java.util.UUID
@@ -13,17 +13,17 @@ import kotlinx.serialization.json.jsonPrimitive
 private const val REMODEX_WIRE_LOG_TAG = "RemodexWire"
 
 /**
- * Mirrors [CodexService+Messages.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Messages.swift).
+ * Mirrors [AgentService+Messages.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Messages.swift).
  * Low-level JSON-RPC framing lives in [com.dotbrains.agnt.mobile.core.protocol.JsonRpcCodec].
  */
-internal suspend fun CodexService.sendRequestImpl(
+internal suspend fun AgentService.sendRequestImpl(
     method: String,
     params: JSONValue?,
 ): RPCMessage {
     testRpcRequestHandler?.let { handler ->
         return handler(method, params)
     }
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val id = JSONValue.Str(UUID.randomUUID().toString())
     val req = RPCMessage.request(id = id, method = method, params = params, includeJsonRpc = false)
     val deferred = CompletableDeferred<RPCMessage>()
@@ -36,21 +36,21 @@ internal suspend fun CodexService.sendRequestImpl(
     }
 }
 
-internal suspend fun CodexService.sendNotificationImpl(
+internal suspend fun AgentService.sendNotificationImpl(
     method: String,
     params: JSONValue?,
 ) {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     sendMessage(RPCMessage.notification(method = method, params = params, includeJsonRpc = false))
 }
 
-internal fun CodexService.sendMessage(message: RPCMessage) {
+internal fun AgentService.sendMessage(message: RPCMessage) {
     val payload = jsonRpc.encodeMessage(message)
     val wire = secureWireText(payload)
     sendRawText(wire)
 }
 
-internal fun CodexService.processWireText(raw: String) {
+internal fun AgentService.processWireText(raw: String) {
     if (isSecureWirePreClassification(raw)) {
         val kind = wireMessageKind(raw) ?: return
         if (kind == "encryptedEnvelope") {
@@ -64,7 +64,7 @@ internal fun CodexService.processWireText(raw: String) {
     dispatchIncomingRpc(message)
 }
 
-private fun CodexService.isSecureWirePreClassification(text: String): Boolean {
+private fun AgentService.isSecureWirePreClassification(text: String): Boolean {
     if (!text.contains("\"kind\":")) return false
     val markers =
         listOf(
@@ -76,7 +76,7 @@ private fun CodexService.isSecureWirePreClassification(text: String): Boolean {
     return markers.any { text.contains(it) }
 }
 
-private fun CodexService.wireMessageKind(text: String): String? =
+private fun AgentService.wireMessageKind(text: String): String? =
     try {
         val el = json.parseToJsonElement(text)
         (el as? JsonObject)?.get("kind")?.jsonPrimitive?.content
@@ -85,7 +85,7 @@ private fun CodexService.wireMessageKind(text: String): String? =
         null
     }
 
-internal fun CodexService.dispatchIncomingRpc(message: RPCMessage) {
+internal fun AgentService.dispatchIncomingRpc(message: RPCMessage) {
     val method = message.method?.trim()
     if (method != null && message.id != null) {
         incomingRouter.dispatchServerRequest(
@@ -105,7 +105,7 @@ internal fun CodexService.dispatchIncomingRpc(message: RPCMessage) {
     completePendingRpc(id, message)
 }
 
-internal fun CodexService.completePendingRpc(
+internal fun AgentService.completePendingRpc(
     id: JSONValue,
     message: RPCMessage,
 ) {
@@ -113,7 +113,7 @@ internal fun CodexService.completePendingRpc(
     val def = pendingRpc.remove(key) ?: return
     val err = message.error
     if (err != null) {
-        def.completeExceptionally(CodexServiceError.RpcFailure(err))
+        def.completeExceptionally(AgentServiceError.RpcFailure(err))
     } else {
         def.complete(message)
     }
@@ -129,7 +129,7 @@ internal fun idKey(id: JSONValue): String =
         else -> "complex:$id"
     }
 
-internal suspend fun CodexService.initializeSession() {
+internal suspend fun AgentService.initializeSession() {
     val appVersion = readAppVersion()
     val clientInfo =
         JSONValue.Obj(
@@ -169,14 +169,14 @@ internal suspend fun CodexService.initializeSession() {
 // bridges that don't publish providerId yield ActiveProvider.Unknown — the
 // existing fail-once-then-hide fallbacks (bridgeSupportsVoiceTranscription,
 // runCatching on thread/generateTitle) cover that gap.
-internal fun CodexService.captureActiveProviderFromInitializeResponse(response: RPCMessage) {
+internal fun AgentService.captureActiveProviderFromInitializeResponse(response: RPCMessage) {
     val resultObject = (response.result as? JSONValue.Obj)?.map ?: return
     val providerId = resultObject["providerId"]?.stringValue
     _activeProvider.value = com.dotbrains.agnt.mobile.core.model.ActiveProvider.fromBridgeId(providerId)
 }
 
 private fun shouldRetryInitializeWithoutCapabilities(e: Throwable): Boolean {
-    val rpc = (e as? CodexServiceError.RpcFailure)?.rpcError ?: return false
+    val rpc = (e as? AgentServiceError.RpcFailure)?.rpcError ?: return false
     if (rpc.code != -32600 && rpc.code != -32602) return false
     val msg = rpc.message.lowercase()
     if (!msg.contains("capabilities") && !msg.contains("experimentalapi")) return false
@@ -188,7 +188,7 @@ private fun shouldRetryInitializeWithoutCapabilities(e: Throwable): Boolean {
         msg.contains("field")
 }
 
-internal suspend fun CodexService.rpcRequestWhileHandshaking(
+internal suspend fun AgentService.rpcRequestWhileHandshaking(
     method: String,
     params: JSONValue?,
 ): RPCMessage {
@@ -204,5 +204,5 @@ internal suspend fun CodexService.rpcRequestWhileHandshaking(
     }
 }
 
-internal fun CodexService.readAppVersion(): String =
+internal fun AgentService.readAppVersion(): String =
     readAgntAppVersionName(appContext)

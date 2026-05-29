@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.projectIconSystemNameFor
 import java.time.Instant
@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Same-thread project path rebind and authoritative cwd guards. Parity:
- * [CodexService+ThreadProjectRouting.swift](../../../../../CodexMobile/CodexMobile/Services/CodexService+ThreadProjectRouting.swift).
+ * [AgentService+ThreadProjectRouting.swift](../../../../../CodexMobile/CodexMobile/Services/AgentService+ThreadProjectRouting.swift).
  */
 internal fun applyAuthoritativeProjectPathMerge(
     thread: CodexThread,
@@ -49,8 +49,8 @@ internal fun confirmAuthoritativeProjectPathIfNeeded(
 internal fun shouldAllowProjectRebindWithoutResume(error: Throwable): Boolean {
     val message: String? =
         when (error) {
-            is CodexServiceError.RpcFailure -> error.rpcError.message.lowercase()
-            is CodexServiceError -> error.toString().lowercase()
+            is AgentServiceError.RpcFailure -> error.rpcError.message.lowercase()
+            is AgentServiceError -> error.toString().lowercase()
             else -> (error.message ?: error.toString()).lowercase()
         }
     if (message == null) return false
@@ -59,10 +59,10 @@ internal fun shouldAllowProjectRebindWithoutResume(error: Throwable): Boolean {
         (message.contains("rollout") && message.contains("is empty"))
 }
 
-internal fun CodexService.applyAuthoritativeProjectPathToServerThread(thread: CodexThread) =
+internal fun AgentService.applyAuthoritativeProjectPathToServerThread(thread: CodexThread) =
     applyAuthoritativeProjectPathMerge(thread, authoritativeProjectPathByThreadId, treatAsServerState = true)
 
-internal fun CodexService.beginAuthoritativeProjectPathTransition(
+internal fun AgentService.beginAuthoritativeProjectPathTransition(
     threadId: String,
     projectPath: String,
 ) {
@@ -72,19 +72,19 @@ internal fun CodexService.beginAuthoritativeProjectPathTransition(
     authoritativeProjectPathByThreadId[tid] = p
 }
 
-internal fun CodexService.currentAuthoritativeProjectPathForImpl(threadId: String): String? {
+internal fun AgentService.currentAuthoritativeProjectPathForImpl(threadId: String): String? {
     val tid = threadId.trim()
     if (tid.isEmpty()) return null
     return CodexThread.normalizeProjectPath(authoritativeProjectPathByThreadId[tid])
 }
 
-internal fun CodexService.associatedManagedWorktreePathForImpl(threadId: String): String? {
+internal fun AgentService.associatedManagedWorktreePathForImpl(threadId: String): String? {
     val tid = threadId.trim()
     if (tid.isEmpty()) return null
     return CodexThread.normalizeProjectPath(associatedManagedWorktreePathByThreadId[tid])
 }
 
-internal fun CodexService.rememberAssociatedManagedWorktreePathIfWorktree(
+internal fun AgentService.rememberAssociatedManagedWorktreePathIfWorktree(
     projectPath: String,
     forThreadId: String,
 ) {
@@ -97,7 +97,7 @@ internal fun CodexService.rememberAssociatedManagedWorktreePathIfWorktree(
     }
 }
 
-private fun CodexService.restoreAssociatedManagedWorktreePath(
+private fun AgentService.restoreAssociatedManagedWorktreePath(
     path: String?,
     forThreadId: String,
 ) {
@@ -118,7 +118,7 @@ private fun CodexService.restoreAssociatedManagedWorktreePath(
     }
 }
 
-internal fun CodexService.requestImmediateThreadListSync() {
+internal fun AgentService.requestImmediateThreadListSync() {
     scope.launch(Dispatchers.IO) {
         if (sessionReady) {
             runCatching { refreshThreadsInternal() }
@@ -126,19 +126,19 @@ internal fun CodexService.requestImmediateThreadListSync() {
     }
 }
 
-internal suspend fun CodexService.moveThreadToProjectPathImpl(
+internal suspend fun AgentService.moveThreadToProjectPathImpl(
     threadId: String,
     projectPath: String,
 ): CodexThread {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val normalizedThreadId = threadId.trim()
     if (normalizedThreadId.isEmpty()) {
-        throw CodexServiceError.InvalidInput("Thread id is required.")
+        throw AgentServiceError.InvalidInput("Thread id is required.")
     }
     val normalizedProjectPath = CodexThread.normalizeProjectPath(projectPath)
-        ?: throw CodexServiceError.InvalidInput("A valid project path is required.")
+        ?: throw AgentServiceError.InvalidInput("A valid project path is required.")
     var current = _threads.value.find { it.id == normalizedThreadId }
-        ?: throw CodexServiceError.InvalidInput("Thread not found.")
+        ?: throw AgentServiceError.InvalidInput("Thread not found.")
     val previousThread = current
     val previousAuth =
         authoritativeProjectPathByThreadId[normalizedThreadId]

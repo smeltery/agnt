@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.dev
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import kotlinx.serialization.json.Json
@@ -33,7 +33,7 @@ internal fun bridgeDebugFormatRpcMessageForLog(
 
 internal fun bridgeDebugFormatRpcDebugError(e: Throwable): String =
     when (e) {
-        is CodexServiceError.RpcFailure ->
+        is AgentServiceError.RpcFailure ->
             "RPC error code=${e.rpcError.code} message=${e.rpcError.message}"
         else -> bridgeDebugFormatConnectError(e)
     }

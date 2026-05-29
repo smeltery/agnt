@@ -8,7 +8,7 @@ import kotlin.math.roundToLong
 
 /**
  * Decodes `account/rateLimits/read` and `account/rateLimits/updated` payloads.
- * Parity with [CodexService+Status.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Status.swift).
+ * Parity with [AgentService+Status.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Status.swift).
  */
 internal object RateLimitPayloadCodec {
     fun decodeRateLimitBuckets(payloadObject: Map<String, JSONValue>): List<CodexRateLimitBucket> {

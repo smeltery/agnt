@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.RPCError
 import com.dotbrains.agnt.mobile.ui.turn.BranchPickerCloseCause
@@ -53,10 +53,10 @@ class NewThreadCreationFlowTest {
         runTest {
             val sink =
                 RecordingNewThreadOpenSink(
-                    resumeFailure = CodexServiceError.Disconnected,
+                    resumeFailure = AgentServiceError.Disconnected,
                 )
 
-            assertFailsWith<CodexServiceError.Disconnected> {
+            assertFailsWith<AgentServiceError.Disconnected> {
                 runNewThreadOpenFlow(
                     thread = CodexThread(id = "thread-1", cwd = "/repo"),
                     normalizedCwd = "/repo",
@@ -79,7 +79,7 @@ class NewThreadCreationFlowTest {
             val sink =
                 RecordingNewThreadOpenSink(
                     resumeFailure =
-                        CodexServiceError.RpcFailure(
+                        AgentServiceError.RpcFailure(
                             RPCError(
                                 code = -32600,
                                 message = "no rollout found for thread id thread-1",
@@ -119,7 +119,7 @@ class NewThreadCreationFlowTest {
             val sink =
                 RecordingNewThreadOpenSink(
                     resumeFailure =
-                        CodexServiceError.RpcFailure(
+                        AgentServiceError.RpcFailure(
                             RPCError(
                                 code = -32603,
                                 message =

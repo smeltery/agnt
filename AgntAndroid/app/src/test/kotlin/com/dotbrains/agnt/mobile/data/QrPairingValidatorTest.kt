@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.model.CODEX_PAIRING_QR_VERSION
+import com.dotbrains.agnt.mobile.core.model.AGNT_PAIRING_QR_VERSION
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -19,7 +19,7 @@ class QrPairingValidatorTest {
     fun wrongVersion_requestsBridgeUpdate() {
         val json =
             """
-            {"v":${CODEX_PAIRING_QR_VERSION + 1},"relay":"ws://127.0.0.1:9000","sessionId":"s",
+            {"v":${AGNT_PAIRING_QR_VERSION + 1},"relay":"ws://127.0.0.1:9000","sessionId":"s",
             "macDeviceId":"m","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":9999999999999}
             """.trimIndent()
         val r = validatePairingQrCode(json)
@@ -32,7 +32,7 @@ class QrPairingValidatorTest {
         val expires = now + 3600_000L
         val json =
             """
-            {"v":$CODEX_PAIRING_QR_VERSION,"relay":"ws://192.168.1.5:9000","sessionId":"sess",
+            {"v":$AGNT_PAIRING_QR_VERSION,"relay":"ws://192.168.1.5:9000","sessionId":"sess",
             "macDeviceId":"mac","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":$expires}
             """.trimIndent()
         val r = validatePairingQrCode(json, nowEpochMillis = now)
@@ -46,7 +46,7 @@ class QrPairingValidatorTest {
         val expires = now + 3600_000L
         val json =
             """
-            {"v":$CODEX_PAIRING_QR_VERSION,"relay":"ws://relay.example.com:9000","sessionId":"sess",
+            {"v":$AGNT_PAIRING_QR_VERSION,"relay":"ws://relay.example.com:9000","sessionId":"sess",
             "macDeviceId":"mac","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":$expires}
             """.trimIndent()
         val r = validatePairingQrCode(json, nowEpochMillis = now)
@@ -59,7 +59,7 @@ class QrPairingValidatorTest {
         val expires = now + 3600_000L
         val json =
             """
-            {"v":$CODEX_PAIRING_QR_VERSION,"relay":"ws://192.168.1.5:9000","sessionId":"sess",
+            {"v":$AGNT_PAIRING_QR_VERSION,"relay":"ws://192.168.1.5:9000","sessionId":"sess",
             "macDeviceId":"mac","macIdentityPublicKey":"not-a-key","expiresAt":$expires}
             """.trimIndent()
         val r = validatePairingQrCode(json, nowEpochMillis = now)
@@ -72,7 +72,7 @@ class QrPairingValidatorTest {
         val expires = now + 3600_000L
         val json =
             """
-            {"v":$CODEX_PAIRING_QR_VERSION,"relay":"ws://192.168.1.5:9000","sessionId":"sess token",
+            {"v":$AGNT_PAIRING_QR_VERSION,"relay":"ws://192.168.1.5:9000","sessionId":"sess token",
             "macDeviceId":"mac","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":$expires}
             """.trimIndent()
         val r = validatePairingQrCode(json, nowEpochMillis = now)
@@ -90,7 +90,7 @@ class QrPairingValidatorTest {
                     .setHeader("content-type", "application/json")
                     .setBody(
                         """
-                        {"ok":true,"v":$CODEX_PAIRING_QR_VERSION,"sessionId":"sess",
+                        {"ok":true,"v":$AGNT_PAIRING_QR_VERSION,"sessionId":"sess",
                         "macDeviceId":"mac","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":$expires}
                         """.trimIndent(),
                     ),
@@ -130,7 +130,7 @@ class QrPairingValidatorTest {
                     .setHeader("content-type", "application/json")
                     .setBody(
                         """
-                        {"ok":true,"v":$CODEX_PAIRING_QR_VERSION,"sessionId":"sess",
+                        {"ok":true,"v":$AGNT_PAIRING_QR_VERSION,"sessionId":"sess",
                         "macDeviceId":"mac","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":$expires}
                         """.trimIndent(),
                     ),
@@ -228,7 +228,7 @@ class QrPairingValidatorTest {
                     .setHeader("content-type", "application/json")
                     .setBody(
                         """
-                        {"ok":true,"v":$CODEX_PAIRING_QR_VERSION,"sessionId":"sess with spaces",
+                        {"ok":true,"v":$AGNT_PAIRING_QR_VERSION,"sessionId":"sess with spaces",
                         "macDeviceId":"mac","macIdentityPublicKey":"$validMacIdentityPublicKey","expiresAt":$expires}
                         """.trimIndent(),
                     ),

@@ -6,7 +6,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 
 /**
  * True while the app process is considered visible (any activity started). Used to suppress local
- * notifications that would duplicate in-app UI, matching iOS [CodexService.isAppInForeground].
+ * notifications that would duplicate in-app UI, matching iOS [AgentService.isAppInForeground].
  */
 object AppForegroundTracker {
     @Volatile

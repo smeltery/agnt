@@ -209,8 +209,8 @@ fun SettingsScreen(
 
             SettingsCard(title = stringResource(R.string.settings_section_about)) {
                 SettingsNavigationRow(
-                    title = stringResource(R.string.nav_about_remodex),
-                    subtitle = stringResource(R.string.settings_about_remodex_hint),
+                    title = stringResource(R.string.nav_about_agnt),
+                    subtitle = stringResource(R.string.settings_about_agnt_hint),
                     onClick = { onNavigateToAbout() },
                 )
                 SettingsNavigationRow(

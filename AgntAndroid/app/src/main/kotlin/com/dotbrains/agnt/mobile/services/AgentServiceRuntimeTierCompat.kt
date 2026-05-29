@@ -3,14 +3,14 @@ package com.dotbrains.agnt.mobile.services
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 
-/** Matches iOS `CodexService+RuntimeCompatibility.serviceTierBridgeUpdatePrompt.command`. */
+/** Matches iOS `AgentService+RuntimeCompatibility.serviceTierBridgeUpdatePrompt.command`. */
 internal const val SERVICE_TIER_BRIDGE_UPDATE_COMMAND = "bun install -g @dotbrains/agnt"
 
 /**
  * After the bridge rejects `serviceTier`, omit it for the rest of the session and optionally surface
  * [CodexBridgeUpdatePrompt] once (parity iOS `markServiceTierUnsupportedForCurrentBridge`).
  */
-internal fun CodexService.markServiceTierUnsupportedForCurrentBridge() {
+internal fun AgentService.markServiceTierUnsupportedForCurrentBridge() {
     supportsServiceTier = false
     if (_selectedServiceTier.value == null || hasPresentedServiceTierBridgeUpdatePrompt) return
     hasPresentedServiceTierBridgeUpdatePrompt = true

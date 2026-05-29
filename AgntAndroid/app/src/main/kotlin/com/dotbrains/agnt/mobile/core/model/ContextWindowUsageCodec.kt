@@ -5,12 +5,12 @@ import kotlin.math.min
 
 /**
  * Decodes bridge `usage` objects for context window display.
- * Key aliases mirror [CodexService+IncomingSupport.swift](../../../../../../../CodexMobile/CodexMobile/Services/CodexService+IncomingSupport.swift) `extractContextWindowUsage`.
+ * Key aliases mirror [AgentService+IncomingSupport.swift](../../../../../../../CodexMobile/CodexMobile/Services/AgentService+IncomingSupport.swift) `extractContextWindowUsage`.
  */
 object ContextWindowUsageCodec {
     /**
      * [thread/tokenUsage/updated] and similar pushes: `usage` object or envelope `usage`, else root params
-     * (parity [CodexService+Incoming.swift] `handleThreadTokenUsageUpdated`).
+     * (parity [AgentService+Incoming.swift] `handleThreadTokenUsageUpdated`).
      */
     fun decodeFromIncomingUsageParams(params: Map<String, JSONValue>?): ContextWindowUsage? {
         if (params == null) return null

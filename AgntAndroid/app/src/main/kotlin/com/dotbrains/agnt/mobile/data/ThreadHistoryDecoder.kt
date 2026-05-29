@@ -26,7 +26,7 @@ internal data class DecodedCompletedItem(
 )
 
 /**
- * Decodes [thread/read] with includeTurns=true (parity with [CodexService.decodeMessagesFromThreadRead]).
+ * Decodes [thread/read] with includeTurns=true (parity with [AgentService.decodeMessagesFromThreadRead]).
  */
 internal object ThreadHistoryDecoder {
     fun decodeFromThreadRead(

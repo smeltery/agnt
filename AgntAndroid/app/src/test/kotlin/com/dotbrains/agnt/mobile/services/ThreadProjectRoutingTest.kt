@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.RPCError
 import kotlin.test.Test
@@ -35,7 +35,7 @@ class ThreadProjectRoutingTest {
     @Test
     fun rolloutMissing_doesNotRollbackLocalRebind_inAllowlist() {
         val e =
-            CodexServiceError.RpcFailure(
+            AgentServiceError.RpcFailure(
                 RPCError(
                     code = -32600,
                     message = "no rollout found for thread id thread-1",
@@ -47,7 +47,7 @@ class ThreadProjectRoutingTest {
 
     @Test
     fun otherRpcErrorsNotAllowlist() {
-        val e = CodexServiceError.RpcFailure(RPCError(-32600, "something else", null))
+        val e = AgentServiceError.RpcFailure(RPCError(-32600, "something else", null))
         assertFalse(shouldAllowProjectRebindWithoutResume(e))
     }
 
@@ -80,7 +80,7 @@ class ThreadProjectRoutingTest {
 
     @Test
     fun noRolloutFileFound_isAllowlist() {
-        val e = CodexServiceError.RpcFailure(RPCError(-1, "No rollout file found for cwd", null))
+        val e = AgentServiceError.RpcFailure(RPCError(-1, "No rollout file found for cwd", null))
         assertTrue(shouldAllowProjectRebindWithoutResume(e))
     }
 

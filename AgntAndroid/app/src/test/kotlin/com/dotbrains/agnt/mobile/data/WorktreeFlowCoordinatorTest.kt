@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
@@ -68,7 +68,7 @@ class WorktreeFlowCoordinatorTest {
                             else -> error("unexpected $method")
                         }
                     },
-                    onStartThread = { throw CodexServiceError.InvalidInput("thread start failed") },
+                    onStartThread = { throw AgentServiceError.InvalidInput("thread start failed") },
                 )
 
             val thrown =
@@ -77,7 +77,7 @@ class WorktreeFlowCoordinatorTest {
                 }
 
             assertEquals(WorktreeFlowCleanupDispositionValue.removed, thrown.cleanupDisposition)
-            assertTrue(thrown.cause is CodexServiceError.InvalidInput)
+            assertTrue(thrown.cause is AgentServiceError.InvalidInput)
             assertTrue(thrown.message?.contains("thread start failed") == true)
             assertTrue(thrown.message?.contains("The temporary worktree was removed automatically.") == true)
             assertTrue(log.contains("removeCwd:/wt/tmp"))
@@ -94,7 +94,7 @@ class WorktreeFlowCoordinatorTest {
                         createManagedWorktreeResult("/wt/tmp")
                     },
                     onStartThread = {
-                        throw CodexServiceError.RpcFailure(
+                        throw AgentServiceError.RpcFailure(
                             RPCError(code = -32000, message = "network timeout", data = null),
                         )
                     },
@@ -118,11 +118,11 @@ class WorktreeFlowCoordinatorTest {
                     onSendRequest = { method, _ ->
                         when (method) {
                             "git/createManagedWorktree" -> createManagedWorktreeResult("/wt/tmp")
-                            "git/removeWorktree" -> throw CodexServiceError.InvalidInput("cleanup failed")
+                            "git/removeWorktree" -> throw AgentServiceError.InvalidInput("cleanup failed")
                             else -> error("unexpected $method")
                         }
                     },
-                    onStartThread = { throw CodexServiceError.InvalidInput("thread start failed") },
+                    onStartThread = { throw AgentServiceError.InvalidInput("thread start failed") },
                 )
 
             val thrown =
@@ -131,7 +131,7 @@ class WorktreeFlowCoordinatorTest {
                 }
 
             assertEquals(WorktreeFlowCleanupDispositionValue.failed, thrown.cleanupDisposition)
-            assertTrue(thrown.cause is CodexServiceError.InvalidInput)
+            assertTrue(thrown.cause is AgentServiceError.InvalidInput)
             assertTrue(thrown.message?.contains("thread start failed") == true)
             assertTrue(thrown.message?.contains("could not remove the temporary worktree") == true)
         }
@@ -199,7 +199,7 @@ class WorktreeFlowCoordinatorTest {
             val repo =
                 WorktreeRecordingRepository(
                     onSendRequest = { _, _ ->
-                        throw CodexServiceError.RpcFailure(
+                        throw AgentServiceError.RpcFailure(
                             RPCError(
                                 code = -32000,
                                 message = "missing target",
@@ -235,7 +235,7 @@ class WorktreeFlowCoordinatorTest {
                             else -> error("unexpected $method")
                         }
                     },
-                    onMoveThread = { _, _ -> throw CodexServiceError.InvalidInput("move failed") },
+                    onMoveThread = { _, _ -> throw AgentServiceError.InvalidInput("move failed") },
                 )
 
             val thrown =
@@ -261,11 +261,11 @@ class WorktreeFlowCoordinatorTest {
                     onSendRequest = { method, _ ->
                         when (method) {
                             "git/createManagedWorktree" -> createManagedWorktreeResult("/wt/new", transferredChanges = true)
-                            "git/transferManagedHandoff" -> throw CodexServiceError.InvalidInput("rollback failed")
+                            "git/transferManagedHandoff" -> throw AgentServiceError.InvalidInput("rollback failed")
                             else -> error("unexpected $method")
                         }
                     },
-                    onMoveThread = { _, _ -> throw CodexServiceError.InvalidInput("move failed") },
+                    onMoveThread = { _, _ -> throw AgentServiceError.InvalidInput("move failed") },
                 )
 
             val thrown =
@@ -293,11 +293,11 @@ class WorktreeFlowCoordinatorTest {
 
     @Test
     fun shouldCleanupWorktreeAfterFailedThreadStart_matchesRpcHeuristics() {
-        assertTrue(WorktreeFlowCoordinator.shouldCleanupWorktreeAfterFailedThreadStart(CodexServiceError.InvalidInput("x")))
-        assertTrue(!WorktreeFlowCoordinator.shouldCleanupWorktreeAfterFailedThreadStart(CodexServiceError.Disconnected))
+        assertTrue(WorktreeFlowCoordinator.shouldCleanupWorktreeAfterFailedThreadStart(AgentServiceError.InvalidInput("x")))
+        assertTrue(!WorktreeFlowCoordinator.shouldCleanupWorktreeAfterFailedThreadStart(AgentServiceError.Disconnected))
         assertTrue(
             !WorktreeFlowCoordinator.shouldCleanupWorktreeAfterFailedThreadStart(
-                CodexServiceError.RpcFailure(RPCError(code = -1, message = "network error", data = null)),
+                AgentServiceError.RpcFailure(RPCError(code = -1, message = "network error", data = null)),
             ),
         )
     }

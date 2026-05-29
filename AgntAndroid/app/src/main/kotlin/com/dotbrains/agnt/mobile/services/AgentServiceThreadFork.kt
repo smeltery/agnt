@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
@@ -11,10 +11,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Native `thread/fork` (parity [CodexService+ThreadFork.swift] / [CodexService+ThreadForkCompatibility.swift]).
+ * Native `thread/fork` (parity [AgentService+ThreadFork.swift] / [AgentService+ThreadForkCompatibility.swift]).
  * Sends only `{ threadId }` in the JSON-RPC params, matching iOS unit expectations.
  */
-internal suspend fun CodexService.forkThreadForRepository(
+internal suspend fun AgentService.forkThreadForRepository(
     sourceThreadId: String,
     targetProjectPath: String?,
 ): CodexThread =
@@ -22,16 +22,16 @@ internal suspend fun CodexService.forkThreadForRepository(
         forkThreadInternal(sourceThreadId, targetProjectPath)
     }
 
-internal suspend fun CodexService.forkThreadInternal(
+internal suspend fun AgentService.forkThreadInternal(
     sourceThreadId: String,
     targetProjectPath: String?,
 ): CodexThread {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val sourceId = sourceThreadId.trim()
-    if (sourceId.isEmpty()) throw CodexServiceError.InvalidInput("Missing thread id")
+    if (sourceId.isEmpty()) throw AgentServiceError.InvalidInput("Missing thread id")
     val sourceThread =
         _threads.value.find { it.id == sourceId }
-            ?: throw CodexServiceError.InvalidInput("Thread not found.")
+            ?: throw AgentServiceError.InvalidInput("Thread not found.")
 
     val explicitTarget =
         targetProjectPath?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
@@ -50,7 +50,7 @@ internal suspend fun CodexService.forkThreadInternal(
             )
         } catch (e: Throwable) {
             if (consumeUnsupportedThreadFork(e)) {
-                throw CodexServiceError.InvalidInput(
+                throw AgentServiceError.InvalidInput(
                     "This computer bridge does not support native thread forks yet. Update Remodex on your computer and retry.",
                 )
             }
@@ -58,16 +58,16 @@ internal suspend fun CodexService.forkThreadInternal(
         }
 
     val resultObj = response.result as? JSONValue.Obj
-        ?: throw CodexServiceError.InvalidResponse("thread/fork missing result")
+        ?: throw AgentServiceError.InvalidResponse("thread/fork missing result")
     val threadEl =
         resultObj.map["thread"] as? JSONValue.Obj
-            ?: throw CodexServiceError.InvalidResponse("thread/fork response missing thread")
+            ?: throw AgentServiceError.InvalidResponse("thread/fork response missing thread")
 
     var decoded =
         runCatching {
             CodexThread.fromJsonObject(jsonObjectFromRpc(threadEl))
         }.getOrElse {
-            throw CodexServiceError.InvalidResponse("thread/fork thread decode failed")
+            throw AgentServiceError.InvalidResponse("thread/fork thread decode failed")
         }
 
     val now = Instant.now()
@@ -141,7 +141,7 @@ internal suspend fun CodexService.forkThreadInternal(
     return finalThread
 }
 
-private fun CodexService.patchForkThreadClientMetadata(
+private fun AgentService.patchForkThreadClientMetadata(
     thread: CodexThread,
     targetProjectPath: String?,
     sourceModelIdentifier: String?,
@@ -171,7 +171,7 @@ private fun CodexService.patchForkThreadClientMetadata(
     return merged
 }
 
-internal fun CodexService.consumeUnsupportedThreadFork(error: Throwable): Boolean {
+internal fun AgentService.consumeUnsupportedThreadFork(error: Throwable): Boolean {
     if (!shouldTreatAsUnsupportedThreadFork(error)) return false
     markThreadForkUnsupportedForCurrentBridge()
     return true
@@ -180,7 +180,7 @@ internal fun CodexService.consumeUnsupportedThreadFork(error: Throwable): Boolea
 private fun shouldTreatAsUnsupportedThreadFork(error: Throwable): Boolean {
     val rpc =
         when (error) {
-            is CodexServiceError.RpcFailure -> error.rpcError
+            is AgentServiceError.RpcFailure -> error.rpcError
             else -> return false
         }
     if (rpc.code == -32601) return true
@@ -199,7 +199,7 @@ private fun shouldTreatAsUnsupportedThreadFork(error: Throwable): Boolean {
     return mentionsUnsupportedMethod || mentionsForkSpecificUnsupported
 }
 
-private fun CodexService.markThreadForkUnsupportedForCurrentBridge() {
+private fun AgentService.markThreadForkUnsupportedForCurrentBridge() {
     supportsThreadFork = false
     if (hasPresentedThreadForkBridgeUpdatePrompt) return
     hasPresentedThreadForkBridgeUpdatePrompt = true

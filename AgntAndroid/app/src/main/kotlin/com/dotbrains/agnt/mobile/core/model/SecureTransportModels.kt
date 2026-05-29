@@ -8,14 +8,14 @@ import java.util.Base64
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-const val CODEX_SECURE_PROTOCOL_VERSION = 1
-const val CODEX_PAIRING_QR_VERSION = 2
-const val CODEX_SECURE_HANDSHAKE_TAG = "agnt-e2ee-v1"
-const val CODEX_SECURE_HANDSHAKE_LABEL = "client-auth"
-const val CODEX_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS = 60.0
-const val CODEX_TRUSTED_SESSION_RESOLVE_TAG = "agnt-trusted-session-resolve-v1"
-const val CODEX_TRUSTED_SESSION_RESOLVE_RESPONSE_TAG = "agnt-trusted-session-resolve-response-v1"
-const val CODEX_TRUSTED_SESSION_RESOLVE_CLOCK_SKEW_TOLERANCE_SECONDS = 90.0
+const val AGNT_SECURE_PROTOCOL_VERSION = 1
+const val AGNT_PAIRING_QR_VERSION = 2
+const val AGNT_SECURE_HANDSHAKE_TAG = "agnt-e2ee-v1"
+const val AGNT_SECURE_HANDSHAKE_LABEL = "client-auth"
+const val AGNT_SECURE_CLOCK_SKEW_TOLERANCE_SECONDS = 60.0
+const val AGNT_TRUSTED_SESSION_RESOLVE_TAG = "agnt-trusted-session-resolve-v1"
+const val AGNT_TRUSTED_SESSION_RESOLVE_RESPONSE_TAG = "agnt-trusted-session-resolve-response-v1"
+const val AGNT_TRUSTED_SESSION_RESOLVE_CLOCK_SKEW_TOLERANCE_SECONDS = 90.0
 
 @Serializable
 enum class CodexSecureHandshakeMode {
@@ -276,7 +276,7 @@ fun codexTrustedSessionResolveTranscriptBytes(
     timestamp: Long,
 ): ByteArray {
     val out = ByteArrayOutputStream()
-    out.appendLengthPrefixedUtf8(CODEX_TRUSTED_SESSION_RESOLVE_TAG)
+    out.appendLengthPrefixedUtf8(AGNT_TRUSTED_SESSION_RESOLVE_TAG)
     out.appendLengthPrefixedUtf8(macDeviceId)
     out.appendLengthPrefixedUtf8(phoneDeviceId)
     out.appendLengthPrefixedData(base64DecodeOrEmpty(phoneIdentityPublicKey))
@@ -297,7 +297,7 @@ fun codexTrustedSessionResolveResponseTranscriptBytes(
     responseTimestamp: Long,
 ): ByteArray {
     val out = ByteArrayOutputStream()
-    out.appendLengthPrefixedUtf8(CODEX_TRUSTED_SESSION_RESOLVE_RESPONSE_TAG)
+    out.appendLengthPrefixedUtf8(AGNT_TRUSTED_SESSION_RESOLVE_RESPONSE_TAG)
     out.appendLengthPrefixedUtf8(macDeviceId)
     out.appendLengthPrefixedData(base64DecodeOrEmpty(macIdentityPublicKey))
     out.appendLengthPrefixedUtf8(displayName.orEmpty())
@@ -326,7 +326,7 @@ fun codexSecureTranscriptBytes(
     expiresAtForTranscript: Long,
 ): ByteArray {
     val out = ByteArrayOutputStream()
-    out.appendLengthPrefixedUtf8(CODEX_SECURE_HANDSHAKE_TAG)
+    out.appendLengthPrefixedUtf8(AGNT_SECURE_HANDSHAKE_TAG)
     out.appendLengthPrefixedUtf8(sessionId)
     out.appendLengthPrefixedUtf8(protocolVersion.toString())
     out.appendLengthPrefixedUtf8(handshakeMode.nameWire())
@@ -352,7 +352,7 @@ private fun CodexSecureHandshakeMode.nameWire(): String =
 fun codexClientAuthTranscript(transcriptBytes: ByteArray): ByteArray {
     val out = ByteArrayOutputStream()
     out.write(transcriptBytes)
-    out.appendLengthPrefixedUtf8(CODEX_SECURE_HANDSHAKE_LABEL)
+    out.appendLengthPrefixedUtf8(AGNT_SECURE_HANDSHAKE_LABEL)
     return out.toByteArray()
 }
 

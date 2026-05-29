@@ -5,9 +5,9 @@ import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
 import com.dotbrains.agnt.mobile.data.ThreadListSync
 
 /**
- * Mirrors [CodexService+Sync.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+Sync.swift).
+ * Mirrors [AgentService+Sync.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Sync.swift).
  */
-internal suspend fun CodexService.refreshThreadsInternal() {
+internal suspend fun AgentService.refreshThreadsInternal() {
     if (!sessionReady) return
     val locallyDeleted = sessionPersistence.loadLocallyDeletedThreadIds()
     val locallyArchived = sessionPersistence.loadLocallyArchivedThreadIds()
@@ -31,7 +31,7 @@ internal suspend fun CodexService.refreshThreadsInternal() {
     publishThreads(merged)
 }
 
-internal fun CodexService.publishThreads(threads: List<CodexThread>) {
+internal fun AgentService.publishThreads(threads: List<CodexThread>) {
     _threads.value = threads
     sessionPersistence.saveCachedThreads(threads)
 }

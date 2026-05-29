@@ -1,6 +1,6 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
@@ -38,7 +38,7 @@ class DesktopHandoffServiceTest {
                     methods += method
                     when (method) {
                         "desktop/continueOnDesktop" ->
-                            throw CodexServiceError.RpcFailure(
+                            throw AgentServiceError.RpcFailure(
                                 RPCError(
                                     code = -32601,
                                     message = "Unknown desktop method: desktop/continueOnDesktop",
@@ -69,7 +69,7 @@ class DesktopHandoffServiceTest {
         runTest {
             val repository =
                 HandoffFakeRepository { _, _ ->
-                    throw CodexServiceError.RpcFailure(
+                    throw AgentServiceError.RpcFailure(
                         RPCError(
                             code = -32000,
                             message = "Desktop handoff is unavailable here.",

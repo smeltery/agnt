@@ -1,22 +1,22 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.CodexServiceError
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.data.ThreadHistoryDecoder
 
 /**
- * Mirrors [CodexService.ensureThreadResumed] in
- * [CodexService+ThreadsTurns.swift](../../../../../../../../CodexMobile/CodexMobile/Services/CodexService+ThreadsTurns.swift).
+ * Mirrors [AgentService.ensureThreadResumed] in
+ * [AgentService+ThreadsTurns.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+ThreadsTurns.swift).
  */
-internal suspend fun CodexService.ensureThreadResumedInternal(
+internal suspend fun AgentService.ensureThreadResumedInternal(
     threadId: String,
     force: Boolean = false,
     preferredProjectPath: String? = null,
     modelIdentifierOverride: String? = null,
 ): CodexThread? {
-    if (!sessionReady) throw CodexServiceError.Disconnected
+    if (!sessionReady) throw AgentServiceError.Disconnected
     val tid = threadId.trim()
     if (tid.isEmpty()) return null
     if (!force && resumedThreadIds.contains(tid)) {
@@ -38,7 +38,7 @@ internal suspend fun CodexService.ensureThreadResumedInternal(
     val response =
         try {
             sendRequestWithSandboxAndApprovalFallback("thread/resume", JSONValue.Obj(camelParams))
-        } catch (e: CodexServiceError.RpcFailure) {
+        } catch (e: AgentServiceError.RpcFailure) {
             if (shouldRetryThreadResumeSnakeCase(e)) {
                 val snake =
                     buildMap {
@@ -102,7 +102,7 @@ internal suspend fun CodexService.ensureThreadResumedInternal(
     return _threads.value.find { it.id == tid }
 }
 
-private fun shouldRetryThreadResumeSnakeCase(e: CodexServiceError.RpcFailure): Boolean {
+private fun shouldRetryThreadResumeSnakeCase(e: AgentServiceError.RpcFailure): Boolean {
     val c = e.rpcError.code
     if (c != -32600 && c != -32602) return false
     val m = e.rpcError.message.lowercase()
