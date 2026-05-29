@@ -729,6 +729,5 @@ enum SidebarThreadsLoadingPresentation {
     }
 }
 
-// SidebarNewChatProjectPickerSheet has moved to
-// Views/Sidebar/SidebarNewChatProjectPickerSheet.swift so it can carry its own
-// SwiftUI #Preview without dragging in the rest of the sidebar.
+// SidebarNewChatProjectPickerSheet lives in SidebarNewChatProjectPickerSheet.swift
+// so it can carry its own SwiftUI #Preview without dragging in the rest of the sidebar.
