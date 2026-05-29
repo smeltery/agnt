@@ -7,7 +7,6 @@ object AppRoutes {
     const val Archived = "archived"
     const val About = "about"
     const val WhatsNew = "whats_new"
-    const val TesterHq = "tester_hq"
     /**
      * On-device SSH terminal. Accepts an optional `cwd` query parameter so
      * the "Open Terminal Here" turn action can pre-populate the working

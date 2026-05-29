@@ -19,18 +19,6 @@ val hasReleaseSigning =
         listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
             .all { key -> !keystoreProperties.getProperty(key).isNullOrBlank() }
 
-fun betaConfigValue(name: String): String =
-    (providers.gradleProperty(name).orNull ?: System.getenv(name) ?: "").trim()
-
-fun quotedBuildConfigString(value: String): String =
-    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
-
-val betaApiBaseUrl = betaConfigValue("BETA_API_BASE_URL")
-val betaApiKey = betaConfigValue("BETA_API_KEY")
-val betaEnabled =
-    betaConfigValue("BETA_ENABLED").equals("true", ignoreCase = true) &&
-        betaApiBaseUrl.isNotBlank()
-
 android {
     namespace = "com.dotbrains.agnt.mobile"
     compileSdk = 36
@@ -42,9 +30,6 @@ android {
 
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("boolean", "BETA_ENABLED", betaEnabled.toString())
-        buildConfigField("String", "BETA_API_BASE_URL", quotedBuildConfigString(betaApiBaseUrl))
-        buildConfigField("String", "BETA_API_KEY", quotedBuildConfigString(betaApiKey))
     }
 
     signingConfigs {

@@ -59,12 +59,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
-private data class TrophySpotlightPx(
-    val cx: Float,
-    val cy: Float,
-    val radiusPx: Float,
-)
-
 /**
  * Drawer sheet body: brand, search + threads (iOS-style list), footer links, Mac connection strip.
  * SwiftUI reference: [SidebarView](CodexMobile/CodexMobile/Views/SidebarView.swift).
@@ -85,49 +79,12 @@ fun SidebarDrawerContent(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var showTesterHqCoachmark by remember { mutableStateOf(false) }
-    var coachmarkRootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    var trophyLayoutCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    var trophySpotlightPx by remember { mutableStateOf<TrophySpotlightPx?>(null) }
-
-    LaunchedEffect(coachmarkRootCoords, trophyLayoutCoords, showTesterHqCoachmark) {
-        if (!showTesterHqCoachmark) {
-            trophySpotlightPx = null
-            return@LaunchedEffect
-        }
-        val root = coachmarkRootCoords
-        val trophy = trophyLayoutCoords
-        if (root == null || trophy == null || !root.isAttached || !trophy.isAttached) {
-            trophySpotlightPx = null
-            return@LaunchedEffect
-        }
-        val topLeft = root.localPositionOf(trophy)
-        val sz = trophy.size
-        val cx = topLeft.x + sz.width / 2f
-        val cy = topLeft.y + sz.height / 2f
-        val r = max(sz.width, sz.height) / 2f * 1.38f
-        trophySpotlightPx = TrophySpotlightPx(cx, cy, r)
-    }
-
-    LaunchedEffect(drawerState.isOpen) {
-        if (drawerState.isOpen &&
-            FeatureFlags.betaEngagementEnabled &&
-            !SidebarTesterHqCoachmarkSession.shownThisProcess
-        ) {
-            SidebarTesterHqCoachmarkSession.shownThisProcess = true
-            showTesterHqCoachmark = true
-        }
-        if (!drawerState.isOpen) {
-            showTesterHqCoachmark = false
-        }
-    }
 
     Box(
         modifier =
             modifier
                 .fillMaxHeight()
-                .fillMaxWidth()
-                .onGloballyPositioned { coachmarkRootCoords = it },
+                .fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.fillMaxHeight().fillMaxWidth(),
@@ -255,23 +212,6 @@ fun SidebarDrawerContent(
                             modifier = Modifier.size(20.dp),
                         )
                     }
-                    if (FeatureFlags.betaEngagementEnabled) {
-                        IconButton(
-                            onClick = {
-                                drawerScope.launch {
-                                    closeDrawer()
-                                    navController.navigate(AppRoutes.TesterHq)
-                                }
-                            },
-                            modifier = Modifier.onGloballyPositioned { trophyLayoutCoords = it },
-                        ) {
-                            Icon(
-                                painter = painterResource(LucideR.drawable.lucide_ic_trophy),
-                                contentDescription = stringResource(R.string.nav_tester_hq),
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
                     IconButton(
                         onClick = {
                             drawerScope.launch {
@@ -314,93 +254,6 @@ fun SidebarDrawerContent(
             }
         }
 
-        if (showTesterHqCoachmark && FeatureFlags.betaEngagementEnabled) {
-            SidebarTesterHqCoachmarkOverlay(
-                trophySpotlight = trophySpotlightPx,
-                onDismiss = { showTesterHqCoachmark = false },
-            )
-        }
-    }
-}
-
-private object SidebarTesterHqCoachmarkSession {
-    /** Cleared when the process dies; each cold start gets one coachmark opportunity. */
-    var shownThisProcess: Boolean = false
-}
-
-@Composable
-private fun SidebarTesterHqCoachmarkOverlay(
-    trophySpotlight: TrophySpotlightPx?,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.48f)
-    val shape = RoundedCornerShape(16.dp)
-    val ringWidth = 2.dp
-    val ringGap = 6.dp
-
-    Box(modifier.fillMaxSize()) {
-        Canvas(
-            Modifier
-                .fillMaxSize()
-                .clickable(onClick = onDismiss),
-        ) {
-            val spotlight = trophySpotlight
-            if (spotlight != null) {
-                val path =
-                    Path().apply {
-                        addRect(Rect(0f, 0f, size.width, size.height))
-                        val hole =
-                            Rect(
-                                spotlight.cx - spotlight.radiusPx,
-                                spotlight.cy - spotlight.radiusPx,
-                                spotlight.cx + spotlight.radiusPx,
-                                spotlight.cy + spotlight.radiusPx,
-                            )
-                        addOval(hole)
-                        fillType = PathFillType.EvenOdd
-                    }
-                drawPath(path, scrimColor)
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.45f),
-                    radius = spotlight.radiusPx + ringGap.toPx(),
-                    center = Offset(spotlight.cx, spotlight.cy),
-                    style = Stroke(width = ringWidth.toPx()),
-                )
-            } else {
-                drawRect(scrimColor)
-            }
-        }
-        Surface(
-            shape = shape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 3.dp,
-            shadowElevation = 8.dp,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = 72.dp)
-                    .padding(horizontal = 4.dp)
-                    .widthIn(max = 288.dp),
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.sidebar_tester_hq_coachmark_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.sidebar_tester_hq_coachmark_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text(stringResource(R.string.sidebar_tester_hq_coachmark_got_it))
-                }
-            }
-        }
     }
 }
 

@@ -1,16 +1,10 @@
 package com.dotbrains.agnt.mobile
 
 import android.content.Context
-import com.dotbrains.agnt.mobile.beta.BetaDeviceInfo
-import com.dotbrains.agnt.mobile.beta.BetaEngagementClient
-import com.dotbrains.agnt.mobile.beta.BetaEngagementRepository
-import com.dotbrains.agnt.mobile.beta.BetaTesterStore
-import com.dotbrains.agnt.mobile.beta.SharedPreferencesBetaKeyValueStore
 import com.dotbrains.agnt.mobile.core.persistence.AIChangeSetPersistence
 import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
 import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
 import com.dotbrains.agnt.mobile.core.security.SecureStore
-import com.dotbrains.agnt.mobile.core.config.FeatureFlags
 import com.dotbrains.agnt.mobile.core.terminal.TerminalController
 import com.dotbrains.agnt.mobile.core.terminal.TerminalKnownHostStore
 import com.dotbrains.agnt.mobile.core.terminal.TerminalPrivateKeyStore
@@ -66,9 +60,6 @@ object AppContainer {
     lateinit var codexRepository: CodexRepository
         private set
 
-    lateinit var betaEngagementRepository: BetaEngagementRepository
-        private set
-
     lateinit var terminalController: TerminalController
         private set
 
@@ -103,31 +94,11 @@ object AppContainer {
                 sessionPersistence = sessionPersistence,
                 messagePersistence = messagePersistence,
             )
-        val betaStore = BetaTesterStore(SharedPreferencesBetaKeyValueStore(app))
-        val betaApi =
-            if (FeatureFlags.betaEngagementEnabled) {
-                BetaEngagementClient(
-                    httpClient = httpCallClient,
-                    baseUrl = BuildConfig.BETA_API_BASE_URL,
-                    apiKey = BuildConfig.BETA_API_KEY,
-                )
-            } else {
-                null
-            }
         terminalController =
             TerminalController(
                 profileStore = TerminalProfileStore(secureStore),
                 privateKeyStore = TerminalPrivateKeyStore(secureStore),
                 knownHostStore = TerminalKnownHostStore(secureStore),
-            )
-        betaEngagementRepository =
-            BetaEngagementRepository(
-                enabled = FeatureFlags.betaEngagementEnabled,
-                store = betaStore,
-                api = betaApi,
-                appVersionProvider = { BetaDeviceInfo.appVersionName(app) },
-                deviceModelProvider = { BetaDeviceInfo.coarseDeviceModel() },
-                deviceKeyProvider = { BetaDeviceInfo.stableBetaDeviceKey(app) },
             )
     }
 }

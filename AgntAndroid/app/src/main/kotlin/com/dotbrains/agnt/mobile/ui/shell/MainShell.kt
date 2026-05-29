@@ -52,9 +52,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.core.config.FeatureFlags
 import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.GitDiffTotals
 import com.dotbrains.agnt.mobile.core.model.GitRepoSyncResult
@@ -207,12 +205,6 @@ fun MainShell(
                         viewModel.onAppForegrounded()
                         if (backgroundedWhileReady) {
                             backgroundedWhileReady = false
-                            scope.launch {
-                                AppContainer.betaEngagementRepository.recordMissionEvent(
-                                    eventType = "session_recovered_from_background",
-                                    screen = "conversation",
-                                )
-                            }
                         }
                     }
                     else -> Unit
@@ -224,9 +216,6 @@ fun MainShell(
 
     LaunchedEffect(Unit) {
         viewModel.onAppLaunched()
-        if (FeatureFlags.betaEngagementEnabled) {
-            AppContainer.betaEngagementRepository.recoverBetaIdentityIfNeeded()
-        }
     }
 
     LaunchedEffect(ready) {

@@ -137,14 +137,19 @@ Open follow-ups:
 
 ### P2.5 — beta tester module
 
-- [ ] The `beta/` module + `TesterHqScreen.kt` integrate with a hosted Supabase
-      backend used for upstream Remodex's tester program. It is build-time
-      gated off by default (`BuildConfig.BETA_ENABLED` requires both the env
-      var `BETA_ENABLED=true` and a non-blank `BETA_API_BASE_URL`), but the
-      hosted-service coupling is at odds with the local-first guardrail in
-      `/CLAUDE.md`. Decide: remove the module entirely, or repurpose it as
-      opt-in self-hosted feedback wired to the user's own relay/instance.
-      Stivy-01's `supabase/` config folder was not imported.
+- [x] **Removed.** The `beta/` module and `TesterHqScreen` integrated with
+      upstream Remodex's hosted Supabase tester program — a direct
+      violation of the local-first guardrail in `/CLAUDE.md`. The whole
+      surface is gone: the `beta/` and `ui/beta/` source directories
+      (8 source files + 4 unit tests), the `BETA_ENABLED` / `BETA_API_BASE_URL` /
+      `BETA_API_KEY` gradle properties + BuildConfig fields,
+      `FeatureFlags.betaEngagementEnabled`, the `TesterHq` nav route,
+      the sidebar trophy + coachmark overlay, the Settings `Tester HQ`
+      row, ~22 `recordMissionEvent` call sites scattered across the
+      composer / shell / terminal / scanner, and the 4 beta unit tests.
+      Net diff is a substantial deletion. If we ever want feedback
+      collection again, we'd build it as a `mailto:` / GitHub-issue
+      handoff so nothing crosses an unowned hosted boundary.
 
 ### P3 — cosmetics / rename
 

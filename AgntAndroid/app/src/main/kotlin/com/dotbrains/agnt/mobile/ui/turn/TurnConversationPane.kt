@@ -114,8 +114,6 @@ private const val TIMELINE_LOAD_EARLIER_PAGE = 80
 private const val TIMELINE_STAGING_THRESHOLD = 72
 private const val STARTUP_TRACE_TAG = "AgntStartup"
 private const val SMART_SCROLL_FADE_JUMP_DISTANCE_ITEMS = 24
-private const val BETA_LONG_THREAD_MESSAGE_THRESHOLD = 18
-private const val BETA_LONG_THREAD_SCROLL_DISTANCE_ITEMS = 6
 private val TurnConversationMessageListTopPadding = 112.dp
 /** Shaves a few dp off IME bottom padding so the composer sits slightly closer to the keyboard. */
 
@@ -861,10 +859,6 @@ fun TurnConversationPane(
     var lastAutoScrollThreadId by remember { mutableStateOf<String?>(null) }
     var shouldAutoFollowBottom by rememberSaveable(threadId) { mutableStateOf(true) }
     var timelineContentVisible by remember(threadId) { mutableStateOf(true) }
-    var emittedStreamingResponseMission by rememberSaveable(threadId) { mutableStateOf(false) }
-    var emittedCommandCardMission by rememberSaveable(threadId) { mutableStateOf(false) }
-    var emittedFileChangeCardMission by rememberSaveable(threadId) { mutableStateOf(false) }
-    var emittedLongThreadScrollMission by rememberSaveable(threadId) { mutableStateOf(false) }
     val timelineContentAlpha by animateFloatAsState(
         targetValue = if (timelineContentVisible) 1f else 0.18f,
         label = "timeline-content-alpha",
@@ -939,67 +933,6 @@ fun TurnConversationPane(
                 if (isScrolling) {
                     shouldAutoFollowBottom = isAtBottom
                 }
-            }
-    }
-    LaunchedEffect(threadId, visibleMessages, emittedStreamingResponseMission) {
-        if (emittedStreamingResponseMission) return@LaunchedEffect
-        val streamingAssistantVisible =
-            visibleMessages.any { message ->
-                message.role == CodexMessageRole.assistant &&
-                    message.kind == CodexMessageKind.chat &&
-                    message.isStreaming
-            }
-        if (!streamingAssistantVisible) return@LaunchedEffect
-        emittedStreamingResponseMission = true
-        AppContainer.betaEngagementRepository.recordMissionEvent(
-            eventType = "streaming_response_seen",
-            screen = "conversation",
-            refreshAfter = false,
-        )
-    }
-    LaunchedEffect(threadId, visibleMessages, emittedCommandCardMission) {
-        if (emittedCommandCardMission) return@LaunchedEffect
-        val hasCommandCard =
-            visibleMessages.any { message ->
-                message.kind == CodexMessageKind.commandExecution
-            }
-        if (!hasCommandCard) return@LaunchedEffect
-        emittedCommandCardMission = true
-        AppContainer.betaEngagementRepository.recordMissionEvent(
-            eventType = "command_card_checked",
-            screen = "conversation",
-            refreshAfter = false,
-        )
-    }
-    LaunchedEffect(threadId, visibleMessages, emittedFileChangeCardMission) {
-        if (emittedFileChangeCardMission) return@LaunchedEffect
-        val hasFileChangeCard =
-            visibleMessages.any { message ->
-                message.kind == CodexMessageKind.fileChange
-            }
-        if (!hasFileChangeCard) return@LaunchedEffect
-        emittedFileChangeCardMission = true
-        AppContainer.betaEngagementRepository.recordMissionEvent(
-            eventType = "file_change_card_checked",
-            screen = "conversation",
-            refreshAfter = false,
-        )
-    }
-    LaunchedEffect(threadId, listState, messages.size, emittedLongThreadScrollMission) {
-        if (emittedLongThreadScrollMission || messages.size < BETA_LONG_THREAD_MESSAGE_THRESHOLD) return@LaunchedEffect
-        val initialIndex = listState.firstVisibleItemIndex
-        snapshotFlow { listState.firstVisibleItemIndex to listState.isScrollInProgress }
-            .distinctUntilChanged()
-            .collect { (firstIndex, isScrolling) ->
-                if (!isScrolling || emittedLongThreadScrollMission) return@collect
-                val scrolledEnough = kotlin.math.abs(firstIndex - initialIndex) >= BETA_LONG_THREAD_SCROLL_DISTANCE_ITEMS
-                if (!scrolledEnough) return@collect
-                emittedLongThreadScrollMission = true
-                AppContainer.betaEngagementRepository.recordMissionEvent(
-                    eventType = "scroll_long_thread_checked",
-                    screen = "conversation",
-                    refreshAfter = false,
-                )
             }
     }
     LaunchedEffect(latestMessageId, shouldFollowBottom) {
@@ -1148,10 +1081,6 @@ fun TurnConversationPane(
                         collaborationMode = collaborationMode,
                     )
                 }.onSuccess {
-                    AppContainer.betaEngagementRepository.recordMissionEvent(
-                        eventType = "queued_draft_used",
-                        screen = "composer",
-                    )
                     draft = ""
                     composerAttachments = emptyList()
                     mentionChips = emptyList()
@@ -1175,32 +1104,6 @@ fun TurnConversationPane(
                 )
             }
                 .onSuccess {
-                    AppContainer.betaEngagementRepository.recordMissionEvent(
-                        eventType = "main_flow_completed",
-                        screen = "conversation",
-                    )
-                    AppContainer.betaEngagementRepository.recordMissionEvent(
-                        eventType = "message_sent",
-                        screen = "conversation",
-                    )
-                    if (collaborationMode == CodexCollaborationModeKind.plan) {
-                        AppContainer.betaEngagementRepository.recordMissionEvent(
-                            eventType = "plan_mode_used",
-                            screen = "composer",
-                        )
-                    }
-                    if (attachments.isNotEmpty()) {
-                        AppContainer.betaEngagementRepository.recordMissionEvent(
-                            eventType = "image_attachment_sent",
-                            screen = "composer",
-                        )
-                    }
-                    if (fileMentions.isNotEmpty()) {
-                        AppContainer.betaEngagementRepository.recordMissionEvent(
-                            eventType = "file_attachment_sent",
-                            screen = "composer",
-                        )
-                    }
                     sending = false
                     if (!fromQueue) {
                         draft = ""
@@ -1850,10 +1753,6 @@ fun TurnConversationPane(
                                             )
                                         if (isActive) {
                                             draft = VoiceDraftAppend.append(draft, text)
-                                            AppContainer.betaEngagementRepository.recordMissionEvent(
-                                                eventType = "voice_input_used",
-                                                screen = "composer",
-                                            )
                                         }
                                     } catch (e: CancellationException) {
                                         throw e
@@ -1919,14 +1818,7 @@ fun TurnConversationPane(
                         onRefreshGitBranches = { gitBranchReloadNonce++ },
                         onCheckoutGitBranch = onGitCheckout,
                         onCreateGitBranch = onGitCreateBranch,
-                        onOpenBranchSelector = {
-                            scope.launch {
-                                AppContainer.betaEngagementRepository.recordMissionEvent(
-                                    eventType = "branch_selector_opened",
-                                    screen = "branch_selector",
-                                )
-                            }
-                        },
+                        onOpenBranchSelector = {},
                         onBranchPickerOpenChange = { isOpen ->
                             isBranchPickerOpen = isOpen
                         },
@@ -1964,10 +1856,6 @@ fun TurnConversationPane(
                                 baseBranch = activeReviewBaseBranch,
                             )
                         }.onSuccess {
-                            AppContainer.betaEngagementRepository.recordMissionEvent(
-                                eventType = "review_flow_started",
-                                screen = "review",
-                            )
                             sending = false
                             draft = ""
                             mentionChips = emptyList()

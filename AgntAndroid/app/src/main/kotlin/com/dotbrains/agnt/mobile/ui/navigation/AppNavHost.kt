@@ -1,7 +1,5 @@
 package com.dotbrains.agnt.mobile.ui.navigation
 
-import com.dotbrains.agnt.mobile.AppContainer
-import com.dotbrains.agnt.mobile.core.config.FeatureFlags
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -15,7 +13,6 @@ import com.dotbrains.agnt.mobile.ui.about.WhatsNewScreen
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.home.HomeMainContent
 import com.dotbrains.agnt.mobile.ui.archived.ArchivedChatsScreen
-import com.dotbrains.agnt.mobile.ui.beta.TesterHqScreen
 import com.dotbrains.agnt.mobile.ui.settings.SettingsScreen
 import com.dotbrains.agnt.mobile.ui.terminal.TerminalScreen
 
@@ -51,11 +48,6 @@ fun AppNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToAbout = { navController.navigate(AppRoutes.About) },
                 onNavigateToWhatsNew = { navController.navigate(AppRoutes.WhatsNew) },
-                onNavigateToTesterHq = {
-                    if (FeatureFlags.betaEngagementEnabled) {
-                        navController.navigate(AppRoutes.TesterHq)
-                    }
-                },
             )
         }
         composable(AppRoutes.Archived) {
@@ -69,12 +61,6 @@ fun AppNavHost(
         }
         composable(AppRoutes.WhatsNew) {
             WhatsNewScreen(onNavigateBack = { navController.popBackStack() })
-        }
-        composable(AppRoutes.TesterHq) {
-            TesterHqScreen(
-                repository = AppContainer.betaEngagementRepository,
-                onNavigateBack = { navController.popBackStack() },
-            )
         }
         composable(
             route = AppRoutes.Terminal,

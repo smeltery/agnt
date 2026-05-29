@@ -64,7 +64,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.AppContainer
-import com.dotbrains.agnt.mobile.core.config.FeatureFlags
 import com.dotbrains.agnt.mobile.core.model.AppFontStyle
 import com.dotbrains.agnt.mobile.core.model.AppLanguagePreference
 import com.dotbrains.agnt.mobile.core.model.AppThemePreference
@@ -87,7 +86,6 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToWhatsNew: () -> Unit,
-    onNavigateToTesterHq: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onNavigateBack)
@@ -213,44 +211,13 @@ fun SettingsScreen(
                 SettingsNavigationRow(
                     title = stringResource(R.string.nav_about_remodex),
                     subtitle = stringResource(R.string.settings_about_remodex_hint),
-                    onClick = {
-                        scope.launch {
-                            AppContainer.betaEngagementRepository.recordMissionEvent(
-                                eventType = "about_screen_opened",
-                                screen = "settings",
-                            )
-                        }
-                        onNavigateToAbout()
-                    },
+                    onClick = { onNavigateToAbout() },
                 )
                 SettingsNavigationRow(
                     title = stringResource(R.string.nav_whats_new),
                     subtitle = stringResource(R.string.settings_whats_new_hint),
-                    onClick = {
-                        scope.launch {
-                            AppContainer.betaEngagementRepository.recordMissionEvent(
-                                eventType = "settings_whats_new_opened",
-                                screen = "settings",
-                            )
-                        }
-                        onNavigateToWhatsNew()
-                    },
+                    onClick = { onNavigateToWhatsNew() },
                 )
-                if (FeatureFlags.betaEngagementEnabled) {
-                    SettingsNavigationRow(
-                        title = stringResource(R.string.nav_tester_hq),
-                        subtitle = stringResource(R.string.settings_tester_hq_hint),
-                        onClick = {
-                            scope.launch {
-                                AppContainer.betaEngagementRepository.recordMissionEvent(
-                                    eventType = "settings_tester_hq_entry_opened",
-                                    screen = "settings",
-                                )
-                            }
-                            onNavigateToTesterHq()
-                        },
-                    )
-                }
                 Text(
                     text = stringResource(R.string.settings_about_version, versionName),
                     style = MaterialTheme.typography.bodyMedium,
