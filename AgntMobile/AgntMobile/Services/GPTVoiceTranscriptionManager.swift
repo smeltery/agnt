@@ -243,27 +243,7 @@ final class GPTVoiceTranscriptionManager: ObservableObject {
     // ─── Mic permission ──────────────────────────────────────────
 
     private func requestMicrophonePermission() async -> Bool {
-#if os(iOS)
-        if #available(iOS 17.0, *) {
-            switch AVAudioApplication.shared.recordPermission {
-            case .granted:
-                return true
-            case .denied:
-                return false
-            case .undetermined:
-                break
-            @unknown default:
-                return false
-            }
-
-            return await withCheckedContinuation { continuation in
-                AVAudioApplication.requestRecordPermission { allowed in
-                    continuation.resume(returning: allowed)
-                }
-            }
-        }
-#endif
-        switch audioSession.recordPermission {
+        switch AVAudioApplication.shared.recordPermission {
         case .granted:
             return true
         case .denied:
@@ -275,7 +255,7 @@ final class GPTVoiceTranscriptionManager: ObservableObject {
         }
 
         return await withCheckedContinuation { continuation in
-            audioSession.requestRecordPermission { allowed in
+            AVAudioApplication.requestRecordPermission { allowed in
                 continuation.resume(returning: allowed)
             }
         }
