@@ -1374,13 +1374,9 @@ final class TurnViewModel {
     // Sends a composer payload, queueing follow-ups while the current run is still active.
     func sendTurn(
         codex: CodexService,
-        subscriptions: SubscriptionService? = nil,
         threadID: String
     ) {
-        guard let pendingSend = buildValidatedPendingSend(
-            codex: codex,
-            subscriptions: subscriptions
-        ) else {
+        guard let pendingSend = buildValidatedPendingSend(codex: codex) else {
             return
         }
 
@@ -1395,7 +1391,6 @@ final class TurnViewModel {
             ? initialQueuedDraft.map { preAppendQueuedDraftMessageIfNeeded($0, codex: codex, threadID: threadID) }
             : initialQueuedDraft
 
-        subscriptions?.consumeFreeSendAttemptIfNeeded()
         isSending = true
         isPlanModeArmed = false
         shouldAnchorToAssistantResponse = true
@@ -1439,20 +1434,15 @@ final class TurnViewModel {
     @discardableResult
     func sendNewThread(
         codex: CodexService,
-        subscriptions: SubscriptionService? = nil,
         draftThreadID: String,
         preferredProjectPath: String?,
         onThreadCreated: @escaping @MainActor @Sendable (CodexThread) -> Void,
         onSendFailed: (@MainActor @Sendable () -> Void)? = nil
     ) -> Bool {
-        guard let pendingSend = buildValidatedPendingSend(
-            codex: codex,
-            subscriptions: subscriptions
-        ) else {
+        guard let pendingSend = buildValidatedPendingSend(codex: codex) else {
             return false
         }
 
-        subscriptions?.consumeFreeSendAttemptIfNeeded()
         isSending = true
         isPlanModeArmed = false
         shouldAnchorToAssistantResponse = true
@@ -1509,11 +1499,8 @@ final class TurnViewModel {
     }
 
     // Shared validation + payload assembly used by `sendTurn` and `sendNewThread`
-    // so the empty/connected/blocking/review/subscription guards stay in one place.
-    private func buildValidatedPendingSend(
-        codex: CodexService,
-        subscriptions: SubscriptionService?
-    ) -> PendingTurnSend? {
+    // so the empty/connected/blocking/review guards stay in one place.
+    private func buildValidatedPendingSend(codex: CodexService) -> PendingTurnSend? {
         let payload = buildPayloadWithMentions()
         let attachments = readyComposerAttachments
         let skillMentions = composerMentionedSkills.map {
@@ -1533,11 +1520,6 @@ final class TurnViewModel {
 
         if reviewSelection != nil, hasComposerContentConflictingWithReview {
             codex.lastErrorMessage = "Clear text, files, skills, and images before starting a code review."
-            return nil
-        }
-
-        if let subscriptions, !subscriptions.hasAppAccess {
-            codex.lastErrorMessage = "Your 5 free messages are over. Unlock agnt Pro to keep chatting."
             return nil
         }
 

@@ -36,7 +36,6 @@ enum NewChatDraftLeadingControl {
 
 struct NewChatDraftView: View {
     @Environment(CodexService.self) private var codex
-    @Environment(SubscriptionService.self) private var subscriptions
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let route: NewChatDraftRoute
@@ -705,7 +704,6 @@ struct NewChatDraftView: View {
             await Task.yield()
             viewModel.sendNewThread(
                 codex: codex,
-                subscriptions: subscriptions,
                 draftThreadID: route.id,
                 preferredProjectPath: selectedProjectPath,
                 onThreadCreated: openThread

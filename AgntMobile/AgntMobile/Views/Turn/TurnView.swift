@@ -16,7 +16,6 @@ struct TurnView: View {
     var onOpenTerminal: ((String?) -> Void)? = nil
 
     @Environment(CodexService.self) private var codex
-    @Environment(SubscriptionService.self) private var subscriptions
     @Environment(\.openURL) private var openURL
     @Environment(\.reconnectAction) private var reconnectAction
     @Environment(\.wakeMacDisplayAction) private var wakeMacDisplayAction
@@ -847,7 +846,7 @@ struct TurnView: View {
 
     private func handleSend() {
         viewModel.clearComposerAutocomplete()
-        viewModel.sendTurn(codex: codex, subscriptions: subscriptions, threadID: thread.id)
+        viewModel.sendTurn(codex: codex, threadID: thread.id)
         isInputFocused = false
     }
 

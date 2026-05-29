@@ -45,7 +45,6 @@
 		B1C2D3E4F5061728394A5B6C /* CodexServiceIncomingCommandExecutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B6C7 /* CodexServiceIncomingCommandExecutionTests.swift */; };
 		B3C4D5E6F708192A3B4C5D6E /* CodexPlanModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D6F /* CodexPlanModeTests.swift */; };
 		B7A1C2D3E4F5061728394051 /* SidebarThreadGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1C2D3E4F5061728394052 /* SidebarThreadGroupingTests.swift */; };
-		C04E214B2F71D34100AA3193 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = C04E214A2F71D34100AA3193 /* RevenueCat */; };
 		C04E214D2F71D4DB00AA3193 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C04E214C2F71D4DB00AA3193 /* StoreKit.framework */; };
 		C078C1A22F79000100BEEF01 /* Citadel in Frameworks */ = {isa = PBXBuildFile; productRef = C078C1A12F79000100BEEF01 /* Citadel */; };
 		C0DED3362F5E39DC0021A8E8 /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = C0DED3352F5E39DC0021A8E8 /* Textual */; };
@@ -150,7 +149,6 @@
 				A4B0C1D2E3F4051627384A0E /* libz.tbd in Frameworks */,
 				C04E214D2F71D4DB00AA3193 /* StoreKit.framework in Frameworks */,
 				C078C1A22F79000100BEEF01 /* Citadel in Frameworks */,
-				C04E214B2F71D34100AA3193 /* RevenueCat in Frameworks */,
 				C0DED3362F5E39DC0021A8E8 /* Textual in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -421,7 +419,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				C0DED3342F5E39DC0021A8E8 /* XCRemoteSwiftPackageReference "textual" */,
-				C04E21492F71D34100AA3193 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
 				C078C1A02F79000100BEEF01 /* XCRemoteSwiftPackageReference "Citadel" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -960,14 +957,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		C04E21492F71D34100AA3193 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 5.66.0;
-			};
-		};
 		C078C1A02F79000100BEEF01 /* XCRemoteSwiftPackageReference "Citadel" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/orlandos-nl/Citadel.git";
@@ -987,11 +976,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C04E214A2F71D34100AA3193 /* RevenueCat */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C04E21492F71D34100AA3193 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
-			productName = RevenueCat;
-		};
 		C078C1A12F79000100BEEF01 /* Citadel */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C078C1A02F79000100BEEF01 /* XCRemoteSwiftPackageReference "Citadel" */;

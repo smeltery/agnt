@@ -1,9 +1,8 @@
 // FILE: AgntMobileApp.swift
-// Purpose: App entry point, RevenueCat setup, and root dependency wiring.
+// Purpose: App entry point and root dependency wiring.
 // Layer: App
 // Exports: AgntMobileApp
 
-import RevenueCat
 import SwiftUI
 
 @MainActor
@@ -14,16 +13,13 @@ struct AgntMobileApp: App {
     @State private var codexService: CodexService
     @State private var petCompanionStore: PetCompanionStore
     @State private var petCompanionStatusStore: PetCompanionStatusStore
-    @State private var subscriptionService: SubscriptionService
 
     init() {
-        Self.configureRevenueCatIfAvailable()
         let service = CodexService()
         service.configureNotifications()
         _codexService = State(initialValue: service)
         _petCompanionStore = State(initialValue: PetCompanionStore())
         _petCompanionStatusStore = State(initialValue: PetCompanionStatusStore())
-        _subscriptionService = State(initialValue: SubscriptionService())
     }
 
     var body: some Scene {
@@ -32,10 +28,6 @@ struct AgntMobileApp: App {
                 .environment(codexService)
                 .environment(petCompanionStore)
                 .environment(petCompanionStatusStore)
-                .environment(subscriptionService)
-                .task {
-                    await subscriptionService.bootstrap()
-                }
                 .onOpenURL { url in
                     Task { @MainActor in
                         guard CodexService.legacyGPTLoginCallbackEnabled else {
@@ -56,19 +48,5 @@ struct AgntMobileApp: App {
                     TurnCacheManager.resetAll()
                 }
         }
-    }
-
-    // Configures RevenueCat once at launch using the client-safe public SDK key.
-    private static func configureRevenueCatIfAvailable() {
-        guard let apiKey = AppEnvironment.revenueCatPublicAPIKey else {
-            assertionFailure("Missing RevenueCat public API key in Info.plist")
-            return
-        }
-
-        #if DEBUG
-        Purchases.logLevel = .debug
-        #endif
-
-        Purchases.configure(withAPIKey: apiKey)
     }
 }
