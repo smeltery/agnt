@@ -66,8 +66,11 @@ Code that originated in [Remodex](https://github.com/Emanuele-web04/remodex) (th
 git clone https://github.com/dotbrains/agnt.git
 cd agnt
 
-# Start a local relay + bridge together
+# Start a local relay + bridge together (macOS / Linux)
 ./scripts/run-local-agnt.sh
+
+# Or on Windows (PowerShell 7)
+# .\scripts\run-local-agnt.ps1
 ```
 
 This launcher:

@@ -6,6 +6,9 @@ node_modules/
 bun-debug.log
 .bun-cache/
 
+# scripts/run-local-agnt.ps1 writes relay logs here
+.agnt-local/
+
 # macOS
 .DS_Store
 **/.DS_Store

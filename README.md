@@ -42,7 +42,23 @@ cd agnt
 ./scripts/run-local-agnt.sh
 ```
 
-That spins up a local relay + the bridge in the foreground and prints a QR code, the JSON payload, and a short alphanumeric pairing code. Force a specific provider with `--provider codex|claude|opencode|cursor`.
+On Windows, use PowerShell 7:
+
+```powershell
+.\scripts\run-local-agnt.ps1
+```
+
+That spins up a local relay + the bridge in the foreground and prints a QR code, the JSON payload, and a short alphanumeric pairing code. Force a specific provider with `--provider codex|claude|opencode|cursor` (PowerShell: `-Provider claude`).
+
+If the advertised host in the QR is not reachable from your phone, pass the LAN or VPN address explicitly:
+
+```sh
+./scripts/run-local-agnt.sh --hostname 192.168.1.254
+```
+
+```powershell
+.\scripts\run-local-agnt.ps1 -Hostname 192.168.1.254
+```
 
 Pair from any client:
 
