@@ -92,6 +92,12 @@ android {
             pickFirsts += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
     }
+
+    lint {
+        // Gates only NEW lint findings; pre-existing issues snapshotted in lint-baseline.xml
+        // and tracked separately as housekeeping work. See AgntAndroid/ROADMAP.md.
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 gradle.taskGraph.whenReady {

@@ -1,0 +1,2067 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.10.1" type="baseline" client="gradle" dependencies="false" name="AGP (8.10.1)" variant="all" version="8.10.1">
+
+    <issue
+        id="MissingPermission"
+        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
+        errorLine1="        NotificationManagerCompat.from(appContext).notify(tag, notificationId, notification)"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            line="169"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
+        errorLine1="                    AudioRecord("
+        errorLine2="                    ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/voice/BridgeVoiceRecorder.kt"
+            line="157"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="AppBundleLocaleChanges"
+        message="Found dynamic locale changes, but did not find corresponding Play Core library calls for downloading languages and splitting by language is not disabled in the `bundle` configuration"
+        errorLine1="            config.setLocales(LocaleList(englishLocale))"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            line="44"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of Gradle than 8.11.1 is available: 8.14.5"
+        errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/wrapper/gradle-wrapper.properties"
+            line="3"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 8.10.1 is available: 9.2.1"
+        errorLine1="agp = &quot;8.10.1&quot;"
+        errorLine2="      ~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="2"
+            column="7"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose:compose-bom than 2026.02.01 is available: 2026.05.01"
+        errorLine1="composeBom = &quot;2026.02.01&quot;"
+        errorLine2="             ~~~~~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="4"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.activity:activity-compose than 1.9.3 is available: 1.13.0"
+        errorLine1="activityCompose = &quot;1.9.3&quot;"
+        errorLine2="                  ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="8"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.appcompat:appcompat than 1.7.0 is available: 1.7.1"
+        errorLine1="appcompat = &quot;1.7.0&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="9"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.camera:camera-camera2 than 1.4.1 is available: 1.6.1"
+        errorLine1="camerax = &quot;1.4.1&quot;"
+        errorLine2="          ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="10"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.camera:camera-core than 1.4.1 is available: 1.6.1"
+        errorLine1="camerax = &quot;1.4.1&quot;"
+        errorLine2="          ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="10"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.camera:camera-lifecycle than 1.4.1 is available: 1.6.1"
+        errorLine1="camerax = &quot;1.4.1&quot;"
+        errorLine2="          ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="10"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.camera:camera-view than 1.4.1 is available: 1.6.1"
+        errorLine1="camerax = &quot;1.4.1&quot;"
+        errorLine2="          ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="10"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.15.0 is available: 1.18.0"
+        errorLine1="coreKtx = &quot;1.15.0&quot;"
+        errorLine2="          ~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="11"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-process than 2.8.7 is available: 2.10.0"
+        errorLine1="lifecycle = &quot;2.8.7&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="12"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-compose than 2.8.7 is available: 2.10.0"
+        errorLine1="lifecycle = &quot;2.8.7&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="12"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.8.7 is available: 2.10.0"
+        errorLine1="lifecycle = &quot;2.8.7&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="12"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-viewmodel-compose than 2.8.7 is available: 2.10.0"
+        errorLine1="lifecycle = &quot;2.8.7&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="12"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.navigation:navigation-compose than 2.8.4 is available: 2.9.8"
+        errorLine1="navigationCompose = &quot;2.8.4&quot;"
+        errorLine2="                    ~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="13"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.webkit:webkit than 1.12.1 is available: 1.16.0"
+        errorLine1="webkit = &quot;1.12.1&quot;"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="15"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of org.bouncycastle:bcprov-jdk18on than 1.78.1 is available: 1.79"
+        errorLine1="bouncycastle = &quot;1.78.1&quot;"
+        errorLine2="               ~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="18"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.material:material than 1.12.0 is available: 1.14.0"
+        errorLine1="material = &quot;1.12.0&quot;"
+        errorLine2="           ~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="25"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="FlowOperatorInvokedInComposition"
+        message="Flow operator functions should not be invoked within composition"
+        errorLine1="                            .filter { it.terminalId == activeTerminalId }"
+        errorLine2="                             ~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="302"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="FlowOperatorInvokedInComposition"
+        message="Flow operator functions should not be invoked within composition"
+        errorLine1="                            .map { it.bytes },"
+        errorLine2="                             ~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="303"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="FlowOperatorInvokedInComposition"
+        message="Flow operator functions should not be invoked within composition"
+        errorLine1="                            .filter { it.terminalId == activeTerminalId }"
+        errorLine2="                             ~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="325"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="FlowOperatorInvokedInComposition"
+        message="Flow operator functions should not be invoked within composition"
+        errorLine1="                            .map { it.bytes },"
+        errorLine2="                             ~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="326"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                                userVisibleMessage ?: context.getString(R.string.git_repo_diff_load_error)"
+        errorLine2="                                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
+            line="304"
+            column="55"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="            gitActionProgressMessage = context.getString(R.string.git_init_initializing)"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
+            line="595"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                    gitActionProgressMessage = context.getString(R.string.git_init_initialized)"
+        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
+            line="607"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                errorMessage = context.getString(R.string.qr_scanner_camera_denied)"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
+            line="128"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="            statusMessage = context.getString(R.string.qr_scanner_valid)"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
+            line="153"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                                context.getString(R.string.sidebar_worktree_chat_no_local_project)"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
+            line="156"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                                            ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)"
+        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
+            line="168"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                                        context.getString(R.string.sidebar_worktree_chat_no_base_branch)"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
+            line="174"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                                    ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
+            line="184"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                    renameError = context.getString(R.string.thread_rename_dialog_empty)"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
+            line="437"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                            inlineUndoError = context.getString(R.string.turn_usage_revert_reason_missing_cwd)"
+        errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            line="1293"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                                            ?: context.getString(R.string.turn_message_action_undo_failed)"
+        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            line="1317"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                                        ?: context.getString(R.string.turn_message_action_undo_failed)"
+        errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            line="1331"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current"
+        errorLine1="                            context.getString(R.string.git_branch_checkout_elsewhere_blocked)"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            line="1533"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="LocalContextResourcesRead"
+        message="Reading Resources using LocalContext.current.resources"
+        errorLine1="            TurnMarkdownRenderCache.toolExecutionUi(preview, details, context.resources)"
+        errorLine2="                                                                      ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/subagent/TurnCommandExecutionCard.kt"
+            line="63"
+            column="71"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/navigation/AppNavHost.kt"
+            line="28"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/BridgeUpdateSheet.kt"
+            line="40"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/design/canvas/CanvasSnapshotViewer.kt"
+            line="42"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/agent/CodeAgentScreen.kt"
+            line="24"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/agent/ConversationHeader.kt"
+            line="111"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier.fillMaxSize(),"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/HomeMainContent.kt"
+            line="42"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Optional Modifier parameter should have a default value of `Modifier`"
+        errorLine1="    modifier: Modifier = Modifier.fillMaxSize(),"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/HomeMainContent.kt"
+            line="42"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarProjectPickerSheet.kt"
+            line="92"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
+            line="86"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarSearchField.kt"
+            line="45"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarThreadRow.kt"
+            line="65"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarThreadRow.kt"
+            line="242"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/ThreadCompletionBanner.kt"
+            line="177"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/agent/ToolCallRow.kt"
+            line="18"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/subagent/TurnCommandExecutionCard.kt"
+            line="54"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/composer/TurnComposerBar.kt"
+            line="106"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/composer/TurnComposerSecondaryBar.kt"
+            line="69"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            line="171"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/toolbar/TurnGitBranchAccessory.kt"
+            line="85"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/toolbar/TurnPlanAccessoryCard.kt"
+            line="49"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libtermux.so` (from `com.termux.termux-app:terminal-emulator:0.118.0`) is not 16 KB aligned"
+        errorLine1="termux-terminal-emulator = { module = &quot;com.termux.termux-app:terminal-emulator&quot;, version.ref = &quot;termux&quot; }"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            line="79"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libtermux.so` (from `com.termux.termux-app:terminal-emulator:0.118.0`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/8.11.1/transforms/439dd170a6b3ef209e0f61e7d12d1a67/transformed/terminal-emulator-0.118.0/jni/arm64-v8a/libtermux.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libtermux.so` (from `com.termux.termux-app:terminal-emulator:0.118.0`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/8.11.1/transforms/439dd170a6b3ef209e0f61e7d12d1a67/transformed/terminal-emulator-0.118.0/jni/arm64-v8a/libtermux.so"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Use of this function is discouraged because resource reflection makes it harder to perform build optimizations and compile-time verification of code. It is much more efficient to retrieve resources by identifier (e.g. `R.foo.bar`) than by name (e.g. `getIdentifier(&quot;bar&quot;, &quot;foo&quot;, null)`)."
+        errorLine1="        val resId = context.resources.getIdentifier(name, &quot;string&quot;, context.packageName)"
+        errorLine2="                                      ~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/config/AppEnvironment.kt"
+            line="54"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;inputs&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;notification_structured_input_many&quot;>%1$d inputs needed to continue.&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="12"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;more&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;thread_list_truncated&quot;>+%1$d more…&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="20"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;items&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_timeline_group_toggle_expand_cd&quot;>Show %1$d items&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="44"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;files&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_timeline_file_change_totals&quot;>%1$d files | +%2$d/-%3$d&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="55"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;more&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_timeline_file_change_entry_line_more&quot;>%1$s | +%2$d/-%3$d | +%4$d more&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="57"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;files&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_timeline_file_change_n_files&quot;>%1$d files&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="60"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;items&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_attachment_limit&quot;>You can attach up to %1$d items per message.&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="100"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;attachments&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_attachment_overflow&quot;>Only %1$d attachments are allowed per message.&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="101"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;draft&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_queue_pending_count&quot;>%1$d draft(s) queued while current turn runs.&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="116"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;image&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_queue_item_attachments&quot;>%1$d image(s)&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="122"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;more&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_queue_more_items&quot;>+%1$d more queued drafts&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="123"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;files&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_usage_revert_item_metrics&quot;>%1$d files · +%2$d/-%3$d&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="195"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;more&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_usage_revert_more&quot;>+%1$d more change sets&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="197"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;more&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;turn_plan_more_steps&quot;>+%1$d more steps&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="239"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;branches&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;git_branch_elsewhere_suffix&quot;> · %1$d branches checked out elsewhere&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="460"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;branches&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;git_branch_cd_loaded&quot;>Git branch %1$s, default %2$s, %3$d branches checked out in other worktrees&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="461"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="TrustAllX509TrustManager"
+        message="`checkServerTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers">
+        <location
+            file="$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle/bcpkix-jdk18on/1.75/5adfef8a71a0933454739264b56283cc73dd2383/bcpkix-jdk18on-1.75.jar"/>
+    </issue>
+
+    <issue
+        id="InsecureBaseConfiguration"
+        message="Insecure Base Configuration"
+        errorLine1="    &lt;base-config cleartextTrafficPermitted=&quot;true&quot;>"
+        errorLine2="                                            ~~~~">
+        <location
+            file="src/main/res/xml/network_security_config.xml"
+            line="3"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 26"
+        errorLine1="                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            line="143"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is never &lt; 26"
+        errorLine1="            if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            line="224"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 26"
+        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 26"
+        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            line="53"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 26. Merge all the resources in this folder into `mipmap-anydpi`.">
+        <location
+            file="src/main/res/mipmap-anydpi-v26"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `CodexMessagePersistence` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="    lateinit var messagePersistence: CodexMessagePersistence"
+        errorLine2="    ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/AppContainer.kt"
+            line="45"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `AIChangeSetPersistence` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="    lateinit var aiChangeSetPersistence: AIChangeSetPersistence"
+        errorLine2="    ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/AppContainer.kt"
+            line="48"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnnecessaryArrayInit"
+        message="This initialization lambda (`{ 0 }`) is unnecessary and is less efficient"
+        errorLine1="    val nonce = ByteArray(12) { 0 }"
+        errorLine2="                              ~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt"
+            line="364"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var gitToolbarRefreshNonce by remember { mutableStateOf(0) }"
+        errorLine2="                                             ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
+            line="139"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var scannerResetNonce by remember { mutableStateOf(0) }"
+        errorLine2="                                        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
+            line="100"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var refreshNonce by remember { mutableStateOf(0) }"
+        errorLine2="                                   ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/settings/SettingsScreen.kt"
+            line="295"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableDoubleStateOf` instead of `mutableStateOf`"
+        errorLine1="    var fontSize by remember { mutableStateOf(TERMINAL_FONT_SIZE_DEFAULT) }"
+        errorLine2="                               ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="66"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableDoubleStateOf` instead of `mutableStateOf`"
+        errorLine1="    var voiceRecordingDurationSeconds by remember(threadId) { mutableStateOf(0.0) }"
+        errorLine2="                                                              ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            line="216"
+            column="63"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.drawer_brand_subtitle` appears to be unused"
+        errorLine1="    &lt;string name=&quot;drawer_brand_subtitle&quot;>Chats &amp;amp; bridge&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="4"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.root_placeholder_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;root_placeholder_title&quot;>agnt&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="16"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.root_placeholder_body` appears to be unused"
+        errorLine1="    &lt;string name=&quot;root_placeholder_body&quot;>Android shell — protocol and UI in later phases.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="17"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.thread_list_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;thread_list_title&quot;>Threads&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="18"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.thread_list_empty` appears to be unused"
+        errorLine1="    &lt;string name=&quot;thread_list_empty&quot;>No threads yet. Connect the bridge, then refresh the list or start a chat on the desktop.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="19"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.thread_list_truncated` appears to be unused"
+        errorLine1="    &lt;string name=&quot;thread_list_truncated&quot;>+%1$d more…&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="20"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.home_thread_selected_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;home_thread_selected_title&quot;>Selected thread&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="33"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.home_thread_selected_hint` appears to be unused"
+        errorLine1="    &lt;string name=&quot;home_thread_selected_hint&quot;>Full conversation UI arrives in Phase J (Turn screen).&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="34"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_timeline_kind_file` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_timeline_kind_file&quot;>File change&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="39"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_timeline_kind_command` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_timeline_kind_command&quot;>Command&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="40"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_timeline_file_change_totals` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_timeline_file_change_totals&quot;>%1$d files | +%2$d/-%3$d&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="55"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_timeline_file_change_entry_line` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_timeline_file_change_entry_line&quot;>%1$s | +%2$d/-%3$d&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="56"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_timeline_file_change_entry_line_more` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_timeline_file_change_entry_line_more&quot;>%1$s | +%2$d/-%3$d | +%4$d more&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="57"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_timeline_file_change_n_files` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_timeline_file_change_n_files&quot;>%1$d files&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="60"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_command_open_sheet` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_command_open_sheet&quot;>Open&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="73"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_code_comment_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_code_comment_title&quot;>Code comment&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="85"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_fork_accessory_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_fork_accessory_title&quot;>Thread fork&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="124"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_fork_accessory_action` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_fork_accessory_action&quot;>Fork&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="125"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_message_action_undo_applying` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_message_action_undo_applying&quot;>Undoing…&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="129"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_message_action_undo_failed_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_message_action_undo_failed_title&quot;>Undo failed&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="131"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_worktree_handoff_sheet_base_branch` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_worktree_handoff_sheet_base_branch&quot;>Base branch&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="159"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_worktree_handoff_sheet_target_path` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_worktree_handoff_sheet_target_path&quot;>Target: %1$s&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="161"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_usage_revert_row_status` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_usage_revert_row_status&quot;>Status: %1$s&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="178"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.turn_connected_locally` appears to be unused"
+        errorLine1="    &lt;string name=&quot;turn_connected_locally&quot;>Connected locally&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="213"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.cd_sidebar_new_managed_worktree_chat` appears to be unused"
+        errorLine1="    &lt;string name=&quot;cd_sidebar_new_managed_worktree_chat&quot;>Start a new chat in a managed worktree for the current project&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="251"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.sidebar_project_picker_quick_locations` appears to be unused"
+        errorLine1="    &lt;string name=&quot;sidebar_project_picker_quick_locations&quot;>Quick locations&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="274"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.sidebar_project_picker_no_quick_locations` appears to be unused"
+        errorLine1="    &lt;string name=&quot;sidebar_project_picker_no_quick_locations&quot;>No quick locations yet. Browse a folder below.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="279"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.sidebar_project_picker_folders` appears to be unused"
+        errorLine1="    &lt;string name=&quot;sidebar_project_picker_folders&quot;>Folders&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="280"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.sidebar_project_picker_no_project` appears to be unused"
+        errorLine1="    &lt;string name=&quot;sidebar_project_picker_no_project&quot;>Chat without working directory&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="293"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.whats_new_sidebar_settings_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;whats_new_sidebar_settings_title&quot;>Settings polish&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="413"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.whats_new_sidebar_settings_item` appears to be unused"
+        errorLine1="    &lt;string name=&quot;whats_new_sidebar_settings_item&quot;>Settings usage information and release notes were refreshed for this build.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="414"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.onboarding_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;onboarding_title&quot;>Welcome to agnt&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="416"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.onboarding_subtitle` appears to be unused"
+        errorLine1="    &lt;string name=&quot;onboarding_subtitle&quot;>Pair your phone with the agnt bridge on your computer.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="417"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.onboarding_step_codex_cli` appears to be unused"
+        errorLine1="    &lt;string name=&quot;onboarding_step_codex_cli&quot;>1. Install Codex CLI: npm install -g @openai/codex@latest&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="418"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.onboarding_step_bridge` appears to be unused"
+        errorLine1="    &lt;string name=&quot;onboarding_step_bridge&quot;>2. Install the bridge: bun install -g @dotbrains/agnt&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="419"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.onboarding_step_scan` appears to be unused"
+        errorLine1="    &lt;string name=&quot;onboarding_step_scan&quot;>3. Run the bridge, show the pairing QR, then scan it on the next screen.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="420"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.qr_scanner_hint` appears to be unused"
+        errorLine1="    &lt;string name=&quot;qr_scanner_hint&quot;>Scan the JSON QR from the bridge terminal. If the relay is 127.0.0.1, enter your PC\&apos;s LAN IP below before connecting.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="423"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.qr_relay_host_override_label` appears to be unused"
+        errorLine1="    &lt;string name=&quot;qr_relay_host_override_label&quot;>Relay host override (optional)&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="427"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.qr_relay_host_override_placeholder` appears to be unused"
+        errorLine1="    &lt;string name=&quot;qr_relay_host_override_placeholder&quot;>e.g. 192.168.1.10 or 10.0.2.2&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="428"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.qr_token_override_label` appears to be unused"
+        errorLine1="    &lt;string name=&quot;qr_token_override_label&quot;>Bearer token (optional)&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="429"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.qr_token_override_placeholder` appears to be unused"
+        errorLine1="    &lt;string name=&quot;qr_token_override_placeholder&quot;>empty = use session id&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="430"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.qr_connect_button` appears to be unused"
+        errorLine1="    &lt;string name=&quot;qr_connect_button&quot;>Connect to bridge&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="431"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.git_discard_confirm_action` appears to be unused"
+        errorLine1="    &lt;string name=&quot;git_discard_confirm_action&quot;>Discard&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="524"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.git_sync_need_desktop_pull` appears to be unused"
+        errorLine1="    &lt;string name=&quot;git_sync_need_desktop_pull&quot;>Branch needs a pull or rebase. Complete this on your Mac if the branch diverged.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="530"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.git_discard_runtime_confirm_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;git_discard_runtime_confirm_title&quot;>Discard local changes?&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="531"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.git_discard_runtime_confirm_body` appears to be unused"
+        errorLine1="    &lt;string name=&quot;git_discard_runtime_confirm_body&quot;>This resets the current branch toward the remote and removes uncommitted changes. This cannot be undone from the phone.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="532"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.composer_runtime_menu_worktree_new` appears to be unused"
+        errorLine1="    &lt;string name=&quot;composer_runtime_menu_worktree_new&quot;>New worktree&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="536"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="    &lt;string name=&quot;nav_reconnect_connecting&quot;>Reconnecting...&lt;/string>"
+        errorLine2="                                            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="26"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="    &lt;string name=&quot;nav_reconnect_waking&quot;>Waking computer...&lt;/string>"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="28"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="    &lt;string name=&quot;turn_runtime_loading&quot;>Loading...&lt;/string>"
+        errorLine2="                                        ~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="218"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="    &lt;string name=&quot;sidebar_thread_delete_local_deleting&quot;>Removing...&lt;/string>"
+        errorLine2="                                                        ~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="304"
+            column="57"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="    &lt;string name=&quot;sidebar_project_archive_busy&quot;>Archiving...&lt;/string>"
+        errorLine2="                                                ~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="308"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="    &lt;string name=&quot;sidebar_project_delete_local_busy&quot;>Removing...&lt;/string>"
+        errorLine2="                                                     ~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="312"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="    &lt;string name=&quot;git_init_initializing&quot;>Initializing...&lt;/string>"
+        errorLine2="                                         ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="519"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="MonochromeLauncherIcon"
+        message="The application adaptive icon is missing a monochrome tag"
+        errorLine1="&lt;adaptive-icon xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;>"
+        errorLine2="^">
+        <location
+            file="src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="MonochromeLauncherIcon"
+        message="The application adaptive roundIcon is missing a monochrome tag"
+        errorLine1="&lt;adaptive-icon xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;>"
+        errorLine2="^">
+        <location
+            file="src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().remove(key).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            line="219"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            context.applicationContext"
+        errorLine2="            ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            line="272"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs(context).edit().putString(AppFontStyle.storageKey, style.name).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/AppFontPreferences.kt"
+            line="20"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs(context).edit().putString(AppLanguagePreference.storageKey, preference.name).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            line="31"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))"
+        errorLine2="                                                         ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
+            line="413"
+            column="58"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putBoolean(KEY_HAS_SEEN_ONBOARDING, value).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/OnboardingPreferences.kt"
+            line="20"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putString(key, value).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/security/SecureStore.kt"
+            line="33"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().remove(key).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/security/SecureStore.kt"
+            line="73"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putBoolean(KEY_FORCE_QR_BOOTSTRAP, value).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="72"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putOrRemove(KEY_LOCAL_RELAY_HOST_OVERRIDE, value?.trim()?.takeIf { it.isNotEmpty() }).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="97"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().remove(KEY_LAST_ACTIVE_THREAD).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="102"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().putString(KEY_LAST_ACTIVE_THREAD, threadId.trim()).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="104"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs"
+        errorLine2="        ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="124"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs"
+        errorLine2="            ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="135"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs"
+        errorLine2="        ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="154"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs"
+        errorLine2="        ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="179"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs"
+        errorLine2="            ^">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="190"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().putStringSet(KEY_LOCALLY_DELETED_THREAD_IDS, existing).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="210"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().putStringSet(KEY_LOCALLY_ARCHIVED_THREAD_IDS, existing).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="227"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            prefs.edit().putStringSet(KEY_LOCALLY_ARCHIVED_THREAD_IDS, existing).apply()"
+        errorLine2="            ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="236"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putStringSet(KEY_CACHED_THREADS, entries).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            line="256"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toColorInt` instead?"
+        errorLine1="    return Color(android.graphics.Color.parseColor(&quot;#$cleaned&quot;))"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalAccessoryBar.kt"
+            line="84"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toColorInt` instead?"
+        errorLine1="    val backgroundColor = remember(theme) { Color(android.graphics.Color.parseColor(theme.background)) }"
+        errorLine2="                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="54"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toColorInt` instead?"
+        errorLine1="                .background(Color(android.graphics.Color.parseColor(theme.background)))"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="381"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toColorInt` instead?"
+        errorLine1="            color = Color(android.graphics.Color.parseColor(theme.foreground)),"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="389"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toColorInt` instead?"
+        errorLine1="            color = Color(android.graphics.Color.parseColor(theme.mutedForeground)),"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            line="394"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toColorInt` instead?"
+        errorLine1="                        setBackgroundColor(android.graphics.Color.parseColor(theme.background))"
+        errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalWebViewSurface.kt"
+            line="80"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toColorInt` instead?"
+        errorLine1="            view.setBackgroundColor(android.graphics.Color.parseColor(theme.background))"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalWebViewSurface.kt"
+            line="155"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs(context).edit().putString(AppThemePreference.storageKey, preference.name).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/ThemePreferences.kt"
+            line="21"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="                Bitmap.createScaledBitmap(decoded, targetWidth, targetHeight, true).also {"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/TurnAttachmentCodec.kt"
+            line="102"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val thumbnail = Bitmap.createBitmap(THUMBNAIL_SIDE, THUMBNAIL_SIDE, Bitmap.Config.ARGB_8888)"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/TurnAttachmentCodec.kt"
+            line="114"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        return Uri.parse(source).path?.takeIf { it.isNotBlank() }"
+        errorLine2="               ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/attachments/TurnAttachmentViews.kt"
+            line="352"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                ): Boolean = !isAllowedUrl(Uri.parse(url))"
+        errorLine2="                                           ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            line="205"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                ): Boolean = !isAllowedUrl(Uri.parse(url))"
+        errorLine2="                                           ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            line="205"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    val parsed = Uri.parse(url)"
+        errorLine2="                                 ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            line="224"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    val parsed = Uri.parse(url)"
+        errorLine2="                                 ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            line="224"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    if (!isAllowedUrl(Uri.parse(url))) {"
+        errorLine2="                                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            line="237"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    if (!isAllowedUrl(Uri.parse(url))) {"
+        errorLine2="                                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            line="237"
+            column="39"/>
+    </issue>
+
+</issues>

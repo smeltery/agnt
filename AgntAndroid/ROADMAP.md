@@ -283,6 +283,29 @@ Open follow-ups:
       Android Lint, which currently has 20 pre-existing errors that are
       separate housekeeping work (track in a follow-up if anyone wants a
       Lint baseline).
+- [x] **Android Lint baseline established.** `AgntAndroid/app/lint-baseline.xml`
+      snapshots the current 20 errors / 163 warnings / 6 hints so
+      `:app:lintDebug` now exits clean and gates only NEW lint findings.
+      Wired via `android { lint { baseline = file("lint-baseline.xml") } }` in
+      `app/build.gradle.kts`. The pre-existing issues are real housekeeping
+      that should be addressed individually (see breakdown below); the
+      baseline just stops them from auto-failing every build while that
+      work is queued. To regenerate after fixing any: `./gradlew
+      :app:updateLintBaseline`. Current error categories:
+        - **`LocalContextGetResourceValueCall` (14)** — `context.getString(R.string.x)`
+          inside `scope.launch { }` blocks within Composables. Fix is to
+          hoist `stringResource(R.string.x)` to a `val` at the top of each
+          Composable so it re-caches on configuration change. MainShell.kt,
+          QrScannerScreen.kt, SidebarScreen.kt, TurnConversationPane.kt.
+        - **`FlowOperatorInvokedInComposition` (4)** — `controller.outputEvents.filter { … }.map { … }`
+          allocated on every recomposition inside `TerminalScreen.kt`.
+          Fix is `remember(activeTerminalId) { … }` around the chain.
+        - **`MissingPermission` (2)** — `NotificationManagerCompat.notify`
+          (AgntLocalNotificationPresenter:169) and `AudioRecord(…)`
+          (BridgeVoiceRecorder:157) can throw `SecurityException` if the
+          user revokes POST_NOTIFICATIONS / RECORD_AUDIO at runtime. Wrap
+          in `try { … } catch (e: SecurityException) { … }` or
+          `checkSelfPermission` first.
 - [x] **Unsigned debug APK uploaded on PRs.** The existing
       `assembleDebug` step now publishes
       `app/build/outputs/apk/debug/*.apk` as
