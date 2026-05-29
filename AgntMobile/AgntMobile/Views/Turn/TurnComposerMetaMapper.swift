@@ -93,7 +93,7 @@ enum TurnComposerMetaMapper {
     }
 
     // Maps raw effort values to user-facing labels.
-    static func reasoningTitle(for effort: String) -> String {
+    nonisolated static func reasoningTitle(for effort: String) -> String {
         let normalized = effort
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()

@@ -3219,7 +3219,7 @@ private actor WorkspaceImagePreviewCache {
 }
 
 private enum CommandImagePreviewDecoder {
-    private static let maxPreviewPixelDimension = 2_400
+    nonisolated private static let maxPreviewPixelDimension = 2_400
 
     // Downsamples and prepares the preview off the main actor before presenting it.
     static func decode(_ data: Data) async throws -> CommandImagePreviewPayload {

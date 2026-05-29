@@ -16,7 +16,7 @@ enum TurnMessageRegexCache {
     static let trailingInlineTotals = try? NSRegularExpression(
         pattern: #"\s*[+\u{FF0B}]\s*\d+\s*[-\u{2212}\u{2013}\u{2014}\u{FE63}\u{FF0D}]\s*\d+\s*$"#
     )
-    static let trailingLineColumn = try? NSRegularExpression(pattern: #":\d+(?::\d+)?$"#)
+    nonisolated static let trailingLineColumn = try? NSRegularExpression(pattern: #":\d+(?::\d+)?$"#)
     static let fileLikeToken = try? NSRegularExpression(pattern: #"[A-Za-z0-9_+.-]+\.[A-Za-z0-9]+$"#)
     static let markdownLinkToken = try? NSRegularExpression(pattern: #"^\[([^\]]+)\]\(([^)]+)\)$"#)
     static let heading = try? NSRegularExpression(pattern: #"(?m)^#{1,6}\s+(.+)$"#)
@@ -25,7 +25,7 @@ enum TurnMessageRegexCache {
     )
     static let inlineCodeContent = try? NSRegularExpression(pattern: #"`([^`\n]+)`"#)
     static let markdownLinkRange = try? NSRegularExpression(pattern: #"\[[^\]]+\]\([^)]+\)"#)
-    static let inlineCodeRange = try? NSRegularExpression(pattern: #"`[^`]+`"#)
+    nonisolated static let inlineCodeRange = try? NSRegularExpression(pattern: #"`[^`]+`"#)
     static let userMentionToken = try? NSRegularExpression(
         // File mentions may contain spaces, but skills remain single-token `$name` values.
         pattern: #"(?<![A-Za-z0-9_])([@$])((?:[^@$\n]+?\.[A-Za-z0-9]+)|(?:[^\s@$]+))(?=[\s,.;:!?)\]}>]|$)"#
@@ -60,13 +60,13 @@ enum TurnMessageRegexCache {
         return regex.matches(in: line, range: NSRange(location: 0, length: nsLine.length)).map(\.range)
     }
 
-    static func inlineCodeRanges(in line: String) -> [NSRange] {
+    nonisolated static func inlineCodeRanges(in line: String) -> [NSRange] {
         guard let regex = inlineCodeRange else { return [] }
         let nsLine = line as NSString
         return regex.matches(in: line, range: NSRange(location: 0, length: nsLine.length)).map(\.range)
     }
 
-    static func rangeOverlaps(_ range: NSRange, protectedRanges: [NSRange]) -> Bool {
+    nonisolated static func rangeOverlaps(_ range: NSRange, protectedRanges: [NSRange]) -> Bool {
         for protectedRange in protectedRanges where NSIntersectionRange(range, protectedRange).length > 0 {
             return true
         }
@@ -79,7 +79,7 @@ enum TurnMessageRegexCache {
         return regex.stringByReplacingMatches(in: text, range: fullRange, withTemplate: template)
     }
 
-    static func removingTrailingLineColumnSuffix(from token: String) -> String {
+    nonisolated static func removingTrailingLineColumnSuffix(from token: String) -> String {
         guard let regex = trailingLineColumn else {
             return token
         }

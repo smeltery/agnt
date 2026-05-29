@@ -110,7 +110,7 @@ private struct NormalizedQuestionSignature: Hashable {
     let question: String
     let options: [String]
 
-    init(_ question: CodexStructuredUserInputQuestion) {
+    nonisolated init(_ question: CodexStructuredUserInputQuestion) {
         self.question = question.question
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
@@ -566,7 +566,7 @@ struct InferredPlanQuestionnaire: Hashable {
 }
 
 enum InferredPlanQuestionnaireParser {
-    static func parseAssistantMessage(_ text: String) -> InferredPlanQuestionnaire? {
+    nonisolated static func parseAssistantMessage(_ text: String) -> InferredPlanQuestionnaire? {
         if hasAssistantQuestionnaireCue(in: text) {
             return parse(text)
         }
@@ -584,7 +584,7 @@ enum InferredPlanQuestionnaireParser {
         return parse(text)
     }
 
-    static func parse(_ text: String) -> InferredPlanQuestionnaire? {
+    nonisolated static func parse(_ text: String) -> InferredPlanQuestionnaire? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return nil
@@ -642,7 +642,7 @@ enum InferredPlanQuestionnaireParser {
         )
     }
 
-    private static func parseQuestionBlock(_ block: QuestionBlock) -> ParsedQuestionBlock {
+    nonisolated private static func parseQuestionBlock(_ block: QuestionBlock) -> ParsedQuestionBlock {
         var promptLines: [String] = []
         var optionLines: [String] = []
         var outroLines: [String] = []
@@ -707,7 +707,7 @@ enum InferredPlanQuestionnaireParser {
         return ParsedQuestionBlock(question: question, outroLines: outroLines)
     }
 
-    private static func questionNumber(from line: String) -> Int? {
+    nonisolated private static func questionNumber(from line: String) -> Int? {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = trimmed.replacingOccurrences(
             of: #"^\**\s*|\s*\**$"#,
@@ -733,7 +733,7 @@ enum InferredPlanQuestionnaireParser {
         return Int(digits)
     }
 
-    private static func questionBody(from line: String) -> String {
+    nonisolated private static func questionBody(from line: String) -> String {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = trimmed.replacingOccurrences(
             of: #"^\**\s*|\s*\**$"#,
@@ -751,7 +751,7 @@ enum InferredPlanQuestionnaireParser {
         return String(normalized[match.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func bulletText(from line: String) -> String? {
+    nonisolated private static func bulletText(from line: String) -> String? {
         let prefixes = ["• ", "- ", "* ", "+ ", "•", "-", "*", "+"]
         for prefix in prefixes {
             if line.hasPrefix(prefix) {
@@ -761,7 +761,7 @@ enum InferredPlanQuestionnaireParser {
         return nil
     }
 
-    private static func inferredSelectionLimit(from prompt: String) -> Int? {
+    nonisolated private static func inferredSelectionLimit(from prompt: String) -> Int? {
         let lowered = prompt.lowercased()
         if lowered.contains("up to two") || lowered.contains("choose two") || lowered.contains("pick two") {
             return 2
@@ -772,7 +772,7 @@ enum InferredPlanQuestionnaireParser {
         return nil
     }
 
-    private static func shouldTreatAsOutroLine(_ line: String) -> Bool {
+    nonisolated private static func shouldTreatAsOutroLine(_ line: String) -> Bool {
         let lowered = line.lowercased()
         return lowered.hasPrefix("once you answer")
             || lowered.hasPrefix("if you answer")
@@ -784,7 +784,7 @@ enum InferredPlanQuestionnaireParser {
             || lowered.hasPrefix("then i'll")
     }
 
-    private static func hasAssistantQuestionnaireCue(in text: String) -> Bool {
+    nonisolated private static func hasAssistantQuestionnaireCue(in text: String) -> Bool {
         let lowered = text.lowercased()
         return lowered.contains("questions for you")
             || lowered.contains("question for you")
@@ -800,7 +800,7 @@ enum InferredPlanQuestionnaireParser {
             || lowered.contains("after you answer")
     }
 
-    private static func parseAssistantChoiceList(_ text: String) -> InferredPlanQuestionnaire? {
+    nonisolated private static func parseAssistantChoiceList(_ text: String) -> InferredPlanQuestionnaire? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return nil
@@ -839,7 +839,7 @@ enum InferredPlanQuestionnaireParser {
         )
     }
 
-    private static func hasStructuredAssistantQuestionnaireShape(in text: String) -> Bool {
+    nonisolated private static func hasStructuredAssistantQuestionnaireShape(in text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return false
@@ -863,7 +863,7 @@ enum InferredPlanQuestionnaireParser {
         return false
     }
 
-    private static func isAssistantChoiceCue(_ line: String) -> Bool {
+    nonisolated private static func isAssistantChoiceCue(_ line: String) -> Bool {
         let lowered = line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return lowered.contains("one of these")
             || lowered.contains("turn this into")
@@ -871,7 +871,7 @@ enum InferredPlanQuestionnaireParser {
             || lowered.contains("pick one")
     }
 
-    private static func numberedOptionBlocks(from lines: [String]) -> [QuestionBlock] {
+    nonisolated private static func numberedOptionBlocks(from lines: [String]) -> [QuestionBlock] {
         var blocks: [QuestionBlock] = []
         var currentBlock: QuestionBlock?
 
@@ -899,7 +899,7 @@ enum InferredPlanQuestionnaireParser {
         return blocks
     }
 
-    private static func makeChoiceListOption(from block: QuestionBlock) -> CodexStructuredUserInputOption? {
+    nonisolated private static func makeChoiceListOption(from block: QuestionBlock) -> CodexStructuredUserInputOption? {
         let normalizedLines = block.lines
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -914,7 +914,7 @@ enum InferredPlanQuestionnaireParser {
         )
     }
 
-    private static func inferredInlineOptions(
+    nonisolated private static func inferredInlineOptions(
         from prompt: String
     ) -> (question: String, options: [CodexStructuredUserInputOption])? {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -954,7 +954,7 @@ enum InferredPlanQuestionnaireParser {
         return (question, options)
     }
 
-    private static func dropTrailingIncompleteQuestions(
+    nonisolated private static func dropTrailingIncompleteQuestions(
         from parsedQuestions: [ParsedQuestionBlock]
     ) -> [ParsedQuestionBlock] {
         var usableQuestions = parsedQuestions
@@ -964,7 +964,7 @@ enum InferredPlanQuestionnaireParser {
         return usableQuestions
     }
 
-    private static func normalizeTextBlock(_ lines: [String]) -> String? {
+    nonisolated private static func normalizeTextBlock(_ lines: [String]) -> String? {
         let normalized = lines
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .reduce(into: [String]()) { result, line in
@@ -991,7 +991,7 @@ private struct ParsedQuestionBlock {
     let question: CodexStructuredUserInputQuestion?
     let outroLines: [String]
 
-    var isQuestionLike: Bool {
+    nonisolated var isQuestionLike: Bool {
         guard let question else {
             return false
         }

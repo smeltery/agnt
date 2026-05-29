@@ -411,7 +411,7 @@ private struct QuestionSignature: Hashable {
     let selectionLimit: Int?
     let options: [OptionSignature]
 
-    init(_ question: CodexStructuredUserInputQuestion) {
+    nonisolated init(_ question: CodexStructuredUserInputQuestion) {
         self.id = question.id
         self.header = question.header
         self.question = question.question

@@ -47,7 +47,7 @@ struct AssistantMarkdownImageReference: Identifiable, Equatable {
     let path: String
     let altText: String
 
-    init(path: String, altText: String, occurrenceIndex: Int) {
+    nonisolated init(path: String, altText: String, occurrenceIndex: Int) {
         self.id = "\(occurrenceIndex)|\(path)"
         self.path = path
         self.altText = altText
@@ -163,9 +163,9 @@ enum AssistantMarkdownContentSegment: Identifiable, Equatable {
 }
 
 enum AssistantMarkdownImageReferenceParser {
-    private static let markdownImageRegex = try? NSRegularExpression(pattern: #"!\[([^\]]*)\]\(([^)]+)\)"#)
+    nonisolated private static let markdownImageRegex = try? NSRegularExpression(pattern: #"!\[([^\]]*)\]\(([^)]+)\)"#)
 
-    static func references(in text: String) -> [AssistantMarkdownImageReference] {
+    nonisolated static func references(in text: String) -> [AssistantMarkdownImageReference] {
         var references: [AssistantMarkdownImageReference] = []
         var isInsideFence = false
         var occurrenceIndex = 0
@@ -192,7 +192,7 @@ enum AssistantMarkdownImageReferenceParser {
         return references
     }
 
-    static func visibleTextRemovingImageSyntax(from text: String) -> String {
+    nonisolated static func visibleTextRemovingImageSyntax(from text: String) -> String {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         var isInsideFence = false
         let transformedLines = lines.compactMap { line -> String? in
@@ -317,7 +317,7 @@ enum AssistantMarkdownImageReferenceParser {
             .contains("/.codex/generated_images/")
     }
 
-    private static func markdownImageMatches(in text: String) -> [(range: NSRange, altText: String, path: String)] {
+    nonisolated private static func markdownImageMatches(in text: String) -> [(range: NSRange, altText: String, path: String)] {
         guard let regex = markdownImageRegex else {
             return []
         }
@@ -335,17 +335,17 @@ enum AssistantMarkdownImageReferenceParser {
         }
     }
 
-    private static func validImageMatches(in text: String) -> [(range: NSRange, altText: String, path: String)] {
+    nonisolated private static func validImageMatches(in text: String) -> [(range: NSRange, altText: String, path: String)] {
         markdownImageMatches(in: text).filter { match in
             CommandOutputImageReferenceParser.isImagePath(match.path)
         }
     }
 
-    private static func isFenceDelimiter(_ line: String) -> Bool {
+    nonisolated private static func isFenceDelimiter(_ line: String) -> Bool {
         line.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("`@agnt``")
     }
 
-    private static func normalizedImagePath(_ raw: String) -> String {
+    nonisolated private static func normalizedImagePath(_ raw: String) -> String {
         var candidate = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "\"'`<>"))
@@ -356,7 +356,7 @@ enum AssistantMarkdownImageReferenceParser {
         return candidate.removingPercentEncoding ?? candidate
     }
 
-    private static func replacementText(for match: (range: NSRange, altText: String, path: String)) -> String {
+    nonisolated private static func replacementText(for match: (range: NSRange, altText: String, path: String)) -> String {
         let trimmedAlt = match.altText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedAlt.isEmpty {
             return trimmedAlt
@@ -368,7 +368,7 @@ enum AssistantMarkdownImageReferenceParser {
 }
 
 enum CommandOutputImageReferenceParser {
-    private static let imageExtensions: Set<String> = [
+    nonisolated private static let imageExtensions: Set<String> = [
         "jpg", "jpeg", "png", "gif", "webp", "heic", "heif"
     ]
     private static let wildcardCharacters = CharacterSet(charactersIn: "*?")
@@ -472,7 +472,7 @@ enum CommandOutputImageReferenceParser {
         return (baseDirectory as NSString).appendingPathComponent(candidate)
     }
 
-    static func isImagePath(_ path: String) -> Bool {
+    nonisolated static func isImagePath(_ path: String) -> Bool {
         let ext = (path as NSString).pathExtension.lowercased()
         return imageExtensions.contains(ext)
     }

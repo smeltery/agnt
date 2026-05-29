@@ -9,8 +9,8 @@ import UIKit
 
 private enum RunningThreadHistoryCatchupPolicy {
     // Running-thread reopen only needs the latest transcript tail to catch up the UI.
-    static let recentMergeWindow = 160
-    static let cancellationCheckInterval = 32
+    nonisolated static let recentMergeWindow = 160
+    nonisolated static let cancellationCheckInterval = 32
 }
 
 fileprivate struct UserMessageSemanticKey: Equatable {

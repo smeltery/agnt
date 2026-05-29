@@ -166,7 +166,7 @@ struct CodexBridgeHostCapabilities: Codable, Equatable, Sendable {
     )
 }
 
-func codexGPTAccountInitialSnapshot() -> CodexGPTAccountSnapshot {
+nonisolated func codexGPTAccountInitialSnapshot() -> CodexGPTAccountSnapshot {
     CodexGPTAccountSnapshot(
         status: .unknown,
         authMethod: nil,

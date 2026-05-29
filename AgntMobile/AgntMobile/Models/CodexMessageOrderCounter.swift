@@ -12,10 +12,10 @@ import os
 /// regardless of wall-clock timestamp drift between device and server.
 enum CodexMessageOrderCounter {
     private nonisolated(unsafe) static var counter: Int = 0
-    private static let lock = NSLock()
+    nonisolated private static let lock = NSLock()
 
     /// Returns the next order index, incrementing the global counter atomically.
-    static func next() -> Int {
+    nonisolated static func next() -> Int {
         lock.lock()
         defer { lock.unlock() }
         let value = counter
@@ -25,7 +25,7 @@ enum CodexMessageOrderCounter {
 
     /// Seeds the counter so new messages always sort after existing persisted ones.
     /// Call this once after loading messages from disk.
-    static func seed(from allMessages: [String: [CodexMessage]]) {
+    nonisolated static func seed(from allMessages: [String: [CodexMessage]]) {
         let maxExisting = allMessages.values.flatMap { $0 }.map(\.orderIndex).max() ?? -1
         lock.lock()
         defer { lock.unlock() }

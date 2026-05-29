@@ -243,7 +243,7 @@ struct CodexStructuredUserInputOption: Identifiable, Codable, Hashable, Sendable
     let label: String
     let description: String
 
-    init(id: String = UUID().uuidString, label: String, description: String) {
+    nonisolated init(id: String = UUID().uuidString, label: String, description: String) {
         self.id = id
         self.label = label
         self.description = description
@@ -259,7 +259,7 @@ struct CodexStructuredUserInputQuestion: Identifiable, Codable, Hashable, Sendab
     let selectionLimit: Int?
     let options: [CodexStructuredUserInputOption]
 
-    init(
+    nonisolated init(
         id: String,
         header: String,
         question: String,
