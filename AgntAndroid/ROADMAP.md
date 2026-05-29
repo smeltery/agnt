@@ -135,6 +135,34 @@ Open follow-ups:
       menu. Empty cwd is hidden so unconnected/idle tabs don't show a
       stray subtitle.
 
+### P2.6 — QR pairing hardening (upstream 245ea8a)
+
+- [x] **Short pairing codes + pasteable `RMX1:` prefix.** Ported the
+      QR scanner / validator changes from upstream Stivy-01/remodex
+      `245ea8a`: `QrPairingValidator.kt` (+87 lines) gained
+      `QrPairingValidationResult.ShortCode`, the
+      `[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8,12}` regex,
+      `normalizeShortPairingCode` (public, also lower-cases via
+      `uppercase()` + strips dashes/spaces), and
+      `decodePasteablePairingCode` for `RMX1:base64...` paste tokens
+      (URL-safe Base64 with stripped padding). The `RMX1:` prefix
+      matches iOS `QRScannerPairingValidator.swift:17`. `QrScannerScreen`
+      (+136 lines) dropped the secondary "Relay URL for short codes"
+      input field in favor of a smart manual-entry parser
+      (`parseManualPairingInput`) that extracts pairing code + relay URL
+      from arbitrary pasted text — including `code: ABCDEF` labels,
+      bare 8-12-char short codes, and embedded `ws(s)?://` / `https?://`
+      relay URLs — and a multi-candidate resolver
+      (`resolvePairingCodeWithCandidates`) that tries pasted relay →
+      saved snapshot → trusted-Mac registry → `AppEnvironment.relayBaseURL`
+      until one resolves. `looksLikeRemodexPairingPayload` →
+      `looksLikeAgntPairingPayload` and "Update Remodex" copy →
+      "Update agnt" to match iOS. Three new tests
+      (`shortPairingCode_returnsLookupRequest`,
+      `pasteablePairingCode_decodesPayload`,
+      `resolvePairingCode_preservesRelayPathPrefix`); full suite
+      562 unit tests green, ktlint clean.
+
 ### P2.5 — beta tester module
 
 - [x] **Removed.** The `beta/` module and `TesterHqScreen` integrated with

@@ -63,7 +63,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.R
+import com.dotbrains.agnt.mobile.core.config.AppEnvironment
 import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
+import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRegistry
+import com.dotbrains.agnt.mobile.core.security.CodexSecureKeys
+import com.dotbrains.agnt.mobile.core.transport.validateRelayUrl
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.QrPairingValidationResult
 import com.dotbrains.agnt.mobile.data.resolvePairingCode
@@ -96,14 +100,6 @@ fun QrScannerScreen(
     var scannerResetNonce by remember { mutableStateOf(0) }
     var manualPairingDialogVisible by remember { mutableStateOf(false) }
     var manualPairingText by remember { mutableStateOf("") }
-    var manualRelayUrl by remember {
-        mutableStateOf(
-            AppContainer.sessionPersistence
-                .loadRelaySnapshot()
-                .relayUrl
-                .orEmpty(),
-        )
-    }
 
     fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -185,6 +181,10 @@ fun QrScannerScreen(
                 manualPairingDialogVisible = false
                 runConnect(result.payload)
             }
+            is QrPairingValidationResult.ShortCode -> {
+                scanEnabled = false
+                errorMessage = "Use Enter pairing code for the short code from your desktop."
+            }
             is QrPairingValidationResult.ScanError -> {
                 scanEnabled = false
                 errorMessage = result.message
@@ -201,7 +201,8 @@ fun QrScannerScreen(
 
     fun submitManualPairing() {
         scope.launch {
-            val raw = manualPairingText.trim()
+            val manualInput = parseManualPairingInput(manualPairingText)
+            val raw = manualInput.codeOrPayload
             if (raw.isEmpty()) {
                 errorMessage = "Enter the pairing code from your desktop."
                 return@launch
@@ -219,19 +220,13 @@ fun QrScannerScreen(
                         connecting = false
                         handlePairingResult(directResult)
                     }
+                    is QrPairingValidationResult.ShortCode -> {
+                        val resolved = resolveManualPairingCode(context, directResult.code)
+                        connecting = false
+                        handlePairingResult(resolved)
+                    }
                     is QrPairingValidationResult.ScanError -> {
-                        val relay = manualRelayUrl.trim()
-                        if (relay.isEmpty()) {
-                            connecting = false
-                            errorMessage = "Enter the relay URL shown on your desktop to use a short pairing code."
-                            return@launch
-                        }
-                        val resolved =
-                            resolvePairingCode(
-                                httpClient = AppContainer.httpCallClient,
-                                relayUrl = relay,
-                                code = raw,
-                            )
+                        val resolved = resolveManualPairingCode(context, raw, manualInput.relayUrl)
                         connecting = false
                         handlePairingResult(resolved)
                     }
@@ -346,17 +341,10 @@ fun QrScannerScreen(
                     OutlinedTextField(
                         value = manualPairingText,
                         onValueChange = { manualPairingText = it },
-                        label = { Text("Pairing code or QR JSON") },
+                        label = { Text("Pairing code") },
+                        placeholder = { Text("ABCDEFGHJK") },
                         singleLine = false,
                         minLines = 2,
-                        enabled = !connecting,
-                    )
-                    OutlinedTextField(
-                        value = manualRelayUrl,
-                        onValueChange = { manualRelayUrl = it },
-                        label = { Text("Relay URL for short codes") },
-                        placeholder = { Text("ws://192.168.1.5:9000/relay") },
-                        singleLine = true,
                         enabled = !connecting,
                     )
                 }
@@ -379,6 +367,133 @@ fun QrScannerScreen(
             },
         )
     }
+}
+
+private data class ManualPairingInput(
+    val codeOrPayload: String,
+    val relayUrl: String?,
+)
+
+private val manualPairingRelayUrlRegex = Regex("""(?i)\b(?:wss?|https?)://[^\s,;)"']+""")
+private val manualPairingCodeLabelRegex =
+    Regex("""(?im)^\s*(?:pairing\s+)?code\s*[:=]\s*([A-Za-z0-9._:-]+)\s*$""")
+private val manualPairingShortCodeRegex = Regex("""\b[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8,12}\b""")
+private val manualPairingTokenRegex = Regex("""[A-Za-z0-9._:-]{4,256}""")
+
+private fun parseManualPairingInput(rawText: String): ManualPairingInput {
+    val trimmed = rawText.trim()
+    if (trimmed.isEmpty()) return ManualPairingInput(codeOrPayload = "", relayUrl = null)
+
+    val relayUrl = extractManualRelayUrl(trimmed)
+    if (trimmed.startsWith("{")) {
+        return ManualPairingInput(codeOrPayload = trimmed, relayUrl = relayUrl)
+    }
+
+    val labeledCode =
+        manualPairingCodeLabelRegex
+            .find(trimmed)
+            ?.groups
+            ?.get(1)
+            ?.value
+    if (!labeledCode.isNullOrBlank()) {
+        return ManualPairingInput(codeOrPayload = labeledCode.trim(), relayUrl = relayUrl)
+    }
+
+    val textWithoutRelay =
+        relayUrl?.let { trimmed.replace(it, " ") } ?: trimmed
+    val shortCode = manualPairingShortCodeRegex.find(textWithoutRelay.uppercase())?.value
+    if (!shortCode.isNullOrBlank()) {
+        return ManualPairingInput(codeOrPayload = shortCode, relayUrl = relayUrl)
+    }
+
+    val token =
+        manualPairingTokenRegex
+            .findAll(textWithoutRelay)
+            .map { it.value.trim() }
+            .firstOrNull { token ->
+                !token.equals("code", ignoreCase = true) &&
+                    !token.equals("pairing", ignoreCase = true)
+            }
+    return ManualPairingInput(codeOrPayload = token ?: textWithoutRelay.trim(), relayUrl = relayUrl)
+}
+
+private fun extractManualRelayUrl(rawText: String): String? =
+    manualPairingRelayUrlRegex
+        .find(rawText)
+        ?.value
+        ?.trim()
+        ?.trimEnd('.', ',', ';', ')', ']', '}', '"', '\'')
+        ?.takeIf { it.isNotBlank() }
+
+private fun manualRelayCandidates(
+    context: android.content.Context,
+    pastedRelayUrl: String?,
+): List<String> {
+    val snapshot = AppContainer.sessionPersistence.loadRelaySnapshot()
+    val registry =
+        AppContainer.secureStore.readCodable<CodexTrustedMacRegistry>(CodexSecureKeys.trustedMacRegistry)
+    val preferredTrustedRelay =
+        snapshot.lastTrustedMacDeviceId
+            ?.let { registry?.records?.get(it) }
+            ?.relayURL
+            ?: registry
+                ?.records
+                ?.values
+                ?.firstOrNull { !it.relayURL.isNullOrBlank() }
+                ?.relayURL
+
+    return listOf(
+        pastedRelayUrl,
+        snapshot.relayUrl,
+        preferredTrustedRelay,
+        AppEnvironment.relayBaseURL(context),
+    ).mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
+        .filter { validateRelayUrl(it) != null }
+        .distinct()
+}
+
+private suspend fun resolveManualPairingCode(
+    context: android.content.Context,
+    code: String,
+    pastedRelayUrl: String? = null,
+): QrPairingValidationResult {
+    val relayCandidates = manualRelayCandidates(context, pastedRelayUrl)
+    if (relayCandidates.isEmpty()) {
+        return QrPairingValidationResult.ScanError(
+            "This device does not know which relay to ask for that pairing code yet. Scan the QR code instead.",
+        )
+    }
+    return resolvePairingCodeWithCandidates(relayCandidates, code)
+}
+
+private suspend fun resolvePairingCodeWithCandidates(
+    relayCandidates: List<String>,
+    code: String,
+): QrPairingValidationResult {
+    var lastScanError: QrPairingValidationResult.ScanError? = null
+    for (relayUrl in relayCandidates) {
+        when (
+            val result =
+                resolvePairingCode(
+                    httpClient = AppContainer.httpCallClient,
+                    relayUrl = relayUrl,
+                    code = code,
+                )
+        ) {
+            is QrPairingValidationResult.Success -> return result
+            is QrPairingValidationResult.BridgeUpdateRequired -> return result
+            is QrPairingValidationResult.ShortCode ->
+                lastScanError =
+                    QrPairingValidationResult.ScanError(
+                        "The relay returned another short pairing code instead of pairing metadata.",
+                    )
+            is QrPairingValidationResult.ScanError -> lastScanError = result
+        }
+    }
+    return lastScanError
+        ?: QrPairingValidationResult.ScanError(
+            "Pairing code could not be resolved. Generate a fresh code from your desktop.",
+        )
 }
 
 @Composable
