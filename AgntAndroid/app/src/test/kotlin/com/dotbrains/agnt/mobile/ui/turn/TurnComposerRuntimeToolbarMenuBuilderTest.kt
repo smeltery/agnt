@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TurnComposerRuntimeToolbarMenuBuilderTest {
-
     @Test
     fun `omits reasoning section when only auto placeholder has no model efforts`() {
         val autoOnly =

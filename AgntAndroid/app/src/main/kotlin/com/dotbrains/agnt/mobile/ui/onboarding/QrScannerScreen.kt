@@ -97,7 +97,12 @@ fun QrScannerScreen(
     var manualPairingDialogVisible by remember { mutableStateOf(false) }
     var manualPairingText by remember { mutableStateOf("") }
     var manualRelayUrl by remember {
-        mutableStateOf(AppContainer.sessionPersistence.loadRelaySnapshot().relayUrl.orEmpty())
+        mutableStateOf(
+            AppContainer.sessionPersistence
+                .loadRelaySnapshot()
+                .relayUrl
+                .orEmpty(),
+        )
     }
 
     fun hasCameraPermission(): Boolean =
@@ -463,7 +468,10 @@ private fun QrScannerOverlay(
             val dimPath =
                 Path().apply {
                     fillType = PathFillType.EvenOdd
-                    addRect(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height))
+                    addRect(
+                        androidx.compose.ui.geometry
+                            .Rect(0f, 0f, size.width, size.height),
+                    )
                     addRoundRect(
                         androidx.compose.ui.geometry.RoundRect(
                             left = left,
@@ -506,12 +514,13 @@ private fun QrScannerOverlay(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = when {
-                    connecting -> "Connecting"
-                    errorMessage != null -> "Scan failed"
-                    statusMessage != null -> "Code found"
-                    else -> "Scan Code"
-                },
+                text =
+                    when {
+                        connecting -> "Connecting"
+                        errorMessage != null -> "Scan failed"
+                        statusMessage != null -> "Code found"
+                        else -> "Scan Code"
+                    },
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,

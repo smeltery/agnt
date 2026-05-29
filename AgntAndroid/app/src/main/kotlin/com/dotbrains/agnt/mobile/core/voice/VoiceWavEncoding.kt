@@ -55,7 +55,10 @@ object VoiceWavEncoding {
     /**
      * Builds a minimal RIFF/WAVE PCM16 mono file (little-endian), matching iOS `encodeWAV`.
      */
-    fun pcm16MonoLeToWav(pcmSamples: ShortArray, sampleRateHz: Int): ByteArray {
+    fun pcm16MonoLeToWav(
+        pcmSamples: ShortArray,
+        sampleRateHz: Int,
+    ): ByteArray {
         require(sampleRateHz > 0) { "sampleRateHz must be positive" }
         val dataSize = pcmSamples.size * 2
         val riffChunkSize = 36 + dataSize

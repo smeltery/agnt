@@ -1,9 +1,9 @@
 package com.dotbrains.agnt.mobile.core.model
 
-import java.time.Instant
-import java.util.UUID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.time.Instant
+import java.util.UUID
 
 @Serializable
 enum class CodexMessageRole {
@@ -23,13 +23,17 @@ enum class CodexMessageDeliveryState {
 enum class CodexMessageKind {
     chat,
     thinking,
+
     @SerialName("fileChange")
     fileChange,
+
     @SerialName("commandExecution")
     commandExecution,
+
     @SerialName("subagentAction")
     subagentAction,
     plan,
+
     /** Ephemeral structured-input timeline marker when the bridge requests `requestUserInput` (J.7b); dialog remains authoritative; not persisted. */
     @SerialName("userInputPrompt")
     userInputPrompt,

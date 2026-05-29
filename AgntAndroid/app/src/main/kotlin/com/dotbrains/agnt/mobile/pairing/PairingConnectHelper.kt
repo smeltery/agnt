@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.pairing
 
+import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
 import com.dotbrains.agnt.mobile.core.persistence.RelaySessionSnapshot
 import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
-import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
 import com.dotbrains.agnt.mobile.core.security.SecureStore
 import com.dotbrains.agnt.mobile.core.transport.isLocalRelayHost
 import com.dotbrains.agnt.mobile.core.transport.validateRelayUrl
@@ -95,7 +95,12 @@ fun applyRelayHostOverride(
         }
     val parsed = forParse.toHttpUrlOrNull() ?: return relayUrl
     if (parsed.isHttps.not() && !isLocalRelayHost(host)) return relayUrl
-    val httpish = parsed.newBuilder().host(host).build().toString()
+    val httpish =
+        parsed
+            .newBuilder()
+            .host(host)
+            .build()
+            .toString()
     return when {
         wss -> httpish.replaceFirst("https://", "wss://", ignoreCase = true)
         ws -> httpish.replaceFirst("http://", "ws://", ignoreCase = true)

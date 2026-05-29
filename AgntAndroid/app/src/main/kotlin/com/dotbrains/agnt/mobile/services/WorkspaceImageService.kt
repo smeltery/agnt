@@ -23,8 +23,7 @@ class WorkspaceImageService(
 
     private val previewCache = mutableMapOf<PreviewCacheKey, PreviewDataUrl>()
 
-    suspend fun readImage(params: RPCObject): WorkspaceImageReadResult =
-        WorkspaceImageReadResult.fromJson(send("workspace/readImage", params))
+    suspend fun readImage(params: RPCObject): WorkspaceImageReadResult = WorkspaceImageReadResult.fromJson(send("workspace/readImage", params))
 
     suspend fun readPreviewDataUrl(
         path: String,

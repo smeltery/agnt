@@ -7,7 +7,6 @@ package com.dotbrains.agnt.mobile.ui.turn
  * Parsing is intentionally tolerant of partial typing (e.g. lone `@`, `$cod`, `/`).
  */
 internal object TurnComposerTrailingTokens {
-
     fun parseTrailingToken(
         text: String,
         caret: Int = text.length,
@@ -216,8 +215,14 @@ internal object TurnComposerTrailingTokens {
             this == '-'
 
     private fun Char.isTrailingMentionPunctuation(): Boolean =
-        this == ',' || this == '.' || this == ';' || this == '!' || this == '?' ||
-            this == ')' || this == ']' || this == '}'
+        this == ',' ||
+            this == '.' ||
+            this == ';' ||
+            this == '!' ||
+            this == '?' ||
+            this == ')' ||
+            this == ']' ||
+            this == '}'
 
     private fun Char.isAllowedFileQueryChar(): Boolean =
         isLetterOrDigit() ||
@@ -246,8 +251,10 @@ internal object TurnComposerTrailingTokens {
         val body = raw.drop(1)
         if (
             body.isNotEmpty() &&
-                !(body.first().isLetterOrDigit() || body.first() == '_')
-        ) return null
+            !(body.first().isLetterOrDigit() || body.first() == '_')
+        ) {
+            return null
+        }
         val validRest =
             body.all { ch ->
                 ch.isLetterOrDigit() || ch == '-' || ch == '_'
@@ -255,14 +262,16 @@ internal object TurnComposerTrailingTokens {
         if (!validRest && body.isNotEmpty()) return null
 
         val pretty =
-            body.replace('-', ' ')
+            body
+                .replace('-', ' ')
                 .replace('_', ' ')
                 .split(' ')
                 .filter { it.isNotBlank() }
                 .joinToString(" ") { w ->
-                    w.replaceFirstChar { ch ->
-                        if (ch.isLowerCase()) ch.titlecaseChar() else ch
-                    }.toString()
+                    w
+                        .replaceFirstChar { ch ->
+                            if (ch.isLowerCase()) ch.titlecaseChar() else ch
+                        }.toString()
                 }
         val payload =
             ComposerMentionChipPayload(
@@ -280,14 +289,16 @@ internal object TurnComposerTrailingTokens {
 
     private fun skillIdToDisplayLabel(skillIdBody: String): String {
         val tail = skillIdBody.substringAfterLast('/').substringAfterLast('.')
-        return tail.replace('-', ' ')
+        return tail
+            .replace('-', ' ')
             .replace('_', ' ')
             .split(' ')
             .filter { it.isNotBlank() }
             .joinToString(" ") { word ->
-                word.replaceFirstChar { ch ->
-                    if (ch.isLowerCase()) ch.titlecaseChar() else ch
-                }.toString()
+                word
+                    .replaceFirstChar { ch ->
+                        if (ch.isLowerCase()) ch.titlecaseChar() else ch
+                    }.toString()
             }
     }
 
@@ -307,17 +318,38 @@ internal object TurnComposerTrailingTokens {
             trimmed.all { ch -> ch.isLetterOrDigit() || ch == '_' || ch == '-' }
     }
 
-    private fun isReservedBareAtMention(query: String): Boolean =
-        query.equals("agnt", ignoreCase = true)
+    private fun isReservedBareAtMention(query: String): Boolean = query.equals("agnt", ignoreCase = true)
 
     private fun hasTrailingSentencePunctuation(query: String): Boolean =
-        query.lastOrNull()?.let { it == ',' || it == '.' || it == ';' || it == ':' || it == '!' || it == '?' || it == ')' || it == ']' || it == '}' } == true
+        query.lastOrNull()?.let {
+            it == ',' ||
+                it == '.' ||
+                it == ';' ||
+                it == ':' ||
+                it == '!' ||
+                it == '?' ||
+                it == ')' ||
+                it == ']' ||
+                it == '}'
+        } ==
+            true
 
     private fun isAllowedInlineFileMentionToken(query: String): Boolean {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return false
         if (trimmed.lastOrNull() == ':') return false
-        val withoutTrailingPunctuation = trimmed.dropLastWhile { it == ',' || it == '.' || it == ';' || it == ':' || it == '!' || it == '?' || it == ')' || it == ']' || it == '}' }
+        val withoutTrailingPunctuation =
+            trimmed.dropLastWhile {
+                it == ',' ||
+                    it == '.' ||
+                    it == ';' ||
+                    it == ':' ||
+                    it == '!' ||
+                    it == '?' ||
+                    it == ')' ||
+                    it == ']' ||
+                    it == '}'
+            }
         return withoutTrailingPunctuation.contains('/') ||
             withoutTrailingPunctuation.contains('\\') ||
             withoutTrailingPunctuation.contains('.')

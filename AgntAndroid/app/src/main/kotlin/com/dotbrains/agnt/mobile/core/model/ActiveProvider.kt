@@ -13,7 +13,9 @@ package com.dotbrains.agnt.mobile.core.model
  * pre-emptively hide their affordances — the existing fail-once-then-hide fallback (e.g.
  * `bridgeSupportsVoiceTranscription`) covers the gap until the next reconnect.
  */
-enum class ActiveProvider(val id: String) {
+enum class ActiveProvider(
+    val id: String,
+) {
     Codex("codex"),
     Claude("claude"),
     Opencode("opencode"),

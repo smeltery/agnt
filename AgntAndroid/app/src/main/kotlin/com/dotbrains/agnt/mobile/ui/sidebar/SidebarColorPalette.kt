@@ -20,9 +20,7 @@ data class SidebarColorPalette(
 )
 
 @Composable
-fun rememberSidebarColorPalette(
-    darkTheme: Boolean = !isAgentLightChrome(),
-): SidebarColorPalette =
+fun rememberSidebarColorPalette(darkTheme: Boolean = !isAgentLightChrome()): SidebarColorPalette =
     remember(darkTheme) {
         if (darkTheme) {
             SidebarColorPalette(

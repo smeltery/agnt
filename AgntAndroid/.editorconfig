@@ -1,0 +1,34 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+# Kotlin convention is 120; the codebase ranges wider in places (long type
+# signatures, RPC envelopes), so leave wrapping to taste.
+max_line_length = off
+# Compose @Composable functions read better as PascalCase; this drops the
+# noisy "function-naming" complaints ktlint would otherwise raise on every
+# screen / component declaration.
+ktlint_standard_function-naming = disabled
+# Project uses unwrapped string templates in many test fixtures; the
+# noisy-defaults rule fires on every interpolated test name.
+ktlint_standard_string-template-indent = disabled
+# Enum values mirror the wire-format JSON (`plan`, `acceptEdits`, `info`)
+# so a lowercase/camelCase value is intentional, not a style miss.
+ktlint_standard_enum-entry-name-case = disabled
+# `private val _foo = MutableStateFlow(...)` + a public `val foo: StateFlow<...>`
+# is the canonical Kotlin StateFlow backing-property pattern — we use it for
+# every observable in CodexService. ktlint's default rules want camelCase
+# without the leading underscore.
+ktlint_standard_property-naming = disabled
+ktlint_standard_backing-property-naming = disabled
+# Several files group a single primary declaration with related helpers under
+# a purpose-named filename (e.g. AppFontPreference.kt holding AppFontStyle).
+# ktlint's class-name-matching default would force renames that hide intent.
+ktlint_standard_filename = disabled

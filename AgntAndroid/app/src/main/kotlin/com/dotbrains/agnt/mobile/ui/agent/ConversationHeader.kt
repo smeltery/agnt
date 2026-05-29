@@ -1,9 +1,8 @@
 package com.dotbrains.agnt.mobile.ui.agent
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,13 +54,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.GitDiffTotals
 import com.dotbrains.agnt.mobile.core.model.TurnGitActionKind
 import com.dotbrains.agnt.mobile.ui.theme.AgentLightColors
 import com.dotbrains.agnt.mobile.ui.theme.AgntGitAddition
 import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
+import com.composables.icons.lucide.R as LucideR
 
 /** Truncate long filesystem paths for the header subtitle (middle ellipsis). */
 fun truncatePathMiddle(
@@ -295,25 +295,26 @@ private fun HeaderAtmosphere(
             )
         }
         Canvas(modifier = Modifier.matchParentSize()) {
-            val contour = Path().apply {
-                moveTo(size.width * 0.08f, size.height * 0.38f)
-                cubicTo(
-                    size.width * 0.25f,
-                    size.height * 0.31f,
-                    size.width * 0.43f,
-                    size.height * 0.39f,
-                    size.width * 0.58f,
-                    size.height * 0.34f,
-                )
-                cubicTo(
-                    size.width * 0.74f,
-                    size.height * 0.29f,
-                    size.width * 0.84f,
-                    size.height * 0.35f,
-                    size.width * 0.94f,
-                    size.height * 0.31f,
-                )
-            }
+            val contour =
+                Path().apply {
+                    moveTo(size.width * 0.08f, size.height * 0.38f)
+                    cubicTo(
+                        size.width * 0.25f,
+                        size.height * 0.31f,
+                        size.width * 0.43f,
+                        size.height * 0.39f,
+                        size.width * 0.58f,
+                        size.height * 0.34f,
+                    )
+                    cubicTo(
+                        size.width * 0.74f,
+                        size.height * 0.29f,
+                        size.width * 0.84f,
+                        size.height * 0.35f,
+                        size.width * 0.94f,
+                        size.height * 0.31f,
+                    )
+                }
             drawPath(
                 path = contour,
                 color = haze.copy(alpha = lineAlpha),
@@ -448,7 +449,7 @@ private fun HeaderActions(
                                 }
                         } else {
                             Modifier
-                        }
+                        },
                     ),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,

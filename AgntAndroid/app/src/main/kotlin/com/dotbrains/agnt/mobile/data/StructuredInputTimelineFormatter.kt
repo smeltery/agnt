@@ -1,10 +1,6 @@
 package com.dotbrains.agnt.mobile.data
 
-
-
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputQuestion
-
-
 
 /**
 
@@ -13,13 +9,10 @@ import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputQuestion
  */
 
 internal object StructuredInputTimelineFormatter {
-
     fun bodyText(questions: List<PendingStructuredInputQuestion>): String {
-
         val qs = questions.map { sanitizeQuestion(it) }.filter { it.isNotEmpty() }
 
         return when {
-
             qs.isEmpty() -> "Input requested"
 
             qs.size == 1 -> qs.single()
@@ -27,19 +20,12 @@ internal object StructuredInputTimelineFormatter {
             else ->
 
                 qs
-
                     .mapIndexed { i, line -> "${i + 1}. $line" }
-
                     .joinToString("\n\n")
-
         }
-
     }
 
-
-
     private fun sanitizeQuestion(question: PendingStructuredInputQuestion): String {
-
         val q = question.question.trim()
 
         val h = question.header.trim()
@@ -47,17 +33,11 @@ internal object StructuredInputTimelineFormatter {
         val id = question.id.trim()
 
         return when {
-
             q.isNotEmpty() -> q
 
             h.isNotEmpty() -> h
 
             else -> id
-
         }
-
     }
-
 }
-
-

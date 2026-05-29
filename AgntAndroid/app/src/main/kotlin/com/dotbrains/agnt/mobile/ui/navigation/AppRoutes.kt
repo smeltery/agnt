@@ -7,6 +7,7 @@ object AppRoutes {
     const val Archived = "archived"
     const val About = "about"
     const val WhatsNew = "whats_new"
+
     /**
      * On-device SSH terminal. Accepts an optional `cwd` query parameter so
      * the "Open Terminal Here" turn action can pre-populate the working
@@ -19,6 +20,5 @@ object AppRoutes {
     const val TerminalArgCwd = "cwd"
 
     /** Build a `terminal?...` route with an optional pre-populated cwd. */
-    fun terminalRoute(cwd: String? = null): String =
-        if (cwd.isNullOrBlank()) "terminal" else "terminal?cwd=${java.net.URLEncoder.encode(cwd, "UTF-8")}"
+    fun terminalRoute(cwd: String? = null): String = if (cwd.isNullOrBlank()) "terminal" else "terminal?cwd=${java.net.URLEncoder.encode(cwd, "UTF-8")}"
 }

@@ -70,7 +70,7 @@ class AgntLocalNotificationPresenter(
         val th = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
         val now = System.currentTimeMillis()
         pruneOlderThan(dedupeApproval, now, DEDUPE_WINDOW_MS)
-        val dedupeKey = "${th}|${request.id}"
+        val dedupeKey = "$th|${request.id}"
         if (isDedupedRecently(dedupeApproval, dedupeKey, now)) return
         dedupeApproval[dedupeKey] = now
 
@@ -97,7 +97,7 @@ class AgntLocalNotificationPresenter(
         val th = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
         val now = System.currentTimeMillis()
         pruneOlderThan(dedupeStructured, now, DEDUPE_WINDOW_MS)
-        val dedupeKey = "${th}|${request.id}"
+        val dedupeKey = "$th|${request.id}"
         if (isDedupedRecently(dedupeStructured, dedupeKey, now)) return
         dedupeStructured[dedupeKey] = now
 
@@ -122,9 +122,7 @@ class AgntLocalNotificationPresenter(
         )
     }
 
-    private fun canPostNotifications(): Boolean {
-        return LocalNotificationSettings.canPostNotifications(appContext)
-    }
+    private fun canPostNotifications(): Boolean = LocalNotificationSettings.canPostNotifications(appContext)
 
     private fun contentIntent(
         threadId: String,
@@ -158,7 +156,8 @@ class AgntLocalNotificationPresenter(
         contentIntent: PendingIntent,
     ) {
         val notification =
-            NotificationCompat.Builder(appContext, CHANNEL_ID)
+            NotificationCompat
+                .Builder(appContext, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle(title)
                 .setContentText(body)

@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.sidebar
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -20,8 +20,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
+import com.composables.icons.lucide.R as LucideR
 
 @Composable
 fun SidebarSearch(

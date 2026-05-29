@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import org.junit.Test
 
 class CodeFenceLanguageResolverTest {
     @Test
@@ -10,9 +10,9 @@ class CodeFenceLanguageResolverTest {
         val segments =
             MarkdownFenceSegmentParser.parse(
                 """
-                ```
-                plain text
-                ```
+				```
+				plain text
+				```
                 """.trimIndent(),
             )
 
@@ -26,13 +26,13 @@ class CodeFenceLanguageResolverTest {
         val segments =
             MarkdownFenceSegmentParser.parse(
                 """
-                ```kotlin
-                println("hi")
-                ```
+				```kotlin
+				println("hi")
+				```
 
-                ```swift
-                println("hi")
-                ```
+				```swift
+				println("hi")
+				```
                 """.trimIndent(),
             )
 

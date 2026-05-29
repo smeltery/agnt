@@ -1,12 +1,12 @@
 package com.dotbrains.agnt.mobile.core.model
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 const val AGNT_SECURE_PROTOCOL_VERSION = 1
 const val AGNT_PAIRING_QR_VERSION = 2
@@ -34,7 +34,8 @@ enum class CodexSecureConnectionState {
     encrypted,
     reconnecting,
     rePairRequired,
-    updateRequired;
+    updateRequired,
+    ;
 
     val statusLabel: String
         get() =
@@ -375,8 +376,7 @@ fun codexSecureFingerprint(publicKeyBase64: String): String {
     return digest.joinToString("") { "%02x".format(it) }.take(12).uppercase()
 }
 
-fun base64DecodeOrEmpty(value: String): ByteArray =
-    base64DecodeOrNull(value) ?: ByteArray(0)
+fun base64DecodeOrEmpty(value: String): ByteArray = base64DecodeOrNull(value) ?: ByteArray(0)
 
 fun base64DecodeOrNull(value: String): ByteArray? =
     try {

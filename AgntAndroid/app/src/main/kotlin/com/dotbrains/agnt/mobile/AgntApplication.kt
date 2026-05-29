@@ -1,10 +1,10 @@
 package com.dotbrains.agnt.mobile
 
 import android.app.Application
-import com.dotbrains.agnt.mobile.core.notification.AppForegroundTracker
 import com.dotbrains.agnt.mobile.core.notification.AgntLocalNotificationPresenter
-import java.security.Security
+import com.dotbrains.agnt.mobile.core.notification.AppForegroundTracker
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import java.security.Security
 
 class AgntApplication : Application() {
     override fun onCreate() {

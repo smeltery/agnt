@@ -7,7 +7,8 @@ package com.dotbrains.agnt.mobile.core.model
 enum class AppFontStyle {
     system,
     geist,
-    jetBrainsMono;
+    jetBrainsMono,
+    ;
 
     val title: String
         get() =

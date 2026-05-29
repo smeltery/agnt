@@ -131,7 +131,10 @@ private fun CommandExecutionDetailSheet(
         previewTrimmed.isNotEmpty() &&
             !previewTrimmed.equals(fullCommand, ignoreCase = false)
 
-    fun copy(label: String, value: String) {
+    fun copy(
+        label: String,
+        value: String,
+    ) {
         scope.launch {
             clipboard.setClipEntry(ClipData.newPlainText(label, value).toClipEntry())
         }

@@ -1,5 +1,7 @@
 package com.dotbrains.agnt.mobile.core.terminal
 
+import net.schmizz.sshj.common.KeyType
+import net.schmizz.sshj.userauth.keyprovider.PKCS8KeyFile
 import java.io.StringReader
 import java.security.KeyPairGenerator
 import java.security.interfaces.ECPrivateKey
@@ -9,8 +11,6 @@ import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import net.schmizz.sshj.common.KeyType
-import net.schmizz.sshj.userauth.keyprovider.PKCS8KeyFile
 
 /**
  * `NativeSshTerminal.open` delegates SSH key parsing to sshj's
@@ -27,22 +27,25 @@ class EcdsaKeyDecodeTest {
     @Test
     fun pkcs8EcdsaP256KeyRoundTripsThroughSshj() {
         val keyPair =
-            KeyPairGenerator.getInstance("EC").apply {
-                initialize(ECGenParameterSpec("secp256r1"))
-            }.generateKeyPair()
+            KeyPairGenerator
+                .getInstance("EC")
+                .apply {
+                    initialize(ECGenParameterSpec("secp256r1"))
+                }.generateKeyPair()
         val privateKey = keyPair.private as ECPrivateKey
 
-        val pem = buildString {
-            append("-----BEGIN PRIVATE KEY-----\n")
-            // PKCS#8 DER body, base64'd in 64-char lines (the OpenSSH /
-            // OpenSSL classic encoding sshj's PKCS8KeyFile accepts).
-            val encoded = Base64.getEncoder().encodeToString(privateKey.encoded)
-            encoded.chunked(64).forEach { line ->
-                append(line)
-                append('\n')
+        val pem =
+            buildString {
+                append("-----BEGIN PRIVATE KEY-----\n")
+                // PKCS#8 DER body, base64'd in 64-char lines (the OpenSSH /
+                // OpenSSL classic encoding sshj's PKCS8KeyFile accepts).
+                val encoded = Base64.getEncoder().encodeToString(privateKey.encoded)
+                encoded.chunked(64).forEach { line ->
+                    append(line)
+                    append('\n')
+                }
+                append("-----END PRIVATE KEY-----\n")
             }
-            append("-----END PRIVATE KEY-----\n")
-        }
 
         val keyFile = PKCS8KeyFile()
         keyFile.init(StringReader(pem))

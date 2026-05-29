@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
-import com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexSkillMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
@@ -144,8 +144,7 @@ internal fun buildComposerAutocompleteState(
                 ).filter { (cmd, _) ->
                     (query.isBlank() || cmd.startsWith(query, ignoreCase = true)) &&
                         !(isThreadRunning && (cmd == "fork" || cmd.startsWith("review")))
-                }
-                    .take(6)
+                }.take(6)
                     .map { (cmd, subtitle) ->
                         TurnComposerAutocompleteItem(
                             id = "slash:$cmd",
@@ -172,8 +171,7 @@ internal fun buildComposerAutocompleteState(
                             it.label.contains(query, ignoreCase = true) ||
                             it.id.contains(query, ignoreCase = true) ||
                             it.searchBlob.contains(query, ignoreCase = true)
-                    }
-                    .take(6)
+                    }.take(6)
                     .map {
                         val kind = if (it.isPlugin) ComposerMentionKind.Plugin else ComposerMentionKind.Skill
                         val path = it.path?.trim()?.takeIf { value -> value.isNotEmpty() }
@@ -251,8 +249,7 @@ internal fun buildComposerAutocompleteState(
                             it.subtitle?.contains(query, ignoreCase = true) == true ||
                             it.payload.semanticValue.contains(query, ignoreCase = true) ||
                             (it.payload.displayLabel?.contains(query, ignoreCase = true) == true)
-                    }
-                    .distinctBy { it.payload.semanticValue.lowercase() }
+                    }.distinctBy { it.payload.semanticValue.lowercase() }
                     .take(6)
                     .toList()
             if (files.isEmpty() && !isPluginLoading) {
@@ -310,11 +307,20 @@ internal fun mergeMentionChipsIntoDraft(
             .mapNotNull { chip ->
                 when (chip.kind) {
                     ComposerMentionKind.File ->
-                        chip.semanticValue.trim().takeIf { it.isNotEmpty() }?.let { "@$it" }
+                        chip.semanticValue
+                            .trim()
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { "@$it" }
                     ComposerMentionKind.Skill ->
-                        chip.semanticValue.trim().takeIf { it.isNotEmpty() }?.let { "\$$it" }
+                        chip.semanticValue
+                            .trim()
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { "\$$it" }
                     ComposerMentionKind.Plugin ->
-                        chip.displayLabel?.trim()?.takeIf { it.isNotEmpty() }?.let { "@$it" }
+                        chip.displayLabel
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+                            ?.let { "@$it" }
                     ComposerMentionKind.SlashCommand -> null
                 }
             }
@@ -328,7 +334,8 @@ internal fun mergeMentionChipsIntoDraft(
 }
 
 internal fun mentionChipsToSkillMentions(chips: List<ComposerMentionChipPayload>): List<CodexTurnSkillMention> =
-    chips.asSequence()
+    chips
+        .asSequence()
         .filter { it.kind == ComposerMentionKind.Skill }
         .mapNotNull { chip ->
             val id = chip.semanticValue.trim()
@@ -338,12 +345,12 @@ internal fun mentionChipsToSkillMentions(chips: List<ComposerMentionChipPayload>
                 name = chip.displayLabel?.trim()?.takeIf { it.isNotEmpty() },
                 path = chip.sourcePath?.trim()?.takeIf { it.isNotEmpty() },
             )
-        }
-        .distinctBy { it.id.lowercase() + "|" + it.name.orEmpty().lowercase() + "|" + it.path.orEmpty().lowercase() }
+        }.distinctBy { it.id.lowercase() + "|" + it.name.orEmpty().lowercase() + "|" + it.path.orEmpty().lowercase() }
         .toList()
 
 internal fun mentionChipsToFileMentions(chips: List<ComposerMentionChipPayload>): List<CodexTurnMention> =
-    chips.asSequence()
+    chips
+        .asSequence()
         .filter { it.kind == ComposerMentionKind.File || it.kind == ComposerMentionKind.Plugin }
         .mapNotNull { chip ->
             val path = chip.semanticValue.trim()
@@ -352,8 +359,7 @@ internal fun mentionChipsToFileMentions(chips: List<ComposerMentionChipPayload>)
                 name = chip.displayLabel?.trim()?.takeIf { it.isNotEmpty() } ?: path.substringAfterLast('/', path),
                 path = path,
             )
-        }
-        .distinctBy { it.name.lowercase() + "|" + it.path.lowercase() }
+        }.distinctBy { it.name.lowercase() + "|" + it.path.lowercase() }
         .toList()
 
 internal fun restoreMentionChips(
@@ -391,14 +397,16 @@ internal fun restoreMentionChips(
 
 private fun skillIdToDisplayLabelLocal(skillIdBody: String): String {
     val tail = skillIdBody.substringAfterLast('/').substringAfterLast('.')
-    return tail.replace('-', ' ')
+    return tail
+        .replace('-', ' ')
         .replace('_', ' ')
         .split(' ')
         .filter { it.isNotBlank() }
         .joinToString(" ") { word ->
-            word.replaceFirstChar { ch ->
-                if (ch.isLowerCase()) ch.titlecaseChar() else ch
-            }.toString()
+            word
+                .replaceFirstChar { ch ->
+                    if (ch.isLowerCase()) ch.titlecaseChar() else ch
+                }.toString()
         }
 }
 

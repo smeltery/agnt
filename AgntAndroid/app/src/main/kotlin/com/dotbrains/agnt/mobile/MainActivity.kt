@@ -15,9 +15,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.dotbrains.agnt.mobile.core.model.AppLanguagePreference
 import com.dotbrains.agnt.mobile.core.model.AppThemePreference
+import com.dotbrains.agnt.mobile.core.notification.AgntLocalNotificationPresenter
 import com.dotbrains.agnt.mobile.data.LanguagePreferences
 import com.dotbrains.agnt.mobile.data.ThemePreferences
-import com.dotbrains.agnt.mobile.core.notification.AgntLocalNotificationPresenter
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
 import com.dotbrains.agnt.mobile.ui.RootScreen

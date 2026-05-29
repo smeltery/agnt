@@ -101,26 +101,51 @@ internal object TurnComposerReviewModeRules {
         return !isOnlyTrailingSlashCommandToken(trimmed)
     }
 
-    private fun isOnlyTrailingSlashCommandToken(value: String): Boolean =
-        value == "/" || value.matches(Regex("""/[A-Za-z][A-Za-z-]*"""))
+    private fun isOnlyTrailingSlashCommandToken(value: String): Boolean = value == "/" || value.matches(Regex("""/[A-Za-z][A-Za-z-]*"""))
 }
 
 /**
  * Narrow event surface for future UI/store wiring (J.8 foundation only).
  */
 internal sealed interface TurnComposerEvent {
-    data class SetEnabled(val value: Boolean) : TurnComposerEvent
-    data class SetSending(val value: Boolean) : TurnComposerEvent
-    data class SetDraftText(val value: String) : TurnComposerEvent
-    data class SetReadyAttachmentCount(val value: Int) : TurnComposerEvent
-    data class SetHasBlockingAttachments(val value: Boolean) : TurnComposerEvent
-    data class SetVoicePhase(val value: TurnVoicePhase) : TurnComposerEvent
-    data class SetThreadRunning(val value: Boolean) : TurnComposerEvent
-    data class SetTranscribing(val value: Boolean) : TurnComposerEvent
+    data class SetEnabled(
+        val value: Boolean,
+    ) : TurnComposerEvent
+
+    data class SetSending(
+        val value: Boolean,
+    ) : TurnComposerEvent
+
+    data class SetDraftText(
+        val value: String,
+    ) : TurnComposerEvent
+
+    data class SetReadyAttachmentCount(
+        val value: Int,
+    ) : TurnComposerEvent
+
+    data class SetHasBlockingAttachments(
+        val value: Boolean,
+    ) : TurnComposerEvent
+
+    data class SetVoicePhase(
+        val value: TurnVoicePhase,
+    ) : TurnComposerEvent
+
+    data class SetThreadRunning(
+        val value: Boolean,
+    ) : TurnComposerEvent
+
+    data class SetTranscribing(
+        val value: Boolean,
+    ) : TurnComposerEvent
 }
 
 internal object TurnComposerReducer {
-    fun reduce(state: TurnComposerModel, event: TurnComposerEvent): TurnComposerModel =
+    fun reduce(
+        state: TurnComposerModel,
+        event: TurnComposerEvent,
+    ): TurnComposerModel =
         when (event) {
             is TurnComposerEvent.SetEnabled -> state.copy(enabled = event.value)
             is TurnComposerEvent.SetSending -> state.copy(sending = event.value)

@@ -40,11 +40,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.ui.design.canvas.CanvasBridge
 import com.dotbrains.agnt.mobile.ui.design.canvas.CanvasRenderState
 import com.dotbrains.agnt.mobile.ui.design.canvas.CanvasSnapshotViewer
 import com.dotbrains.agnt.mobile.ui.design.canvas.CanvasWebView
+import com.composables.icons.lucide.R as LucideR
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,17 +108,19 @@ fun DesignWorkspaceScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
         ) {
             if (currentDocument == null && generationState.status == "idle") {
                 DesignEmptyState(
@@ -129,16 +131,18 @@ fun DesignWorkspaceScreen(
             } else if (generationState.status == "error") {
                 GenerationErrorView(
                     onRetry = viewModel::onSubmitPrompt,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
                 )
             } else if (generationState.status in listOf("generating", "rendering_snapshot")) {
                 GenerationProgressView(
                     steps = generationState.steps,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
                 )
             } else if (currentDocument != null) {
                 CanvasArea(
@@ -161,9 +165,10 @@ fun DesignWorkspaceScreen(
                                 )
                             },
                             onDismiss = { viewModel.onSelectionCleared() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                         )
                     }
                 }
@@ -173,9 +178,10 @@ fun DesignWorkspaceScreen(
                     onPromptTextChanged = viewModel::onPromptTextChanged,
                     onSubmit = { viewModel.editDesignWithAi(promptText, selectedNode?.id) },
                     onExport = { showExportSheet = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
         }
@@ -203,22 +209,25 @@ private fun CanvasArea(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         when (uiMode) {
-            DesignMode.VIEW -> CanvasSnapshotViewer(
-                state = snapshotRenderState,
-                onRetry = null,
-                onRefreshSnapshot = onRefreshSnapshot,
-                modifier = Modifier.fillMaxSize(),
-            )
-            DesignMode.EDIT -> CanvasWebView(
-                bridge = canvasBridge,
-                modifier = Modifier.fillMaxSize(),
-            )
+            DesignMode.VIEW ->
+                CanvasSnapshotViewer(
+                    state = snapshotRenderState,
+                    onRetry = null,
+                    onRefreshSnapshot = onRefreshSnapshot,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            DesignMode.EDIT ->
+                CanvasWebView(
+                    bridge = canvasBridge,
+                    modifier = Modifier.fillMaxSize(),
+                )
         }
     }
 }
@@ -244,25 +253,28 @@ private fun GenerationProgressView(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val color = when (step.status) {
-                    GenerationStepStatus.DONE -> MaterialTheme.colorScheme.primary
-                    GenerationStepStatus.ACTIVE -> MaterialTheme.colorScheme.secondary
-                    GenerationStepStatus.ERROR -> MaterialTheme.colorScheme.error
-                    GenerationStepStatus.PENDING -> MaterialTheme.colorScheme.outline
-                }
+                val color =
+                    when (step.status) {
+                        GenerationStepStatus.DONE -> MaterialTheme.colorScheme.primary
+                        GenerationStepStatus.ACTIVE -> MaterialTheme.colorScheme.secondary
+                        GenerationStepStatus.ERROR -> MaterialTheme.colorScheme.error
+                        GenerationStepStatus.PENDING -> MaterialTheme.colorScheme.outline
+                    }
                 Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(color),
+                    modifier =
+                        Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(color),
                 )
                 Text(
                     text = step.label,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = when (step.status) {
-                        GenerationStepStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
+                    color =
+                        when (step.status) {
+                            GenerationStepStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
                 )
             }
         }
@@ -313,9 +325,10 @@ private fun InspectorCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -394,15 +407,20 @@ private fun GenerationErrorView(
     }
 }
 
-private fun statusLabel(docStatus: DesignDocumentStatus, genStatus: String): String = when {
-    genStatus == "error" -> "Generation failed"
-    genStatus == "generating" -> "Generating..."
-    genStatus == "rendering_snapshot" -> "Rendering..."
-    else -> when (docStatus) {
-        DesignDocumentStatus.EMPTY -> "Empty"
-        DesignDocumentStatus.GENERATING -> "Generating..."
-        DesignDocumentStatus.READY -> "Ready"
-        DesignDocumentStatus.ERROR -> "Error"
-        DesignDocumentStatus.OUTDATED_SNAPSHOT -> "Preview may be outdated"
+private fun statusLabel(
+    docStatus: DesignDocumentStatus,
+    genStatus: String,
+): String =
+    when {
+        genStatus == "error" -> "Generation failed"
+        genStatus == "generating" -> "Generating..."
+        genStatus == "rendering_snapshot" -> "Rendering..."
+        else ->
+            when (docStatus) {
+                DesignDocumentStatus.EMPTY -> "Empty"
+                DesignDocumentStatus.GENERATING -> "Generating..."
+                DesignDocumentStatus.READY -> "Ready"
+                DesignDocumentStatus.ERROR -> "Error"
+                DesignDocumentStatus.OUTDATED_SNAPSHOT -> "Preview may be outdated"
+            }
     }
-}

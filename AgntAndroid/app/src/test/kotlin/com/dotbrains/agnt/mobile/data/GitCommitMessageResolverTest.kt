@@ -1,9 +1,9 @@
 package com.dotbrains.agnt.mobile.data
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlinx.coroutines.test.runTest
 
 class GitCommitMessageResolverTest {
     @Test
@@ -30,4 +30,3 @@ class GitCommitMessageResolverTest {
             assertNull(agntResolveCommitMessage("") { "   " })
         }
 }
-

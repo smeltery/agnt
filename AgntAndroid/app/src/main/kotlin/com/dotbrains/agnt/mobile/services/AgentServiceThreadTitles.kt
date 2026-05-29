@@ -15,8 +15,7 @@ internal fun AgentService.persistedThreadRename(threadId: String?): String? {
     return persistedThreadRenameById[tid]?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-internal fun AgentService.applyPersistedThreadRename(thread: CodexThread): CodexThread =
-    thread.withPersistedThreadRename(persistedThreadRename(thread.id))
+internal fun AgentService.applyPersistedThreadRename(thread: CodexThread): CodexThread = thread.withPersistedThreadRename(persistedThreadRename(thread.id))
 
 internal fun CodexThread.withPersistedThreadRename(rename: String?): CodexThread {
     val trimmed = rename?.trim()?.takeIf { it.isNotEmpty() } ?: return this
@@ -217,7 +216,9 @@ private suspend fun AgentService.generatedThreadTitleOrNull(
     runtimeModelIdentifierForTurn(threadId)?.trim()?.takeIf { it.isNotEmpty() }?.let { model ->
         params["model"] = JSONValue.Str(model)
     }
-    _threads.value.firstOrNull { it.id == threadId }?.gitWorkingDirectory
+    _threads.value
+        .firstOrNull { it.id == threadId }
+        ?.gitWorkingDirectory
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
         ?.let { cwd -> params["cwd"] = JSONValue.Str(cwd) }
@@ -284,10 +285,8 @@ private fun upsertThreadTitle(
     return sortThreadsForBridge(next)
 }
 
-private fun normalizedAutomaticTitleComparisonValue(value: String): String =
-    value.trim().lowercase()
+private fun normalizedAutomaticTitleComparisonValue(value: String): String = value.trim().lowercase()
 
-private fun normalizedThreadTitleId(threadId: String?): String? =
-    threadId?.trim()?.takeIf { it.isNotEmpty() }
+private fun normalizedThreadTitleId(threadId: String?): String? = threadId?.trim()?.takeIf { it.isNotEmpty() }
 
 private const val IMAGE_REQUEST_TITLE_SEED = "Image request"

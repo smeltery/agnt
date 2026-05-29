@@ -10,15 +10,13 @@ import com.dotbrains.agnt.mobile.core.security.SecureStore
 class TerminalPrivateKeyStore(
     private val secureStore: SecureStore,
 ) {
-    fun loadPrivateKey(): String =
-        secureStore.readString(CodexSecureKeys.terminalSshPrivateKey).orEmpty()
+    fun loadPrivateKey(): String = secureStore.readString(CodexSecureKeys.terminalSshPrivateKey).orEmpty()
 
     fun savePrivateKey(value: String) {
         secureStore.writeString(CodexSecureKeys.terminalSshPrivateKey, normalize(value))
     }
 
-    fun loadPassphrase(): String =
-        secureStore.readString(CodexSecureKeys.terminalSshPrivateKeyPassphrase).orEmpty()
+    fun loadPassphrase(): String = secureStore.readString(CodexSecureKeys.terminalSshPrivateKeyPassphrase).orEmpty()
 
     fun savePassphrase(value: String) {
         secureStore.writeString(CodexSecureKeys.terminalSshPrivateKeyPassphrase, value)
@@ -29,6 +27,5 @@ class TerminalPrivateKeyStore(
         return key.contains("PRIVATE KEY")
     }
 
-    private fun normalize(value: String): String =
-        value.replace("\r\n", "\n").trim()
+    private fun normalize(value: String): String = value.replace("\r\n", "\n").trim()
 }

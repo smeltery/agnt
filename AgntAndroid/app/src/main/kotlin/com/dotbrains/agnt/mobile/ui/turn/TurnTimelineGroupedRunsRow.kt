@@ -59,13 +59,11 @@ internal fun TurnTimelineGroupedRunsRow(
                 Modifier
                     .clickable {
                         expanded = !expanded
-                    }
-                    .semantics {
+                    }.semantics {
                         contentDescription =
                             if (expanded) collapseLabel else expandLabel
                         role = Role.Button
-                    }
-                    .padding(vertical = 4.dp),
+                    }.padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {

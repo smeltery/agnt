@@ -96,14 +96,13 @@ internal suspend fun AgentService.refreshRateLimitsInternal() {
     }
 }
 
-private suspend fun AgentService.fetchRateLimitsWithCompatRetry(): RPCMessage {
-    return try {
+private suspend fun AgentService.fetchRateLimitsWithCompatRetry(): RPCMessage =
+    try {
         sendRequestImpl("account/rateLimits/read", JSONValue.Null)
     } catch (e: Exception) {
         if (!shouldRetryRateLimitsWithEmptyParams(e)) throw e
         sendRequestImpl("account/rateLimits/read", JSONValue.Obj(emptyMap()))
     }
-}
 
 private fun shouldRetryRateLimitsWithEmptyParams(e: Throwable): Boolean {
     val rpc = (e as? AgentServiceError.RpcFailure)?.rpcError ?: return false

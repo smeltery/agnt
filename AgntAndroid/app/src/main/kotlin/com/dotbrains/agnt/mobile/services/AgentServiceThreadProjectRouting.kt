@@ -3,10 +3,10 @@ package com.dotbrains.agnt.mobile.services
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.projectIconSystemNameFor
-import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 /**
  * Same-thread project path rebind and authoritative cwd guards. Parity:
@@ -59,8 +59,7 @@ internal fun shouldAllowProjectRebindWithoutResume(error: Throwable): Boolean {
         (message.contains("rollout") && message.contains("is empty"))
 }
 
-internal fun AgentService.applyAuthoritativeProjectPathToServerThread(thread: CodexThread) =
-    applyAuthoritativeProjectPathMerge(thread, authoritativeProjectPathByThreadId, treatAsServerState = true)
+internal fun AgentService.applyAuthoritativeProjectPathToServerThread(thread: CodexThread) = applyAuthoritativeProjectPathMerge(thread, authoritativeProjectPathByThreadId, treatAsServerState = true)
 
 internal fun AgentService.beginAuthoritativeProjectPathTransition(
     threadId: String,
@@ -135,10 +134,12 @@ internal suspend fun AgentService.moveThreadToProjectPathImpl(
     if (normalizedThreadId.isEmpty()) {
         throw AgentServiceError.InvalidInput("Thread id is required.")
     }
-    val normalizedProjectPath = CodexThread.normalizeProjectPath(projectPath)
-        ?: throw AgentServiceError.InvalidInput("A valid project path is required.")
-    var current = _threads.value.find { it.id == normalizedThreadId }
-        ?: throw AgentServiceError.InvalidInput("Thread not found.")
+    val normalizedProjectPath =
+        CodexThread.normalizeProjectPath(projectPath)
+            ?: throw AgentServiceError.InvalidInput("A valid project path is required.")
+    var current =
+        _threads.value.find { it.id == normalizedThreadId }
+            ?: throw AgentServiceError.InvalidInput("Thread not found.")
     val previousThread = current
     val previousAuth =
         authoritativeProjectPathByThreadId[normalizedThreadId]

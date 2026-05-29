@@ -28,8 +28,7 @@ object ContextWindowUsageCodec {
      * Root `thread` object from [thread/read] may embed usage fields at top level
      * (parity `extractContextWindowUsageIfAvailable`).
      */
-    fun decodeFromThreadReadThreadObject(threadObject: Map<String, JSONValue>): ContextWindowUsage? =
-        decodeObject(threadObject)
+    fun decodeFromThreadReadThreadObject(threadObject: Map<String, JSONValue>): ContextWindowUsage? = decodeObject(threadObject)
 
     /**
      * Legacy `codex/event` payloads with `type == token_count` / nested `info`

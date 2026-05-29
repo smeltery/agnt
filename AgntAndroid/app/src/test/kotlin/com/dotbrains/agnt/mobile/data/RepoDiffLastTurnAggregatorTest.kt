@@ -3,11 +3,11 @@ package com.dotbrains.agnt.mobile.data
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import java.time.Instant
 
 class RepoDiffLastTurnAggregatorTest {
     @Test
@@ -35,18 +35,18 @@ class RepoDiffLastTurnAggregatorTest {
     fun lastTurnFileRows_yieldOneRowPerPath_whenFenceContainsTwoFiles() {
         val body =
             """
-            ```diff
-            diff --git a/a/A.kt b/a/A.kt
-            --- a/a/A.kt
-            +++ b/a/A.kt
-            @@ -0,0 +1 @@
-            +a
-            diff --git a/b/B.kt b/b/B.kt
-            --- a/b/B.kt
-            +++ b/b/B.kt
-            @@ -0,0 +1 @@
-            +b
-            ```
+			```diff
+			diff --git a/a/A.kt b/a/A.kt
+			--- a/a/A.kt
+			+++ b/a/A.kt
+			@@ -0,0 +1 @@
+			+a
+			diff --git a/b/B.kt b/b/B.kt
+			--- a/b/B.kt
+			+++ b/b/B.kt
+			@@ -0,0 +1 @@
+			+b
+			```
             """.trimIndent()
         val msgs =
             listOf(

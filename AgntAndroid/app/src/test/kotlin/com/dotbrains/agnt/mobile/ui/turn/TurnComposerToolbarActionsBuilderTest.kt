@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TurnComposerToolbarActionsBuilderTest {
-
     @Test
     fun build_idle_withPayload_showsMicWhenVoiceUiOn() {
         val actions =

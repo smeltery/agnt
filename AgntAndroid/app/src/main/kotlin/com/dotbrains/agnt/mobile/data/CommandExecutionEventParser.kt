@@ -36,8 +36,7 @@ internal object CommandExecutionEventParser {
         )
     }
 
-    private fun envelopeEventObject(params: Map<String, JSONValue>): Map<String, JSONValue>? =
-        params["msg"]?.objectValue ?: params["event"]?.objectValue
+    private fun envelopeEventObject(params: Map<String, JSONValue>): Map<String, JSONValue>? = params["msg"]?.objectValue ?: params["event"]?.objectValue
 
     private fun extractItemId(
         params: Map<String, JSONValue>,
@@ -64,8 +63,7 @@ internal object CommandExecutionEventParser {
     private fun extractCommand(
         event: Map<String, JSONValue>?,
         params: Map<String, JSONValue>,
-    ): String =
-        firstCommandValue(event) ?: firstCommandValue(params) ?: "command"
+    ): String = firstCommandValue(event) ?: firstCommandValue(params) ?: "command"
 
     private fun firstCommandValue(obj: Map<String, JSONValue>?): String? {
         if (obj == null) return null
@@ -78,7 +76,10 @@ internal object CommandExecutionEventParser {
     }
 
     private fun commandString(value: JSONValue): String? {
-        value.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        value.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
         value.arrayValue
             ?.mapNotNull { element -> element.stringValue?.trim()?.takeIf { it.isNotEmpty() } }
             ?.takeIf { it.isNotEmpty() }
@@ -176,7 +177,8 @@ internal object CommandExecutionEventParser {
         }
         val normalized = method.lowercase()
         return when {
-            normalized.endsWith("exec_command_end") || normalized.contains("commandexecution/completed") ||
+            normalized.endsWith("exec_command_end") ||
+                normalized.contains("commandexecution/completed") ||
                 normalized.contains("command_execution/completed") -> "completed"
             else -> "running"
         }
@@ -184,7 +186,11 @@ internal object CommandExecutionEventParser {
 
     private fun firstNonBlankString(vararg values: JSONValue?): String? {
         for (value in values) {
-            value?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            value
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return null
     }
@@ -201,7 +207,11 @@ internal object CommandExecutionEventParser {
             when (value) {
                 is JSONValue.NumLong -> return value.value.toInt()
                 is JSONValue.NumDouble -> return value.value.toInt()
-                is JSONValue.Str -> value.value.trim().toIntOrNull()?.let { return it }
+                is JSONValue.Str ->
+                    value.value
+                        .trim()
+                        .toIntOrNull()
+                        ?.let { return it }
                 else -> Unit
             }
         }

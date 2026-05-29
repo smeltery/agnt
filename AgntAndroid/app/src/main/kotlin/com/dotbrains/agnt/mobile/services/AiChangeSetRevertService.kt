@@ -44,14 +44,19 @@ class AiChangeSetRevertService(
         workingDirectory: String,
         checkpointRef: String,
     ): RevertApplyResult {
-        val params = linkedMapOf<String, JSONValue>(
-            "cwd" to JSONValue.Str(workingDirectory),
-            "threadId" to JSONValue.Str(changeSet.threadId),
-            "targetCheckpointRef" to JSONValue.Str(checkpointRef),
-            "confirmDestructiveRestore" to JSONValue.Bool(true),
-        )
-        changeSet.turnId.trim().takeIf { it.isNotEmpty() }?.let { params["targetTurnId"] = JSONValue.Str(it) }
-        changeSet.workspaceCheckpoint?.restoreExpectedCommit
+        val params =
+            linkedMapOf<String, JSONValue>(
+                "cwd" to JSONValue.Str(workingDirectory),
+                "threadId" to JSONValue.Str(changeSet.threadId),
+                "targetCheckpointRef" to JSONValue.Str(checkpointRef),
+                "confirmDestructiveRestore" to JSONValue.Bool(true),
+            )
+        changeSet.turnId
+            .trim()
+            .takeIf { it.isNotEmpty() }
+            ?.let { params["targetTurnId"] = JSONValue.Str(it) }
+        changeSet.workspaceCheckpoint
+            ?.restoreExpectedCommit
             ?.let { params["expectedTargetCommit"] = JSONValue.Str(it) }
 
         val response =
@@ -74,4 +79,3 @@ class AiChangeSetRevertService(
         )
     }
 }
-

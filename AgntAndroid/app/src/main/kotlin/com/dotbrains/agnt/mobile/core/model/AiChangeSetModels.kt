@@ -1,10 +1,10 @@
 package com.dotbrains.agnt.mobile.core.model
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 @Serializable
 enum class AIFileChangeKind {
@@ -33,6 +33,7 @@ enum class AIChangeSetStatus {
     ready,
     reverted,
     failed,
+
     @SerialName("not_revertable")
     notRevertable,
 }
@@ -231,8 +232,11 @@ object AIUnifiedPatchParser {
         var deletions = 0
         for (line in normalized.lineSequence()) {
             val first = line.firstOrNull() ?: continue
-            if (first == '+' && !line.startsWith("+++")) additions++
-            else if (first == '-' && !line.startsWith("---")) deletions++
+            if (first == '+' && !line.startsWith("+++")) {
+                additions++
+            } else if (first == '-' && !line.startsWith("---")) {
+                deletions++
+            }
         }
         return additions to deletions
     }
@@ -281,6 +285,7 @@ object AIUnifiedPatchParser {
         if (lines.isEmpty()) return emptyList()
         val chunks = mutableListOf<List<String>>()
         var current = mutableListOf<String>()
+
         fun flush() {
             if (current.isNotEmpty()) {
                 chunks.add(current.toList())
@@ -331,8 +336,11 @@ object AIUnifiedPatchParser {
         var deletions = 0
         for (line in lines) {
             val first = line.firstOrNull() ?: continue
-            if (first == '+' && !line.startsWith("+++")) additions++
-            else if (first == '-' && !line.startsWith("---")) deletions++
+            if (first == '+' && !line.startsWith("+++")) {
+                additions++
+            } else if (first == '-' && !line.startsWith("---")) {
+                deletions++
+            }
         }
         val unsupportedReasons = mutableSetOf<String>()
         if (isBinary) unsupportedReasons.add("Binary changes are not auto-revertable in v1.")

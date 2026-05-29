@@ -32,15 +32,18 @@ class TerminalController(
     val snapshots: StateFlow<Map<String, TerminalSnapshot>> = _snapshots
 
     /** Per-chunk output events for callers (e.g. xterm.js bridge) that need to forward incremental writes. */
-    data class OutputEvent(val terminalId: String, val instanceId: String, val bytes: ByteArray) {
+    data class OutputEvent(
+        val terminalId: String,
+        val instanceId: String,
+        val bytes: ByteArray,
+    ) {
         override fun equals(other: Any?): Boolean =
             other is OutputEvent &&
                 terminalId == other.terminalId &&
                 instanceId == other.instanceId &&
                 bytes.contentEquals(other.bytes)
 
-        override fun hashCode(): Int =
-            (terminalId.hashCode() * 31 + instanceId.hashCode()) * 31 + bytes.contentHashCode()
+        override fun hashCode(): Int = (terminalId.hashCode() * 31 + instanceId.hashCode()) * 31 + bytes.contentHashCode()
     }
 
     private val _outputEvents =
@@ -53,8 +56,7 @@ class TerminalController(
     private val terminals = mutableMapOf<String, NativeSshTerminal>()
     private val terminalsLock = Any()
 
-    fun snapshot(terminalId: String): TerminalSnapshot =
-        _snapshots.value[terminalId] ?: TerminalSnapshot.idle(terminalId)
+    fun snapshot(terminalId: String): TerminalSnapshot = _snapshots.value[terminalId] ?: TerminalSnapshot.idle(terminalId)
 
     fun knownSnapshots(): List<TerminalSnapshot> {
         val map = _snapshots.value.toMutableMap()
@@ -85,7 +87,10 @@ class TerminalController(
 
     fun hasPrivateKey(value: String? = null): Boolean = privateKeyStore.hasPrivateKey(value)
 
-    fun resetKnownHost(host: String, port: Int) {
+    fun resetKnownHost(
+        host: String,
+        port: Int,
+    ) {
         knownHostStore.delete(host, port)
     }
 
@@ -218,15 +223,20 @@ class TerminalController(
         updateSnapshot(terminalId) { it.copy(status = TerminalStatus.Closed, errorMessage = null) }
     }
 
-    private fun isCurrentInstance(terminalId: String, instanceId: String): Boolean =
-        snapshot(terminalId).instanceId == instanceId
+    private fun isCurrentInstance(
+        terminalId: String,
+        instanceId: String,
+    ): Boolean = snapshot(terminalId).instanceId == instanceId
 
     private fun nativeTerminal(terminalId: String): NativeSshTerminal =
         synchronized(terminalsLock) {
             terminals.getOrPut(terminalId) { NativeSshTerminal(knownHostStore) }
         }
 
-    private fun setSnapshot(terminalId: String, snapshot: TerminalSnapshot) {
+    private fun setSnapshot(
+        terminalId: String,
+        snapshot: TerminalSnapshot,
+    ) {
         _snapshots.update { it + (terminalId to snapshot) }
     }
 

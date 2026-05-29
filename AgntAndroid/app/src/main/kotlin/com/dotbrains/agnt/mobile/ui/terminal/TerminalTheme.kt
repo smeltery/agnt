@@ -28,10 +28,22 @@ data class TerminalTheme(
                 cursorBackground = "#f2f2f7",
                 palette =
                     listOf(
-                        "#1f1f21", "#ff2e3f", "#0dbe4e", "#ffca00",
-                        "#009fff", "#c635e4", "#08c0ef", "#c6c6c8",
-                        "#1f1f21", "#ff2e3f", "#0dbe4e", "#ffca00",
-                        "#009fff", "#c635e4", "#08c0ef", "#c6c6c8",
+                        "#1f1f21",
+                        "#ff2e3f",
+                        "#0dbe4e",
+                        "#ffca00",
+                        "#009fff",
+                        "#c635e4",
+                        "#08c0ef",
+                        "#c6c6c8",
+                        "#1f1f21",
+                        "#ff2e3f",
+                        "#0dbe4e",
+                        "#ffca00",
+                        "#009fff",
+                        "#c635e4",
+                        "#08c0ef",
+                        "#c6c6c8",
                     ),
             )
 
@@ -45,10 +57,22 @@ data class TerminalTheme(
                 cursorBackground = "#0a0a0a",
                 palette =
                     listOf(
-                        "#141415", "#ff2e3f", "#0dbe4e", "#ffca00",
-                        "#009fff", "#c635e4", "#08c0ef", "#c6c6c8",
-                        "#141415", "#ff2e3f", "#0dbe4e", "#ffca00",
-                        "#009fff", "#c635e4", "#08c0ef", "#c6c6c8",
+                        "#141415",
+                        "#ff2e3f",
+                        "#0dbe4e",
+                        "#ffca00",
+                        "#009fff",
+                        "#c635e4",
+                        "#08c0ef",
+                        "#c6c6c8",
+                        "#141415",
+                        "#ff2e3f",
+                        "#0dbe4e",
+                        "#ffca00",
+                        "#009fff",
+                        "#c635e4",
+                        "#08c0ef",
+                        "#c6c6c8",
                     ),
             )
     }

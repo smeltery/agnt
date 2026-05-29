@@ -1,14 +1,14 @@
 package com.dotbrains.agnt.mobile.data
 
+import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageDeliveryState
-import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
+import kotlinx.coroutines.test.runTest
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlinx.coroutines.test.runTest
 
 class MessageTimelineStoreTest {
     @Test
@@ -358,7 +358,10 @@ class MessageTimelineStoreTest {
                 turnId = "turn-1",
             )
 
-            val message = store.messagesByThread.value["thread-1"].orEmpty().single()
+            val message =
+                store.messagesByThread.value["thread-1"]
+                    .orEmpty()
+                    .single()
             assertEquals(CodexMessageDeliveryState.confirmed, message.deliveryState)
             assertEquals("turn-1", message.turnId)
         }
@@ -375,7 +378,10 @@ class MessageTimelineStoreTest {
                 bodyText = "Choose speed",
             )
 
-            val row = store.messagesByThread.value["t1"].orEmpty().single()
+            val row =
+                store.messagesByThread.value["t1"]
+                    .orEmpty()
+                    .single()
             assertEquals(CodexMessageKind.userInputPrompt, row.kind)
             assertEquals("req-1", row.id)
             assertEquals("Choose speed", row.text)
@@ -403,12 +409,27 @@ class MessageTimelineStoreTest {
 
             store.removeEphemeralPendingServerMarker("si-9")
 
-            assertEquals(0, store.messagesByThread.value["t-in"].orEmpty().size)
-            assertEquals(1, store.messagesByThread.value["t-app"].orEmpty().size)
+            assertEquals(
+                0,
+                store.messagesByThread.value["t-in"]
+                    .orEmpty()
+                    .size,
+            )
+            assertEquals(
+                1,
+                store.messagesByThread.value["t-app"]
+                    .orEmpty()
+                    .size,
+            )
 
             store.removeEphemeralPendingServerMarker("ap-9")
 
-            assertEquals(0, store.messagesByThread.value["t-app"].orEmpty().size)
+            assertEquals(
+                0,
+                store.messagesByThread.value["t-app"]
+                    .orEmpty()
+                    .size,
+            )
         }
 
     private fun userMessage(

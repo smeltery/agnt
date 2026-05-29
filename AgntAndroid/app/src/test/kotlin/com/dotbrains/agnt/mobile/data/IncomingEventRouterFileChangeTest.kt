@@ -5,11 +5,11 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.flow.MutableStateFlow
 
 class IncomingEventRouterFileChangeTest {
     @Test
@@ -41,7 +41,11 @@ class IncomingEventRouterFileChangeTest {
                     ),
             )
 
-            assertTrue(timeline.messagesByThread.value["thread-1"].orEmpty().isEmpty())
+            assertTrue(
+                timeline.messagesByThread.value["thread-1"]
+                    .orEmpty()
+                    .isEmpty(),
+            )
         }
 
     private fun newRouter(messageTimeline: MessageTimelineStore): IncomingEventRouter =

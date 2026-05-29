@@ -3,8 +3,8 @@ package com.dotbrains.agnt.mobile.data
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.GitWorktreeChangeTransferMode
-import com.dotbrains.agnt.mobile.services.GitActionsService
 import com.dotbrains.agnt.mobile.services.GitActionsError
+import com.dotbrains.agnt.mobile.services.GitActionsService
 
 /**
  * Orchestrates managed-worktree creation + thread start, and managed handoff + project rebind.
@@ -65,11 +65,12 @@ class WorktreeFlowCoordinator(
     ): WorktreeFlowHandoffOutcome =
         handoffThreadToProjectPath(
             threadId = threadId,
-            sourceProjectPath = requiredProjectPath(
-                sourceProjectPath,
-                "The current handoff source is not available on this Mac.",
-                WorktreeFlowErrorCode.missing_handoff_source,
-            ),
+            sourceProjectPath =
+                requiredProjectPath(
+                    sourceProjectPath,
+                    "The current handoff source is not available on this Mac.",
+                    WorktreeFlowErrorCode.missing_handoff_source,
+                ),
             projectPath = targetProjectPath,
             transferTrackedChangesFromSource = true,
             didTransferTrackedChangesBeforeRebind = false,
@@ -220,7 +221,9 @@ class WorktreeFlowCoordinator(
                 sourceProjectPath.isNullOrBlank() ||
                 comparableProjectPath(reboundProjectPath) == comparableProjectPath(sourceProjectPath)
             ) {
-                notices.add("The moved changes were kept in the temporary worktree because the original checkout could not be restored automatically.")
+                notices.add(
+                    "The moved changes were kept in the temporary worktree because the original checkout could not be restored automatically.",
+                )
                 notices.add("The temporary worktree was kept so the moved changes stay available.")
                 return notices.joinToString("\n\n")
             }
@@ -319,14 +322,11 @@ class WorktreeFlowCoordinator(
         return "$baseMessage\n\n$detail"
     }
 
-    private fun rollbackFailureMessage(error: Throwable): String =
-        error.message?.trim()?.takeIf { it.isNotEmpty() } ?: "check the original checkout before retrying"
+    private fun rollbackFailureMessage(error: Throwable): String = error.message?.trim()?.takeIf { it.isNotEmpty() } ?: "check the original checkout before retrying"
 
-    private fun cleanupFailureMessage(error: Throwable): String =
-        error.message?.trim()?.takeIf { it.isNotEmpty() } ?: "remove it manually before retrying"
+    private fun cleanupFailureMessage(error: Throwable): String = error.message?.trim()?.takeIf { it.isNotEmpty() } ?: "remove it manually before retrying"
 
-    private fun isMissingManagedWorktreeTargetError(error: Throwable): Boolean =
-        error is GitActionsError.BridgeFailure && error.errorCode == "missing_handoff_target"
+    private fun isMissingManagedWorktreeTargetError(error: Throwable): Boolean = error is GitActionsError.BridgeFailure && error.errorCode == "missing_handoff_target"
 
     private fun requiredProjectPath(
         rawPath: String?,
@@ -340,20 +340,19 @@ class WorktreeFlowCoordinator(
         CodexThread.normalizeProjectPath(rawPath)
             ?: rawPath.trim()
 
-    private fun comparableProjectPath(rawPath: String?): String? =
-        rawPath?.let { canonicalProjectPath(it) }
+    private fun comparableProjectPath(rawPath: String?): String? = rawPath?.let { canonicalProjectPath(it) }
 
     companion object {
-        internal fun shouldCleanupWorktreeAfterFailedThreadStart(error: Throwable): Boolean =
-            failedNewWorktreeChatDisposition(error) is WorktreeFlowCleanupDisposition.CleanupSafe
+        internal fun shouldCleanupWorktreeAfterFailedThreadStart(error: Throwable): Boolean = failedNewWorktreeChatDisposition(error) is WorktreeFlowCleanupDisposition.CleanupSafe
 
         private fun failedNewWorktreeChatDisposition(error: Throwable): WorktreeFlowCleanupDisposition =
             when (error) {
                 AgentServiceError.Disconnected,
                 is AgentServiceError.InvalidResponse,
-                -> WorktreeFlowCleanupDisposition.PreserveWorktree(
-                    "The connection dropped after the chat request was sent, so the new worktree was kept in case the chat still appears after sync.",
-                )
+                ->
+                    WorktreeFlowCleanupDisposition.PreserveWorktree(
+                        "The connection dropped after the chat request was sent, so the new worktree was kept in case the chat still appears after sync.",
+                    )
 
                 is AgentServiceError.RpcFailure -> {
                     val msg = error.rpcError.message.lowercase()
@@ -383,7 +382,6 @@ class WorktreeFlowCoordinator(
                         "The runtime may have created the new chat before the error reached the app.",
                     )
             }
-
     }
 }
 

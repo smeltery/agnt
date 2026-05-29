@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.core.model
 
-import java.util.UUID
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import java.util.UUID
 
 @Serializable
 enum class CodexCollaborationModeKind {
@@ -152,14 +152,16 @@ data class CodexSubagentAction(
 
     val normalizedTool: String
         get() =
-            tool.trim()
+            tool
+                .trim()
                 .lowercase()
                 .replace("_", "")
                 .replace("-", "")
 
     val normalizedStatus: String
         get() =
-            status.trim()
+            status
+                .trim()
                 .lowercase()
                 .replace("_", "")
                 .replace("-", "")

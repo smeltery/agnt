@@ -168,11 +168,27 @@ internal fun decodePluginMetadata(result: JSONValue?): List<CodexPluginMetadata>
                     marketplaceName = marketplaceName,
                     marketplacePath = marketplacePath,
                     displayName =
-                        interfaceObject?.get("displayName")?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
-                            ?: interfaceObject?.get("display_name")?.stringValue?.trim()?.takeIf { it.isNotEmpty() },
+                        interfaceObject
+                            ?.get("displayName")
+                            ?.stringValue
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+                            ?: interfaceObject
+                                ?.get("display_name")
+                                ?.stringValue
+                                ?.trim()
+                                ?.takeIf { it.isNotEmpty() },
                     shortDescription =
-                        interfaceObject?.get("shortDescription")?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
-                            ?: interfaceObject?.get("short_description")?.stringValue?.trim()?.takeIf { it.isNotEmpty() },
+                        interfaceObject
+                            ?.get("shortDescription")
+                            ?.stringValue
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+                            ?: interfaceObject
+                                ?.get("short_description")
+                                ?.stringValue
+                                ?.trim()
+                                ?.takeIf { it.isNotEmpty() },
                     installed = plugin["installed"]?.boolValue ?: false,
                     enabled = plugin["enabled"]?.boolValue ?: false,
                     installPolicy = plugin["installPolicy"]?.stringValue ?: plugin["install_policy"]?.stringValue,

@@ -8,7 +8,11 @@ import com.dotbrains.agnt.mobile.R
  */
 internal object PendingRequestPresentation {
     private fun normalizeMethod(method: String): String =
-        method.trim().lowercase().replace("_", "").replace("-", "")
+        method
+            .trim()
+            .lowercase()
+            .replace("_", "")
+            .replace("-", "")
 
     @StringRes
     fun approvalKindTitleRes(method: String): Int {
@@ -26,8 +30,7 @@ internal object PendingRequestPresentation {
     /**
      * `acceptForSession` applies only to shell command approvals (parity iOS `isCommandApproval`).
      */
-    fun supportsAcceptForSession(method: String): Boolean =
-        normalizeMethod(method) == "item/commandexecution/requestapproval"
+    fun supportsAcceptForSession(method: String): Boolean = normalizeMethod(method) == "item/commandexecution/requestapproval"
 
     /**
      * [reason] and [formattedCommandLine] (e.g. from [R.string.approval_command_line]), separated

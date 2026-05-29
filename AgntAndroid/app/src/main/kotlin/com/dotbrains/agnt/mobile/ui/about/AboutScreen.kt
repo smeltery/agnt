@@ -100,5 +100,4 @@ internal fun LocalInfoSection(
     }
 }
 
-private fun readAppVersionName(context: Context): String =
-    readAgntAppVersionName(context)
+private fun readAppVersionName(context: Context): String = readAgntAppVersionName(context)

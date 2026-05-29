@@ -152,8 +152,7 @@ internal object RateLimitPayloadCodec {
             o["primary_window"] != null ||
             o["secondary_window"] != null
 
-    private fun firstNonEmptyString(candidates: List<String?>): String? =
-        candidates.firstOrNull { !it.isNullOrBlank() }?.trim()
+    private fun firstNonEmptyString(candidates: List<String?>): String? = candidates.firstOrNull { !it.isNullOrBlank() }?.trim()
 
     private fun stableFallbackLimitId(
         o: Map<String, JSONValue>,

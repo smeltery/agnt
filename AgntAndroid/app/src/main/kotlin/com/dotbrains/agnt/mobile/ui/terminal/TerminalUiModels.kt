@@ -25,9 +25,13 @@ enum class TerminalHostPlatform {
 }
 
 sealed class TerminalAccessoryAction {
-    data class Send(val data: String) : TerminalAccessoryAction()
+    data class Send(
+        val data: String,
+    ) : TerminalAccessoryAction()
 
-    data class Modifier(val modifier: TerminalPendingModifier) : TerminalAccessoryAction()
+    data class Modifier(
+        val modifier: TerminalPendingModifier,
+    ) : TerminalAccessoryAction()
 }
 
 data class TerminalAccessoryButton(

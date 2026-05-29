@@ -65,9 +65,9 @@ class StructuredInputTimelineFormatterTest {
             )
         assertEquals(
             """
-            1. First?
+			1. First?
 
-            2. Second?
+			2. Second?
             """.trimIndent(),
             text,
         )

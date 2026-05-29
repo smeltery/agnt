@@ -232,23 +232,51 @@ private class RemoteTerminalOutput(
 
 private class NoopTerminalSessionClient : TerminalSessionClient {
     override fun onTextChanged(changedSession: TerminalSession?) = Unit
+
     override fun onTitleChanged(changedSession: TerminalSession?) = Unit
+
     override fun onSessionFinished(finishedSession: TerminalSession?) = Unit
+
     override fun onCopyTextToClipboard(
         session: TerminalSession?,
         text: String?,
     ) = Unit
 
     override fun onPasteTextFromClipboard(session: TerminalSession?) = Unit
+
     override fun onBell(session: TerminalSession?) = Unit
+
     override fun onColorsChanged(session: TerminalSession?) = Unit
+
     override fun onTerminalCursorStateChange(state: Boolean) = Unit
+
     override fun getTerminalCursorStyle(): Int? = null
-    override fun logError(tag: String?, message: String?) = Unit
-    override fun logWarn(tag: String?, message: String?) = Unit
-    override fun logInfo(tag: String?, message: String?) = Unit
-    override fun logDebug(tag: String?, message: String?) = Unit
-    override fun logVerbose(tag: String?, message: String?) = Unit
+
+    override fun logError(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logWarn(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logInfo(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logDebug(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logVerbose(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
     override fun logStackTraceWithMessage(
         tag: String?,
         message: String?,
@@ -263,12 +291,19 @@ private class NoopTerminalSessionClient : TerminalSessionClient {
 
 private class NoopTerminalViewClient : TerminalViewClient {
     override fun onScale(scale: Float): Float = scale.coerceIn(0.8f, 1.4f)
+
     override fun onSingleTapUp(e: MotionEvent?) = Unit
+
     override fun shouldBackButtonBeMappedToEscape(): Boolean = false
+
     override fun shouldEnforceCharBasedInput(): Boolean = true
+
     override fun shouldUseCtrlSpaceWorkaround(): Boolean = false
+
     override fun isTerminalViewSelected(): Boolean = false
+
     override fun copyModeChanged(copyMode: Boolean) = Unit
+
     override fun onKeyDown(
         keyCode: Int,
         e: KeyEvent?,
@@ -281,10 +316,15 @@ private class NoopTerminalViewClient : TerminalViewClient {
     ): Boolean = true
 
     override fun onLongPress(event: MotionEvent?): Boolean = false
+
     override fun readControlKey(): Boolean = false
+
     override fun readAltKey(): Boolean = false
+
     override fun readShiftKey(): Boolean = false
+
     override fun readFnKey(): Boolean = false
+
     override fun onCodePoint(
         codePoint: Int,
         ctrlDown: Boolean,
@@ -292,11 +332,32 @@ private class NoopTerminalViewClient : TerminalViewClient {
     ): Boolean = true
 
     override fun onEmulatorSet() = Unit
-    override fun logError(tag: String?, message: String?) = Unit
-    override fun logWarn(tag: String?, message: String?) = Unit
-    override fun logInfo(tag: String?, message: String?) = Unit
-    override fun logDebug(tag: String?, message: String?) = Unit
-    override fun logVerbose(tag: String?, message: String?) = Unit
+
+    override fun logError(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logWarn(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logInfo(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logDebug(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
+    override fun logVerbose(
+        tag: String?,
+        message: String?,
+    ) = Unit
+
     override fun logStackTraceWithMessage(
         tag: String?,
         message: String?,

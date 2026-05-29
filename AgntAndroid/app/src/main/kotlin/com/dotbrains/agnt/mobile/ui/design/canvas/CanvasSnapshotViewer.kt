@@ -47,20 +47,23 @@ fun CanvasSnapshotViewer(
     ) {
         when (state) {
             is CanvasRenderState.Loading -> SnapshotLoadingState()
-            is CanvasRenderState.Ready -> ZoomableSnapshot(
-                imageUrl = state.imageUrl,
-                version = state.version,
-            )
-            is CanvasRenderState.Outdated -> OutdatedSnapshot(
-                imageUrl = state.imageUrl,
-                currentVersion = state.currentVersion,
-                snapshotVersion = state.snapshotVersion,
-                onRefreshSnapshot = onRefreshSnapshot,
-            )
-            is CanvasRenderState.Error -> SnapshotErrorState(
-                message = state.message,
-                onRetry = onRetry,
-            )
+            is CanvasRenderState.Ready ->
+                ZoomableSnapshot(
+                    imageUrl = state.imageUrl,
+                    version = state.version,
+                )
+            is CanvasRenderState.Outdated ->
+                OutdatedSnapshot(
+                    imageUrl = state.imageUrl,
+                    currentVersion = state.currentVersion,
+                    snapshotVersion = state.snapshotVersion,
+                    onRefreshSnapshot = onRefreshSnapshot,
+                )
+            is CanvasRenderState.Error ->
+                SnapshotErrorState(
+                    message = state.message,
+                    onRetry = onRetry,
+                )
         }
     }
 }
@@ -84,45 +87,47 @@ private fun ZoomableSnapshot(
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
     SubcomposeAsyncImage(
-        model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-            .data(imageUrl)
-            .crossfade(true)
-            .build(),
+        model =
+            ImageRequest
+                .Builder(androidx.compose.ui.platform.LocalContext.current)
+                .data(imageUrl)
+                .crossfade(true)
+                .build(),
         contentDescription = "Design preview v$version",
         contentScale = ContentScale.Fit,
-        modifier = modifier
-            .fillMaxSize()
-            .onSizeChanged { containerSize = it }
-            .pointerInput(Unit) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
-                    val scaleFactor = newScale / scale
+        modifier =
+            modifier
+                .fillMaxSize()
+                .onSizeChanged { containerSize = it }
+                .pointerInput(Unit) {
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        val newScale = (scale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                        val scaleFactor = newScale / scale
 
-                    if (scaleFactor != 1f) {
-                        val cx = centroid.x - (containerSize.width / 2f)
-                        val cy = centroid.y - (containerSize.height / 2f)
+                        if (scaleFactor != 1f) {
+                            val cx = centroid.x - (containerSize.width / 2f)
+                            val cy = centroid.y - (containerSize.height / 2f)
+                            offset =
+                                Offset(
+                                    x = cx - (cx - offset.x) * scaleFactor,
+                                    y = cy - (cy - offset.y) * scaleFactor,
+                                )
+                        }
+
                         offset =
                             Offset(
-                                x = cx - (cx - offset.x) * scaleFactor,
-                                y = cy - (cy - offset.y) * scaleFactor,
+                                x = offset.x + pan.x / scale,
+                                y = offset.y + pan.y / scale,
                             )
+
+                        scale = newScale
                     }
-
-                    offset =
-                        Offset(
-                            x = offset.x + pan.x / scale,
-                            y = offset.y + pan.y / scale,
-                        )
-
-                    scale = newScale
-                }
-            }
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationX = offset.x
-                translationY = offset.y
-            },
+                }.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = offset.x
+                    translationY = offset.y
+                },
         loading = {
             CircularProgressIndicator(
                 modifier = Modifier.size(28.dp),
@@ -152,42 +157,44 @@ private fun OutdatedSnapshot(
 
     Box(modifier = modifier.fillMaxSize()) {
         SubcomposeAsyncImage(
-            model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                .data(imageUrl)
-                .crossfade(true)
-                .build(),
+            model =
+                ImageRequest
+                    .Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
             contentDescription = "Design preview v$snapshotVersion",
             contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { containerSize = it }
-                .pointerInput(Unit) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        val newScale = (scale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
-                        val scaleFactor = newScale / scale
-                        if (scaleFactor != 1f) {
-                            val cx = centroid.x - (containerSize.width / 2f)
-                            val cy = centroid.y - (containerSize.height / 2f)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { containerSize = it }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                            val scaleFactor = newScale / scale
+                            if (scaleFactor != 1f) {
+                                val cx = centroid.x - (containerSize.width / 2f)
+                                val cy = centroid.y - (containerSize.height / 2f)
+                                offset =
+                                    Offset(
+                                        x = cx - (cx - offset.x) * scaleFactor,
+                                        y = cy - (cy - offset.y) * scaleFactor,
+                                    )
+                            }
                             offset =
                                 Offset(
-                                    x = cx - (cx - offset.x) * scaleFactor,
-                                    y = cy - (cy - offset.y) * scaleFactor,
+                                    x = offset.x + pan.x / scale,
+                                    y = offset.y + pan.y / scale,
                                 )
+                            scale = newScale
                         }
-                        offset =
-                            Offset(
-                                x = offset.x + pan.x / scale,
-                                y = offset.y + pan.y / scale,
-                            )
-                        scale = newScale
-                    }
-                }
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = offset.x
-                    translationY = offset.y
-                },
+                    }.graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
             loading = {
                 CircularProgressIndicator(
                     modifier = Modifier.size(28.dp),
@@ -203,11 +210,12 @@ private fun OutdatedSnapshot(
         )
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                ),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    ),
             contentAlignment = Alignment.Center,
         ) {
             SnapshotErrorContent(

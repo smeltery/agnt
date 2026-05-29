@@ -45,10 +45,11 @@ fun TerminalWindowsSetupGuide(
     ) {
         Text(
             text = stringResource(R.string.terminal_windows_guide_title),
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            ),
+            style =
+                MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
@@ -92,10 +93,11 @@ private fun TerminalGuideStepCard(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
+            style =
+                MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
             color = MaterialTheme.colorScheme.onSurface,
         )
         Surface(
@@ -107,11 +109,12 @@ private fun TerminalGuideStepCard(
             Text(
                 text = command,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                ),
+                style =
+                    MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                    ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

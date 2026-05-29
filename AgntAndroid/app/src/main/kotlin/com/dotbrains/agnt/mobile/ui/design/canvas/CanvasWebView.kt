@@ -38,11 +38,13 @@ fun CanvasWebView(
 
                 addJavascriptInterface(bridge, "AndroidCanvasBridge")
 
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                        return true
+                webViewClient =
+                    object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView,
+                            url: String,
+                        ): Boolean = true
                     }
-                }
                 webView = this
                 bridge.attach(this)
                 loadUrl("file:///android_asset/mobile_canvas_stub.html")

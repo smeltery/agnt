@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.data.CodexRepository
@@ -39,6 +38,7 @@ import com.dotbrains.agnt.mobile.ui.theme.AgentLightColors
 import com.dotbrains.agnt.mobile.ui.theme.AgntFullAccessIconDark
 import com.dotbrains.agnt.mobile.ui.theme.AgntFullAccessIconLight
 import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
+import com.composables.icons.lucide.R as LucideR
 
 /**
  * Single-row controls below attachments, above the composer capsule (Swift [TurnComposerSecondaryBar]).
@@ -105,8 +105,7 @@ internal fun TurnComposerSecondaryBar(
                     shape = envPillShape,
                     ambientColor = Color.Black.copy(alpha = 0.06f),
                     spotColor = Color.Black.copy(alpha = 0.06f),
-                )
-                .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.42f), envPillShape)
+                ).border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.42f), envPillShape)
         } else {
             Modifier.shadow(
                 elevation = 3.dp,

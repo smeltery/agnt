@@ -69,7 +69,12 @@ internal fun bridgeDebugApplyRelayHostOverride(
             else -> trimmed
         }
     val parsed = forParse.toHttpUrlOrNull() ?: return relayUrl
-    val httpish = parsed.newBuilder().host(host).build().toString()
+    val httpish =
+        parsed
+            .newBuilder()
+            .host(host)
+            .build()
+            .toString()
     return when {
         wss -> httpish.replaceFirst("https://", "wss://", ignoreCase = true)
         ws -> httpish.replaceFirst("http://", "ws://", ignoreCase = true)
@@ -84,9 +89,16 @@ internal fun bridgeDebugFormatConnectError(e: Throwable): String {
     while (cur != null && depth < 5) {
         val head =
             if (depth == 0) {
-                cur.message?.trim().orEmpty().ifEmpty { cur.javaClass.simpleName }
+                cur.message
+                    ?.trim()
+                    .orEmpty()
+                    .ifEmpty { cur.javaClass.simpleName }
             } else {
-                val msg = cur.message?.trim().orEmpty().ifEmpty { cur.javaClass.simpleName }
+                val msg =
+                    cur.message
+                        ?.trim()
+                        .orEmpty()
+                        .ifEmpty { cur.javaClass.simpleName }
                 "Caused by: $msg"
             }
         lines.add(head)

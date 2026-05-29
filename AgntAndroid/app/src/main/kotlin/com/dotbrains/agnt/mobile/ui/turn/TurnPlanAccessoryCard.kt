@@ -5,10 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -319,24 +319,26 @@ internal data class PlanAccessorySnapshot(
             steps.firstOrNull { it.status == CodexPlanStepStatus.inProgress }?.let { return it.step }
             steps.firstOrNull { it.status == CodexPlanStepStatus.pending }?.let { return it.step }
             steps.lastOrNull()?.let { return it.step }
-            val explanation = message.planState?.explanation?.trim().orEmpty()
+            val explanation =
+                message.planState
+                    ?.explanation
+                    ?.trim()
+                    .orEmpty()
             if (explanation.isNotEmpty()) return explanation
             return message.text.trim().takeIf { it.isNotEmpty() } ?: "Open plan details"
         }
     }
 }
 
-internal fun selectPinnedPlanAccessoryMessage(messages: List<CodexMessage>): CodexMessage? {
-    return messages
+internal fun selectPinnedPlanAccessoryMessage(messages: List<CodexMessage>): CodexMessage? =
+    messages
         .asReversed()
         .firstOrNull { it.shouldDisplayPinnedPlanAccessory() }
-}
 
-internal fun selectCompletedPlanAccessoryMessage(messages: List<CodexMessage>): CodexMessage? {
-    return messages
+internal fun selectCompletedPlanAccessoryMessage(messages: List<CodexMessage>): CodexMessage? =
+    messages
         .asReversed()
         .firstOrNull { it.shouldDisplayCompletedPlanAccessory() }
-}
 
 internal fun CodexMessage.shouldDisplayPinnedPlanAccessory(): Boolean {
     if (role != CodexMessageRole.system || kind != CodexMessageKind.plan) return false

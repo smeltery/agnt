@@ -24,20 +24,20 @@ class SkillReferenceFormatterTest {
     fun preservesFencedCodeBlocks() {
         val input =
             """
-            Use ${'$'}code-review here.
-            ```text
-            ${'$'}code-review stays raw
-            ```
-            Then ${'$'}bug-fix.
+			Use ${'$'}code-review here.
+			```text
+			${'$'}code-review stays raw
+			```
+			Then ${'$'}bug-fix.
             """.trimIndent()
 
         val expected =
             """
-            Use Code Review here.
-            ```text
-            ${'$'}code-review stays raw
-            ```
-            Then Bug Fix.
+			Use Code Review here.
+			```text
+			${'$'}code-review stays raw
+			```
+			Then Bug Fix.
             """.trimIndent()
 
         assertEquals(expected, SkillReferenceFormatter.formatVisibleProse(input))

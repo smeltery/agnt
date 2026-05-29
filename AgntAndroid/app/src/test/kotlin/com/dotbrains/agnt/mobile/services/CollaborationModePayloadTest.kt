@@ -17,14 +17,14 @@ import kotlin.test.assertFailsWith
  * mode across providers, so this regression test exists.
  */
 class CollaborationModePayloadTest {
-
     @Test
     fun planModeEnvelopeIsClaudeBridgeCompatible() {
-        val payload = buildCollaborationModePayload(
-            mode = CodexCollaborationModeKind.plan,
-            threadModel = "claude-3-7-sonnet",
-            reasoningEffort = "medium",
-        )
+        val payload =
+            buildCollaborationModePayload(
+                mode = CodexCollaborationModeKind.plan,
+                threadModel = "claude-3-7-sonnet",
+                reasoningEffort = "medium",
+            )
 
         val mode = (payload.map["mode"] as? JSONValue.Str)?.value
         assertEquals("plan", mode, "Bridge claude translator keys on the literal 'plan'")
@@ -60,11 +60,12 @@ class CollaborationModePayloadTest {
     fun nullReasoningEffortIsForwardedAsJsonNull() {
         // Codex's runtime distinguishes "no preference" (null) from "auto" /
         // "medium" — JSON null preserves the intent across the wire.
-        val payload = buildCollaborationModePayload(
-            mode = CodexCollaborationModeKind.plan,
-            threadModel = "claude-3-7-sonnet",
-            reasoningEffort = null,
-        )
+        val payload =
+            buildCollaborationModePayload(
+                mode = CodexCollaborationModeKind.plan,
+                threadModel = "claude-3-7-sonnet",
+                reasoningEffort = null,
+            )
         val settings = payload.map["settings"] as JSONValue.Obj
         assertEquals(JSONValue.Null, settings.map["reasoning_effort"])
     }
@@ -78,11 +79,12 @@ class CollaborationModePayloadTest {
         // settings-builder path with a model-only collaboration that we
         // haven't introduced yet — guard against future regressions by
         // verifying the trim/non-empty handling in isolation.)
-        val payload = buildCollaborationModePayload(
-            mode = CodexCollaborationModeKind.plan,
-            threadModel = "  claude-3-7-sonnet  ",
-            reasoningEffort = "high",
-        )
+        val payload =
+            buildCollaborationModePayload(
+                mode = CodexCollaborationModeKind.plan,
+                threadModel = "  claude-3-7-sonnet  ",
+                reasoningEffort = "high",
+            )
         val settings = payload.map["settings"] as JSONValue.Obj
         // The trim is applied at the call site (runtimeModelIdentifierForTurn);
         // builder takes the value as-is so it stays composable. Verify that

@@ -46,7 +46,8 @@ data class CodexProjectDirectoryListing(
         fun fromJson(json: RPCObject): CodexProjectDirectoryListing {
             val path = json["path"]?.stringValue?.trim().orEmpty()
             val entries =
-                json["entries"]?.arrayValue
+                json["entries"]
+                    ?.arrayValue
                     ?.mapNotNull { it.objectValue?.let(CodexProjectDirectoryEntry::fromOrNull) }
                     ?: emptyList()
             return CodexProjectDirectoryListing(

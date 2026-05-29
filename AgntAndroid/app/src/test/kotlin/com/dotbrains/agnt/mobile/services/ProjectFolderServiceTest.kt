@@ -2,9 +2,9 @@ package com.dotbrains.agnt.mobile.services
 
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlinx.coroutines.test.runTest
 
 class ProjectFolderServiceTest {
     @Test

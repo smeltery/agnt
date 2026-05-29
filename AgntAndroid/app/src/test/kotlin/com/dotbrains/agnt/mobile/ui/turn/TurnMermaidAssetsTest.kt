@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
+import org.junit.Test
 import java.io.File
 import kotlin.test.assertTrue
-import org.junit.Test
 
 class TurnMermaidAssetsTest {
     @Test

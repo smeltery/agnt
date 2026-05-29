@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.valentinilk.shimmer.shimmer
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageDeliveryState
@@ -34,6 +33,7 @@ import com.dotbrains.agnt.mobile.core.model.TurnThinkingDisclosureHints
 import com.dotbrains.agnt.mobile.ui.agent.FileEditRow
 import com.dotbrains.agnt.mobile.ui.agent.ToolCallRow
 import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
+import com.valentinilk.shimmer.shimmer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -49,8 +49,10 @@ fun TurnMessageRow(
 ) {
     val isTimelineToolRow =
         message.role == CodexMessageRole.system &&
-            (message.kind == CodexMessageKind.commandExecution ||
-                message.kind == CodexMessageKind.fileChange)
+            (
+                message.kind == CodexMessageKind.commandExecution ||
+                    message.kind == CodexMessageKind.fileChange
+            )
     val horizontalAlignment =
         when (message.role) {
             CodexMessageRole.user -> Alignment.End
@@ -127,8 +129,7 @@ fun TurnMessageRow(
                                 CodexMessageRole.assistant -> 0.98f
                                 CodexMessageRole.system -> 0.96f
                             },
-                        )
-                        .widthIn(max = 620.dp)
+                        ).widthIn(max = 620.dp)
                 },
         ) {
             Column(
@@ -353,9 +354,7 @@ private fun streamingRevealStep(remaining: Int): Int =
     }
 
 @Composable
-private fun Modifier.streamingAssistantShimmer(enabled: Boolean): Modifier {
-    return if (enabled) this.shimmer() else this
-}
+private fun Modifier.streamingAssistantShimmer(enabled: Boolean): Modifier = if (enabled) this.shimmer() else this
 
 private const val STREAMING_ASSISTANT_INITIAL_DELAY_MS = 80L
 private const val STREAMING_ASSISTANT_REVEAL_FRAME_MS = 34L
@@ -414,7 +413,11 @@ private fun PlanMessageDetails(
     contentColor: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
 ) {
-    val explanation = message.planState?.explanation?.trim().orEmpty()
+    val explanation =
+        message.planState
+            ?.explanation
+            ?.trim()
+            .orEmpty()
     val body = message.text.trim()
     Column(
         modifier = modifier,
@@ -453,8 +456,8 @@ private fun PlanMessageDetails(
 }
 
 /** Chat utente/assistant, plan e reasoning: markdown; diff/path comando restano testo semplice. */
-private fun shouldRenderMarkdownBody(message: CodexMessage): Boolean {
-    return when (message.kind) {
+private fun shouldRenderMarkdownBody(message: CodexMessage): Boolean =
+    when (message.kind) {
         CodexMessageKind.chat ->
             message.role == CodexMessageRole.user || message.role == CodexMessageRole.assistant
         CodexMessageKind.plan,
@@ -467,7 +470,6 @@ private fun shouldRenderMarkdownBody(message: CodexMessage): Boolean {
         CodexMessageKind.pendingApproval,
         -> false
     }
-}
 
 @Composable
 private fun systemKindLabel(message: CodexMessage): String? {

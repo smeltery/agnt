@@ -48,8 +48,8 @@ import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.QueuedTurnDraftPreview
 import com.dotbrains.agnt.mobile.services.AiChangeSetRevertService
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
-import java.time.Instant
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 /**
  * J.7d: detailed usage + account rate limits for the current thread, backed by
@@ -298,7 +298,7 @@ private fun ContextWindowStatusBlock(
                         usage.tokensUsedFormatted,
                         usage.tokenLimitFormatted,
                         usage.percentUsed,
-                ),
+                    ),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -359,7 +359,13 @@ private fun ThreadRuntimeStatusBlock(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = draft.text.lines().firstOrNull()?.trim().orEmpty().ifBlank { queueItemEmptyLabel },
+                        text =
+                            draft.text
+                                .lines()
+                                .firstOrNull()
+                                ?.trim()
+                                .orEmpty()
+                                .ifBlank { queueItemEmptyLabel },
                         style = MaterialTheme.typography.bodySmall,
                     )
                     val meta =

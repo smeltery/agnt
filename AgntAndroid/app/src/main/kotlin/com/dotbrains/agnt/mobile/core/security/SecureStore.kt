@@ -85,9 +85,11 @@ class SecureStore(
 
         private fun createPrefs(context: Context): SharedPreferences {
             val masterKey =
-                MasterKey.Builder(context)
+                MasterKey
+                    .Builder(context)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build()
+
             fun openEncryptedPrefs(): SharedPreferences =
                 EncryptedSharedPreferences.create(
                     context,

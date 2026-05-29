@@ -3,20 +3,20 @@ package com.dotbrains.agnt.mobile.services
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
-import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
-import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
-import com.dotbrains.agnt.mobile.core.model.isExplicitServerThreadMissing
 import com.dotbrains.agnt.mobile.core.model.CodexMessageDeliveryState
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
+import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
+import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
+import com.dotbrains.agnt.mobile.core.model.isExplicitServerThreadMissing
 import com.dotbrains.agnt.mobile.data.ThreadTurnInterruptSnapshot
 import com.dotbrains.agnt.mobile.data.ThreadTurnSnapshot
 import com.dotbrains.agnt.mobile.data.extractTurnIdFromRpcResult
-import java.time.Instant
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.time.Instant
 
 /**
  * Invio turno utente via `turn/start` (parity con [AgentService.sendTurnStart] in
@@ -506,8 +506,14 @@ internal fun makeTurnInputPayload(
             val id = mention.id.trim()
             if (id.isEmpty()) return@forEach
             val payload = linkedMapOf<String, JSONValue>("type" to JSONValue.Str("skill"), "id" to JSONValue.Str(id))
-            mention.name?.trim()?.takeIf { it.isNotEmpty() }?.let { payload["name"] = JSONValue.Str(it) }
-            mention.path?.trim()?.takeIf { it.isNotEmpty() }?.let { payload["path"] = JSONValue.Str(it) }
+            mention.name
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { payload["name"] = JSONValue.Str(it) }
+            mention.path
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { payload["path"] = JSONValue.Str(it) }
             inputItems += JSONValue.Obj(payload)
         }
     }

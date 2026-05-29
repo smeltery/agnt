@@ -19,8 +19,7 @@ import androidx.compose.ui.unit.dp
  * content behind the composer cannot read as a rectangular band.
  */
 @Composable
-internal fun isAgentLightChrome(): Boolean =
-    MaterialTheme.colorScheme.background.luminance() >= 0.43f
+internal fun isAgentLightChrome(): Boolean = MaterialTheme.colorScheme.background.luminance() >= 0.43f
 
 /**
  * Main turn composer shell: frosted white, hairline border, soft shadow (light only).
@@ -41,16 +40,17 @@ internal fun AgntComposerCapsuleChrome(
                         shape = shape,
                         ambientColor = Color.Black.copy(alpha = 0.06f),
                         spotColor = Color.Black.copy(alpha = 0.06f),
-                    )
-                    .clip(shape)
+                    ).clip(shape)
                     .border(0.5.dp, Color.White.copy(alpha = 0.62f), shape)
                     .background(fill, shape),
         ) {
             content()
         }
     } else {
-        val fill = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
-            .compositeOver(MaterialTheme.colorScheme.background)
+        val fill =
+            MaterialTheme.colorScheme.surfaceVariant
+                .copy(alpha = 0.34f)
+                .compositeOver(MaterialTheme.colorScheme.background)
         Box(
             modifier =
                 modifier
@@ -59,8 +59,7 @@ internal fun AgntComposerCapsuleChrome(
                         shape = shape,
                         ambientColor = Color.Black.copy(alpha = 0.12f),
                         spotColor = Color.Black.copy(alpha = 0.12f),
-                    )
-                    .clip(shape)
+                    ).clip(shape)
                     .border(0.5.dp, Color.White.copy(alpha = 0.12f), shape)
                     .background(fill, shape),
         ) {

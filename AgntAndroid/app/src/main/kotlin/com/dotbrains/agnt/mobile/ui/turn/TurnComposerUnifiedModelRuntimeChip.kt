@@ -30,8 +30,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
+import com.composables.icons.lucide.R as LucideR
 
 /** Compact footnote / unified chip icon size. */
 internal val ComposerFootnoteIconDp = 13.dp

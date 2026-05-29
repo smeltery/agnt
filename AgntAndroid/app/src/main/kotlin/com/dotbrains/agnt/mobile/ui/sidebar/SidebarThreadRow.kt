@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.ui.sidebar
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,9 +67,10 @@ fun SidebarThreadRow(
     val colors = rememberSidebarColorPalette()
     val rowShape = RoundedCornerShape(8.dp)
     var menuExpanded by remember(thread.id) { mutableStateOf(false) }
-    val metadataTokens = remember(thread, selected, activeMetadata, colors) {
-        if (selected) thread.activeMetadataTokens(colors, activeMetadata) else emptyList()
-    }
+    val metadataTokens =
+        remember(thread, selected, activeMetadata, colors) {
+            if (selected) thread.activeMetadataTokens(colors, activeMetadata) else emptyList()
+        }
     Row(
         modifier =
             modifier
@@ -83,12 +84,10 @@ fun SidebarThreadRow(
                         } else {
                             Color.Transparent
                         },
-                )
-                .combinedClickable(
+                ).combinedClickable(
                     onClick = onSelect,
                     onLongClick = { onRenameRequest?.invoke() },
-                )
-                .padding(end = 8.dp),
+                ).padding(end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -297,19 +296,16 @@ private fun CodexThread.activeMetadataTokens(
                 "headBranch",
                 "head_branch",
             )
-    )
-        ?.let { tokens += SidebarMetadataToken(it, colors.secondaryText) }
+    )?.let { tokens += SidebarMetadataToken(it, colors.secondaryText) }
     (
         activeMetadata?.additions
             ?: firstMetadataInt("additions", "added", "linesAdded", "lines_added", "insertions")
-    )
-        ?.takeIf { it > 0 }
+    )?.takeIf { it > 0 }
         ?.let { tokens += SidebarMetadataToken("+$it", colors.green) }
     (
         activeMetadata?.deletions
             ?: firstMetadataInt("deletions", "deleted", "linesDeleted", "lines_deleted", "removals")
-    )
-        ?.takeIf { it > 0 }
+    )?.takeIf { it > 0 }
         ?.let { tokens += SidebarMetadataToken("-$it", colors.red) }
     (
         activeMetadata?.model?.trim()?.takeIf { it.isNotEmpty() }
@@ -339,9 +335,10 @@ private fun CodexThread.firstMetadataInt(vararg keys: String): Int? {
 }
 
 private fun String.compactModelLabel(): String {
-    val cleaned = trim()
-        .removePrefix("gpt-")
-        .replace("reasoning", "", ignoreCase = true)
-        .trim('-', ' ')
+    val cleaned =
+        trim()
+            .removePrefix("gpt-")
+            .replace("reasoning", "", ignoreCase = true)
+            .trim('-', ' ')
     return cleaned.ifEmpty { trim() }
 }

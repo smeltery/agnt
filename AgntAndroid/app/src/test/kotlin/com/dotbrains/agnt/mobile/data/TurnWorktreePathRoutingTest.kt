@@ -9,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class TurnWorktreePathRoutingTest {
-
     @Test
     fun liveThread_returnsNullWhenNoSibling() {
         val tmp = Files.createTempDirectory("wt-routing").toFile().canonicalPath

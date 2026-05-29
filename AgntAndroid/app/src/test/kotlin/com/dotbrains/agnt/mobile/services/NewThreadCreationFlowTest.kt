@@ -5,12 +5,12 @@ import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.RPCError
 import com.dotbrains.agnt.mobile.ui.turn.BranchPickerCloseCause
 import com.dotbrains.agnt.mobile.ui.turn.shouldConsumeBranchPickerOpenRequest
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.coroutines.test.runTest
 
 class NewThreadCreationFlowTest {
     @Test

@@ -10,8 +10,10 @@ import androidx.compose.ui.graphics.Color
 object AgentLightColors {
     /** Screen/root background — warm white. */
     val ScreenBg = Color(0xFFFBFBFA)
+
     /** Default surface / opaque card (opaque here; overlays use Compose alpha where needed). */
     val Surface = Color(0xFFFFFFFF)
+
     /** Pills / composer-adjacent soft fills. */
     val SurfaceSoft = Color(0xFFF4F4F4)
 
@@ -37,6 +39,7 @@ val AgntLightSurface = AgentLightColors.Surface
 val AgntLightSurfaceVariant = AgentLightColors.SurfaceSoft
 val AgntLightOnBackground = AgentLightColors.TextPrimary
 val AgntLightOnSurface = AgentLightColors.TextPrimary
+
 /** Body / labels on surface (secondary text). */
 val AgntLightOnSurfaceVariant = AgentLightColors.TextSecondary
 val AgntLightPrimary = AgentLightColors.TextPrimary
@@ -46,11 +49,13 @@ val AgntLightOnPrimaryContainer = AgentLightColors.TextPrimary
 
 val AgntLightSecondary = AgentLightColors.LinkBlue
 val AgntLightOnSecondary = AgentLightColors.Surface
+
 /** Link / Thinking pill tint. */
 private val SecondaryContainerBlend = AgentLightColors.LinkBlue.copy(alpha = 0.10f)
 
 val AgntLightSecondaryContainer =
     SecondaryContainerBlend.over(AgentLightColors.Surface)
+
 /** Solid fill for readability on white/soft surfaces. */
 val AgntLightOnSecondaryContainer = AgentLightColors.LinkBlue
 
@@ -64,7 +69,11 @@ private fun Color.over(base: Color): Color {
     val a = alpha
     if (a <= 0f) return base
     if (a >= 1f) return this
-    fun ch(c: Float, b: Float) = b * (1f - a) + c * a
+
+    fun ch(
+        c: Float,
+        b: Float,
+    ) = b * (1f - a) + c * a
     return Color(red = ch(red, base.red), green = ch(green, base.green), blue = ch(blue, base.blue))
 }
 

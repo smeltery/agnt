@@ -30,13 +30,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotbrains.agnt.mobile.AppContainer
-import com.dotbrains.agnt.mobile.core.model.RPCMessage
-import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
+import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRegistry
-import com.dotbrains.agnt.mobile.core.transport.ConnectionState
+import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import com.dotbrains.agnt.mobile.core.security.CodexSecureKeys
 import com.dotbrains.agnt.mobile.core.security.PhoneIdentityStore
+import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +71,7 @@ fun BridgeConnectionTestPanel(
     var rpcParamsJson by remember { mutableStateOf("{}") }
 
     val context = LocalContext.current
+
     fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
@@ -566,7 +567,11 @@ private fun resolvePhaseFThreadId(
     threads: List<CodexThread>,
 ): String? =
     activeThreadId?.trim()?.takeIf { it.isNotEmpty() }
-        ?: threads.firstOrNull()?.id?.trim()?.takeIf { it.isNotEmpty() }
+        ?: threads
+            .firstOrNull()
+            ?.id
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
 private fun phaseFThreadScopedParamsJson(
     json: Json,
@@ -595,7 +600,6 @@ private suspend fun runPhaseFJsonRpc(
     return "[$method]\n${formatRpcMessageForLog(logJson, reply)}"
 }
 
-
 private fun parseOptionalRpcParams(
     json: Json,
     raw: String,
@@ -606,8 +610,7 @@ private fun formatRpcMessageForLog(
     msg: RPCMessage,
 ): String = bridgeDebugFormatRpcMessageForLog(logJson, msg)
 
-private fun formatRpcDebugError(e: Throwable): String =
-    bridgeDebugFormatRpcDebugError(e)
+private fun formatRpcDebugError(e: Throwable): String = bridgeDebugFormatRpcDebugError(e)
 
 private fun buildPersistedStateReport(): String {
     val snap = AppContainer.sessionPersistence.loadRelaySnapshot()
@@ -650,4 +653,3 @@ private fun applyRelayHostOverride(
 ): String = bridgeDebugApplyRelayHostOverride(relayUrl, overrideHost)
 
 private fun formatConnectError(e: Throwable): String = bridgeDebugFormatConnectError(e)
-

@@ -8,4 +8,3 @@ internal suspend fun agntResolveCommitMessage(
     if (trimmed.isNotEmpty()) return trimmed
     return generateDraft().trim().takeIf { it.isNotEmpty() }
 }
-

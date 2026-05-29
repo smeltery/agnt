@@ -6,15 +6,15 @@ object TurnUsageSheetLogic {
         threadId: String,
         runningTurnIdByThread: Map<String, String>,
         protectedRunningFallbackThreadIds: Set<String>,
-    ): Boolean =
-        runningTurnIdByThread.containsKey(threadId) || threadId in protectedRunningFallbackThreadIds
+    ): Boolean = runningTurnIdByThread.containsKey(threadId) || threadId in protectedRunningFallbackThreadIds
 
     fun recentChangeSetsForThread(
         threadId: String,
         all: List<AIChangeSet>,
         limit: Int = 8,
     ): List<AIChangeSet> =
-        all.asSequence()
+        all
+            .asSequence()
             .filter { it.threadId == threadId }
             .sortedByDescending { it.createdAt }
             .take(limit)

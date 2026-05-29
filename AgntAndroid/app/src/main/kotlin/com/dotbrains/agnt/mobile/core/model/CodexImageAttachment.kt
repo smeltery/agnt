@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.core.model
 
-import java.util.UUID
 import kotlinx.serialization.Serializable
+import java.util.UUID
 
 @Serializable
 data class CodexImageAttachment(

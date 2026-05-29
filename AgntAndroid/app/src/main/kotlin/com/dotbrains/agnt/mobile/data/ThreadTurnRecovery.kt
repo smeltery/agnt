@@ -1,8 +1,12 @@
 package com.dotbrains.agnt.mobile.data
 
 internal sealed interface ThreadTurnRecoveryAction {
-    data class Running(val turnId: String) : ThreadTurnRecoveryAction
+    data class Running(
+        val turnId: String,
+    ) : ThreadTurnRecoveryAction
+
     data object ProtectedFallback : ThreadTurnRecoveryAction
+
     data object Idle : ThreadTurnRecoveryAction
 }
 

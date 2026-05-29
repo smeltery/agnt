@@ -4,8 +4,6 @@ import com.dotbrains.agnt.mobile.core.model.AIFileChange
 import com.dotbrains.agnt.mobile.core.model.AIFileChangeKind
 import com.dotbrains.agnt.mobile.core.model.AIUnifiedPatchParser
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
-import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
-import com.dotbrains.agnt.mobile.core.model.CodexSubagentAction
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
 
 internal data class TurnMarkdownSegment(
@@ -111,8 +109,7 @@ internal object TurnCommandExecutionPreviewMerge {
         )
     }
 
-    fun hasUsefulFields(details: CommandExecutionDetails?): Boolean =
-        details?.hasStructuredFields() == true
+    fun hasUsefulFields(details: CommandExecutionDetails?): Boolean = details?.hasStructuredFields() == true
 
     private fun CommandExecutionDetails.hasStructuredFields(): Boolean =
         fullCommand.isNotBlank() ||
@@ -352,7 +349,12 @@ internal object TurnTimelineRichContentParser {
             var cmd = inlinedPhaseCommand.groups["cmd"]!!.value.trim()
             var skippedLines = 1
             if (cmd.isBlank()) {
-                cmd = lines.drop(1).firstOrNull { it.trim().isNotBlank() }?.trim().orEmpty()
+                cmd =
+                    lines
+                        .drop(1)
+                        .firstOrNull { it.trim().isNotBlank() }
+                        ?.trim()
+                        .orEmpty()
                 skippedLines = 2
             }
             if (cmd.isBlank()) cmd = "command"
@@ -371,7 +373,8 @@ internal object TurnTimelineRichContentParser {
         val firstParts = first.split(Regex("""\s+"""), limit = 2)
         val phaseCandidate = firstParts.firstOrNull().orEmpty().lowercase()
         val knownPhase =
-            phaseCandidate in setOf("running", "completed", "complete", "success", "succeeded", "failed", "error", "stopped", "cancelled", "canceled")
+            phaseCandidate in
+                setOf("running", "completed", "complete", "success", "succeeded", "failed", "error", "stopped", "cancelled", "canceled")
         val phase =
             when {
                 knownPhase && phaseCandidate == "complete" -> "completed"
@@ -392,7 +395,13 @@ internal object TurnTimelineRichContentParser {
                 first.ifBlank { "command" }
             }
         val skippedLinesAfterCommand =
-            if (knownPhase && firstParts.getOrNull(1)?.trim().orEmpty().isBlank() && firstContinuation != null &&
+            if (knownPhase &&
+                firstParts
+                    .getOrNull(1)
+                    ?.trim()
+                    .orEmpty()
+                    .isBlank() &&
+                firstContinuation != null &&
                 command.trim() == firstContinuation
             ) {
                 2
@@ -474,7 +483,8 @@ internal object TurnTimelineRichContentParser {
     private fun metadataKeyValue(line: String): Pair<String, String>? {
         val separator = line.indexOf(':').takeIf { it >= 0 } ?: line.indexOf('=').takeIf { it >= 0 } ?: return null
         val key =
-            line.take(separator)
+            line
+                .take(separator)
                 .trim()
                 .lowercase()
                 .replace(Regex("""[\s_-]+"""), "")
@@ -501,7 +511,12 @@ internal object TurnTimelineRichContentParser {
     }
 
     private fun parseSummaryEntries(rawText: String): List<TurnFileChangeEntryPresentation> {
-        val lines = rawText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+        val lines =
+            rawText
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toList()
         if (lines.isEmpty()) return emptyList()
         val entries = mutableListOf<TurnFileChangeEntryPresentation>()
         var path: String? = null
@@ -566,11 +581,14 @@ internal object TurnTimelineRichContentParser {
         return entries
     }
 
-    private fun normalizePathKey(path: String): String =
-        path.replace('\\', '/').trim().lowercase()
+    private fun normalizePathKey(path: String): String = path.replace('\\', '/').trim().lowercase()
 
     private fun fileBaseName(path: String): String =
-        path.replace('\\', '/').trim().substringAfterLast('/').ifBlank { path.trim() }
+        path
+            .replace('\\', '/')
+            .trim()
+            .substringAfterLast('/')
+            .ifBlank { path.trim() }
 
     private fun enrichFileChangeEntriesFromSummary(
         patchEntries: List<TurnFileChangeEntryPresentation>,
@@ -595,7 +613,10 @@ internal object TurnTimelineRichContentParser {
         }
     }
 
-    private fun pathsLikelySameChunkToEntry(chunkPath: String, entryPath: String): Boolean {
+    private fun pathsLikelySameChunkToEntry(
+        chunkPath: String,
+        entryPath: String,
+    ): Boolean {
         val a = normalizePathKey(chunkPath)
         val b = normalizePathKey(entryPath)
         if (a.isNotEmpty() && b.isNotEmpty()) {
@@ -619,7 +640,8 @@ internal object TurnTimelineRichContentParser {
             return entries.map { it.copy(patchChunkText = null) }
         }
         val pool =
-            AIUnifiedPatchParser.splitUnifiedPatchIntoFileChunks(body)
+            AIUnifiedPatchParser
+                .splitUnifiedPatchIntoFileChunks(body)
                 .map { it.first to it.second }
                 .toMutableList()
         if (pool.isEmpty()) return entries.map { it.copy(patchChunkText = null) }
@@ -752,8 +774,7 @@ internal object TurnTimelineRichContentParser {
                         normalizePathKey(p) == key ||
                             fileBaseName(p).lowercase() == base ||
                             pathsLikelySameChunkToEntry(p, entryPath)
-                    }
-                    .map { it.second }
+                    }.map { it.second }
             for (body in bodies) {
                 val analysis = AIUnifiedPatchParser.analyze(body)
                 val change =
@@ -797,8 +818,11 @@ internal object TurnTimelineRichContentParser {
         var deletions = 0
         for (line in body.split('\n')) {
             val first = line.firstOrNull() ?: continue
-            if (first == '+' && !line.startsWith("+++")) additions++
-            else if (first == '-' && !line.startsWith("---")) deletions++
+            if (first == '+' && !line.startsWith("+++")) {
+                additions++
+            } else if (first == '-' && !line.startsWith("---")) {
+                deletions++
+            }
         }
         return additions to deletions
     }
@@ -868,8 +892,7 @@ internal object TurnTimelineRichContentParser {
         return null
     }
 
-    private fun firstNonBlankLine(rawText: String): String? =
-        rawText.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
+    private fun firstNonBlankLine(rawText: String): String? = rawText.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
 
     private data class MarkdownFence(
         val markerChar: Char,

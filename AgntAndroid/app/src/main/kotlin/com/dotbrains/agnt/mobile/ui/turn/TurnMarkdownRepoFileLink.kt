@@ -18,7 +18,6 @@ val LocalOpenRepoDiffForMarkdownLink = staticCompositionLocalOf<(String) -> Unit
  * Decide when a tapped markdown URL should route to repo diff vs [androidx.compose.ui.platform.LocalUriHandler].
  */
 internal object RepoMarkdownFileLink {
-
     fun looksLikeLinkToLocalRepoFile(raw: String): Boolean {
         val s = raw.trim()
         if (s.isEmpty()) return false
@@ -29,8 +28,8 @@ internal object RepoMarkdownFileLink {
         val path = stripFileSchemeAndDecode(s)
 
         fun hasSlash() = '/' in path || '\\' in path
-        fun nameFrom(p: String): String =
-            normalizeSlashes(File(p.trim()).name).substringBefore('#').substringBefore('?').trim()
+
+        fun nameFrom(p: String): String = normalizeSlashes(File(p.trim()).name).substringBefore('#').substringBefore('?').trim()
 
         val nm = nameFrom(path)
         val extOk = hasKnownSourceExtension(nm)
@@ -53,17 +52,19 @@ internal object RepoMarkdownFileLink {
                     .ifBlank { path }
                     .substringAfterLast('\\')
                     .trim()
-            )
-            .substringBefore('#')
-            .substringBefore('?')
-            .trim()
+            ).substringBefore('#')
+                .substringBefore('?')
+                .trim()
         return seg.ifBlank { path }.trim()
     }
 
     fun normalizePath(raw: String): String = normalizeSlashes(stripFileSchemeAndDecode(raw.trim()))
 
     /** Row label may be truncated or absolute; matching is path-segment tolerant. */
-    fun rowMatchesQuery(displayPath: String, canonicalQuery: String): Boolean {
+    fun rowMatchesQuery(
+        displayPath: String,
+        canonicalQuery: String,
+    ): Boolean {
         val q =
             canonicalQuery.trim().substringAfterLast('/').substringAfterLast('\\').ifBlank {
                 canonicalQuery.trim()

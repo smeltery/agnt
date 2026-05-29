@@ -57,9 +57,10 @@ enum class SystemNoticeSeverity {
     }
 
     val defaultDurationMs: Long
-        get() = when (this) {
-            Info -> Info_defaultDurationMs
-            Warn -> Warn_defaultDurationMs
-            Error -> Error_defaultDurationMs
-        }
+        get() =
+            when (this) {
+                Info -> Info_defaultDurationMs
+                Warn -> Warn_defaultDurationMs
+                Error -> Error_defaultDurationMs
+            }
 }

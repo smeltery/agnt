@@ -3,10 +3,9 @@ package com.dotbrains.agnt.mobile.ui.shell
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -17,9 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -34,8 +33,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -64,13 +63,13 @@ import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightPolicy
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlert
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertAction
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertButtonRole
-import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnAggregator
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnFileRow
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
 import com.dotbrains.agnt.mobile.data.agntBuildPullRequestUrl
 import com.dotbrains.agnt.mobile.data.agntResolveCommitMessage
+import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.services.DesktopHandoffService
 import com.dotbrains.agnt.mobile.services.GitActionsError
 import com.dotbrains.agnt.mobile.services.GitActionsService
@@ -87,8 +86,8 @@ import com.dotbrains.agnt.mobile.ui.navigation.AppNavHost
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
 import com.dotbrains.agnt.mobile.ui.turn.LocalOpenRepoDiffForMarkdownLink
 import com.dotbrains.agnt.mobile.ui.turn.RepoMarkdownFileLink
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
@@ -140,6 +139,7 @@ fun MainShell(
     var gitToolbarRefreshNonce by remember { mutableStateOf(0) }
     var showRepoDiffSheet by remember { mutableStateOf(false) }
     var repoDiffSheetScope by remember { mutableStateOf(GitRepoDiffScope.LastTurn) }
+
     /** threadId → full working-tree patch from bridge (invalidated via [gitToolbarRefreshNonce]). */
     var cachedFullWorkingTreeDiff by remember { mutableStateOf<Pair<String, String>?>(null) }
     var repoDiffSheetLastTurnRows by remember { mutableStateOf<List<RepoDiffLastTurnFileRow>>(emptyList()) }
@@ -253,7 +253,9 @@ fun MainShell(
             val preferredBranch = branches.defaultBranch ?: branches.currentBranch
             preferredBranch
                 ?.let { branches.worktreePathByBranch[it]?.trim()?.takeIf { path -> path.isNotEmpty() } }
-                ?: branches.worktreePathByBranch.values.firstOrNull { it.isNotBlank() }?.trim()
+                ?: branches.worktreePathByBranch.values
+                    .firstOrNull { it.isNotBlank() }
+                    ?.trim()
         }
     val showWorktreeHandoff =
         showGitControls &&
@@ -267,10 +269,10 @@ fun MainShell(
             )
     val gitToastMessage =
         if (isLoadingRepoDiff && showGitControls && gitActionProgressPhase == null) {
-                gitStatusLoadingToast
-            } else {
-                null
-            }
+            gitStatusLoadingToast
+        } else {
+            null
+        }
     val gitProgressToast =
         gitActionProgressPhase?.let {
             GitActionProgressBannerState(
@@ -292,8 +294,7 @@ fun MainShell(
                     .onSuccess {
                         cachedFullWorkingTreeDiff = tid to it.patch
                         repoDiffSheetFullPatch = it.patch
-                    }
-                    .onFailure {
+                    }.onFailure {
                         val rawMessage = it.message.orEmpty()
                         val userVisibleMessage = rawMessage.withoutGitLineEndingWarnings().ifBlank { null }
                         repoDiffSheetFullError =
@@ -374,9 +375,7 @@ fun MainShell(
     suspend fun resolveCommitMessage(
         git: GitActionsService,
         rawMessage: String,
-    ): String? {
-        return agntResolveCommitMessage(rawMessage) { git.generateCommitMessage().fullMessage }
-    }
+    ): String? = agntResolveCommitMessage(rawMessage) { git.generateCommitMessage().fullMessage }
 
     suspend fun openPullRequestUrl(
         git: GitActionsService,
@@ -386,7 +385,8 @@ fun MainShell(
         val bw = git.branchesWithStatus()
         val branch = st.currentBranch?.trim().orEmpty()
         val base =
-            submission.baseBranch.trim()
+            submission.baseBranch
+                .trim()
                 .ifEmpty { bw.defaultBranch?.trim().orEmpty() }
         if (branch.isEmpty() || base.isEmpty()) {
             throw IllegalStateException("Could not determine branch or default for PR.")
@@ -398,10 +398,12 @@ fun MainShell(
                 null
             }
         val title =
-            submission.pullRequestTitle.trim()
+            submission.pullRequestTitle
+                .trim()
                 .ifEmpty { draft?.title?.trim().orEmpty() }
         val body =
-            submission.pullRequestBody.trim()
+            submission.pullRequestBody
+                .trim()
                 .ifEmpty { draft?.body?.trim().orEmpty() }
         val remote = git.remoteUrl()
         val ownerRepo =
@@ -1033,9 +1035,10 @@ fun MainShell(
                         // Surface the menu item whenever the active thread has a repo-bound
                         // cwd. Mirrors iOS `onTapTerminal = onOpenTerminal == nil ? nil : { onOpenTerminal?(gitWorkingDirectory) }`.
                         showOpenTerminalHere = !gitCwd.isNullOrBlank(),
-                        onOpenTerminalHere = gitCwd?.takeIf { it.isNotBlank() }?.let { cwd ->
-                            { navController.navigate(AppRoutes.terminalRoute(cwd)) }
-                        },
+                        onOpenTerminalHere =
+                            gitCwd?.takeIf { it.isNotBlank() }?.let { cwd ->
+                                { navController.navigate(AppRoutes.terminalRoute(cwd)) }
+                            },
                         modifier = Modifier.align(Alignment.TopCenter),
                     )
                 }
@@ -1296,6 +1299,7 @@ fun MainShell(
 
     pendingApprovalRequest?.let { request ->
         val supportsSession = PendingRequestPresentation.supportsAcceptForSession(request.method)
+
         fun resolve(decision: PendingApprovalDecision) {
             scope.launch { runCatching { repository.resolvePendingApproval(request.id, decision) } }
         }
@@ -1397,9 +1401,10 @@ fun MainShell(
         SystemNoticeHost(
             notices = systemNotices,
             onDismiss = { id -> repository.dismissSystemNotice(id) },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues()),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues()),
         )
     }
 }

@@ -1,54 +1,33 @@
 package com.dotbrains.agnt.mobile.ui.agent
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.core.config.FeatureFlags
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
@@ -57,7 +36,7 @@ import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
 import com.dotbrains.agnt.mobile.ui.sidebar.SidebarScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.max
+import com.composables.icons.lucide.R as LucideR
 
 /**
  * Drawer sheet body: brand, search + threads (iOS-style list), footer links, Mac connection strip.
@@ -253,7 +232,6 @@ fun SidebarDrawerContent(
                 )
             }
         }
-
     }
 }
 
@@ -261,8 +239,8 @@ fun SidebarDrawerContent(
 private fun drawerFooterStatus(
     conn: ConnectionState,
     sessionReady: Boolean,
-): String {
-    return when (conn) {
+): String =
+    when (conn) {
         ConnectionState.Offline -> stringResource(R.string.sidebar_bridge_offline)
         ConnectionState.Connecting -> stringResource(R.string.sidebar_bridge_connecting)
         ConnectionState.Connected ->
@@ -273,5 +251,4 @@ private fun drawerFooterStatus(
             }
         is ConnectionState.Error ->
             stringResource(R.string.sidebar_bridge_error, conn.message)
-        }
-}
+    }

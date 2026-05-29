@@ -17,7 +17,6 @@ import kotlinx.coroutines.launch
 class DesignViewModel(
     private val repository: DesignRepository = MockDesignRepository(),
 ) : ViewModel() {
-
     private val _uiMode = MutableStateFlow(DesignMode.VIEW)
     val uiMode: StateFlow<DesignMode> = _uiMode.asStateFlow()
 
@@ -30,36 +29,37 @@ class DesignViewModel(
     private val _snapshotVersion = MutableStateFlow(0)
     val snapshotVersion: StateFlow<Int> = _snapshotVersion.asStateFlow()
 
-    val snapshotRenderState: StateFlow<CanvasRenderState> = combine(
-        _currentDocument,
-        _snapshotVersion,
-        _generationState,
-    ) { doc, snapVer, gen ->
-        when {
-            gen.status in listOf("generating", "rendering_snapshot") -> CanvasRenderState.Loading
-            doc == null -> CanvasRenderState.Loading
-            gen.status == "done" && doc.snapshotUrl != null -> {
-                val docVer = doc.version
-                if (snapVer < docVer) {
-                    CanvasRenderState.Outdated(
-                        imageUrl = doc.snapshotUrl,
-                        currentVersion = docVer,
-                        snapshotVersion = snapVer,
-                    )
-                } else {
-                    CanvasRenderState.Ready(
-                        imageUrl = doc.snapshotUrl,
-                        version = docVer,
-                    )
+    val snapshotRenderState: StateFlow<CanvasRenderState> =
+        combine(
+            _currentDocument,
+            _snapshotVersion,
+            _generationState,
+        ) { doc, snapVer, gen ->
+            when {
+                gen.status in listOf("generating", "rendering_snapshot") -> CanvasRenderState.Loading
+                doc == null -> CanvasRenderState.Loading
+                gen.status == "done" && doc.snapshotUrl != null -> {
+                    val docVer = doc.version
+                    if (snapVer < docVer) {
+                        CanvasRenderState.Outdated(
+                            imageUrl = doc.snapshotUrl,
+                            currentVersion = docVer,
+                            snapshotVersion = snapVer,
+                        )
+                    } else {
+                        CanvasRenderState.Ready(
+                            imageUrl = doc.snapshotUrl,
+                            version = docVer,
+                        )
+                    }
                 }
+                else -> CanvasRenderState.Error("No design generated yet")
             }
-            else -> CanvasRenderState.Error("No design generated yet")
+        }.let { flow ->
+            val mutable = MutableStateFlow<CanvasRenderState>(CanvasRenderState.Loading)
+            viewModelScope.launch { flow.collect { mutable.value = it } }
+            mutable.asStateFlow()
         }
-    }.let { flow ->
-        val mutable = MutableStateFlow<CanvasRenderState>(CanvasRenderState.Loading)
-        viewModelScope.launch { flow.collect { mutable.value = it } }
-        mutable.asStateFlow()
-    }
 
     private val _selectedNode = MutableStateFlow<SelectedNode?>(null)
     val selectedNode: StateFlow<SelectedNode?> = _selectedNode.asStateFlow()
@@ -70,19 +70,20 @@ class DesignViewModel(
     private val _promptText = MutableStateFlow("")
     val promptText: StateFlow<String> = _promptText.asStateFlow()
 
-    val canvasBridge = CanvasBridge(
-        onCanvasReady = { /* WebView initialized */ },
-        onSnapshotReady = { documentId, version, dataUrl ->
-            _snapshotVersion.value = version
-        },
-        onNodeSelected = { node -> _selectedNode.value = node },
-        onSelectionCleared = { _selectedNode.value = null },
-        onCanvasError = { code, message ->
-            if (BuildConfig.DEBUG) {
-                android.util.Log.e("DesignVM", "Canvas error [$code]: $message")
-            }
-        },
-    )
+    val canvasBridge =
+        CanvasBridge(
+            onCanvasReady = { /* WebView initialized */ },
+            onSnapshotReady = { documentId, version, dataUrl ->
+                _snapshotVersion.value = version
+            },
+            onNodeSelected = { node -> _selectedNode.value = node },
+            onSelectionCleared = { _selectedNode.value = null },
+            onCanvasError = { code, message ->
+                if (BuildConfig.DEBUG) {
+                    android.util.Log.e("DesignVM", "Canvas error [$code]: $message")
+                }
+            },
+        )
 
     fun onPromptTextChanged(text: String) {
         _promptText.value = text
@@ -95,28 +96,31 @@ class DesignViewModel(
         _currentDocument.value = null
         _snapshotVersion.value = 0
 
-        _generationState.value = GenerationState(
-            generationId = "gen_${System.currentTimeMillis()}",
-            status = "generating",
-            steps = listOf(
-                GenerationStep("Understanding prompt", GenerationStepStatus.PENDING),
-                GenerationStep("Creating layout", GenerationStepStatus.PENDING),
-                GenerationStep("Adding components", GenerationStepStatus.PENDING),
-                GenerationStep("Styling screen", GenerationStepStatus.PENDING),
-                GenerationStep("Rendering preview", GenerationStepStatus.PENDING),
-                GenerationStep("Creating snapshot", GenerationStepStatus.PENDING),
-            ),
-        )
+        _generationState.value =
+            GenerationState(
+                generationId = "gen_${System.currentTimeMillis()}",
+                status = "generating",
+                steps =
+                    listOf(
+                        GenerationStep("Understanding prompt", GenerationStepStatus.PENDING),
+                        GenerationStep("Creating layout", GenerationStepStatus.PENDING),
+                        GenerationStep("Adding components", GenerationStepStatus.PENDING),
+                        GenerationStep("Styling screen", GenerationStepStatus.PENDING),
+                        GenerationStep("Rendering preview", GenerationStepStatus.PENDING),
+                        GenerationStep("Creating snapshot", GenerationStepStatus.PENDING),
+                    ),
+            )
 
         viewModelScope.launch {
-            val stepLabels = listOf(
-                "Understanding prompt",
-                "Creating layout",
-                "Adding components",
-                "Styling screen",
-                "Rendering preview",
-                "Creating snapshot",
-            )
+            val stepLabels =
+                listOf(
+                    "Understanding prompt",
+                    "Creating layout",
+                    "Adding components",
+                    "Styling screen",
+                    "Rendering preview",
+                    "Creating snapshot",
+                )
 
             for (i in stepLabels.indices) {
                 delay(800)
@@ -129,83 +133,96 @@ class DesignViewModel(
             }
 
             delay(400)
-            _generationState.value = _generationState.value.copy(
-                status = "rendering_snapshot",
-                steps = _generationState.value.steps.map {
-                    GenerationStep(it.label, GenerationStepStatus.DONE)
-                },
-            )
-
-            val result = runCatching {
-                repository.generateDesign(
-                    projectId = "mock_project",
-                    prompt = prompt,
-                    target = null,
+            _generationState.value =
+                _generationState.value.copy(
+                    status = "rendering_snapshot",
+                    steps =
+                        _generationState.value.steps.map {
+                            GenerationStep(it.label, GenerationStepStatus.DONE)
+                        },
                 )
-            }
+
+            val result =
+                runCatching {
+                    repository.generateDesign(
+                        projectId = "mock_project",
+                        prompt = prompt,
+                        target = null,
+                    )
+                }
 
             result.fold(
                 onSuccess = { genState ->
                     _generationState.value = genState
                     if (genState.documentId != null) {
-                        _currentDocument.value = DesignDocument(
-                            id = genState.documentId,
-                            projectId = "mock_project",
-                            version = genState.documentVersion,
-                            opFileUrl = null,
-                            localOpJson = null,
-                            snapshotUrl = genState.snapshotUrl,
-                            thumbnailUrl = null,
-                            status = DesignDocumentStatus.READY,
-                        )
+                        _currentDocument.value =
+                            DesignDocument(
+                                id = genState.documentId,
+                                projectId = "mock_project",
+                                version = genState.documentVersion,
+                                opFileUrl = null,
+                                localOpJson = null,
+                                snapshotUrl = genState.snapshotUrl,
+                                thumbnailUrl = null,
+                                status = DesignDocumentStatus.READY,
+                            )
                         _snapshotVersion.value = genState.documentVersion
                     }
                 },
                 onFailure = { error ->
-                    _generationState.value = _generationState.value.copy(
-                        status = "error",
-                        steps = _generationState.value.steps.map {
-                            if (it.status == GenerationStepStatus.ACTIVE) {
-                                GenerationStep(it.label, GenerationStepStatus.ERROR)
-                            } else {
-                                it
-                            }
-                        },
-                    )
+                    _generationState.value =
+                        _generationState.value.copy(
+                            status = "error",
+                            steps =
+                                _generationState.value.steps.map {
+                                    if (it.status == GenerationStepStatus.ACTIVE) {
+                                        GenerationStep(it.label, GenerationStepStatus.ERROR)
+                                    } else {
+                                        it
+                                    }
+                                },
+                        )
                 },
             )
         }
     }
 
-    fun editDesignWithAi(prompt: String, selectedNodeId: String?) {
+    fun editDesignWithAi(
+        prompt: String,
+        selectedNodeId: String?,
+    ) {
         if (prompt.isBlank() && selectedNodeId == null) return
         val docId = _currentDocument.value?.id ?: return
 
         viewModelScope.launch {
-            _generationState.value = GenerationState(
-                generationId = "edit_${System.currentTimeMillis()}",
-                status = "generating",
-                steps = listOf(
-                    GenerationStep("Applying edit", GenerationStepStatus.ACTIVE),
-                    GenerationStep("Rendering preview", GenerationStepStatus.PENDING),
-                ),
-            )
+            _generationState.value =
+                GenerationState(
+                    generationId = "edit_${System.currentTimeMillis()}",
+                    status = "generating",
+                    steps =
+                        listOf(
+                            GenerationStep("Applying edit", GenerationStepStatus.ACTIVE),
+                            GenerationStep("Rendering preview", GenerationStepStatus.PENDING),
+                        ),
+                )
 
             delay(800)
 
-            val result = runCatching {
-                repository.editDocument(docId, prompt, selectedNodeId)
-            }
+            val result =
+                runCatching {
+                    repository.editDocument(docId, prompt, selectedNodeId)
+                }
 
             result.fold(
                 onSuccess = { genState ->
                     _generationState.value = genState
                     val current = _currentDocument.value
                     if (current != null && genState.snapshotUrl != null) {
-                        _currentDocument.value = current.copy(
-                            version = genState.documentVersion,
-                            snapshotUrl = genState.snapshotUrl,
-                        )
+                        _currentDocument.value =
+                            current.copy(
+                                version = genState.documentVersion,
+                                snapshotUrl = genState.snapshotUrl,
+                            )
                     }
                 },
                 onFailure = {
@@ -221,10 +238,11 @@ class DesignViewModel(
     }
 
     fun onToggleMode() {
-        _uiMode.value = when (_uiMode.value) {
-            DesignMode.VIEW -> DesignMode.EDIT
-            DesignMode.EDIT -> DesignMode.VIEW
-        }
+        _uiMode.value =
+            when (_uiMode.value) {
+                DesignMode.VIEW -> DesignMode.EDIT
+                DesignMode.EDIT -> DesignMode.VIEW
+            }
     }
 
     fun onNodeSelected(node: SelectedNode) {

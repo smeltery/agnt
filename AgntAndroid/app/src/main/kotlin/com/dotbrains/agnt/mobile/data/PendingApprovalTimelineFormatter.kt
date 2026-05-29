@@ -18,7 +18,12 @@ internal object PendingApprovalTimelineFormatter {
     }
 
     private fun fallbackHeadline(method: String): String {
-        val n = method.trim().lowercase().replace("_", "").replace("-", "")
+        val n =
+            method
+                .trim()
+                .lowercase()
+                .replace("_", "")
+                .replace("-", "")
         return when {
             n.contains("apply") && n.contains("patch") -> "Pending approval (apply patch)"
             n.contains("filechange") && n.contains("requestapproval") -> "Pending approval (file change)"

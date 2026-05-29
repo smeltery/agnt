@@ -7,7 +7,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -47,9 +46,10 @@ fun SystemNoticeHost(
 ) {
     if (notices.isEmpty()) return
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(contentPadding),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // Stack newest-on-top so an incoming severity can shove the older row
@@ -73,11 +73,12 @@ private fun SystemNoticePill(
 ) {
     val (container, content) = noticeColors(notice.severity)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(container)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(container)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -116,4 +117,3 @@ private fun noticeColors(severity: SystemNoticeSeverity): Pair<Color, Color> {
         SystemNoticeSeverity.Error -> scheme.errorContainer to scheme.onErrorContainer
     }
 }
-

@@ -76,9 +76,22 @@ internal object CommandHumanizer {
         windowsPowerShellCommandLabel(line, isRunning)?.let { return it }
 
         fun pathFromQuotedOrNamed(): String {
-            pathArgRegex.find(line)?.groupValues?.getOrNull(1)?.trim()?.let { return compactPath(it) }
-            Regex(""""([^"]+\.\w+)"""").find(line)?.groupValues?.getOrNull(1)?.let { return compactPath(it) }
-            Regex("'([^']+\\.[^']+)'").find(line)?.groupValues?.getOrNull(1)?.let { return compactPath(it) }
+            pathArgRegex
+                .find(line)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.trim()
+                ?.let { return compactPath(it) }
+            Regex(""""([^"]+\.\w+)"""")
+                .find(line)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.let { return compactPath(it) }
+            Regex("'([^']+\\.[^']+)'")
+                .find(line)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.let { return compactPath(it) }
             return "file"
         }
 
@@ -127,8 +140,7 @@ internal object CommandHumanizer {
         ).find(trimmed)
             ?.let { match ->
                 match.groupValues.drop(1).firstOrNull { it.isNotBlank() }
-            }
-            ?.trim()
+            }?.trim()
             ?.takeIf { it.isNotEmpty() }
     }
 
@@ -209,7 +221,11 @@ internal object CommandHumanizer {
             "checkout", "switch" ->
                 CommandHumanizedLabel(
                     if (isRunning) "Switching to" else "Switched to",
-                    rest.split(' ').lastOrNull().orEmpty().ifBlank { "branch" },
+                    rest
+                        .split(' ')
+                        .lastOrNull()
+                        .orEmpty()
+                        .ifBlank { "branch" },
                 )
             else -> CommandHumanizedLabel(if (isRunning) "Running" else "Ran", "git $args")
         }
@@ -218,7 +234,12 @@ internal object CommandHumanizer {
     private fun searchTarget(args: String): String {
         val tokens = args.split(Regex("""\s+""")).filter { it.isNotBlank() && !it.startsWith("-") }
         val pattern = tokens.firstOrNull()?.trim('"', '\'')?.take(32) ?: "..."
-        val path = tokens.drop(1).firstOrNull()?.let { " in ${compactPath(it)}" }.orEmpty()
+        val path =
+            tokens
+                .drop(1)
+                .firstOrNull()
+                ?.let { " in ${compactPath(it)}" }
+                .orEmpty()
         return "for $pattern$path"
     }
 
@@ -226,7 +247,8 @@ internal object CommandHumanizer {
         args: String,
         fallback: String,
     ): String =
-        args.split(Regex("""\s+"""))
+        args
+            .split(Regex("""\s+"""))
             .asReversed()
             .firstOrNull { it.isNotBlank() && !it.startsWith("-") }
             ?.trim('"', '\'')

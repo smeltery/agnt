@@ -58,7 +58,12 @@ internal fun QueuedDraftsCard(
             )
             previews.take(3).forEachIndexed { idx, draft ->
                 val line =
-                    draft.text.lines().firstOrNull()?.trim().orEmpty().ifBlank { queueItemEmptyLabel }
+                    draft.text
+                        .lines()
+                        .firstOrNull()
+                        ?.trim()
+                        .orEmpty()
+                        .ifBlank { queueItemEmptyLabel }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,

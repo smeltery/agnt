@@ -1,13 +1,13 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsageCodec
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
+import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStep
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStepStatus
-import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
+import com.dotbrains.agnt.mobile.core.model.ContextWindowUsageCodec
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
@@ -16,13 +16,13 @@ import com.dotbrains.agnt.mobile.core.model.RPCError
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import com.dotbrains.agnt.mobile.core.notification.RunCompletionAttentionKind
 import com.dotbrains.agnt.mobile.core.notification.TurnCompletionNotificationLogic
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import java.util.concurrent.ConcurrentHashMap
 
 private enum class ServerRequestKind {
     StructuredInput,
@@ -234,7 +234,12 @@ internal class IncomingEventRouter(
         val p = params ?: return false
         val msg = p["msg"]?.objectValue ?: p["event"]?.objectValue ?: return false
         val eventType =
-            msg["type"]?.stringValue?.trim()?.lowercase()?.replace("_", "")?.replace("-", "")
+            msg["type"]
+                ?.stringValue
+                ?.trim()
+                ?.lowercase()
+                ?.replace("_", "")
+                ?.replace("-", "")
                 ?: return false
         if (!eventType.contains("plan")) return false
         handleTurnPlanUpdated(p)
@@ -285,8 +290,7 @@ internal class IncomingEventRouter(
         onThreadContextUsageLive(threadId.trim(), usage)
     }
 
-    private fun normalizeMethod(method: String): String =
-        method.lowercase().replace("_", "").replace("-", "")
+    private fun normalizeMethod(method: String): String = method.lowercase().replace("_", "").replace("-", "")
 
     fun dispatchServerRequest(
         method: String,
@@ -763,7 +767,8 @@ internal class IncomingEventRouter(
             resolveThreadId(p)
                 ?: firstString(p, listOf("threadId", "thread_id"))
                     ?.let { CodexThread.normalizeIdentifier(it) }
-                ?: event?.let { firstString(it, listOf("threadId", "thread_id")) }
+                ?: event
+                    ?.let { firstString(it, listOf("threadId", "thread_id")) }
                     ?.let { CodexThread.normalizeIdentifier(it) }
                 ?: return
         val turnId =
@@ -795,7 +800,8 @@ internal class IncomingEventRouter(
             resolveThreadId(p)
                 ?: firstString(p, listOf("threadId", "thread_id"))
                     ?.let { CodexThread.normalizeIdentifier(it) }
-                ?: event?.let { firstString(it, listOf("threadId", "thread_id")) }
+                ?: event
+                    ?.let { firstString(it, listOf("threadId", "thread_id")) }
                     ?.let { CodexThread.normalizeIdentifier(it) }
                 ?: return
         val turnId =
@@ -972,7 +978,8 @@ internal class IncomingEventRouter(
         val itemId = state.itemId ?: IncomingNotificationParsers.extractItemId(p)
         val shortCommand =
             itemId?.let { id ->
-                commandDetailsStore.detailsByItemId.value[id]?.fullCommand
+                commandDetailsStore.detailsByItemId.value[id]
+                    ?.fullCommand
                     ?.trim()
                     ?.takeIf { it.isNotEmpty() }
             } ?: state.fullCommand
@@ -1027,8 +1034,11 @@ internal class IncomingEventRouter(
         val body =
             fullCommand.trim().ifBlank { "command" }.let { c ->
                 val max = 8192
-                if (c.length <= max) c
-                else c.take(max - 1) + "…"
+                if (c.length <= max) {
+                    c
+                } else {
+                    c.take(max - 1) + "…"
+                }
             }
         return "$p> $body"
     }
@@ -1136,8 +1146,7 @@ internal class IncomingEventRouter(
         }
     }
 
-    private fun approvalDecisionResult(decision: String): JSONValue =
-        JSONValue.Obj(mapOf("decision" to JSONValue.Str(decision)))
+    private fun approvalDecisionResult(decision: String): JSONValue = JSONValue.Obj(mapOf("decision" to JSONValue.Str(decision)))
 
     private fun structuredUserInputResult(answersByQuestionId: Map<String, List<String>>): JSONValue =
         JSONValue.Obj(
@@ -1217,8 +1226,7 @@ internal class IncomingEventRouter(
         )
     }
 
-    private fun requestKey(requestId: JSONValue): String =
-        JSONValue.toJsonElement(requestId).toString()
+    private fun requestKey(requestId: JSONValue): String = JSONValue.toJsonElement(requestId).toString()
 
     private fun extractThreadId(params: Map<String, JSONValue>): String? {
         fun norm(s: String?) = CodexThread.normalizeIdentifier(s)
@@ -1253,15 +1261,18 @@ internal class IncomingEventRouter(
         }
     }
 
-    private fun envelopeEventObject(params: Map<String, JSONValue>): Map<String, JSONValue>? =
-        params["msg"]?.objectValue ?: params["event"]?.objectValue
+    private fun envelopeEventObject(params: Map<String, JSONValue>): Map<String, JSONValue>? = params["msg"]?.objectValue ?: params["event"]?.objectValue
 
     private fun firstString(
         obj: Map<String, JSONValue>,
         keys: List<String>,
     ): String? {
         for (k in keys) {
-            obj[k]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            obj[k]
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return null
     }

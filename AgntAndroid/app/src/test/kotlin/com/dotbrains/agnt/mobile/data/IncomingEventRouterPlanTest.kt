@@ -7,11 +7,11 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class IncomingEventRouterPlanTest {
     @Test
@@ -49,11 +49,20 @@ class IncomingEventRouterPlanTest {
                     ),
             )
 
-            val plan = timeline.messagesByThread.value["thread-1"].orEmpty().single()
+            val plan =
+                timeline.messagesByThread.value["thread-1"]
+                    .orEmpty()
+                    .single()
             assertEquals(CodexMessageKind.plan, plan.kind)
             assertEquals(true, plan.isStreaming)
             assertEquals("Plan first", plan.planState?.explanation)
-            assertEquals(CodexPlanStepStatus.inProgress, plan.planState?.steps?.single()?.status)
+            assertEquals(
+                CodexPlanStepStatus.inProgress,
+                plan.planState
+                    ?.steps
+                    ?.single()
+                    ?.status,
+            )
         }
 
     @Test
@@ -84,9 +93,18 @@ class IncomingEventRouterPlanTest {
                     ),
             )
 
-            val plan = timeline.messagesByThread.value["thread-2"].orEmpty().single()
+            val plan =
+                timeline.messagesByThread.value["thread-2"]
+                    .orEmpty()
+                    .single()
             assertEquals(CodexMessageKind.plan, plan.kind)
-            assertEquals(CodexPlanStepStatus.pending, plan.planState?.steps?.single()?.status)
+            assertEquals(
+                CodexPlanStepStatus.pending,
+                plan.planState
+                    ?.steps
+                    ?.single()
+                    ?.status,
+            )
         }
 
     @Test
@@ -107,14 +125,15 @@ class IncomingEventRouterPlanTest {
                     ),
             )
 
-            val plan = timeline.messagesByThread.value["thread-3"].orEmpty().single()
+            val plan =
+                timeline.messagesByThread.value["thread-3"]
+                    .orEmpty()
+                    .single()
             assertEquals(CodexMessageKind.plan, plan.kind)
             assertEquals("Plan summary", plan.planState?.explanation)
         }
 
-    private fun newRouter(
-        messageTimeline: MessageTimelineStore = MessageTimelineStore(),
-    ): IncomingEventRouter =
+    private fun newRouter(messageTimeline: MessageTimelineStore = MessageTimelineStore()): IncomingEventRouter =
         IncomingEventRouter(
             scope = kotlinx.coroutines.CoroutineScope(Dispatchers.Unconfined),
             threads = MutableStateFlow<List<CodexThread>>(emptyList()),

@@ -90,21 +90,26 @@ fun TerminalWebViewSurface(
                         addJavascriptInterface(bridge, "AndroidTerminal")
                         webViewClient =
                             object : WebViewClient() {
-                                override fun onPageFinished(view: WebView, url: String?) {
-                                    val themeJson = JSONObject().apply {
-                                        put("background", theme.background)
-                                        put("foreground", theme.foreground)
-                                        put("cursor", theme.cursorForeground)
-                                        put("cursorAccent", theme.cursorBackground)
-                                        put("selectionBackground", theme.border)
-                                        val pal = org.json.JSONArray()
-                                        theme.palette.forEach { pal.put(it) }
-                                        put("palette", pal)
-                                    }
-                                    val configJson = JSONObject().apply {
-                                        put("fontSize", fontSize)
-                                        put("theme", themeJson)
-                                    }
+                                override fun onPageFinished(
+                                    view: WebView,
+                                    url: String?,
+                                ) {
+                                    val themeJson =
+                                        JSONObject().apply {
+                                            put("background", theme.background)
+                                            put("foreground", theme.foreground)
+                                            put("cursor", theme.cursorForeground)
+                                            put("cursorAccent", theme.cursorBackground)
+                                            put("selectionBackground", theme.border)
+                                            val pal = org.json.JSONArray()
+                                            theme.palette.forEach { pal.put(it) }
+                                            put("palette", pal)
+                                        }
+                                    val configJson =
+                                        JSONObject().apply {
+                                            put("fontSize", fontSize)
+                                            put("theme", themeJson)
+                                        }
                                     view.evaluateJavascript(
                                         "window.bridge.init(${JSONObject.quote(configJson.toString())});",
                                         null,
@@ -132,16 +137,17 @@ fun TerminalWebViewSurface(
         update = { view ->
             if (!isReady) return@AndroidView
             view.evaluateJavascript("window.bridge.setFontSize($fontSize);", null)
-            val themeJson = JSONObject().apply {
-                put("background", theme.background)
-                put("foreground", theme.foreground)
-                put("cursor", theme.cursorForeground)
-                put("cursorAccent", theme.cursorBackground)
-                put("selectionBackground", theme.border)
-                val pal = org.json.JSONArray()
-                theme.palette.forEach { pal.put(it) }
-                put("palette", pal)
-            }
+            val themeJson =
+                JSONObject().apply {
+                    put("background", theme.background)
+                    put("foreground", theme.foreground)
+                    put("cursor", theme.cursorForeground)
+                    put("cursorAccent", theme.cursorBackground)
+                    put("selectionBackground", theme.border)
+                    val pal = org.json.JSONArray()
+                    theme.palette.forEach { pal.put(it) }
+                    put("palette", pal)
+                }
             view.evaluateJavascript(
                 "window.bridge.setTheme(${JSONObject.quote(themeJson.toString())});",
                 null,
@@ -200,7 +206,9 @@ private class TerminalJsBridge(
     }
 
     @JavascriptInterface
-    fun onReady(@Suppress("UNUSED_PARAMETER") payload: String) {
+    fun onReady(
+        @Suppress("UNUSED_PARAMETER") payload: String,
+    ) {
         onReady.invoke()
     }
 }

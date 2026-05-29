@@ -24,9 +24,9 @@ import com.dotbrains.agnt.mobile.core.model.codexSecureTranscriptBytes
 import com.dotbrains.agnt.mobile.core.security.CodexSecureKeys
 import com.dotbrains.agnt.mobile.core.security.PhoneIdentityStore
 import com.dotbrains.agnt.mobile.core.transport.CodexSecureTransportErrorEvent
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import java.time.Instant
 import java.util.Base64
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
 
 /**
  * Protocol label for phone→Mac encrypted envelopes (nonce + SecureEnvelope.sender).
@@ -47,7 +47,9 @@ internal fun AgentService.secureWireText(plaintext: String): String {
                 secureSession
                     ?: throw CodexSecureTransportError.InvalidHandshake("The secure Remodex session is not ready yet. Try reconnecting.")
             if (current.nextOutboundCounter == Int.MAX_VALUE) {
-                throw CodexSecureTransportError.InvalidHandshake("The secure Remodex session reached its message limit. Reconnect and try again.")
+                throw CodexSecureTransportError.InvalidHandshake(
+                    "The secure Remodex session reached its message limit. Reconnect and try again.",
+                )
             }
             secureSession = current.copy(nextOutboundCounter = current.nextOutboundCounter + 1)
             current

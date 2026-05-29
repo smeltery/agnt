@@ -29,37 +29,45 @@ class CanvasBridge(
         webView?.evaluateJavascript("javascript:$js", null)
     }
 
-    fun loadDocument(payload: String) = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.loadDocument($payload)",
-    )
+    fun loadDocument(payload: String) =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.loadDocument($payload)",
+        )
 
-    fun applyPatch(patch: String) = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.applyPatch($patch)",
-    )
+    fun applyPatch(patch: String) =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.applyPatch($patch)",
+        )
 
-    fun setViewport(viewport: String) = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.setViewport($viewport)",
-    )
+    fun setViewport(viewport: String) =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.setViewport($viewport)",
+        )
 
-    fun setRenderQuality(level: String) = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.setRenderQuality('$level')",
-    )
+    fun setRenderQuality(level: String) =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.setRenderQuality('$level')",
+        )
 
-    fun selectNode(nodeId: String) = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.selectNode('$nodeId')",
-    )
+    fun selectNode(nodeId: String) =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.selectNode('$nodeId')",
+        )
 
-    fun clearSelection() = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.clearSelection()",
-    )
+    fun clearSelection() =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.clearSelection()",
+        )
 
-    fun requestSnapshot() = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.requestSnapshot({format:'webp',quality:0.82})",
-    )
+    fun requestSnapshot() =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.requestSnapshot({format:'webp',quality:0.82})",
+        )
 
-    fun disposeCanvas() = eval(
-        "window.OpenPencilMobile && window.OpenPencilMobile.disposeCanvas()",
-    )
+    fun disposeCanvas() =
+        eval(
+            "window.OpenPencilMobile && window.OpenPencilMobile.disposeCanvas()",
+        )
 
     @JavascriptInterface
     fun onCanvasReady(jsonStr: String) {

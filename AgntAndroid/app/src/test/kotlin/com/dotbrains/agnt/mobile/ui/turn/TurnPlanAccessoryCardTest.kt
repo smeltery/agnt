@@ -6,12 +6,12 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexPlanState
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStep
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStepStatus
-import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 
 class TurnPlanAccessoryCardTest {
     @Test

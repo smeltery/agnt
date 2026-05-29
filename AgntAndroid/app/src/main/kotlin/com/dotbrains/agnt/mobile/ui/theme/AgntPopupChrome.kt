@@ -19,15 +19,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 
 object AgntPopupChrome {
-    val PopupShape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
-    val PanelShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+    val PopupShape =
+        androidx.compose.foundation.shape
+            .RoundedCornerShape(16.dp)
+    val PanelShape =
+        androidx.compose.foundation.shape
+            .RoundedCornerShape(24.dp)
 
     @Composable
     fun surfaceColor(): Color =
         if (isAgentLightChrome()) {
             Color(0xFFFAF8F2).copy(alpha = 0.97f).compositeOver(MaterialTheme.colorScheme.background)
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+            MaterialTheme.colorScheme.surfaceVariant
+                .copy(alpha = 0.58f)
                 .compositeOver(MaterialTheme.colorScheme.background)
         }
 

@@ -10,8 +10,9 @@ internal suspend fun AgentService.deleteThreadLocallyForRepository(threadId: Str
     }
 
 internal suspend fun AgentService.deleteThreadLocallyInternal(threadId: String) {
-    val tid = threadId.trim().takeIf { it.isNotEmpty() }
-        ?: throw AgentServiceError.InvalidInput("Missing thread id")
+    val tid =
+        threadId.trim().takeIf { it.isNotEmpty() }
+            ?: throw AgentServiceError.InvalidInput("Missing thread id")
 
     noteTurnFinished(tid)
     resumedThreadIds.remove(tid)

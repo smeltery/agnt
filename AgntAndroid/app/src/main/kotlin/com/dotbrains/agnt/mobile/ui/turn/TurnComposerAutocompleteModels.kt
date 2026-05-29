@@ -15,4 +15,3 @@ internal data class TurnComposerAutocompleteItem(
     val payload: ComposerMentionChipPayload,
     val replacementText: String,
 )
-

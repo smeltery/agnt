@@ -7,9 +7,7 @@ import kotlinx.serialization.json.Json
 class JsonRpcCodec(
     private val json: Json,
 ) {
-    fun decodeMessage(text: String): RPCMessage? =
-        runCatching { json.decodeFromString(RPCMessage.serializer(), text) }.getOrNull()
+    fun decodeMessage(text: String): RPCMessage? = runCatching { json.decodeFromString(RPCMessage.serializer(), text) }.getOrNull()
 
-    fun encodeMessage(message: RPCMessage): String =
-        json.encodeToString(RPCMessage.serializer(), message)
+    fun encodeMessage(message: RPCMessage): String = json.encodeToString(RPCMessage.serializer(), message)
 }

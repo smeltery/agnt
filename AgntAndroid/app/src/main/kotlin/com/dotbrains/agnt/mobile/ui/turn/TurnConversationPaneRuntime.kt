@@ -17,7 +17,12 @@ private fun reasoningEffortMenuLabel(
     titles: ReasoningEffortTitleStrings,
     bridgeDescription: String,
 ): Pair<String, String?> {
-    val key = effortId.trim().lowercase().replace('-', '_').replace(' ', '_')
+    val key =
+        effortId
+            .trim()
+            .lowercase()
+            .replace('-', '_')
+            .replace(' ', '_')
     val desc = bridgeDescription.trim()
     val knownTitle =
         when (key) {
@@ -78,7 +83,12 @@ internal fun buildRuntimeControlsState(
                     label = if (isLoadingModels) loadingLabel else modelFallbackLabel,
                     enabled = false,
                 ),
-            options = modelOptions.ifEmpty { listOf(TurnComposerRuntimeOption(TURN_COMPOSER_RUNTIME_AUTO_ID, noModelsLabel, enabled = false)) },
+            options =
+                modelOptions.ifEmpty {
+                    listOf(
+                        TurnComposerRuntimeOption(TURN_COMPOSER_RUNTIME_AUTO_ID, noModelsLabel, enabled = false),
+                    )
+                },
             enabled = modelOptions.isNotEmpty() && !isLoadingModels,
         )
 

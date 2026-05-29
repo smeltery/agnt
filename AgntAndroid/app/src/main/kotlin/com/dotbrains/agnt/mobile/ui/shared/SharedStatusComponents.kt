@@ -41,12 +41,14 @@ fun TrustedPairSummary(
     modifier: Modifier = Modifier,
 ) {
     val relayHost =
-        snapshot?.relayUrl
+        snapshot
+            ?.relayUrl
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
             ?.let { raw -> runCatching { raw.toHttpUrlOrNull()?.host ?: raw }.getOrDefault(raw) }
     val mac =
-        snapshot?.macDeviceId
+        snapshot
+            ?.macDeviceId
             ?.takeIf { !it.isNullOrBlank() }
             ?: snapshot?.lastTrustedMacDeviceId
     Surface(
@@ -115,7 +117,13 @@ fun UsageStatusSummary(
                 CircularProgressIndicator(strokeWidth = 2.dp)
             }
             val usageText = contextUsage?.let { "${it.percentUsed}%" } ?: "-"
-            val limitsText = rateLimitRows.firstOrNull()?.window?.clampedUsedPercent?.toString()?.plus("%") ?: "-"
+            val limitsText =
+                rateLimitRows
+                    .firstOrNull()
+                    ?.window
+                    ?.clampedUsedPercent
+                    ?.toString()
+                    ?.plus("%") ?: "-"
             Text(
                 text = stringResource(R.string.usage_status_summary_values, usageText, limitsText),
                 style = MaterialTheme.typography.bodySmall,

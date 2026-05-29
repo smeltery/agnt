@@ -1,11 +1,11 @@
 package com.dotbrains.agnt.mobile.core.model
 
-import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
 
 @Serializable
 data class CodexFuzzyFileMatch(

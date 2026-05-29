@@ -5,7 +5,9 @@ enum class TerminalModifier {
     Alt,
 }
 
-enum class TerminalDirection(val escapeSequence: String) {
+enum class TerminalDirection(
+    val escapeSequence: String,
+) {
     Up("\u001B[A"),
     Down("\u001B[B"),
     Right("\u001B[C"),

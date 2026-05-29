@@ -12,7 +12,8 @@ internal suspend fun AgentService.refreshThreadsInternal() {
     val locallyDeleted = sessionPersistence.loadLocallyDeletedThreadIds()
     val locallyArchived = sessionPersistence.loadLocallyArchivedThreadIds()
     val fetched =
-        runCatching { ThreadListSync.fetchMerged(this) }.getOrElse { return }
+        runCatching { ThreadListSync.fetchMerged(this) }
+            .getOrElse { return }
             .filter { it.id !in locallyDeleted }
             .map { thread ->
                 if (thread.id in locallyArchived && thread.syncState == CodexThreadSyncState.live) {

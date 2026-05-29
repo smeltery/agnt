@@ -22,8 +22,7 @@ object WorktreeNewChatDefaults {
         return threads
             .sortedByDescending { t ->
                 t.updatedAt ?: t.createdAt ?: Instant.EPOCH
-            }
-            .firstOrNull { it.gitWorkingDirectoryForGitActions() != null }
+            }.firstOrNull { it.gitWorkingDirectoryForGitActions() != null }
             ?.gitWorkingDirectoryForGitActions()
     }
 
@@ -32,9 +31,19 @@ object WorktreeNewChatDefaults {
      * elsewhere, then any first branch in the sorted list.
      */
     fun baseBranch(summary: GitBranchDisplaySummary): String? {
-        summary.currentBranch?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        summary.defaultBranch?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        val elsewhere = summary.branchesCheckedOutElsewhere.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        summary.currentBranch
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        summary.defaultBranch
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        val elsewhere =
+            summary.branchesCheckedOutElsewhere
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
         summary.branches.firstOrNull { it !in elsewhere }?.let { return it }
         return summary.branches.firstOrNull()
     }

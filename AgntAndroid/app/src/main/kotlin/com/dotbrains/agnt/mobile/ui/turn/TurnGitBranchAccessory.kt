@@ -44,12 +44,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.data.GitBranchDisplaySummary
 import com.dotbrains.agnt.mobile.data.GitBranchPickerRules
 import com.dotbrains.agnt.mobile.ui.theme.AgentLightColors
 import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
+import com.composables.icons.lucide.R as LucideR
 
 /** Read-only Git branch / worktree snapshot for the active thread (J.7c), with optional picker. */
 sealed class GitBranchPaneState {
@@ -91,6 +91,7 @@ internal fun TurnGitBranchAccessory(
     var lastLoadedState by remember {
         mutableStateOf(state as? GitBranchPaneState.Loaded)
     }
+
     fun closeBranchPicker(cause: BranchPickerCloseCause) {
         sheetOpen = false
         searchQuery = ""
@@ -269,19 +270,20 @@ private fun GitBranchPickerSheetContent(
 
     val defaultRowBranch = defaultBr?.takeIf(::matchesSearch)
 
-    val nonDefaultBranches = run {
-        val base =
-            summary.branches
-                .filter { it != defaultBr }
-                .filter(::matchesSearch)
-                .sorted()
+    val nonDefaultBranches =
+        run {
+            val base =
+                summary.branches
+                    .filter { it != defaultBr }
+                    .filter(::matchesSearch)
+                    .sorted()
 
-        if (q.isNotEmpty() || current.isNullOrBlank() || current == defaultBr || !base.contains(current)) {
-            base
-        } else {
-            listOf(current) + base.filter { it != current }
+            if (q.isNotEmpty() || current.isNullOrBlank() || current == defaultBr || !base.contains(current)) {
+                base
+            } else {
+                listOf(current) + base.filter { it != current }
+            }
         }
-    }
 
     Column(
         modifier =

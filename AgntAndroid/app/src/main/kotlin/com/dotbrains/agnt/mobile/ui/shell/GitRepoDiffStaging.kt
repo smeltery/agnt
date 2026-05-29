@@ -28,13 +28,14 @@ internal fun findGitStatusForPatchPath(
     val want = normalizePath(patchPath.trim())
     if (want.isEmpty()) return null
     files.firstOrNull { normalizePath(it.path) == want }?.let { return it }
-    files.firstOrNull {
-        val p = normalizePath(it.path)
-        want == p ||
-            want.endsWith("/$p") ||
-            p.endsWith("/$want") ||
-            want.substringAfterLast('/') == p.substringAfterLast('/')
-    }?.let { return it }
+    files
+        .firstOrNull {
+            val p = normalizePath(it.path)
+            want == p ||
+                want.endsWith("/$p") ||
+                p.endsWith("/$want") ||
+                want.substringAfterLast('/') == p.substringAfterLast('/')
+        }?.let { return it }
     return null
 }
 

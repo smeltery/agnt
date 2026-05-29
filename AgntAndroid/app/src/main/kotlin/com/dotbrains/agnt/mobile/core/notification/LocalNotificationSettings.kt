@@ -14,11 +14,10 @@ object LocalNotificationSettings {
         NotRequired,
     }
 
-    fun canPostNotifications(context: Context): Boolean {
-        return permissionStatus(context).let { status ->
+    fun canPostNotifications(context: Context): Boolean =
+        permissionStatus(context).let { status ->
             status == PermissionStatus.Granted || status == PermissionStatus.NotRequired
         }
-    }
 
     fun permissionStatus(context: Context): PermissionStatus {
         val nm = NotificationManagerCompat.from(context)

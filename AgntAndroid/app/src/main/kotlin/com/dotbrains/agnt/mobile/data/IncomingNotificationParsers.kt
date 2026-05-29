@@ -5,8 +5,7 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 
 /** Shared param extraction for Mac→phone notifications (iOS IncomingSupport patterns). */
 internal object IncomingNotificationParsers {
-    fun envelopeEvent(params: Map<String, JSONValue>?): Map<String, JSONValue>? =
-        params?.get("msg")?.objectValue ?: params?.get("event")?.objectValue
+    fun envelopeEvent(params: Map<String, JSONValue>?): Map<String, JSONValue>? = params?.get("msg")?.objectValue ?: params?.get("event")?.objectValue
 
     fun normalizedAssistantPhase(rawPhase: String?): String? =
         rawPhase
@@ -24,7 +23,11 @@ internal object IncomingNotificationParsers {
             params?.get("phase")?.stringValue,
             ev?.get("phase")?.stringValue,
             itemObject?.get("phase")?.stringValue,
-            params?.get("event")?.objectValue?.get("phase")?.stringValue,
+            params
+                ?.get("event")
+                ?.objectValue
+                ?.get("phase")
+                ?.stringValue,
         ).forEach { value ->
             normalizedAssistantPhase(value)?.let { return it }
         }
@@ -33,6 +36,7 @@ internal object IncomingNotificationParsers {
 
     fun extractThreadId(params: Map<String, JSONValue>?): String? {
         if (params == null) return null
+
         fun norm(s: String?) = CodexThread.normalizeIdentifier(s)
         norm(params["threadId"]?.stringValue)?.let { return it }
         norm(params["thread_id"]?.stringValue)?.let { return it }
@@ -60,6 +64,7 @@ internal object IncomingNotificationParsers {
 
     private fun extractThreadIdFromNestedEvent(event: Map<String, JSONValue>?): String? {
         if (event == null) return null
+
         fun norm(s: String?) = CodexThread.normalizeIdentifier(s)
         norm(event["threadId"]?.stringValue)?.let { return it }
         norm(event["thread_id"]?.stringValue)?.let { return it }
@@ -100,19 +105,47 @@ internal object IncomingNotificationParsers {
         keys: List<String>,
     ): String? {
         for (k in keys) {
-            o[k]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            o[k]
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return null
     }
 
     fun extractTurnId(params: Map<String, JSONValue>?): String? {
         if (params == null) return null
-        params["turn"]?.objectValue?.get("id")?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        params["turnId"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        params["turn_id"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        params["turn"]
+            ?.objectValue
+            ?.get("id")
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        params["turnId"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        params["turn_id"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
         envelopeEvent(params)?.let { ev ->
-            ev["turnId"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-            ev["turn"]?.objectValue?.get("id")?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            ev["turnId"]
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+            ev["turn"]
+                ?.objectValue
+                ?.get("id")
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return null
     }
@@ -121,6 +154,7 @@ internal object IncomingNotificationParsers {
     fun extractTurnIdForTurnLifecycleEvent(params: Map<String, JSONValue>?): String? {
         if (params == null) return null
         extractTurnId(params)?.let { return it }
+
         fun norm(s: String?) = CodexThread.normalizeIdentifier(s)
         norm(params["id"]?.stringValue)?.let { return it }
         val ev = envelopeEvent(params)
@@ -144,7 +178,11 @@ internal object IncomingNotificationParsers {
                 ev?.get("item_id")?.stringValue,
                 ev?.get("call_id")?.stringValue,
                 ev?.get("callId")?.stringValue,
-                ev?.get("item")?.objectValue?.get("id")?.stringValue,
+                ev
+                    ?.get("item")
+                    ?.objectValue
+                    ?.get("id")
+                    ?.stringValue,
             )
         for (s in candidates) {
             s?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -184,7 +222,11 @@ internal object IncomingNotificationParsers {
     ): Map<String, JSONValue>? {
         params["item"]?.objectValue?.let { return it }
         event?.get("item")?.objectValue?.let { return it }
-        params["event"]?.objectValue?.get("item")?.objectValue?.let { return it }
+        params["event"]
+            ?.objectValue
+            ?.get("item")
+            ?.objectValue
+            ?.let { return it }
         if (isLikelyIncomingItemPayload(params)) return params
         if (event != null && isLikelyIncomingItemPayload(event)) return event
         val nested = params["event"]?.objectValue
@@ -210,12 +252,9 @@ internal object IncomingNotificationParsers {
         }
     }
 
-    private fun normalizedItemType(raw: String): String =
-        raw.replace("_", "").replace("-", "").lowercase()
+    private fun normalizedItemType(raw: String): String = raw.replace("_", "").replace("-", "").lowercase()
 
-    fun extractAssistantDelta(
-        params: Map<String, JSONValue>?,
-    ): String? {
+    fun extractAssistantDelta(params: Map<String, JSONValue>?): String? {
         if (params == null) return null
         extractTextDelta(params)?.takeIf { it.isNotEmpty() }?.let { return it }
         val ev = envelopeEvent(params)
@@ -237,7 +276,11 @@ internal object IncomingNotificationParsers {
             params["message"]?.stringValue,
             params["error"]?.objectValue?.get("message")?.stringValue,
             ev?.get("message")?.stringValue,
-            ev?.get("error")?.objectValue?.get("message")?.stringValue,
+            ev
+                ?.get("error")
+                ?.objectValue
+                ?.get("message")
+                ?.stringValue,
         ).forEach { s ->
             s?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
         }

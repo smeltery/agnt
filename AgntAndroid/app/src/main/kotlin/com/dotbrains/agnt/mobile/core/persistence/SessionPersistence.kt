@@ -66,8 +66,7 @@ class SessionPersistence(
      * After a fresh QR scan, the next handshake must use QR bootstrap (parity with iOS
      * `shouldForceQRBootstrapOnNextHandshake`).
      */
-    fun shouldForceQrBootstrapOnNextHandshake(): Boolean =
-        prefs.getBoolean(KEY_FORCE_QR_BOOTSTRAP, false)
+    fun shouldForceQrBootstrapOnNextHandshake(): Boolean = prefs.getBoolean(KEY_FORCE_QR_BOOTSTRAP, false)
 
     fun setForceQrBootstrapOnNextHandshake(value: Boolean) {
         prefs.edit().putBoolean(KEY_FORCE_QR_BOOTSTRAP, value).apply()
@@ -90,11 +89,9 @@ class SessionPersistence(
         setForceQrBootstrapOnNextHandshake(true)
     }
 
-    fun loadLastActiveThreadId(): String? =
-        prefs.getString(KEY_LAST_ACTIVE_THREAD, null)?.trim()?.takeIf { it.isNotEmpty() }
+    fun loadLastActiveThreadId(): String? = prefs.getString(KEY_LAST_ACTIVE_THREAD, null)?.trim()?.takeIf { it.isNotEmpty() }
 
-    fun loadLocalRelayHostOverride(): String? =
-        prefs.getString(KEY_LOCAL_RELAY_HOST_OVERRIDE, null)?.trim()?.takeIf { it.isNotEmpty() }
+    fun loadLocalRelayHostOverride(): String? = prefs.getString(KEY_LOCAL_RELAY_HOST_OVERRIDE, null)?.trim()?.takeIf { it.isNotEmpty() }
 
     fun saveLocalRelayHostOverride(value: String?) {
         prefs.edit().putOrRemove(KEY_LOCAL_RELAY_HOST_OVERRIDE, value?.trim()?.takeIf { it.isNotEmpty() }).apply()
@@ -109,7 +106,9 @@ class SessionPersistence(
     }
 
     fun loadAssociatedManagedWorktreePaths(): Map<String, String> =
-        prefs.getStringSet(KEY_ASSOCIATED_MANAGED_WORKTREES, emptySet()).orEmpty()
+        prefs
+            .getStringSet(KEY_ASSOCIATED_MANAGED_WORKTREES, emptySet())
+            .orEmpty()
             .mapNotNull(::decodeManagedWorktreeEntry)
             .toMap()
 
@@ -122,7 +121,8 @@ class SessionPersistence(
         if (tid.isEmpty() || normalizedPath.isEmpty()) return
         val existing = loadAssociatedManagedWorktreePaths().toMutableMap()
         existing[tid] = normalizedPath
-        prefs.edit()
+        prefs
+            .edit()
             .putStringSet(KEY_ASSOCIATED_MANAGED_WORKTREES, existing.map(::encodeManagedWorktreeEntry).toSet())
             .apply()
     }
@@ -132,7 +132,8 @@ class SessionPersistence(
         if (tid.isEmpty()) return
         val existing = loadAssociatedManagedWorktreePaths().toMutableMap()
         if (existing.remove(tid) != null) {
-            prefs.edit()
+            prefs
+                .edit()
                 .putStringSet(KEY_ASSOCIATED_MANAGED_WORKTREES, existing.map(::encodeManagedWorktreeEntry).toSet())
                 .apply()
         }
@@ -150,7 +151,8 @@ class SessionPersistence(
         )
 
     fun saveRuntimeSelection(snapshot: RuntimeSelectionSnapshot) {
-        prefs.edit()
+        prefs
+            .edit()
             .putOrRemove(KEY_RUNTIME_MODEL_ID, snapshot.selectedModelId)
             .putOrRemove(KEY_RUNTIME_REASONING_EFFORT, snapshot.selectedReasoningEffort)
             .putOrRemove(KEY_RUNTIME_ACCESS_MODE, snapshot.selectedAccessMode)
@@ -159,7 +161,9 @@ class SessionPersistence(
     }
 
     fun loadThreadRenames(): Map<String, String> =
-        prefs.getStringSet(KEY_THREAD_RENAMES, emptySet()).orEmpty()
+        prefs
+            .getStringSet(KEY_THREAD_RENAMES, emptySet())
+            .orEmpty()
             .mapNotNull(::decodeThreadRenameEntry)
             .toMap()
 
@@ -172,7 +176,8 @@ class SessionPersistence(
         if (tid.isEmpty() || trimmedName.isEmpty()) return
         val existing = loadThreadRenames().toMutableMap()
         existing[tid] = trimmedName
-        prefs.edit()
+        prefs
+            .edit()
             .putStringSet(KEY_THREAD_RENAMES, existing.map(::encodeThreadRenameEntry).toSet())
             .apply()
     }
@@ -182,14 +187,17 @@ class SessionPersistence(
         if (tid.isEmpty()) return
         val existing = loadThreadRenames().toMutableMap()
         if (existing.remove(tid) != null) {
-            prefs.edit()
+            prefs
+                .edit()
                 .putStringSet(KEY_THREAD_RENAMES, existing.map(::encodeThreadRenameEntry).toSet())
                 .apply()
         }
     }
 
     fun loadLocallyDeletedThreadIds(): Set<String> =
-        prefs.getStringSet(KEY_LOCALLY_DELETED_THREAD_IDS, emptySet()).orEmpty()
+        prefs
+            .getStringSet(KEY_LOCALLY_DELETED_THREAD_IDS, emptySet())
+            .orEmpty()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toSet()
@@ -204,7 +212,9 @@ class SessionPersistence(
     }
 
     fun loadLocallyArchivedThreadIds(): Set<String> =
-        prefs.getStringSet(KEY_LOCALLY_ARCHIVED_THREAD_IDS, emptySet()).orEmpty()
+        prefs
+            .getStringSet(KEY_LOCALLY_ARCHIVED_THREAD_IDS, emptySet())
+            .orEmpty()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toSet()
@@ -228,13 +238,14 @@ class SessionPersistence(
     }
 
     fun loadCachedThreads(): List<CodexThread> =
-        prefs.getStringSet(KEY_CACHED_THREADS, emptySet()).orEmpty()
+        prefs
+            .getStringSet(KEY_CACHED_THREADS, emptySet())
+            .orEmpty()
             .mapNotNull(::decodeCachedThreadEntry)
             .sortedWith(
                 compareByDescending<CachedThreadEntry> { it.sortInstant ?: Instant.EPOCH }
                     .thenBy { it.index },
-            )
-            .map { it.thread }
+            ).map { it.thread }
 
     fun saveCachedThreads(threads: List<CodexThread>) {
         val entries =
@@ -273,8 +284,7 @@ class SessionPersistence(
         const val MAX_CACHED_THREADS = 100
     }
 
-    private fun encodeManagedWorktreeEntry(entry: Map.Entry<String, String>): String =
-        urlEncode(entry.key) + MANAGED_WORKTREE_ENTRY_SEPARATOR + urlEncode(entry.value)
+    private fun encodeManagedWorktreeEntry(entry: Map.Entry<String, String>): String = urlEncode(entry.key) + MANAGED_WORKTREE_ENTRY_SEPARATOR + urlEncode(entry.value)
 
     private fun decodeManagedWorktreeEntry(raw: String): Pair<String, String>? {
         val parts = raw.split(MANAGED_WORKTREE_ENTRY_SEPARATOR, limit = 2)
@@ -285,8 +295,7 @@ class SessionPersistence(
         return threadId to path
     }
 
-    private fun encodeThreadRenameEntry(entry: Map.Entry<String, String>): String =
-        urlEncode(entry.key) + MANAGED_WORKTREE_ENTRY_SEPARATOR + urlEncode(entry.value)
+    private fun encodeThreadRenameEntry(entry: Map.Entry<String, String>): String = urlEncode(entry.key) + MANAGED_WORKTREE_ENTRY_SEPARATOR + urlEncode(entry.value)
 
     private fun decodeThreadRenameEntry(raw: String): Pair<String, String>? {
         val parts = raw.split(MANAGED_WORKTREE_ENTRY_SEPARATOR, limit = 2)
@@ -326,14 +335,16 @@ class SessionPersistence(
 
     private fun decodeCachedThreadEntry(raw: String): CachedThreadEntry? {
         val parts =
-            raw.split(MANAGED_WORKTREE_ENTRY_SEPARATOR)
+            raw
+                .split(MANAGED_WORKTREE_ENTRY_SEPARATOR)
                 .map { runCatching { urlDecode(it) }.getOrNull() ?: return null }
         if (parts.size < 9) return null
         val id = parts[1].trim().takeIf { it.isNotEmpty() } ?: return null
         val createdAt = parts.getOrNull(5).parseInstantOrNull()
         val updatedAt = parts.getOrNull(6).parseInstantOrNull()
         val syncState =
-            parts.getOrNull(8)
+            parts
+                .getOrNull(8)
                 ?.let { runCatching { CodexThreadSyncState.valueOf(it) }.getOrNull() }
                 ?: CodexThreadSyncState.live
         val thread =
@@ -367,19 +378,16 @@ class SessionPersistence(
         val thread: CodexThread,
     )
 
-    private fun String?.nonBlankOrNull(): String? =
-        this?.trim()?.takeIf { it.isNotEmpty() }
+    private fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun String?.parseInstantOrNull(): Instant? =
         this?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
             runCatching { Instant.parse(raw) }.getOrNull()
         }
 
-    private fun urlEncode(value: String): String =
-        URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+    private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
 
-    private fun urlDecode(value: String): String =
-        URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+    private fun urlDecode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8.name())
 }
 
 private fun android.content.SharedPreferences.Editor.putOrRemove(

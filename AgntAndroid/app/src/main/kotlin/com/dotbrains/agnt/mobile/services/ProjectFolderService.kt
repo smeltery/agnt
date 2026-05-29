@@ -18,8 +18,12 @@ class ProjectFolderService(
                     if (error.isUnsupportedProjectMethod()) return emptyList()
                     throw error
                 }
-        val raw = response.result?.objectValue?.get("locations")?.arrayValue
-            ?: throw AgentServiceError.InvalidInput("project/quickLocations response missing locations")
+        val raw =
+            response.result
+                ?.objectValue
+                ?.get("locations")
+                ?.arrayValue
+                ?: throw AgentServiceError.InvalidInput("project/quickLocations response missing locations")
         return raw.mapNotNull { it.objectValue?.let(CodexProjectLocation::fromOrNull) }
     }
 
@@ -39,8 +43,9 @@ class ProjectFolderService(
                 if (error.isUnsupportedProjectMethod()) return listDirectoryWithFsRpc(path)
                 throw error
             }
-        val obj = response.result?.objectValue
-            ?: throw AgentServiceError.InvalidInput("project/listDirectory response missing entries")
+        val obj =
+            response.result?.objectValue
+                ?: throw AgentServiceError.InvalidInput("project/listDirectory response missing entries")
         return CodexProjectDirectoryListing.fromJson(obj)
     }
 
@@ -66,8 +71,12 @@ class ProjectFolderService(
                 if (error.isUnsupportedProjectMethod()) return searchDirectoriesWithFsRpc(rootPath, normalizedQuery)
                 throw error
             }
-        val raw = response.result?.objectValue?.get("entries")?.arrayValue
-            ?: throw AgentServiceError.InvalidInput("project/searchDirectories response missing entries")
+        val raw =
+            response.result
+                ?.objectValue
+                ?.get("entries")
+                ?.arrayValue
+                ?: throw AgentServiceError.InvalidInput("project/searchDirectories response missing entries")
         return raw.mapNotNull { it.objectValue?.let(CodexProjectDirectoryEntry::fromOrNull) }
     }
 
@@ -90,7 +99,12 @@ class ProjectFolderService(
                 if (error.isUnsupportedProjectMethod()) return createDirectoryWithFsRpc(parentPath, name)
                 throw error
             }
-        return response.result?.objectValue?.get("path")?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
+        return response.result
+            ?.objectValue
+            ?.get("path")
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
             ?: throw AgentServiceError.InvalidInput("project/createDirectory response missing path")
     }
 
@@ -102,7 +116,10 @@ class ProjectFolderService(
                 JSONValue.Obj(mapOf("path" to JSONValue.Str(normalizedPath))),
             )
         val entries =
-            response.result?.objectValue?.get("entries")?.arrayValue
+            response.result
+                ?.objectValue
+                ?.get("entries")
+                ?.arrayValue
                 ?.mapNotNull { it.objectValue?.toProjectEntry(parentPath = normalizedPath) }
                 ?.filter { entry -> entry.name.isNotBlank() }
                 ?.sortedWith(compareBy<CodexProjectDirectoryEntry> { it.name.lowercase() }.thenBy { it.path })
@@ -180,9 +197,9 @@ class ProjectFolderService(
     private fun Throwable.isUnsupportedProjectMethod(): Boolean {
         val rpcFailure = this as? AgentServiceError.RpcFailure ?: return false
         val message = rpcFailure.rpcError.message.lowercase()
-        return message.contains("unknown variant")
-            && message.contains("project/")
-            && message.contains("fs/")
+        return message.contains("unknown variant") &&
+            message.contains("project/") &&
+            message.contains("fs/")
     }
 
     private fun parentPathOf(path: String): String? {

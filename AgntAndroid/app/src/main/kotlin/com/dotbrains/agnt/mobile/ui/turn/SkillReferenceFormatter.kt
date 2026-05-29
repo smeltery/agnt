@@ -60,11 +60,10 @@ internal object SkillReferenceFormatter {
     private fun removeSearchCitations(
         line: String,
         protectedRanges: List<IntRange>,
-    ): String {
-        return searchCitationRegex.replace(line) { match ->
+    ): String =
+        searchCitationRegex.replace(line) { match ->
             if (match.range.overlapsAny(protectedRanges)) match.value else ""
         }
-    }
 
     private fun extractSearchCitationRefs(
         line: String,
@@ -192,11 +191,9 @@ internal object SkillReferenceFormatter {
             .filter { it.isNotBlank() }
             .joinToString(" ") { word ->
                 word.replaceFirstChar { ch -> if (ch.isLowerCase()) ch.titlecase() else ch.toString() }
-            }
-            .ifBlank { this }
+            }.ifBlank { this }
 
-    private fun IntRange.overlapsAny(ranges: List<IntRange>): Boolean =
-        ranges.any { first <= it.last && it.first <= last }
+    private fun IntRange.overlapsAny(ranges: List<IntRange>): Boolean = ranges.any { first <= it.last && it.first <= last }
 
     private val mentionRegex = Regex("""(?<![\w`])\$([A-Za-z0-9][A-Za-z0-9._/-]*)(?![\w`])""")
     private val markdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")

@@ -1,20 +1,20 @@
 package com.dotbrains.agnt.mobile.services
 
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsageCodec
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.ContextWindowUsageCodec
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.ThreadHistoryPaginationState
 import com.dotbrains.agnt.mobile.core.model.isExplicitServerThreadMissing
-import com.dotbrains.agnt.mobile.data.ThreadHistoryDecoder
 import com.dotbrains.agnt.mobile.data.RunningThreadRefreshPolicy
+import com.dotbrains.agnt.mobile.data.ThreadHistoryDecoder
 import com.dotbrains.agnt.mobile.data.ThreadTurnRecovery
 import com.dotbrains.agnt.mobile.data.ThreadTurnRecoveryAction
 import com.dotbrains.agnt.mobile.data.ThreadTurnSnapshot
-import java.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.time.Instant
 
 /**
  * Mirrors [AgentService+History.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+History.swift).
@@ -207,13 +207,15 @@ private fun AgentService.markThreadHistoryPage(
     val previous = _threadHistoryPaginationByThread.value[threadId] ?: ThreadHistoryPaginationState()
     _threadHistoryPaginationByThread.value =
         _threadHistoryPaginationByThread.value +
-            (threadId to
+        (
+            threadId to
                 previous.copy(
                     olderCursor = olderCursor,
                     exhaustedOlderCursor = exhaustedOlderCursor ?: previous.exhaustedOlderCursor,
                     hasAuthoritativeLocalHistoryStart = hasAuthoritativeStart,
                     initialTurnsLoaded = initialLoaded,
-                ))
+                )
+        )
 }
 
 private fun firstCursorValue(map: Map<String, JSONValue>): JSONValue? =

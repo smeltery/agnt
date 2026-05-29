@@ -73,8 +73,7 @@ internal fun ToolExecutionCard(
                             .semantics {
                                 contentDescription = cd
                                 role = Role.Button
-                            }
-                            .clickable(onClick = openDetails)
+                            }.clickable(onClick = openDetails)
                     } else {
                         Modifier.semantics { contentDescription = cd }
                     },

@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
-import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch
+import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -197,7 +197,14 @@ class TurnConversationPaneAutocompleteTest {
             )
 
         assertEquals("Plugins", state?.title)
-        assertEquals("gmail", state?.items?.single()?.payload?.displayLabel)
+        assertEquals(
+            "gmail",
+            state
+                ?.items
+                ?.single()
+                ?.payload
+                ?.displayLabel,
+        )
     }
 
     @Test

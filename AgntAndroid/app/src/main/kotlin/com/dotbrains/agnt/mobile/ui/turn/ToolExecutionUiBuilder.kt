@@ -76,8 +76,7 @@ internal fun buildCommandPreview(
 
 /** Rewrites embedded Windows / long Unix paths to leaf names only (timeline + sheet preview). */
 internal fun abbreviatedCommandPathsEmbedded(line: String): String {
-    fun leafFromPathString(p: String): String =
-        compactPath(p.trim().trim('"', '\'')).ifBlank { "…" }
+    fun leafFromPathString(p: String): String = compactPath(p.trim().trim('"', '\'')).ifBlank { "…" }
 
     val quotedWindowsPathDouble = Regex(""""([a-zA-Z]:[^"]+)""""")
     val quotedWindowsPathSingle = Regex("""'([a-zA-Z]:[^']+)'""")

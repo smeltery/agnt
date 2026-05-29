@@ -105,13 +105,12 @@ class TurnComposerStateModelTest {
     fun reducer_fold_matches_snapshot_derive() {
         val folded =
             listOf<TurnComposerEvent>(
-                    TurnComposerEvent.SetEnabled(false),
-                    TurnComposerEvent.SetEnabled(true),
-                    TurnComposerEvent.SetDraftText("go"),
-                    TurnComposerEvent.SetReadyAttachmentCount(2),
-                    TurnComposerEvent.SetHasBlockingAttachments(false),
-                )
-                .fold(TurnComposerModel()) { state, evt -> TurnComposerReducer.reduce(state, evt) }
+                TurnComposerEvent.SetEnabled(false),
+                TurnComposerEvent.SetEnabled(true),
+                TurnComposerEvent.SetDraftText("go"),
+                TurnComposerEvent.SetReadyAttachmentCount(2),
+                TurnComposerEvent.SetHasBlockingAttachments(false),
+            ).fold(TurnComposerModel()) { state, evt -> TurnComposerReducer.reduce(state, evt) }
 
         assertEquals("go", folded.draftText)
         assertEquals(2, folded.readyAttachmentCount)

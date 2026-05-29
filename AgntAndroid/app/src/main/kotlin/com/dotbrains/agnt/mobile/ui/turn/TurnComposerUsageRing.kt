@@ -108,18 +108,17 @@ internal fun TurnComposerUsageRing(
                     } else {
                         Modifier
                     },
-                )
-                .size(28.dp)
+                ).size(28.dp)
                 .then(
                     if (agentLightChrome) {
-                        Modifier.clip(CircleShape)
+                        Modifier
+                            .clip(CircleShape)
                             .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                             .background(AgentLightColors.Surface.copy(alpha = 0.94f), CircleShape)
                     } else {
                         Modifier
                     },
-                )
-                .clickable(onClick = { sheetOpen = true })
+                ).clickable(onClick = { sheetOpen = true })
                 .semantics { contentDescription = openSheetCd },
         contentAlignment = Alignment.Center,
     ) {

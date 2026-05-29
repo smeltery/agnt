@@ -3,9 +3,9 @@ package com.dotbrains.agnt.mobile.ui.shell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -67,6 +67,7 @@ internal fun GitPatchHighlightedBlock(
         remember(patch) {
             patch.replace("\r\n", "\n").split('\n')
         }
+
     /** Use dark washes only for app graphite theme; system night mode alone must not switch palette. */
     val useDarkDiffSurfaces = !isAgentLightChrome()
     val addBg =
@@ -113,10 +114,11 @@ internal fun GitPatchHighlightedBlock(
                         when (kind) {
                             GitPatchLineKind.Addition -> newLineNumber?.also { newLineNumber = it + 1 }
                             GitPatchLineKind.Deletion -> oldLineNumber?.also { oldLineNumber = it + 1 }
-                            GitPatchLineKind.Context -> newLineNumber?.also {
-                                newLineNumber = it + 1
-                                oldLineNumber = oldLineNumber?.plus(1)
-                            }
+                            GitPatchLineKind.Context ->
+                                newLineNumber?.also {
+                                    newLineNumber = it + 1
+                                    oldLineNumber = oldLineNumber?.plus(1)
+                                }
                             GitPatchLineKind.Meta -> null
                         }
                     val bg: Color? =

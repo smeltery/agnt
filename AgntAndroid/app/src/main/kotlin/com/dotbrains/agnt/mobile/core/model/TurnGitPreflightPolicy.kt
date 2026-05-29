@@ -171,10 +171,11 @@ object TurnGitPreflightPolicy {
         val target = branch.trim().ifEmpty { "the selected branch" }
         return TurnGitSyncAlert.withDefaultButtons(
             title = "Switch branches with local changes?",
-            message = dirtyFilesMessage(
-                intro = "Checkout can overwrite files that differ on $target. Continue only if these local changes are safe to carry across.",
-                files = status.files,
-            ),
+            message =
+                dirtyFilesMessage(
+                    intro = "Checkout can overwrite files that differ on $target. Continue only if these local changes are safe to carry across.",
+                    files = status.files,
+                ),
             action = TurnGitSyncAlertAction.continuePendingGitOperation,
         )
     }
@@ -217,10 +218,11 @@ object TurnGitPreflightPolicy {
         if (status?.isDirty == true) {
             return TurnGitSyncAlert(
                 title = "Bring local changes to '$branch'?",
-                message = dirtyFilesMessage(
-                    intro = "You are creating '$branch' from ${currentBranch ?: "the current branch"}. Carry your local changes onto the new branch, or commit first.",
-                    files = status.files,
-                ),
+                message =
+                    dirtyFilesMessage(
+                        intro = "You are creating '$branch' from ${currentBranch ?: "the current branch"}. Carry your local changes onto the new branch, or commit first.",
+                        files = status.files,
+                    ),
                 buttons =
                     listOf(
                         TurnGitSyncAlertButton(
@@ -286,7 +288,12 @@ object TurnGitPreflightPolicy {
         val target = branch.trim()
         if (target.isEmpty()) return null
         if (!branches?.branchesCheckedOutElsewhere.orEmpty().contains(target)) return null
-        val path = branches?.worktreePathByBranch?.get(target)?.trim().orEmpty()
+        val path =
+            branches
+                ?.worktreePathByBranch
+                ?.get(target)
+                ?.trim()
+                .orEmpty()
         if (path.isNotEmpty()) return null
         return TurnGitSyncAlert.withDefaultButtons(
             title = "Branch open in another worktree",

@@ -3,6 +3,7 @@ package com.dotbrains.agnt.mobile.ui.turn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,15 +13,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,19 +42,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.ui.theme.AgentLightColors
 import com.dotbrains.agnt.mobile.ui.theme.AgntComposerCapsuleChrome
 import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
 import com.valentinilk.shimmer.shimmer
+import com.composables.icons.lucide.R as LucideR
 
 internal enum class TurnVoicePhase {
     Idle,
@@ -414,8 +414,7 @@ internal fun TurnComposerBar(
                                         .clickable(
                                             enabled = actions.stopButtonEnabled,
                                             onClick = onStopTurn,
-                                        )
-                                        .semantics { contentDescription = stopCd },
+                                        ).semantics { contentDescription = stopCd },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
@@ -454,8 +453,7 @@ internal fun TurnComposerBar(
                                         .clickable(
                                             enabled = actions.sendButtonEnabled,
                                             onClick = onSend,
-                                        )
-                                        .semantics { contentDescription = sendCd },
+                                        ).semantics { contentDescription = sendCd },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
@@ -502,9 +500,7 @@ private fun autocompleteIconRes(kind: ComposerMentionKind): Int =
     }
 
 @Composable
-private fun ComposerPlanModeBadge(
-    onClick: () -> Unit,
-) {
+private fun ComposerPlanModeBadge(onClick: () -> Unit) {
     val lightChrome = isAgentLightChrome()
     val shape = RoundedCornerShape(999.dp)
     val background =
@@ -540,8 +536,7 @@ private fun ComposerPlanModeBadge(
                             background,
                         ),
                     ),
-                )
-                .clickable(onClick = onClick)
+                ).clickable(onClick = onClick)
                 .semantics { contentDescription = label }
                 .padding(horizontal = 9.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,

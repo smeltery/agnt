@@ -10,9 +10,9 @@ import androidx.navigation.navArgument
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.ui.about.AboutScreen
 import com.dotbrains.agnt.mobile.ui.about.WhatsNewScreen
-import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
-import com.dotbrains.agnt.mobile.ui.home.HomeMainContent
 import com.dotbrains.agnt.mobile.ui.archived.ArchivedChatsScreen
+import com.dotbrains.agnt.mobile.ui.home.HomeMainContent
+import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.settings.SettingsScreen
 import com.dotbrains.agnt.mobile.ui.terminal.TerminalScreen
 
@@ -64,20 +64,22 @@ fun AppNavHost(
         }
         composable(
             route = AppRoutes.Terminal,
-            arguments = listOf(
-                navArgument(AppRoutes.TerminalArgCwd) {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-            ),
+            arguments =
+                listOf(
+                    navArgument(AppRoutes.TerminalArgCwd) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
         ) { backStackEntry ->
             // Decoded by navigation-compose's StringType; URL-encoded by
             // AppRoutes.terminalRoute. Blank → null so the screen falls back
             // to the persisted profile cwd.
-            val preferredCwd = backStackEntry.arguments
-                ?.getString(AppRoutes.TerminalArgCwd)
-                ?.takeIf { it.isNotBlank() }
+            val preferredCwd =
+                backStackEntry.arguments
+                    ?.getString(AppRoutes.TerminalArgCwd)
+                    ?.takeIf { it.isNotBlank() }
             TerminalScreen(
                 onNavigateBack = { navController.popBackStack() },
                 preferredWorkingDirectory = preferredCwd,

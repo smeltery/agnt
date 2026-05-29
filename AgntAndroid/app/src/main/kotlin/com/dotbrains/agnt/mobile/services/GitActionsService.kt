@@ -190,8 +190,9 @@ class GitActionsService(
         method: String,
         extraParams: Map<String, JSONValue> = emptyMap(),
     ): Map<String, JSONValue> {
-        val wd = normalizedWorkingDirectory(workingDirectory)
-            ?: throw GitActionsError.MissingWorkingDirectory
+        val wd =
+            normalizedWorkingDirectory(workingDirectory)
+                ?: throw GitActionsError.MissingWorkingDirectory
 
         val scoped = extraParams + ("cwd" to JSONValue.Str(wd))
 
@@ -213,7 +214,11 @@ class GitActionsService(
             when (e) {
                 AgentServiceError.Disconnected -> GitActionsError.Disconnected
                 is AgentServiceError.RpcFailure -> {
-                    val code = e.rpcError.data?.objectValue?.get("errorCode")?.stringValue
+                    val code =
+                        e.rpcError.data
+                            ?.objectValue
+                            ?.get("errorCode")
+                            ?.stringValue
                     GitActionsError.BridgeFailure(
                         errorCode = code,
                         message = userMessageForGit(code, e.rpcError.message),

@@ -6,8 +6,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,19 +23,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,12 +55,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.AIUnifiedPatchParser
 import com.dotbrains.agnt.mobile.core.model.GitRepoSyncResult
@@ -69,6 +68,7 @@ import com.dotbrains.agnt.mobile.ui.agent.truncatePathMiddle
 import com.dotbrains.agnt.mobile.ui.theme.AgntGitAddition
 import com.dotbrains.agnt.mobile.ui.turn.RepoMarkdownFileLink
 import kotlinx.coroutines.delay
+import com.composables.icons.lucide.R as LucideR
 
 enum class GitRepoDiffScope {
     LastTurn,
@@ -134,8 +134,8 @@ fun GitRepoDiffBottomSheet(
                             emptyList()
                         } else {
                             AIUnifiedPatchParser.splitUnifiedPatchIntoFileChunks(trimmedFull).mapIndexed {
-                                    i,
-                                    pair,
+                                i,
+                                pair,
                                 ->
                                 GitRepoDiffRenderableRow(
                                     stableKey = "full:$i:${pair.first}",
@@ -319,8 +319,7 @@ private fun GitRepoDiffSegmentedTabs(
                             } else {
                                 colors.surface.copy(alpha = 0.02f)
                             },
-                        )
-                        .clickable { onSelected(tab) },
+                        ).clickable { onSelected(tab) },
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -726,8 +725,7 @@ private fun GitRepoDiffExpandableFile(
                                                     0.5.dp,
                                                     MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                                                     RoundedCornerShape(14.dp),
-                                                )
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)),
+                                                ).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)),
                                     )
                                 } else {
                                     val fieldValue =
@@ -744,8 +742,7 @@ private fun GitRepoDiffExpandableFile(
                                                     0.5.dp,
                                                     MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                                                     RoundedCornerShape(14.dp),
-                                                )
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)),
+                                                ).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)),
                                     )
                                 }
                             }
@@ -764,8 +761,7 @@ private fun GitRepoDiffExpandableFile(
                                             0.5.dp,
                                             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                                             RoundedCornerShape(14.dp),
-                                        )
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)),
+                                        ).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f)),
                             )
                         }
                     }

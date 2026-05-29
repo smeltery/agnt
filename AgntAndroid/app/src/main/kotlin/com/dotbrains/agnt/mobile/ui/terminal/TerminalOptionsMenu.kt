@@ -21,8 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.core.terminal.TerminalStatus
+import com.composables.icons.lucide.R as LucideR
 
 /**
  * Status pill + drop-down with text-size, sessions, and connection actions.
@@ -87,12 +87,18 @@ fun TerminalOptionsMenu(
         DropdownMenuItem(
             text = { Text("A- ${formatFontSize(nextSmaller(fontSize))} pt") },
             enabled = fontSize > TERMINAL_FONT_SIZE_MIN,
-            onClick = { onAdjustFontSize(-TERMINAL_FONT_SIZE_STEP); expanded = false },
+            onClick = {
+                onAdjustFontSize(-TERMINAL_FONT_SIZE_STEP)
+                expanded = false
+            },
         )
         DropdownMenuItem(
             text = { Text("A+ ${formatFontSize(nextLarger(fontSize))} pt") },
             enabled = fontSize < TERMINAL_FONT_SIZE_MAX,
-            onClick = { onAdjustFontSize(TERMINAL_FONT_SIZE_STEP); expanded = false },
+            onClick = {
+                onAdjustFontSize(TERMINAL_FONT_SIZE_STEP)
+                expanded = false
+            },
         )
         HorizontalDivider()
         sessions.forEach { session ->
@@ -201,10 +207,8 @@ fun toneFor(status: TerminalStatus): Color =
         TerminalStatus.Idle, TerminalStatus.Closed, TerminalStatus.Exited -> Color(0xFFEF4444)
     }
 
-private fun nextSmaller(value: Double): Double =
-    (value - TERMINAL_FONT_SIZE_STEP).coerceAtLeast(TERMINAL_FONT_SIZE_MIN)
+private fun nextSmaller(value: Double): Double = (value - TERMINAL_FONT_SIZE_STEP).coerceAtLeast(TERMINAL_FONT_SIZE_MIN)
 
-private fun nextLarger(value: Double): Double =
-    (value + TERMINAL_FONT_SIZE_STEP).coerceAtMost(TERMINAL_FONT_SIZE_MAX)
+private fun nextLarger(value: Double): Double = (value + TERMINAL_FONT_SIZE_STEP).coerceAtMost(TERMINAL_FONT_SIZE_MAX)
 
 private fun formatFontSize(value: Double): String = "%.1f".format(value)

@@ -1,33 +1,33 @@
 package com.dotbrains.agnt.mobile.services
 
 import android.content.Context
-import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
+import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
+import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
-import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
-import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
+import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexSecureSession
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
+import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
-import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
+import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
-import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import com.dotbrains.agnt.mobile.core.model.ThreadHistoryPaginationState
+import com.dotbrains.agnt.mobile.core.notification.AgntLocalNotificationPresenter
 import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
 import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
 import com.dotbrains.agnt.mobile.core.protocol.JsonRpcCodec
 import com.dotbrains.agnt.mobile.core.security.SecureStore
-import com.dotbrains.agnt.mobile.core.notification.AgntLocalNotificationPresenter
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.core.transport.SecureControlMultiplexer
 import com.dotbrains.agnt.mobile.data.CodexRepository
@@ -37,9 +37,6 @@ import com.dotbrains.agnt.mobile.data.MessageTimelineStore
 import com.dotbrains.agnt.mobile.data.QueuedTurnDraft
 import com.dotbrains.agnt.mobile.data.QueuedTurnDraftPreview
 import com.dotbrains.agnt.mobile.data.TurnDraftQueueStore
-import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +51,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.WebSocket
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val INITIAL_TIMELINE_TAIL_LIMIT = 48
 
@@ -267,9 +267,12 @@ class AgentService(
             initialTailLimit = INITIAL_TIMELINE_TAIL_LIMIT,
         )
     internal val commandExecutionDetailsStore = CommandExecutionDetailsStore()
-    internal val systemNoticesStore = com.dotbrains.agnt.mobile.data.SystemNoticesStore(scope = scope)
+    internal val systemNoticesStore =
+        com.dotbrains.agnt.mobile.data
+            .SystemNoticesStore(scope = scope)
     override val systemNotices: StateFlow<List<com.dotbrains.agnt.mobile.core.model.SystemNotice>> =
         systemNoticesStore.notices
+
     override fun dismissSystemNotice(id: String) {
         systemNoticesStore.dismiss(id)
     }
@@ -391,7 +394,9 @@ class AgentService(
             onRunCompletionAttention = { th, turn, kind -> notifyRunCompletionAttention(th, turn, kind) },
             onSystemNotice = { severity, title, message, provider, threadId, durationMs ->
                 systemNoticesStore.enqueue(
-                    severity = com.dotbrains.agnt.mobile.core.model.SystemNoticeSeverity.fromBridgeValue(severity),
+                    severity =
+                        com.dotbrains.agnt.mobile.core.model.SystemNoticeSeverity
+                            .fromBridgeValue(severity),
                     title = title,
                     message = message,
                     provider = provider,
@@ -456,14 +461,11 @@ class AgentService(
 
     override suspend fun setSelectedModelId(modelId: String?) = setSelectedModelIdForRepository(modelId)
 
-    override suspend fun setSelectedReasoningEffort(reasoningEffort: String?) =
-        setSelectedReasoningEffortForRepository(reasoningEffort)
+    override suspend fun setSelectedReasoningEffort(reasoningEffort: String?) = setSelectedReasoningEffortForRepository(reasoningEffort)
 
-    override suspend fun setSelectedAccessMode(accessMode: CodexAccessMode) =
-        setSelectedAccessModeForRepository(accessMode)
+    override suspend fun setSelectedAccessMode(accessMode: CodexAccessMode) = setSelectedAccessModeForRepository(accessMode)
 
-    override suspend fun setSelectedServiceTier(serviceTier: CodexServiceTier?) =
-        setSelectedServiceTierForRepository(serviceTier)
+    override suspend fun setSelectedServiceTier(serviceTier: CodexServiceTier?) = setSelectedServiceTierForRepository(serviceTier)
 
     override suspend fun resolvePendingApproval(
         requestId: String,
@@ -491,20 +493,18 @@ class AgentService(
         syncThreadHistoryInternal(threadId, force)
     }
 
-    override suspend fun loadOlderThreadHistory(threadId: String) = withContext(Dispatchers.IO) {
-        loadOlderThreadHistoryInternal(threadId)
-    }
+    override suspend fun loadOlderThreadHistory(threadId: String) =
+        withContext(Dispatchers.IO) {
+            loadOlderThreadHistoryInternal(threadId)
+        }
 
     override suspend fun refreshRateLimits() = refreshRateLimitsForRepository()
 
-    override suspend fun refreshContextWindowUsage(threadId: String) =
-        refreshContextWindowUsageForRepository(threadId)
+    override suspend fun refreshContextWindowUsage(threadId: String) = refreshContextWindowUsageForRepository(threadId)
 
-    override suspend fun refreshUsageStatus(threadId: String?) =
-        refreshUsageStatusForRepository(threadId)
+    override suspend fun refreshUsageStatus(threadId: String?) = refreshUsageStatusForRepository(threadId)
 
-    override fun shouldAutoRefreshUsageStatus(threadId: String?): Boolean =
-        shouldAutoRefreshUsageStatusForRepository(threadId)
+    override fun shouldAutoRefreshUsageStatus(threadId: String?): Boolean = shouldAutoRefreshUsageStatusForRepository(threadId)
 
     override suspend fun sendRequest(
         method: String,
@@ -620,9 +620,7 @@ class AgentService(
         moveThreadToProjectPathImpl(threadId, projectPath)
     }
 
-    override fun currentAuthoritativeProjectPathFor(threadId: String) =
-        currentAuthoritativeProjectPathForImpl(threadId)
+    override fun currentAuthoritativeProjectPathFor(threadId: String) = currentAuthoritativeProjectPathForImpl(threadId)
 
-    override fun associatedManagedWorktreePathFor(threadId: String) =
-        associatedManagedWorktreePathForImpl(threadId)
+    override fun associatedManagedWorktreePathFor(threadId: String) = associatedManagedWorktreePathForImpl(threadId)
 }

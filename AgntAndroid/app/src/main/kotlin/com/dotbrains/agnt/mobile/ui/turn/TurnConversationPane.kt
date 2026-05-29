@@ -2,7 +2,6 @@
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,7 +10,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,16 +18,14 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -47,55 +43,46 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dotbrains.agnt.mobile.AppContainer
-import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.BuildConfig
-import com.dotbrains.agnt.mobile.core.model.ActiveProvider
+import com.dotbrains.agnt.mobile.R
+import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.AIChangeSet
+import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexFileAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
-import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
-import com.dotbrains.agnt.mobile.core.model.CodexThread
-import com.dotbrains.agnt.mobile.core.error.AgentServiceError
-import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
-import com.dotbrains.agnt.mobile.core.model.CodexModelOption
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
-import com.dotbrains.agnt.mobile.core.model.JSONValue
+import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
+import com.dotbrains.agnt.mobile.core.voice.BridgeVoiceRecorder
+import com.dotbrains.agnt.mobile.core.voice.VoiceDraftAppend
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
-import com.dotbrains.agnt.mobile.data.GitBranchPickerRules
-import com.dotbrains.agnt.mobile.data.QueuedTurnDraftPreview
+import com.dotbrains.agnt.mobile.data.TurnAttachmentCodec
+import com.dotbrains.agnt.mobile.data.TurnFileAttachmentCodec
 import com.dotbrains.agnt.mobile.data.TurnWorktreePathRouting
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
 import com.dotbrains.agnt.mobile.services.AiChangeSetRevertService
+import com.dotbrains.agnt.mobile.services.CodexLookupService
 import com.dotbrains.agnt.mobile.services.GitActionsService
-import com.dotbrains.agnt.mobile.data.TurnAttachmentCodec
-import com.dotbrains.agnt.mobile.data.TurnFileAttachmentCodec
+import com.dotbrains.agnt.mobile.services.isPluginListUnsupported
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.agent.MessageList
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
-import com.dotbrains.agnt.mobile.services.CodexLookupService
-import com.dotbrains.agnt.mobile.services.isPluginListUnsupported
-import com.dotbrains.agnt.mobile.core.voice.BridgeVoiceRecorder
-import com.dotbrains.agnt.mobile.core.voice.VoiceDraftAppend
-import java.io.ByteArrayOutputStream
-import java.time.Instant
-import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -104,7 +91,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.material3.rememberModalBottomSheetState
+import java.time.Instant
+import java.util.UUID
 
 private const val MAX_COMPOSER_ATTACHMENTS = 4
 private const val MAX_NON_IMAGE_ATTACHMENT_BYTES = 256 * 1024
@@ -115,10 +103,11 @@ private const val TIMELINE_STAGING_THRESHOLD = 72
 private const val STARTUP_TRACE_TAG = "AgntStartup"
 private const val SMART_SCROLL_FADE_JUMP_DISTANCE_ITEMS = 24
 private val TurnConversationMessageListTopPadding = 112.dp
-/** Shaves a few dp off IME bottom padding so the composer sits slightly closer to the keyboard. */
 
 /**
- * Guscio conversazione: timeline + composer (testo, invio, allegati immagine).
+ * Conversation shell: timeline + composer (text, send, image attachments).
+ * Shaves a few dp off IME bottom padding so the composer sits slightly
+ * closer to the keyboard.
  */
 @Composable
 fun TurnConversationPane(
@@ -169,7 +158,9 @@ fun TurnConversationPane(
     var pluginAutocompleteLoading by remember(threadId) { mutableStateOf(false) }
     var cachedPluginSearchIndexByRoot by remember(repository) { mutableStateOf<Map<String, List<CodexPluginMetadata>>>(emptyMap()) }
     var unsupportedPluginAutocompleteRoots by remember(repository) { mutableStateOf<Set<String>>(emptySet()) }
-    var availableFileMatches by remember(threadId) { mutableStateOf<List<com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch>>(emptyList()) }
+    var availableFileMatches by remember(threadId) {
+        mutableStateOf<List<com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch>>(emptyList())
+    }
     var voicePhase by remember(threadId) { mutableStateOf(TurnVoicePhase.Idle) }
     var voiceAudioLevels by remember(threadId) { mutableStateOf<List<Float>>(emptyList()) }
     var voiceRecordingDurationSeconds by remember(threadId) { mutableStateOf(0.0) }
@@ -253,7 +244,9 @@ fun TurnConversationPane(
             val preferredBranch = summary.defaultBranch ?: summary.currentBranch
             preferredBranch
                 ?.let { summary.worktreePathByBranch[it]?.trim()?.takeIf { path -> path.isNotEmpty() } }
-                ?: summary.worktreePathByBranch.values.firstOrNull { it.isNotBlank() }?.trim()
+                ?: summary.worktreePathByBranch.values
+                    .firstOrNull { it.isNotBlank() }
+                    ?.trim()
         }
 
     val isThreadRunning =
@@ -664,7 +657,8 @@ fun TurnConversationPane(
         }
         availableSkills =
             runCatching {
-                com.dotbrains.agnt.mobile.ui.turn.loadSkillAutocompleteSuggestions(repository, activeThread?.cwd)
+                com.dotbrains.agnt.mobile.ui.turn
+                    .loadSkillAutocompleteSuggestions(repository, activeThread?.cwd)
             }.getOrDefault(emptyList())
     }
 
@@ -774,10 +768,20 @@ fun TurnConversationPane(
         expandedPlanAccessoryMessageId = null
     }
     val fileAutocompleteCandidates =
-        remember(messages) { com.dotbrains.agnt.mobile.ui.turn.extractThreadFileAutocompleteCandidates(messages) }
+        remember(messages) {
+            com.dotbrains.agnt.mobile.ui.turn
+                .extractThreadFileAutocompleteCandidates(messages)
+        }
     val trailingToken =
         remember(draft) { TurnComposerTrailingTokens.parseTrailingToken(draft) }
-    LaunchedEffect(threadId, ready, connectionState, activeThread?.cwd, trailingToken?.payload?.kind, trailingToken?.payload?.semanticValue) {
+    LaunchedEffect(
+        threadId,
+        ready,
+        connectionState,
+        activeThread?.cwd,
+        trailingToken?.payload?.kind,
+        trailingToken?.payload?.semanticValue,
+    ) {
         val parse = trailingToken
         if (!ready || connectionState !is ConnectionState.Connected || parse?.payload?.kind != ComposerMentionKind.File) {
             availableFileMatches = emptyList()
@@ -794,7 +798,14 @@ fun TurnConversationPane(
                 lookupService.fuzzyFileSearch(query = query, roots = listOf(cwd))
             }.getOrDefault(emptyList())
     }
-    LaunchedEffect(threadId, ready, connectionState, activeThread?.cwd, trailingToken?.payload?.kind, trailingToken?.payload?.semanticValue) {
+    LaunchedEffect(
+        threadId,
+        ready,
+        connectionState,
+        activeThread?.cwd,
+        trailingToken?.payload?.kind,
+        trailingToken?.payload?.semanticValue,
+    ) {
         val parse = trailingToken
         val shouldLoadPlugins =
             parse?.payload?.kind == ComposerMentionKind.Plugin ||
@@ -871,7 +882,10 @@ fun TurnConversationPane(
         derivedStateOf {
             shouldFollowTimelineBottom(
                 totalItemsCount = listState.layoutInfo.totalItemsCount,
-                lastVisibleItemIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index,
+                lastVisibleItemIndex =
+                    listState.layoutInfo.visibleItemsInfo
+                        .lastOrNull()
+                        ?.index,
             )
         }
     }
@@ -879,7 +893,11 @@ fun TurnConversationPane(
         derivedStateOf { listState.firstVisibleItemIndex }
     }
     val lastVisibleListItemIndex by remember {
-        derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+        derivedStateOf {
+            listState.layoutInfo.visibleItemsInfo
+                .lastOrNull()
+                ?.index
+        }
     }
     val totalListItemCount by remember {
         derivedStateOf { listState.layoutInfo.totalItemsCount }
@@ -913,7 +931,7 @@ fun TurnConversationPane(
                 anchors = chatAnchors,
                 isNearBottom = shouldFollowBottom,
             )
-    }
+        }
     LaunchedEffect(threadId) {
         lastAutoScrollThreadId = threadId
         if (visibleMessages.isNotEmpty()) {
@@ -1007,15 +1025,18 @@ fun TurnConversationPane(
         }
     val draftWithMentions =
         remember(draft, mentionChips) {
-            com.dotbrains.agnt.mobile.ui.turn.mergeMentionChipsIntoDraft(draft, mentionChips)
+            com.dotbrains.agnt.mobile.ui.turn
+                .mergeMentionChipsIntoDraft(draft, mentionChips)
         }
     val structuredSkillMentions =
         remember(mentionChips) {
-            com.dotbrains.agnt.mobile.ui.turn.mentionChipsToSkillMentions(mentionChips)
+            com.dotbrains.agnt.mobile.ui.turn
+                .mentionChipsToSkillMentions(mentionChips)
         }
     val structuredFileMentions =
         remember(mentionChips) {
-            com.dotbrains.agnt.mobile.ui.turn.mentionChipsToFileMentions(mentionChips)
+            com.dotbrains.agnt.mobile.ui.turn
+                .mentionChipsToFileMentions(mentionChips)
         }
     val composerModel =
         remember(
@@ -1029,30 +1050,29 @@ fun TurnConversationPane(
             transcribeJob,
         ) {
             listOf<TurnComposerEvent>(
-                    TurnComposerEvent.SetEnabled(ready),
-                    TurnComposerEvent.SetSending(sending),
-                    TurnComposerEvent.SetDraftText(draftWithMentions),
-                    TurnComposerEvent.SetReadyAttachmentCount(
-                        composerAttachments.count {
-                            it.state is TurnComposerAttachmentState.ReadyImage ||
-                                it.state is TurnComposerAttachmentState.ReadyFile
-                        },
-                    ),
-                    TurnComposerEvent.SetHasBlockingAttachments(
-                        composerAttachments.any {
-                            it.state == TurnComposerAttachmentState.Loading ||
-                                it.state is TurnComposerAttachmentState.Failed
-                        },
-                    ),
-                    TurnComposerEvent.SetVoicePhase(voicePhase),
-                    TurnComposerEvent.SetThreadRunning(isThreadRunning),
-                    TurnComposerEvent.SetTranscribing(
-                        voicePhase == TurnVoicePhase.Transcribing || transcribeJob != null,
-                    ),
-                )
-                .fold(TurnComposerModel()) { state, evt ->
-                    TurnComposerReducer.reduce(state, evt)
-                }
+                TurnComposerEvent.SetEnabled(ready),
+                TurnComposerEvent.SetSending(sending),
+                TurnComposerEvent.SetDraftText(draftWithMentions),
+                TurnComposerEvent.SetReadyAttachmentCount(
+                    composerAttachments.count {
+                        it.state is TurnComposerAttachmentState.ReadyImage ||
+                            it.state is TurnComposerAttachmentState.ReadyFile
+                    },
+                ),
+                TurnComposerEvent.SetHasBlockingAttachments(
+                    composerAttachments.any {
+                        it.state == TurnComposerAttachmentState.Loading ||
+                            it.state is TurnComposerAttachmentState.Failed
+                    },
+                ),
+                TurnComposerEvent.SetVoicePhase(voicePhase),
+                TurnComposerEvent.SetThreadRunning(isThreadRunning),
+                TurnComposerEvent.SetTranscribing(
+                    voicePhase == TurnVoicePhase.Transcribing || transcribeJob != null,
+                ),
+            ).fold(TurnComposerModel()) { state, evt ->
+                TurnComposerReducer.reduce(state, evt)
+            }
         }
     val composerLocks = remember(composerModel) { composerModel.deriveInteractionLocks() }
 
@@ -1068,7 +1088,9 @@ fun TurnConversationPane(
             attachments.isEmpty() &&
             skillMentions.isEmpty() &&
             fileMentions.isEmpty()
-        ) return
+        ) {
+            return
+        }
         if (!fromQueue && isThreadRunning) {
             scope.launch {
                 runCatching {
@@ -1085,7 +1107,9 @@ fun TurnConversationPane(
                     composerAttachments = emptyList()
                     mentionChips = emptyList()
                 }.onFailure { e ->
-                    lastError = com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)
+                    lastError =
+                        com.dotbrains.agnt.mobile.ui.turn
+                            .formatTurnSendError(e)
                 }
             }
             return
@@ -1102,34 +1126,34 @@ fun TurnConversationPane(
                     fileMentions = fileMentions,
                     collaborationMode = collaborationMode,
                 )
+            }.onSuccess {
+                sending = false
+                if (!fromQueue) {
+                    draft = ""
+                    composerAttachments = emptyList()
+                    mentionChips = emptyList()
+                }
+            }.onFailure { e ->
+                sending = false
+                if (fromQueue) {
+                    runCatching {
+                        repository.enqueueTurnDraft(
+                            threadId = threadId,
+                            text = text,
+                            attachments = attachments,
+                            skillMentions = skillMentions,
+                            fileMentions = fileMentions,
+                            collaborationMode = collaborationMode,
+                            prepend = true,
+                        )
+                    }
+                    lastError = "$queuedDraftSendFailedMessage: ${com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)}"
+                } else {
+                    lastError =
+                        com.dotbrains.agnt.mobile.ui.turn
+                            .formatTurnSendError(e)
+                }
             }
-                .onSuccess {
-                    sending = false
-                    if (!fromQueue) {
-                        draft = ""
-                        composerAttachments = emptyList()
-                        mentionChips = emptyList()
-                    }
-                }
-                .onFailure { e ->
-                    sending = false
-                    if (fromQueue) {
-                        runCatching {
-                            repository.enqueueTurnDraft(
-                                threadId = threadId,
-                                text = text,
-                                attachments = attachments,
-                                skillMentions = skillMentions,
-                                fileMentions = fileMentions,
-                                collaborationMode = collaborationMode,
-                                prepend = true,
-                            )
-                        }
-                        lastError = "${queuedDraftSendFailedMessage}: ${com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)}"
-                    } else {
-                        lastError = com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)
-                    }
-                }
         }
     }
 
@@ -1141,7 +1165,9 @@ fun TurnConversationPane(
                     turnId = activeTurnId,
                 )
             }.onFailure { e ->
-                lastError = com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)
+                lastError =
+                    com.dotbrains.agnt.mobile.ui.turn
+                        .formatTurnSendError(e)
             }
         }
     }
@@ -1165,7 +1191,7 @@ fun TurnConversationPane(
     Box(
         modifier =
             modifier
-                .fillMaxSize()
+                .fillMaxSize(),
     ) {
         Column(
             modifier =
@@ -1327,569 +1353,572 @@ fun TurnConversationPane(
                             .padding(bottom = 14.dp),
                 )
             }
-        lastError?.let { err ->
-            Text(
-                text = err,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-        gitBranchCheckoutError?.let { err ->
-            Text(
-                text = err,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-        worktreeHandoffError?.let { err ->
-            Text(
-                text = err,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-        inlineUndoError?.let { err ->
-            Text(
-                text = err,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-        connectionRecoverySnapshot?.let { snapshot ->
-            TurnConnectionRecoveryCard(
-                snapshot = snapshot,
-                onTap = {
-                    when {
-                        reconnectUiState.recoveryAction == RootReconnectRecoveryAction.ScanNewQr -> onOpenPairingScanner()
-                        reconnectUiState.wakeDisplayAvailable -> onWakeSavedComputer()
-                        else -> onReconnectSavedPairing()
-                    }
-                },
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        }
-        if (queuedDraftCount > 0) {
-            com.dotbrains.agnt.mobile.ui.turn.QueuedDraftsCard(
-                previews = queuedDraftPreviews,
-                totalCount = queuedDraftCount,
-                canRestore = canRestoreQueuedDrafts,
-                onRestore = { draftId ->
-                    scope.launch {
-                        if (!canRestoreQueuedDrafts) {
-                            lastError = queuedDraftRestoreBlockedMessage
-                            return@launch
-                        }
-                        val restored = runCatching { repository.removeQueuedTurnDraft(threadId, draftId) }.getOrNull()
-                        if (restored == null) return@launch
-                        mentionChips =
-                            com.dotbrains.agnt.mobile.ui.turn.restoreMentionChips(
-                                skillMentions = restored.skillMentions,
-                                fileMentions = restored.fileMentions,
-                            )
-                        draft =
-                            com.dotbrains.agnt.mobile.ui.turn.stripMergedMentionPrefix(
-                                text = restored.text,
-                                skillMentions = restored.skillMentions,
-                                fileMentions = restored.fileMentions,
-                            )
-                        composerAttachments =
-                            restored.attachments.take(MAX_COMPOSER_ATTACHMENTS).map {
-                                TurnComposerAttachment(
-                                    state = TurnComposerAttachmentState.ReadyImage(it),
-                                )
-                            }
-                        if (restored.attachments.size > MAX_COMPOSER_ATTACHMENTS) {
-                            lastError = attachmentOverflowMessage
-                        }
-                    }
-                },
-                onRemove = { draftId ->
-                    scope.launch {
-                        runCatching { repository.removeQueuedTurnDraft(threadId, draftId) }
-                    }
-                },
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        }
-        reviewTarget?.let { target ->
-            com.dotbrains.agnt.mobile.ui.turn.TurnReviewAccessoryCard(
-                target = target,
-                selectedBaseBranch = resolvedReviewBaseBranch,
-                availableBranches = loadedGitBranchSummary?.branches.orEmpty(),
-                currentBranch = loadedGitBranchSummary?.currentBranch,
-                defaultBranch = defaultReviewBaseBranch,
-                onSelectCurrentChanges = {
-                    selectReviewTarget(CodexReviewTarget.uncommittedChanges)
-                },
-                onSelectBaseBranch = { branch ->
-                    selectReviewTarget(CodexReviewTarget.baseBranch, branch)
-                },
-                onDismiss = {
-                    clearReviewTarget()
-                    draft = ""
-                },
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        }
-        visiblePlanAccessoryMessage?.let { planMessage ->
-            TurnPlanAccessoryCard(
-                message = planMessage,
-                expanded = false,
-                onToggleExpanded = { expandedPlanAccessoryMessageId = planMessage.id },
-                canApplyPlan = !isThreadRunning && !sending,
-                onApplyPlan = { applyPlanToComposer() },
-                onOpenDetailsSheet = {
-                    showPlanDetailsSheet = true
-                    lastError = null
-                },
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            )
-        }
-        val onGitCheckout: (String) -> Unit =
-            checkout@{ selectedBranch ->
-            val cwd = gitCwd
-            val loaded = gitBranchPaneState as? GitBranchPaneState.Loaded
-            if (cwd == null || loaded == null) return@checkout
-            val summary = loaded.summary
-            val elsewhereSet = summary.branchesCheckedOutElsewhere.toSet()
-            val elsewherePathRaw = summary.worktreePathByBranch[selectedBranch]?.trim()
-            val selectedElsewhereUnresolved =
-                elsewhereSet.contains(selectedBranch) &&
-                    elsewherePathRaw.isNullOrEmpty()
-            if (selectedElsewhereUnresolved) {
-                gitBranchCheckoutError =
-                    context.getString(R.string.git_branch_checkout_elsewhere_blocked)
-                return@checkout
+            lastError?.let { err ->
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
-            if (
-                elsewhereSet.contains(selectedBranch) &&
-                    !elsewherePathRaw.isNullOrEmpty()
-            ) {
-                val targetComparable =
-                    TurnWorktreePathRouting.comparableGitProjectPath(
-                        CodexThread.normalizeProjectPath(elsewherePathRaw) ?: elsewherePathRaw,
-                    )
-                        ?: return@checkout
-                val cwdComparable =
-                    TurnWorktreePathRouting.comparableGitProjectPath(activeThread?.cwd ?: cwd)
-                if (cwdComparable != null && targetComparable == cwdComparable) {
-                    gitBranchCheckoutError = null
-                    return@checkout
-                }
-                val siblingElsewhere =
-                    TurnWorktreePathRouting.liveThreadAtProjectPath(
-                        elsewherePathRaw,
-                        threads,
-                        threadId,
-                    )
-                scope.launch {
-                    isSwitchingGitBranch = true
-                    gitBranchCheckoutError = null
-                    runCatching {
-                        val targetNormalized =
-                            CodexThread.normalizeProjectPath(elsewherePathRaw) ?: elsewherePathRaw
-                        if (siblingElsewhere != null) {
-                            repository.setActiveThreadId(siblingElsewhere.id)
-                            hydrateGitContextAfterMutation(siblingElsewhere.id)
-                        } else {
-                            repository.moveThreadToProjectPath(threadId, targetNormalized)
-                            hydrateGitContextAfterMutation()
-                        }
-                    }.onFailure { e ->
-                        gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
-                    }
-                    isSwitchingGitBranch = false
-                }
-                return@checkout
+            gitBranchCheckoutError?.let { err ->
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
-            scope.launch {
-                isSwitchingGitBranch = true
-                gitBranchCheckoutError = null
-                runCatching { GitActionsService(repository, cwd).checkout(selectedBranch) }
-                    .onSuccess { hydrateGitContextAfterMutation() }
-                    .onFailure { e ->
-                        gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
-                    }
-                isSwitchingGitBranch = false
+            worktreeHandoffError?.let { err ->
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
-        }
-        val onGitCreateBranch: (String) -> Unit =
-            createBranch@{ branchName ->
-                val cwd = gitCwd ?: return@createBranch
-                val loaded = gitBranchPaneState as? GitBranchPaneState.Loaded ?: return@createBranch
-                if (branchName.isBlank()) return@createBranch
-                scope.launch {
-                    isSwitchingGitBranch = true
-                    gitBranchCheckoutError = null
-                    runCatching {
-                        GitActionsService(repository, cwd).createBranch(branchName.trim())
-                    }.onSuccess {
-                        val createdBranch = it.branch.trim()
-                        val previous = loaded.summary
-                        val nextSummary =
-                            GitBranchDisplayMapper.summaryFrom(
-                                GitBranchesWithStatusResult(
-                                    branches = (previous.branches + createdBranch).filter { branch -> branch.isNotBlank() }.distinct(),
-                                    branchesCheckedOutElsewhere = previous.branchesCheckedOutElsewhere.toSet(),
-                                    worktreePathByBranch = previous.worktreePathByBranch,
-                                    localCheckoutPath = null,
-                                    currentBranch = createdBranch.ifEmpty { previous.currentBranch },
-                                    defaultBranch = previous.defaultBranch,
-                                    status = it.status,
-                                ),
-                            )
-                        gitBranchPaneState = GitBranchPaneState.Loaded(nextSummary)
-                        hydrateGitContextAfterMutation()
-                    }.onFailure { e ->
-                        gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
-                    }
-                    isSwitchingGitBranch = false
-                }
+            inlineUndoError?.let { err ->
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
-        TurnComposerBar(
-            draft = draft,
-            attachments = composerAttachments,
-            model = composerModel,
-            isPlanModeEnabled = isPlanModeEnabled,
-            runtimeControls = runtimeControls,
-            mentionChips = mentionChips,
-            autocomplete = autocompleteState,
-            onDraftChange = { next ->
-                draft = next
-                val target = reviewTarget
-                if (target != null && next.trim() != reviewDraftText(target, reviewBaseBranch)) {
-                    clearReviewTarget()
-                }
-            },
-            onPickImages = {
-                if (reviewTarget != null) {
-                    lastError = reviewNoAttachmentsMessage
-                    return@TurnComposerBar
-                }
-                if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
-                    lastError = attachmentLimitMessage
-                } else {
-                    photoPickerLauncher.launch("image/*")
-                }
-            },
-            onPickFiles = {
-                if (reviewTarget != null) {
-                    lastError = reviewNoAttachmentsMessage
-                    return@TurnComposerBar
-                }
-                if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
-                    lastError = attachmentLimitMessage
-                } else {
-                    filePickerLauncher.launch(arrayOf("*/*"))
-                }
-            },
-            onTakePhoto = {
-                if (reviewTarget != null) {
-                    lastError = reviewNoAttachmentsMessage
-                    return@TurnComposerBar
-                }
-                if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
-                    lastError = attachmentLimitMessage
-                    return@TurnComposerBar
-                }
-                val hasCamera =
-                    context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
-                if (!hasCamera) {
-                    lastError = attachmentCameraUnavailableMessage
-                    return@TurnComposerBar
-                }
-                val hasPermission =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                if (hasPermission) {
-                    cameraPreviewLauncher.launch(null)
-                } else {
-                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-            },
-            onSetPlanModeEnabled = { isPlanModeEnabled = it },
-            onSelectModel = { option ->
-                scope.launch { runCatching { repository.setSelectedModelId(option.id) } }
-            },
-            onSelectReasoningEffort = { option ->
-                scope.launch {
-                    runCatching {
-                        repository.setSelectedReasoningEffort(option.id.takeUnless { it == TURN_COMPOSER_RUNTIME_AUTO_ID })
-                    }
-                }
-            },
-            onSelectAccessMode = { option ->
-                CodexAccessMode.entries.firstOrNull { it.name == option.id }?.let { mode ->
-                    scope.launch { runCatching { repository.setSelectedAccessMode(mode) } }
-                }
-            },
-            onSelectServiceTier = { option ->
-                val tier = CodexServiceTier.entries.firstOrNull { it.name == option.id }
-                scope.launch { runCatching { repository.setSelectedServiceTier(tier) } }
-            },
-            onRemoveAttachment = { attachmentId ->
-                composerAttachments = composerAttachments.filterNot { it.id == attachmentId }
-            },
-            onRemoveMentionChip = { chip ->
-                mentionChips = mentionChips.filterNot { it == chip }
-            },
-            onSelectAutocomplete = { item ->
-                val replaced =
-                    TurnComposerTrailingTokens.replaceTrailingSegment(
-                        text = draft,
-                        replacement = item.replacementText,
-                        parse = trailingToken,
-                    )
-                draft = replaced.text
-                when (item.payload.kind) {
-                    ComposerMentionKind.File,
-                    ComposerMentionKind.Skill,
-                    ComposerMentionKind.Plugin,
-                    -> {
-                        if (mentionChips.none { it.kind == item.payload.kind && it.semanticValue == item.payload.semanticValue }) {
-                            mentionChips = mentionChips + item.payload
-                        }
-                    }
-                    ComposerMentionKind.SlashCommand -> {
+            connectionRecoverySnapshot?.let { snapshot ->
+                TurnConnectionRecoveryCard(
+                    snapshot = snapshot,
+                    onTap = {
                         when {
-                            item.payload.semanticValue.equals("fork", ignoreCase = true) -> {
-                                draft = replaced.text.removeSuffix("/fork ").trimEnd()
-                                showForkThreadSheet = true
-                                lastError = null
-                            }
-                            item.payload.semanticValue.equals("feedback", ignoreCase = true) -> {
-                                draft = replaced.text.removeSuffix("/feedback ").trimEnd()
-                                showFeedbackDialog = true
-                                lastError = null
-                            }
-                            item.payload.semanticValue.equals("compact", ignoreCase = true) -> {
-                                draft = (replaced.text.trimEnd() + " /compact").trim()
-                                mentionChips = mentionChips.filterNot { chip ->
-                                    chip.kind == ComposerMentionKind.SlashCommand &&
-                                        chip.semanticValue.equals("compact", ignoreCase = true)
-                                }
-                                lastError = null
-                            }
-                            item.payload.semanticValue.equals("review", ignoreCase = true) -> {
-                                selectReviewTarget(CodexReviewTarget.uncommittedChanges)
-                            }
-                            item.payload.semanticValue.equals("review-base", ignoreCase = true) -> {
-                                val branch = defaultReviewBaseBranch
-                                if (branch == null) {
-                                    draft = replaced.text.removeSuffix("/review-base ").trimEnd()
-                                    lastError = reviewNoDefaultBranchMessage
-                                } else {
-                                    selectReviewTarget(CodexReviewTarget.baseBranch, branch)
-                                }
-                            }
+                            reconnectUiState.recoveryAction == RootReconnectRecoveryAction.ScanNewQr -> onOpenPairingScanner()
+                            reconnectUiState.wakeDisplayAvailable -> onWakeSavedComputer()
+                            else -> onReconnectSavedPairing()
                         }
-                    }
-                }
-            },
-            onStopTurn = { stopActiveTurn() },
-            voiceUiEnabled = voiceInteractionEnabled,
-            voiceAudioLevels = voiceAudioLevels,
-            voiceRecordingDurationSeconds = voiceRecordingDurationSeconds,
-            onVoiceClick = {
-                when (voicePhase) {
-                    TurnVoicePhase.Idle -> {
-                        if (voiceInteractionEnabled) {
-                            val hasAudioPermission =
-                                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                                    PackageManager.PERMISSION_GRANTED
-                            if (!hasAudioPermission) {
-                                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            } else {
-                                scope.launch {
-                                    if (voicePhase != TurnVoicePhase.Idle) return@launch
-                                    resetVoiceMeteringState()
-                                    val ok =
-                                        withContext(Dispatchers.IO) {
-                                            voiceRecorder.start(::appendVoiceAudioLevel)
-                                        }
-                                    if (ok) {
-                                        voicePhase = TurnVoicePhase.Recording
-                                    } else {
-                                        resetVoiceMeteringState()
-                                        lastError = voiceRecorderFailedMessage
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    TurnVoicePhase.Recording -> {
+                    },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+            if (queuedDraftCount > 0) {
+                com.dotbrains.agnt.mobile.ui.turn.QueuedDraftsCard(
+                    previews = queuedDraftPreviews,
+                    totalCount = queuedDraftCount,
+                    canRestore = canRestoreQueuedDrafts,
+                    onRestore = { draftId ->
                         scope.launch {
-                            if (voicePhase != TurnVoicePhase.Recording) return@launch
-                            val encoded =
-                                withContext(Dispatchers.IO) {
-                                    voiceRecorder.stopAndEncodeWav()
+                            if (!canRestoreQueuedDrafts) {
+                                lastError = queuedDraftRestoreBlockedMessage
+                                return@launch
+                            }
+                            val restored = runCatching { repository.removeQueuedTurnDraft(threadId, draftId) }.getOrNull()
+                            if (restored == null) return@launch
+                            mentionChips =
+                                com.dotbrains.agnt.mobile.ui.turn.restoreMentionChips(
+                                    skillMentions = restored.skillMentions,
+                                    fileMentions = restored.fileMentions,
+                                )
+                            draft =
+                                com.dotbrains.agnt.mobile.ui.turn.stripMergedMentionPrefix(
+                                    text = restored.text,
+                                    skillMentions = restored.skillMentions,
+                                    fileMentions = restored.fileMentions,
+                                )
+                            composerAttachments =
+                                restored.attachments.take(MAX_COMPOSER_ATTACHMENTS).map {
+                                    TurnComposerAttachment(
+                                        state = TurnComposerAttachmentState.ReadyImage(it),
+                                    )
                                 }
-                            val pair =
-                                encoded.getOrElse { err ->
-                                    voicePhase = TurnVoicePhase.Idle
-                                    resetVoiceMeteringState()
-                                    if (err.message != "not_recording") {
-                                        lastError =
-                                            when (err.message) {
-                                                "empty_audio" -> voiceNoAudioMessage
-                                                else -> voiceRecorderFailedMessage
-                                            }
-                                    }
-                                    return@launch
-                                }
-                            voicePhase = TurnVoicePhase.Transcribing
-                            resetVoiceMeteringState()
-                            transcribeJob =
-                                scope.launch {
-                                    try {
-                                        val text =
-                                            repository.transcribeBridgeVoiceWav(
-                                                pair.first,
-                                                pair.second,
-                                            )
-                                        if (isActive) {
-                                            draft = VoiceDraftAppend.append(draft, text)
-                                        }
-                                    } catch (e: CancellationException) {
-                                        throw e
-                                    } catch (e: Exception) {
-                                        if (isActive) {
-                                            lastError =
-                                                when (e) {
-                                                    is AgentServiceError ->
-                                                        e.message ?: voiceTranscriptionFailedMessage
-                                                    else -> e.message ?: voiceTranscriptionFailedMessage
-                                                }
-                                        }
-                                    } finally {
-                                        transcribeJob = null
-                                        if (isActive) {
-                                            voicePhase = TurnVoicePhase.Idle
-                                        }
-                                    }
-                                }
+                            if (restored.attachments.size > MAX_COMPOSER_ATTACHMENTS) {
+                                lastError = attachmentOverflowMessage
+                            }
                         }
+                    },
+                    onRemove = { draftId ->
+                        scope.launch {
+                            runCatching { repository.removeQueuedTurnDraft(threadId, draftId) }
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+            reviewTarget?.let { target ->
+                com.dotbrains.agnt.mobile.ui.turn.TurnReviewAccessoryCard(
+                    target = target,
+                    selectedBaseBranch = resolvedReviewBaseBranch,
+                    availableBranches = loadedGitBranchSummary?.branches.orEmpty(),
+                    currentBranch = loadedGitBranchSummary?.currentBranch,
+                    defaultBranch = defaultReviewBaseBranch,
+                    onSelectCurrentChanges = {
+                        selectReviewTarget(CodexReviewTarget.uncommittedChanges)
+                    },
+                    onSelectBaseBranch = { branch ->
+                        selectReviewTarget(CodexReviewTarget.baseBranch, branch)
+                    },
+                    onDismiss = {
+                        clearReviewTarget()
+                        draft = ""
+                    },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+            visiblePlanAccessoryMessage?.let { planMessage ->
+                TurnPlanAccessoryCard(
+                    message = planMessage,
+                    expanded = false,
+                    onToggleExpanded = { expandedPlanAccessoryMessageId = planMessage.id },
+                    canApplyPlan = !isThreadRunning && !sending,
+                    onApplyPlan = { applyPlanToComposer() },
+                    onOpenDetailsSheet = {
+                        showPlanDetailsSheet = true
+                        lastError = null
+                    },
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                )
+            }
+            val onGitCheckout: (String) -> Unit =
+                checkout@{ selectedBranch ->
+                    val cwd = gitCwd
+                    val loaded = gitBranchPaneState as? GitBranchPaneState.Loaded
+                    if (cwd == null || loaded == null) return@checkout
+                    val summary = loaded.summary
+                    val elsewhereSet = summary.branchesCheckedOutElsewhere.toSet()
+                    val elsewherePathRaw = summary.worktreePathByBranch[selectedBranch]?.trim()
+                    val selectedElsewhereUnresolved =
+                        elsewhereSet.contains(selectedBranch) &&
+                            elsewherePathRaw.isNullOrEmpty()
+                    if (selectedElsewhereUnresolved) {
+                        gitBranchCheckoutError =
+                            context.getString(R.string.git_branch_checkout_elsewhere_blocked)
+                        return@checkout
                     }
-                    TurnVoicePhase.Transcribing -> Unit
-                }
-            },
-            onCancelVoiceRecording = {
-                scope.launch {
-                    if (voicePhase != TurnVoicePhase.Recording) return@launch
-                    withContext(Dispatchers.IO) { voiceRecorder.cancel() }
-                    voicePhase = TurnVoicePhase.Idle
-                    resetVoiceMeteringState()
-                }
-            },
-            composerEnvironment = {
-                if (!isImeVisible || isBranchPickerOpen) {
-                    TurnComposerSecondaryBar(
-                        threadId = threadId,
-                        repository = repository,
-                        isWorktreeProject = activeThread?.isManagedWorktreeProject == true,
-                        worktreeHandoffEnabled =
-                            gitCwd != null &&
-                                gitBranchPaneState is GitBranchPaneState.Loaded &&
-                                ready &&
-                                connectionState is ConnectionState.Connected &&
-                                !isThreadRunning &&
-                                !sending &&
-                                !isSwitchingGitBranch,
-                        isHandingOffWorktree = isHandingOffWorktree,
-                        onWorktreeHandoff = {
-                            showWorktreeHandoffSheet = true
-                            worktreeHandoffError = null
-                        },
-                        selectedAccessMode = selectedAccessMode,
-                        accessPickerEnabled =
-                            ready &&
-                                !composerLocks.runtimeControlsLocked &&
-                                runtimeControls.accessMode.enabled,
-                        onSelectAccessMode = { mode ->
-                            scope.launch { runCatching { repository.setSelectedAccessMode(mode) } }
-                        },
-                        gitBranchPaneState = gitBranchPaneState,
-                        branchPickerEnabled = branchPickerEnabled,
-                        isSwitchingGitBranch = isSwitchingGitBranch,
-                        onRefreshGitBranches = { gitBranchReloadNonce++ },
-                        onCheckoutGitBranch = onGitCheckout,
-                        onCreateGitBranch = onGitCreateBranch,
-                        onOpenBranchSelector = {},
-                        onBranchPickerOpenChange = { isOpen ->
-                            isBranchPickerOpen = isOpen
-                        },
-                    )
-                }
-            },
-            onSend = {
-                transcribeJob?.cancel()
-                transcribeJob = null
-                voiceRecorder.cancel()
-                voicePhase = TurnVoicePhase.Idle
-                resetVoiceMeteringState()
-                lastError = null
-                val activeReviewTarget = reviewTarget
-                if (activeReviewTarget != null) {
-                    if (isThreadRunning) {
-                        lastError = reviewRunningUnavailableMessage
-                        return@TurnComposerBar
+                    if (
+                        elsewhereSet.contains(selectedBranch) &&
+                        !elsewherePathRaw.isNullOrEmpty()
+                    ) {
+                        val targetComparable =
+                            TurnWorktreePathRouting.comparableGitProjectPath(
+                                CodexThread.normalizeProjectPath(elsewherePathRaw) ?: elsewherePathRaw,
+                            )
+                                ?: return@checkout
+                        val cwdComparable =
+                            TurnWorktreePathRouting.comparableGitProjectPath(activeThread?.cwd ?: cwd)
+                        if (cwdComparable != null && targetComparable == cwdComparable) {
+                            gitBranchCheckoutError = null
+                            return@checkout
+                        }
+                        val siblingElsewhere =
+                            TurnWorktreePathRouting.liveThreadAtProjectPath(
+                                elsewherePathRaw,
+                                threads,
+                                threadId,
+                            )
+                        scope.launch {
+                            isSwitchingGitBranch = true
+                            gitBranchCheckoutError = null
+                            runCatching {
+                                val targetNormalized =
+                                    CodexThread.normalizeProjectPath(elsewherePathRaw) ?: elsewherePathRaw
+                                if (siblingElsewhere != null) {
+                                    repository.setActiveThreadId(siblingElsewhere.id)
+                                    hydrateGitContextAfterMutation(siblingElsewhere.id)
+                                } else {
+                                    repository.moveThreadToProjectPath(threadId, targetNormalized)
+                                    hydrateGitContextAfterMutation()
+                                }
+                            }.onFailure { e ->
+                                gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
+                            }
+                            isSwitchingGitBranch = false
+                        }
+                        return@checkout
                     }
-                    val activeReviewBaseBranch = resolvedReviewBaseBranch
-                    if (activeReviewTarget.name == "baseBranch" && activeReviewBaseBranch == null) {
-                        lastError = reviewNoBaseBranchAvailableMessage
-                        return@TurnComposerBar
+                    scope.launch {
+                        isSwitchingGitBranch = true
+                        gitBranchCheckoutError = null
+                        runCatching { GitActionsService(repository, cwd).checkout(selectedBranch) }
+                            .onSuccess { hydrateGitContextAfterMutation() }
+                            .onFailure { e ->
+                                gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
+                            }
+                        isSwitchingGitBranch = false
                     }
-                    if (composerAttachments.isNotEmpty()) {
+                }
+            val onGitCreateBranch: (String) -> Unit =
+                createBranch@{ branchName ->
+                    val cwd = gitCwd ?: return@createBranch
+                    val loaded = gitBranchPaneState as? GitBranchPaneState.Loaded ?: return@createBranch
+                    if (branchName.isBlank()) return@createBranch
+                    scope.launch {
+                        isSwitchingGitBranch = true
+                        gitBranchCheckoutError = null
+                        runCatching {
+                            GitActionsService(repository, cwd).createBranch(branchName.trim())
+                        }.onSuccess {
+                            val createdBranch = it.branch.trim()
+                            val previous = loaded.summary
+                            val nextSummary =
+                                GitBranchDisplayMapper.summaryFrom(
+                                    GitBranchesWithStatusResult(
+                                        branches = (previous.branches + createdBranch).filter { branch -> branch.isNotBlank() }.distinct(),
+                                        branchesCheckedOutElsewhere = previous.branchesCheckedOutElsewhere.toSet(),
+                                        worktreePathByBranch = previous.worktreePathByBranch,
+                                        localCheckoutPath = null,
+                                        currentBranch = createdBranch.ifEmpty { previous.currentBranch },
+                                        defaultBranch = previous.defaultBranch,
+                                        status = it.status,
+                                    ),
+                                )
+                            gitBranchPaneState = GitBranchPaneState.Loaded(nextSummary)
+                            hydrateGitContextAfterMutation()
+                        }.onFailure { e ->
+                            gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
+                        }
+                        isSwitchingGitBranch = false
+                    }
+                }
+            TurnComposerBar(
+                draft = draft,
+                attachments = composerAttachments,
+                model = composerModel,
+                isPlanModeEnabled = isPlanModeEnabled,
+                runtimeControls = runtimeControls,
+                mentionChips = mentionChips,
+                autocomplete = autocompleteState,
+                onDraftChange = { next ->
+                    draft = next
+                    val target = reviewTarget
+                    if (target != null && next.trim() != reviewDraftText(target, reviewBaseBranch)) {
+                        clearReviewTarget()
+                    }
+                },
+                onPickImages = {
+                    if (reviewTarget != null) {
                         lastError = reviewNoAttachmentsMessage
                         return@TurnComposerBar
                     }
-                    sending = true
+                    if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
+                        lastError = attachmentLimitMessage
+                    } else {
+                        photoPickerLauncher.launch("image/*")
+                    }
+                },
+                onPickFiles = {
+                    if (reviewTarget != null) {
+                        lastError = reviewNoAttachmentsMessage
+                        return@TurnComposerBar
+                    }
+                    if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
+                        lastError = attachmentLimitMessage
+                    } else {
+                        filePickerLauncher.launch(arrayOf("*/*"))
+                    }
+                },
+                onTakePhoto = {
+                    if (reviewTarget != null) {
+                        lastError = reviewNoAttachmentsMessage
+                        return@TurnComposerBar
+                    }
+                    if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
+                        lastError = attachmentLimitMessage
+                        return@TurnComposerBar
+                    }
+                    val hasCamera =
+                        context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+                    if (!hasCamera) {
+                        lastError = attachmentCameraUnavailableMessage
+                        return@TurnComposerBar
+                    }
+                    val hasPermission =
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED
+                    if (hasPermission) {
+                        cameraPreviewLauncher.launch(null)
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                onSetPlanModeEnabled = { isPlanModeEnabled = it },
+                onSelectModel = { option ->
+                    scope.launch { runCatching { repository.setSelectedModelId(option.id) } }
+                },
+                onSelectReasoningEffort = { option ->
                     scope.launch {
                         runCatching {
-                            repository.startReview(
-                                threadId = threadId,
-                                target = activeReviewTarget,
-                                baseBranch = activeReviewBaseBranch,
-                            )
-                        }.onSuccess {
-                            sending = false
-                            draft = ""
-                            mentionChips = emptyList()
-                            clearReviewTarget()
-                        }.onFailure { e ->
-                            sending = false
-                            lastError = com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)
+                            repository.setSelectedReasoningEffort(option.id.takeUnless { it == TURN_COMPOSER_RUNTIME_AUTO_ID })
                         }
                     }
-                    return@TurnComposerBar
-                }
-                val draftText =
-                    com.dotbrains.agnt.mobile.ui.turn.appendFileAttachmentsToDraft(
-                        baseText = draftWithMentions,
-                        files = readyComposerFileAttachments,
-                        binarySummary = attachmentFileBinarySummary,
-                    )
-                val attachmentsToSend = readyComposerImageAttachments
-                val collaborationMode =
-                    if (isPlanModeEnabled) {
-                        CodexCollaborationModeKind.plan
-                    } else {
-                        null
+                },
+                onSelectAccessMode = { option ->
+                    CodexAccessMode.entries.firstOrNull { it.name == option.id }?.let { mode ->
+                        scope.launch { runCatching { repository.setSelectedAccessMode(mode) } }
                     }
-                dispatchTurn(
-                    text = draftText,
-                    attachments = attachmentsToSend,
-                    skillMentions = structuredSkillMentions,
-                    fileMentions = structuredFileMentions,
-                    collaborationMode = collaborationMode,
-                    fromQueue = false,
-                )
-            },
-        )
+                },
+                onSelectServiceTier = { option ->
+                    val tier = CodexServiceTier.entries.firstOrNull { it.name == option.id }
+                    scope.launch { runCatching { repository.setSelectedServiceTier(tier) } }
+                },
+                onRemoveAttachment = { attachmentId ->
+                    composerAttachments = composerAttachments.filterNot { it.id == attachmentId }
+                },
+                onRemoveMentionChip = { chip ->
+                    mentionChips = mentionChips.filterNot { it == chip }
+                },
+                onSelectAutocomplete = { item ->
+                    val replaced =
+                        TurnComposerTrailingTokens.replaceTrailingSegment(
+                            text = draft,
+                            replacement = item.replacementText,
+                            parse = trailingToken,
+                        )
+                    draft = replaced.text
+                    when (item.payload.kind) {
+                        ComposerMentionKind.File,
+                        ComposerMentionKind.Skill,
+                        ComposerMentionKind.Plugin,
+                        -> {
+                            if (mentionChips.none { it.kind == item.payload.kind && it.semanticValue == item.payload.semanticValue }) {
+                                mentionChips = mentionChips + item.payload
+                            }
+                        }
+                        ComposerMentionKind.SlashCommand -> {
+                            when {
+                                item.payload.semanticValue.equals("fork", ignoreCase = true) -> {
+                                    draft = replaced.text.removeSuffix("/fork ").trimEnd()
+                                    showForkThreadSheet = true
+                                    lastError = null
+                                }
+                                item.payload.semanticValue.equals("feedback", ignoreCase = true) -> {
+                                    draft = replaced.text.removeSuffix("/feedback ").trimEnd()
+                                    showFeedbackDialog = true
+                                    lastError = null
+                                }
+                                item.payload.semanticValue.equals("compact", ignoreCase = true) -> {
+                                    draft = (replaced.text.trimEnd() + " /compact").trim()
+                                    mentionChips =
+                                        mentionChips.filterNot { chip ->
+                                            chip.kind == ComposerMentionKind.SlashCommand &&
+                                                chip.semanticValue.equals("compact", ignoreCase = true)
+                                        }
+                                    lastError = null
+                                }
+                                item.payload.semanticValue.equals("review", ignoreCase = true) -> {
+                                    selectReviewTarget(CodexReviewTarget.uncommittedChanges)
+                                }
+                                item.payload.semanticValue.equals("review-base", ignoreCase = true) -> {
+                                    val branch = defaultReviewBaseBranch
+                                    if (branch == null) {
+                                        draft = replaced.text.removeSuffix("/review-base ").trimEnd()
+                                        lastError = reviewNoDefaultBranchMessage
+                                    } else {
+                                        selectReviewTarget(CodexReviewTarget.baseBranch, branch)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                onStopTurn = { stopActiveTurn() },
+                voiceUiEnabled = voiceInteractionEnabled,
+                voiceAudioLevels = voiceAudioLevels,
+                voiceRecordingDurationSeconds = voiceRecordingDurationSeconds,
+                onVoiceClick = {
+                    when (voicePhase) {
+                        TurnVoicePhase.Idle -> {
+                            if (voiceInteractionEnabled) {
+                                val hasAudioPermission =
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                                        PackageManager.PERMISSION_GRANTED
+                                if (!hasAudioPermission) {
+                                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                } else {
+                                    scope.launch {
+                                        if (voicePhase != TurnVoicePhase.Idle) return@launch
+                                        resetVoiceMeteringState()
+                                        val ok =
+                                            withContext(Dispatchers.IO) {
+                                                voiceRecorder.start(::appendVoiceAudioLevel)
+                                            }
+                                        if (ok) {
+                                            voicePhase = TurnVoicePhase.Recording
+                                        } else {
+                                            resetVoiceMeteringState()
+                                            lastError = voiceRecorderFailedMessage
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        TurnVoicePhase.Recording -> {
+                            scope.launch {
+                                if (voicePhase != TurnVoicePhase.Recording) return@launch
+                                val encoded =
+                                    withContext(Dispatchers.IO) {
+                                        voiceRecorder.stopAndEncodeWav()
+                                    }
+                                val pair =
+                                    encoded.getOrElse { err ->
+                                        voicePhase = TurnVoicePhase.Idle
+                                        resetVoiceMeteringState()
+                                        if (err.message != "not_recording") {
+                                            lastError =
+                                                when (err.message) {
+                                                    "empty_audio" -> voiceNoAudioMessage
+                                                    else -> voiceRecorderFailedMessage
+                                                }
+                                        }
+                                        return@launch
+                                    }
+                                voicePhase = TurnVoicePhase.Transcribing
+                                resetVoiceMeteringState()
+                                transcribeJob =
+                                    scope.launch {
+                                        try {
+                                            val text =
+                                                repository.transcribeBridgeVoiceWav(
+                                                    pair.first,
+                                                    pair.second,
+                                                )
+                                            if (isActive) {
+                                                draft = VoiceDraftAppend.append(draft, text)
+                                            }
+                                        } catch (e: CancellationException) {
+                                            throw e
+                                        } catch (e: Exception) {
+                                            if (isActive) {
+                                                lastError =
+                                                    when (e) {
+                                                        is AgentServiceError ->
+                                                            e.message ?: voiceTranscriptionFailedMessage
+                                                        else -> e.message ?: voiceTranscriptionFailedMessage
+                                                    }
+                                            }
+                                        } finally {
+                                            transcribeJob = null
+                                            if (isActive) {
+                                                voicePhase = TurnVoicePhase.Idle
+                                            }
+                                        }
+                                    }
+                            }
+                        }
+                        TurnVoicePhase.Transcribing -> Unit
+                    }
+                },
+                onCancelVoiceRecording = {
+                    scope.launch {
+                        if (voicePhase != TurnVoicePhase.Recording) return@launch
+                        withContext(Dispatchers.IO) { voiceRecorder.cancel() }
+                        voicePhase = TurnVoicePhase.Idle
+                        resetVoiceMeteringState()
+                    }
+                },
+                composerEnvironment = {
+                    if (!isImeVisible || isBranchPickerOpen) {
+                        TurnComposerSecondaryBar(
+                            threadId = threadId,
+                            repository = repository,
+                            isWorktreeProject = activeThread?.isManagedWorktreeProject == true,
+                            worktreeHandoffEnabled =
+                                gitCwd != null &&
+                                    gitBranchPaneState is GitBranchPaneState.Loaded &&
+                                    ready &&
+                                    connectionState is ConnectionState.Connected &&
+                                    !isThreadRunning &&
+                                    !sending &&
+                                    !isSwitchingGitBranch,
+                            isHandingOffWorktree = isHandingOffWorktree,
+                            onWorktreeHandoff = {
+                                showWorktreeHandoffSheet = true
+                                worktreeHandoffError = null
+                            },
+                            selectedAccessMode = selectedAccessMode,
+                            accessPickerEnabled =
+                                ready &&
+                                    !composerLocks.runtimeControlsLocked &&
+                                    runtimeControls.accessMode.enabled,
+                            onSelectAccessMode = { mode ->
+                                scope.launch { runCatching { repository.setSelectedAccessMode(mode) } }
+                            },
+                            gitBranchPaneState = gitBranchPaneState,
+                            branchPickerEnabled = branchPickerEnabled,
+                            isSwitchingGitBranch = isSwitchingGitBranch,
+                            onRefreshGitBranches = { gitBranchReloadNonce++ },
+                            onCheckoutGitBranch = onGitCheckout,
+                            onCreateGitBranch = onGitCreateBranch,
+                            onOpenBranchSelector = {},
+                            onBranchPickerOpenChange = { isOpen ->
+                                isBranchPickerOpen = isOpen
+                            },
+                        )
+                    }
+                },
+                onSend = {
+                    transcribeJob?.cancel()
+                    transcribeJob = null
+                    voiceRecorder.cancel()
+                    voicePhase = TurnVoicePhase.Idle
+                    resetVoiceMeteringState()
+                    lastError = null
+                    val activeReviewTarget = reviewTarget
+                    if (activeReviewTarget != null) {
+                        if (isThreadRunning) {
+                            lastError = reviewRunningUnavailableMessage
+                            return@TurnComposerBar
+                        }
+                        val activeReviewBaseBranch = resolvedReviewBaseBranch
+                        if (activeReviewTarget.name == "baseBranch" && activeReviewBaseBranch == null) {
+                            lastError = reviewNoBaseBranchAvailableMessage
+                            return@TurnComposerBar
+                        }
+                        if (composerAttachments.isNotEmpty()) {
+                            lastError = reviewNoAttachmentsMessage
+                            return@TurnComposerBar
+                        }
+                        sending = true
+                        scope.launch {
+                            runCatching {
+                                repository.startReview(
+                                    threadId = threadId,
+                                    target = activeReviewTarget,
+                                    baseBranch = activeReviewBaseBranch,
+                                )
+                            }.onSuccess {
+                                sending = false
+                                draft = ""
+                                mentionChips = emptyList()
+                                clearReviewTarget()
+                            }.onFailure { e ->
+                                sending = false
+                                lastError =
+                                    com.dotbrains.agnt.mobile.ui.turn
+                                        .formatTurnSendError(e)
+                            }
+                        }
+                        return@TurnComposerBar
+                    }
+                    val draftText =
+                        com.dotbrains.agnt.mobile.ui.turn.appendFileAttachmentsToDraft(
+                            baseText = draftWithMentions,
+                            files = readyComposerFileAttachments,
+                            binarySummary = attachmentFileBinarySummary,
+                        )
+                    val attachmentsToSend = readyComposerImageAttachments
+                    val collaborationMode =
+                        if (isPlanModeEnabled) {
+                            CodexCollaborationModeKind.plan
+                        } else {
+                            null
+                        }
+                    dispatchTurn(
+                        text = draftText,
+                        attachments = attachmentsToSend,
+                        skillMentions = structuredSkillMentions,
+                        fileMentions = structuredFileMentions,
+                        collaborationMode = collaborationMode,
+                        fromQueue = false,
+                    )
+                },
+            )
         }
         expandedPlanAccessoryMessage?.let { planMessage ->
             TurnPlanAccessoryCard(
@@ -1928,7 +1957,9 @@ fun TurnConversationPane(
                     showForkThreadSheet = false
                     lastError = null
                 }.onFailure { e ->
-                    lastError = com.dotbrains.agnt.mobile.ui.turn.formatTurnSendError(e)
+                    lastError =
+                        com.dotbrains.agnt.mobile.ui.turn
+                            .formatTurnSendError(e)
                 }
                 forkingThread = false
             }
@@ -1997,7 +2028,9 @@ private fun FullTimelineMessageSheet(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+            verticalArrangement =
+                androidx.compose.foundation.layout.Arrangement
+                    .spacedBy(12.dp),
         ) {
             Text(
                 text = stringResource(R.string.turn_message_full_sheet_title),
@@ -2028,21 +2061,19 @@ private fun assistantUndoChangeSetsByMessageId(
                     ?.trim()
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { it to changeSet }
-            }
-            .toMap()
+            }.toMap()
     val byTurnId = readyChangeSets.associateBy { it.turnId }
     val mapped =
         messages
-        .asSequence()
-        .filter { it.role == com.dotbrains.agnt.mobile.core.model.CodexMessageRole.assistant }
-        .mapNotNull { message ->
-            val changeSet =
-                byAssistantMessageId[message.id]
-                    ?: message.itemId?.let { byAssistantMessageId[it] }
-                    ?: message.turnId?.let { byTurnId[it] }
-            changeSet?.let { message.id to it }
-        }
-        .toMap()
+            .asSequence()
+            .filter { it.role == com.dotbrains.agnt.mobile.core.model.CodexMessageRole.assistant }
+            .mapNotNull { message ->
+                val changeSet =
+                    byAssistantMessageId[message.id]
+                        ?: message.itemId?.let { byAssistantMessageId[it] }
+                        ?: message.turnId?.let { byTurnId[it] }
+                changeSet?.let { message.id to it }
+            }.toMap()
     if (mapped.isNotEmpty()) return mapped
     val latestAssistant = messages.lastOrNull { it.role == com.dotbrains.agnt.mobile.core.model.CodexMessageRole.assistant }
     val latestReady = readyChangeSets.maxByOrNull { it.createdAt }

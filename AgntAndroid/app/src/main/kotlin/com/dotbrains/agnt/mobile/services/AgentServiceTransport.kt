@@ -51,11 +51,9 @@ internal suspend fun AgentService.openWebSocketAwaitOpen(
     }
 }
 
-internal fun AgentService.newRelayWebSocketListener(
-    handshakeCont: CancellableContinuation<Unit>?,
-): WebSocketListener {
+internal fun AgentService.newRelayWebSocketListener(handshakeCont: CancellableContinuation<Unit>?): WebSocketListener {
     val svc = this
-        return object : WebSocketListener() {
+    return object : WebSocketListener() {
         override fun onOpen(
             webSocket: WebSocket,
             response: Response,

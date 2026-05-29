@@ -1,7 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
 import android.annotation.SuppressLint
-import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -24,9 +23,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import kotlin.math.roundToInt
-import org.json.JSONObject
+import android.graphics.Color as AndroidColor
 
 private const val MermaidAssetDomain = "appassets.androidplatform.net"
 private const val MermaidAssetPath = "/assets/mermaid/index.html"
@@ -72,7 +72,7 @@ internal fun TurnMermaidWebViewCard(
                     ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                )
+                    )
                 state.attach(webView, enablesInteraction)
                 state.updateSource(normalizedCode, darkMode)
             }
@@ -131,9 +131,10 @@ internal class TurnMermaidWebViewState {
 
         currentSource = source
         currentDarkMode = darkMode
-        currentHeightCacheKey = MermaidHeightCacheKey(source, darkMode).also { key ->
-            MermaidKnownHeightCache.get(key)?.let { heightDp = it }
-        }
+        currentHeightCacheKey =
+            MermaidHeightCacheKey(source, darkMode).also { key ->
+                MermaidKnownHeightCache.get(key)?.let { heightDp = it }
+            }
         if (pageLoaded) {
             renderCurrentSource()
         }
@@ -157,13 +158,13 @@ internal class TurnMermaidWebViewState {
 
     private fun configureWebView(webView: WebView) {
         val assetLoader =
-            WebViewAssetLoader.Builder()
+            WebViewAssetLoader
+                .Builder()
                 .setDomain(MermaidAssetDomain)
                 .addPathHandler(
                     "/assets/",
                     WebViewAssetLoader.AssetsPathHandler(webView.context.applicationContext),
-                )
-                .build()
+                ).build()
         with(webView.settings) {
             javaScriptEnabled = true
             domStorageEnabled = false
@@ -195,17 +196,13 @@ internal class TurnMermaidWebViewState {
                 override fun shouldOverrideUrlLoading(
                     view: WebView,
                     request: WebResourceRequest,
-                ): Boolean {
-                    return !isAllowedUrl(request.url)
-                }
+                ): Boolean = !isAllowedUrl(request.url)
 
                 @Deprecated("Deprecated in Java")
                 override fun shouldOverrideUrlLoading(
                     view: WebView,
                     url: String,
-                ): Boolean {
-                    return !isAllowedUrl(Uri.parse(url))
-                }
+                ): Boolean = !isAllowedUrl(Uri.parse(url))
 
                 override fun shouldInterceptRequest(
                     view: WebView,
@@ -331,7 +328,9 @@ internal class TurnMermaidWebViewState {
                             return@evaluateJavascript
                         }
 
-                        val density = webView.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
+                        val density =
+                            webView.resources.displayMetrics.density
+                                .takeIf { it > 0f } ?: 1f
                         val measuredHeight = ((heightPx / density).roundToInt()).dp
                         val clampedHeight = measuredHeight.coerceIn(MermaidMinHeight, MermaidMaxHeight)
                         if (clampedHeight != heightDp) {
@@ -391,12 +390,10 @@ internal class TurnMermaidWebViewState {
         webView?.stopLoading()
     }
 
-    private fun isAllowedUrl(url: Uri): Boolean {
-        return url.scheme == "https" && url.host == MermaidAssetDomain
-    }
+    private fun isAllowedUrl(url: Uri): Boolean = url.scheme == "https" && url.host == MermaidAssetDomain
 
-    private fun blockedResponse(): WebResourceResponse {
-        return WebResourceResponse(
+    private fun blockedResponse(): WebResourceResponse =
+        WebResourceResponse(
             "text/plain",
             "utf-8",
             403,
@@ -404,7 +401,6 @@ internal class TurnMermaidWebViewState {
             emptyMap(),
             ByteArrayInputStream(ByteArray(0)),
         )
-    }
 
     private fun buildRenderScript(
         source: String,
@@ -414,18 +410,15 @@ internal class TurnMermaidWebViewState {
         return "(function(){try{window.renderAgntMermaid($quotedSource, $darkMode);return true;}catch(_){return false;}})()"
     }
 
-    private fun heightScript(): String {
-        return "(function(){try{return Number(window.agntMermaidHeight ? window.agntMermaidHeight() : -1);}catch(_){return -1;}})()"
-    }
+    private fun heightScript(): String = "(function(){try{return Number(window.agntMermaidHeight ? window.agntMermaidHeight() : -1);}catch(_){return -1;}})()"
 }
 
-private fun clampMermaidHeight(height: Dp): Dp {
-    return when {
+private fun clampMermaidHeight(height: Dp): Dp =
+    when {
         height < MermaidMinHeight -> MermaidMinHeight
         height > MermaidMaxHeight -> MermaidMaxHeight
         else -> height
     }
-}
 
 internal data class MermaidHeightCacheKey(
     val source: String,

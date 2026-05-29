@@ -1,8 +1,8 @@
 ﻿package com.dotbrains.agnt.mobile.ui.turn
 
-import com.dotbrains.agnt.mobile.core.model.TurnCodeCommentDirectiveParsing
-import com.dotbrains.agnt.mobile.core.model.TurnCodeCommentDirectiveFormatter
 import com.dotbrains.agnt.mobile.core.model.TurnCodeCommentDirectiveFinding
+import com.dotbrains.agnt.mobile.core.model.TurnCodeCommentDirectiveFormatter
+import com.dotbrains.agnt.mobile.core.model.TurnCodeCommentDirectiveParsing
 import com.dotbrains.agnt.mobile.core.model.TurnThinkingDisclosureHints
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -10,7 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CodeCommentDirectiveParsingTest {
-
     @Test
     fun validDirective_extractsStructuredFinding_andCleansFallbackText() {
         val outcome =
@@ -198,10 +197,12 @@ class CodeCommentDirectiveParsingTest {
     @Test
     fun thinkingTags_stripped_balanced_simple() {
         val raw =
-            """Before <thinking>
-            peek
-            </thinking> after"""
-                .trimIndent()
+            """
+			Before <thinking>
+			peek
+			</thinking> after
+			
+            """.trimIndent()
         val stripped = TurnThinkingDisclosureHints.stripSimpleThinkingTags(raw)
         assertEquals("Before peek after", stripped.lines().joinToString(" ").trim())
     }

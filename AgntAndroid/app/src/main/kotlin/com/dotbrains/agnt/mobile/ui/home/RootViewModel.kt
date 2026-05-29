@@ -10,10 +10,10 @@ import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.pairing.buildWebSocketConnectParams
 import com.dotbrains.agnt.mobile.pairing.reconnectUsingSavedRelaySnapshot
 import com.dotbrains.agnt.mobile.services.DesktopHandoffService
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 enum class RootPhase {
@@ -81,28 +81,30 @@ class RootViewModel(
 
     fun onAppLaunched() {
         autoReconnectJob?.cancel()
-        autoReconnectJob = viewModelScope.launch {
-            restoreActiveThreadIfNeeded(allowBeforeSessionReady = true)
-            attemptAutoConnectIfNeeded(minIntervalMs = 0L)
-        }
+        autoReconnectJob =
+            viewModelScope.launch {
+                restoreActiveThreadIfNeeded(allowBeforeSessionReady = true)
+                attemptAutoConnectIfNeeded(minIntervalMs = 0L)
+            }
     }
 
     fun onAppForegrounded() {
         if (autoReconnectJob?.isActive == true || manualReconnectJob?.isActive == true) return
-        autoReconnectJob = viewModelScope.launch {
-            if (repository.isSessionReady.value) {
-                restoreActiveThreadIfNeeded()
-                val active = repository.activeThreadId.value ?: sessionPersistence.loadLastActiveThreadId()
-                if (!active.isNullOrBlank()) {
-                    repository.setActiveThreadId(active)
-                    runCatching { repository.refreshUsageStatus(active) }
-                } else {
-                    repository.refreshThreads()
+        autoReconnectJob =
+            viewModelScope.launch {
+                if (repository.isSessionReady.value) {
+                    restoreActiveThreadIfNeeded()
+                    val active = repository.activeThreadId.value ?: sessionPersistence.loadLastActiveThreadId()
+                    if (!active.isNullOrBlank()) {
+                        repository.setActiveThreadId(active)
+                        runCatching { repository.refreshUsageStatus(active) }
+                    } else {
+                        repository.refreshThreads()
+                    }
+                    return@launch
                 }
-                return@launch
+                attemptAutoConnectIfNeeded(minIntervalMs = 2_000L)
             }
-            attemptAutoConnectIfNeeded(minIntervalMs = 2_000L)
-        }
     }
 
     fun reconnectSavedPairingManually() {

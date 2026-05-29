@@ -5,10 +5,10 @@ import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
 import com.dotbrains.agnt.mobile.core.model.JSONValue
-import java.time.Instant
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.time.Instant
 
 /**
  * Native `thread/fork` (parity [AgentService+ThreadFork.swift] / [AgentService+ThreadForkCompatibility.swift]).
@@ -57,8 +57,9 @@ internal suspend fun AgentService.forkThreadInternal(
             throw e
         }
 
-    val resultObj = response.result as? JSONValue.Obj
-        ?: throw AgentServiceError.InvalidResponse("thread/fork missing result")
+    val resultObj =
+        response.result as? JSONValue.Obj
+            ?: throw AgentServiceError.InvalidResponse("thread/fork missing result")
     val threadEl =
         resultObj.map["thread"] as? JSONValue.Obj
             ?: throw AgentServiceError.InvalidResponse("thread/fork response missing thread")
@@ -127,7 +128,9 @@ internal suspend fun AgentService.forkThreadInternal(
         }
         syncThreadHistoryInternal(forkId, force = true)
         val hasMessages =
-            messageTimelineStore.messagesByThread.value[forkId].orEmpty().isNotEmpty()
+            messageTimelineStore.messagesByThread.value[forkId]
+                .orEmpty()
+                .isNotEmpty()
         if (hydratedThreadIds.contains(forkId) || hasMessages) {
             hydrated = _threads.value.find { it.id == forkId }
             break

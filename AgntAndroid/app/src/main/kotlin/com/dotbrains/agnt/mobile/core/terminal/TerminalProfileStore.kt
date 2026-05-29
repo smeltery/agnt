@@ -10,8 +10,7 @@ import com.dotbrains.agnt.mobile.core.security.SecureStore
 class TerminalProfileStore(
     private val secureStore: SecureStore,
 ) {
-    fun load(): TerminalProfile =
-        secureStore.readCodable<TerminalProfile>(CodexSecureKeys.terminalSshProfile) ?: TerminalProfile.EMPTY
+    fun load(): TerminalProfile = secureStore.readCodable<TerminalProfile>(CodexSecureKeys.terminalSshProfile) ?: TerminalProfile.EMPTY
 
     fun save(profile: TerminalProfile) {
         secureStore.writeCodable(CodexSecureKeys.terminalSshProfile, profile.normalizedForSave())

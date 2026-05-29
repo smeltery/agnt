@@ -62,13 +62,15 @@ internal object FileChangeItemBodyRenderer {
             return renderedChanges.joinToString(separator = "\n\n---\n\n")
         }
 
-        diffFallback?.trim()?.takeIf {
-            hasFileChangeEvidence(it) &&
-                !looksLikeTempPreviewError(it) &&
-                !looksLikeIgnoredImageReference(it)
-        }?.let { fallback ->
-            return "Status: completed\n\n```diff\n$fallback\n```"
-        }
+        diffFallback
+            ?.trim()
+            ?.takeIf {
+                hasFileChangeEvidence(it) &&
+                    !looksLikeTempPreviewError(it) &&
+                    !looksLikeIgnoredImageReference(it)
+            }?.let { fallback ->
+                return "Status: completed\n\n```diff\n$fallback\n```"
+            }
 
         return null
     }
@@ -133,7 +135,11 @@ internal object FileChangeItemBodyRenderer {
 
     private fun firstNonBlankString(vararg values: JSONValue?): String? {
         for (value in values) {
-            value?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            value
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return null
     }
@@ -143,7 +149,11 @@ internal object FileChangeItemBodyRenderer {
             when (value) {
                 is JSONValue.NumLong -> return value.value.toInt()
                 is JSONValue.NumDouble -> return value.value.toInt()
-                is JSONValue.Str -> value.value.trim().toIntOrNull()?.let { return it }
+                is JSONValue.Str ->
+                    value.value
+                        .trim()
+                        .toIntOrNull()
+                        ?.let { return it }
                 else -> Unit
             }
         }
@@ -187,4 +197,3 @@ internal object FileChangeItemBodyRenderer {
             )
     }
 }
-

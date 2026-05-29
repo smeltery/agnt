@@ -83,8 +83,7 @@ fun SidebarNewWorktreeSheet(
                 val next = GitBranchDisplayMapper.summaryFrom(branches)
                 summary = next
                 selectedBranch = WorktreeNewChatDefaults.baseBranch(next)
-            }
-            .onFailure { error ->
+            }.onFailure { error ->
                 summary = null
                 selectedBranch = null
                 loadError = GitBranchDisplayMapper.userVisibleMessage(error)

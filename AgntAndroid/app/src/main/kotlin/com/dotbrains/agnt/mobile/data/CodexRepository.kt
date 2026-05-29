@@ -1,20 +1,20 @@
 package com.dotbrains.agnt.mobile.data
 
 import com.dotbrains.agnt.mobile.core.model.ActiveProvider
-import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
-import com.dotbrains.agnt.mobile.core.model.CodexMessage
-import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
+import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
-import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
+import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
+import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
+import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
-import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
+import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
@@ -234,16 +234,13 @@ interface CodexRepository {
     ): Unit = throw UnsupportedOperationException("renameThread is not implemented by this repository")
 
     /** Removes a chat from Android's local list without mutating the paired desktop runtime. */
-    suspend fun deleteThreadLocally(threadId: String): Unit =
-        throw UnsupportedOperationException("deleteThreadLocally is not implemented by this repository")
+    suspend fun deleteThreadLocally(threadId: String): Unit = throw UnsupportedOperationException("deleteThreadLocally is not implemented by this repository")
 
     /** Archives every root thread in a sidebar project group so the folder disappears from the live list. */
-    suspend fun archiveThreadGroup(threadIds: List<String>): List<String> =
-        throw UnsupportedOperationException("archiveThreadGroup is not implemented by this repository")
+    suspend fun archiveThreadGroup(threadIds: List<String>): List<String> = throw UnsupportedOperationException("archiveThreadGroup is not implemented by this repository")
 
     /** Removes every thread in a sidebar group without issuing per-thread RPC mutations. */
-    suspend fun deleteLocalThreadGroup(threadIds: List<String>): List<String> =
-        throw UnsupportedOperationException("deleteLocalThreadGroup is not implemented by this repository")
+    suspend fun deleteLocalThreadGroup(threadIds: List<String>): List<String> = throw UnsupportedOperationException("deleteLocalThreadGroup is not implemented by this repository")
 
     /**
      * WAV clip → transcript: `voice/resolveAuth` on the bridge, then ChatGPT `/backend-api/transcribe` (J.7e).
@@ -323,6 +320,7 @@ interface CodexRepository {
 
     /** Pops the next queued local draft for [threadId], or null if empty. */
     suspend fun pollTurnDraft(threadId: String): QueuedTurnDraft? = null
+
     suspend fun removeQueuedTurnDraft(
         threadId: String,
         draftId: String,

@@ -4,7 +4,6 @@ package com.dotbrains.agnt.mobile.core.model
  * Shared parsing helpers for timeline text that may include `::code-comment{...}` directives.
  */
 internal object TurnCodeCommentDirectiveParsing {
-
     private const val directivePrefix = "::code-comment{"
     private val priorityPrefixRegex = Regex("""^\[P([0-3])]\s*""", RegexOption.IGNORE_CASE)
 
@@ -21,15 +20,16 @@ internal object TurnCodeCommentDirectiveParsing {
             removedRanges += directive.range
         }
 
-        val cleaned = buildString(input.length) {
-            var cursor = 0
-            removedRanges.sortBy { it.first }
-            for (range in removedRanges) {
-                if (cursor < range.first) append(input, cursor, range.first)
-                cursor = range.last + 1
+        val cleaned =
+            buildString(input.length) {
+                var cursor = 0
+                removedRanges.sortBy { it.first }
+                for (range in removedRanges) {
+                    if (cursor < range.first) append(input, cursor, range.first)
+                    cursor = range.last + 1
+                }
+                if (cursor < input.length) append(input, cursor, input.length)
             }
-            if (cursor < input.length) append(input, cursor, input.length)
-        }
 
         return TurnCodeCommentDirectiveParseOutcome(
             findings = findings,
@@ -37,9 +37,7 @@ internal object TurnCodeCommentDirectiveParsing {
         )
     }
 
-    internal fun parseKvPairs(inner: String): Map<String, String> {
-        return parseAttributes(inner) ?: emptyMap()
-    }
+    internal fun parseKvPairs(inner: String): Map<String, String> = parseAttributes(inner) ?: emptyMap()
 
     private fun parseFinding(payload: String): TurnCodeCommentDirectiveFinding? {
         val attrs = parseAttributes(payload) ?: return null
@@ -192,12 +190,11 @@ internal object TurnCodeCommentDirectiveParsing {
         return out
     }
 
-    private fun collapseSurroundingWhitespace(s: String): String {
-        return s
+    private fun collapseSurroundingWhitespace(s: String): String =
+        s
             .replace(Regex("""[ \t]{2,}"""), " ")
             .replace(Regex("""\n{3,}"""), "\n\n")
             .trim()
-    }
 }
 
 internal data class TurnCodeCommentDirectiveFinding(
@@ -221,11 +218,12 @@ internal data class TurnCodeCommentDirectiveParseOutcome(
 
 internal object TurnCodeCommentDirectiveFormatter {
     fun format(finding: TurnCodeCommentDirectiveFinding): String {
-        val parts = mutableListOf(
-            "title=\"${escapeQuoted(finding.title)}\"",
-            "body=\"${escapeQuoted(finding.body)}\"",
-            "file=\"${escapeQuoted(finding.file)}\"",
-        )
+        val parts =
+            mutableListOf(
+                "title=\"${escapeQuoted(finding.title)}\"",
+                "body=\"${escapeQuoted(finding.body)}\"",
+                "file=\"${escapeQuoted(finding.file)}\"",
+            )
         finding.startLine?.let { parts += "start=$it" }
         finding.endLine?.let { parts += "end=$it" }
         finding.priority?.let { parts += "priority=$it" }
@@ -283,6 +281,7 @@ internal object TurnThinkingDisclosureHints {
     }
 
     private fun collapseBlankRuns(s: String): String =
-        s.replace(Regex("""[ \t]{2,}"""), " ")
+        s
+            .replace(Regex("""[ \t]{2,}"""), " ")
             .replace(Regex("""\n{3,}"""), "\n\n")
 }

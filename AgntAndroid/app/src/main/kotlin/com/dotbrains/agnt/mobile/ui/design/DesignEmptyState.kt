@@ -18,16 +18,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.dotbrains.agnt.mobile.R
 
-private val quickTemplates = listOf(
-    "Onboarding" to "Create onboarding screen for a ride tracker",
-    "Paywall" to "Create a paywall screen for premium subscription",
-    "Settings" to "Create a settings screen with profile and preferences",
-    "Chat screen" to "Create a chat screen with message bubbles",
-    "Dashboard" to "Create a dashboard with stats cards",
-    "Mobile landing" to "Create a landing page for a mobile app",
-)
+private val quickTemplates =
+    listOf(
+        "Onboarding" to "Create onboarding screen for a ride tracker",
+        "Paywall" to "Create a paywall screen for premium subscription",
+        "Settings" to "Create a settings screen with profile and preferences",
+        "Chat screen" to "Create a chat screen with message bubbles",
+        "Dashboard" to "Create a dashboard with stats cards",
+        "Mobile landing" to "Create a landing page for a mobile app",
+    )
 
 @Composable
 fun DesignEmptyState(
@@ -37,9 +37,10 @@ fun DesignEmptyState(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

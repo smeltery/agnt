@@ -1,5 +1,6 @@
 package com.dotbrains.agnt.mobile.pairing
 
+import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexBridgeUpdatePrompt
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
@@ -8,24 +9,23 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
-import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexThread
-import com.dotbrains.agnt.mobile.core.model.SystemNotice
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
+import com.dotbrains.agnt.mobile.core.model.SystemNotice
 import com.dotbrains.agnt.mobile.core.persistence.RelaySessionSnapshot
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class ReconnectSavedRelaySnapshotTest {
     @Test
@@ -89,7 +89,9 @@ private class ReconnectTrackingRepository : CodexRepository {
     override val bridgeSupportsVoiceTranscription: StateFlow<Boolean> = MutableStateFlow(true)
     override val activeProvider: StateFlow<ActiveProvider> = MutableStateFlow(ActiveProvider.Unknown)
     override val systemNotices: StateFlow<List<SystemNotice>> = MutableStateFlow(emptyList())
+
     override fun dismissSystemNotice(id: String) {}
+
     override val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?> = MutableStateFlow(null)
 
     override suspend fun connect(
@@ -106,13 +108,21 @@ private class ReconnectTrackingRepository : CodexRepository {
     }
 
     override suspend fun setActiveThreadId(threadId: String?) = error("unused")
+
     override suspend fun refreshModels() = error("unused")
+
     override suspend fun refreshRateLimits() = error("unused")
+
     override suspend fun refreshContextWindowUsage(threadId: String) = error("unused")
+
     override suspend fun setSelectedModelId(modelId: String?) = error("unused")
+
     override suspend fun setSelectedReasoningEffort(reasoningEffort: String?) = error("unused")
+
     override suspend fun setSelectedAccessMode(accessMode: CodexAccessMode) = error("unused")
+
     override suspend fun setSelectedServiceTier(serviceTier: CodexServiceTier?) = error("unused")
+
     override suspend fun resolvePendingApproval(
         requestId: String,
         decision: PendingApprovalDecision,
@@ -124,7 +134,9 @@ private class ReconnectTrackingRepository : CodexRepository {
     ) = error("unused")
 
     override fun dismissBridgeUpdatePrompt() = error("unused")
+
     override suspend fun refreshThreads() = error("unused")
+
     override suspend fun syncThreadHistory(
         threadId: String,
         force: Boolean,
@@ -152,7 +164,9 @@ private class ReconnectTrackingRepository : CodexRepository {
     ): CodexThread = error("unused")
 
     override fun currentAuthoritativeProjectPathFor(threadId: String): String? = null
+
     override fun associatedManagedWorktreePathFor(threadId: String): String? = null
+
     override suspend fun startTurn(
         threadId: String,
         text: String,

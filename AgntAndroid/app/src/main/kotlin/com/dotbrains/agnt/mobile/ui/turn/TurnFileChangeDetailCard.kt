@@ -2,6 +2,7 @@ package com.dotbrains.agnt.mobile.ui.turn
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -23,8 +23,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -224,8 +224,9 @@ private fun SingleFileChange(
 
     if (expanded && expandedEnabled) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val singlePatch = entry.patchChunkText?.takeIf { it.isNotBlank() }
-                ?: preview.rawPatchText?.takeIf { it.isNotBlank() }
+            val singlePatch =
+                entry.patchChunkText?.takeIf { it.isNotBlank() }
+                    ?: preview.rawPatchText?.takeIf { it.isNotBlank() }
             if (singlePatch != null) {
                 entry.label?.takeIf { it.isNotBlank() }?.let { label ->
                     Text(
@@ -271,123 +272,122 @@ private fun MultipleFileChanges(
     ) {
         preview.entries.forEachIndexed { index, entry ->
             key(entry.path, index) {
-            val patchChunk = entry.patchChunkText?.takeIf { it.isNotBlank() }
-            val combinedFencePatch = preview.rawPatchText?.takeIf { it.isNotBlank() }
-            val expandable = patchChunk != null || combinedFencePatch != null
-            val expanded = index in expandedSlots
-            val accordionCd =
-                "${fileNameFromPath(entry.path)}, " +
-                    if (expanded) hideDetailsCd else showDetailsCd
+                val patchChunk = entry.patchChunkText?.takeIf { it.isNotBlank() }
+                val combinedFencePatch = preview.rawPatchText?.takeIf { it.isNotBlank() }
+                val expandable = patchChunk != null || combinedFencePatch != null
+                val expanded = index in expandedSlots
+                val accordionCd =
+                    "${fileNameFromPath(entry.path)}, " +
+                        if (expanded) hideDetailsCd else showDetailsCd
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp)
-                            .clip(MaterialTheme.shapes.small)
-                            .then(
-                                if (expandable) {
-                                    Modifier
-                                        .semantics {
-                                            contentDescription = accordionCd
-                                            role = Role.Button
-                                        }
-                                        .clickable {
-                                            expandedSlots =
-                                                if (expanded) {
-                                                    expandedSlots - index
-                                                } else {
-                                                    expandedSlots + index
-                                                }
-                                        }
-                                } else {
-                                    Modifier
-                                },
-                            ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    DotLeadAligned()
-                    Spacer(Modifier.width(8.dp))
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .then(
+                                    if (expandable) {
+                                        Modifier
+                                            .semantics {
+                                                contentDescription = accordionCd
+                                                role = Role.Button
+                                            }.clickable {
+                                                expandedSlots =
+                                                    if (expanded) {
+                                                        expandedSlots - index
+                                                    } else {
+                                                        expandedSlots + index
+                                                    }
+                                            }
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
+                        DotLeadAligned()
+                        Spacer(Modifier.width(8.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            Text(
-                                text = fileNameFromPath(entry.path),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f).padding(end = 8.dp),
-                            )
-                            FileChangeCountOrLabel(
-                                entry = entry,
-                                likelyHasDiff = preview.likelyHasDiff,
-                            )
-                        }
-                        entry.label?.takeIf { it.isNotBlank() }?.let { label ->
-                            Text(
-                                text = label,
-                                style =
-                                    MaterialTheme.typography.bodySmall.copy(
-                                        lineHeight = 18.sp,
-                                    ),
-                                color = colors.onSurfaceVariant.copy(alpha = 0.72f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    if (expandable) {
-                        Icon(
-                            imageVector = Icons.Rounded.ChevronRight,
-                            contentDescription =
-                                if (expanded) {
-                                    stringResource(R.string.turn_timeline_hide_details)
-                                } else {
-                                    stringResource(R.string.turn_timeline_show_details)
-                                },
-                            tint = colors.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier =
-                                Modifier
-                                    .padding(start = 6.dp)
-                                    .size(rowChevronSize)
-                                    .rotate(
-                                        if (expanded) {
-                                            ChevronExpandedDegrees
-                                        } else {
-                                            ChevronCollapsedDegrees
-                                        },
-                                    ),
-                        )
-                    }
-                }
-
-                if (expanded) {
-                    Spacer(Modifier.height(6.dp))
-                    when {
-                        patchChunk != null -> FileChangeHighlightedPatch(patchText = patchChunk)
-                        combinedFencePatch != null -> {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Text(
-                                    text = stringResource(R.string.turn_timeline_file_change_full_patch_fallback),
+                                    text = fileNameFromPath(entry.path),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                )
+                                FileChangeCountOrLabel(
+                                    entry = entry,
+                                    likelyHasDiff = preview.likelyHasDiff,
+                                )
+                            }
+                            entry.label?.takeIf { it.isNotBlank() }?.let { label ->
+                                Text(
+                                    text = label,
                                     style =
                                         MaterialTheme.typography.bodySmall.copy(
                                             lineHeight = 18.sp,
                                         ),
-                                    color = colors.onSurfaceVariant.copy(alpha = 0.75f),
+                                    color = colors.onSurfaceVariant.copy(alpha = 0.72f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                                FileChangeHighlightedPatch(patchText = combinedFencePatch)
+                            }
+                        }
+                        if (expandable) {
+                            Icon(
+                                imageVector = Icons.Rounded.ChevronRight,
+                                contentDescription =
+                                    if (expanded) {
+                                        stringResource(R.string.turn_timeline_hide_details)
+                                    } else {
+                                        stringResource(R.string.turn_timeline_show_details)
+                                    },
+                                tint = colors.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier =
+                                    Modifier
+                                        .padding(start = 6.dp)
+                                        .size(rowChevronSize)
+                                        .rotate(
+                                            if (expanded) {
+                                                ChevronExpandedDegrees
+                                            } else {
+                                                ChevronCollapsedDegrees
+                                            },
+                                        ),
+                            )
+                        }
+                    }
+
+                    if (expanded) {
+                        Spacer(Modifier.height(6.dp))
+                        when {
+                            patchChunk != null -> FileChangeHighlightedPatch(patchText = patchChunk)
+                            combinedFencePatch != null -> {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = stringResource(R.string.turn_timeline_file_change_full_patch_fallback),
+                                        style =
+                                            MaterialTheme.typography.bodySmall.copy(
+                                                lineHeight = 18.sp,
+                                            ),
+                                        color = colors.onSurfaceVariant.copy(alpha = 0.75f),
+                                    )
+                                    FileChangeHighlightedPatch(patchText = combinedFencePatch)
+                                }
                             }
                         }
                     }
                 }
-            }
             }
         }
     }

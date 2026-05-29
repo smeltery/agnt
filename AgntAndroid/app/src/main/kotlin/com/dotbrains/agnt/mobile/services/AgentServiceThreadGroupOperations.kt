@@ -1,7 +1,5 @@
 package com.dotbrains.agnt.mobile.services
 
-import com.dotbrains.agnt.mobile.core.error.AgentServiceError
-import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,13 +72,20 @@ private suspend fun AgentService.archiveThreadInternal(threadId: String) {
     sendThreadArchiveRpc(threadId, unarchive = false)
 }
 
-private suspend fun AgentService.sendThreadArchiveRpc(threadId: String, unarchive: Boolean) {
+private suspend fun AgentService.sendThreadArchiveRpc(
+    threadId: String,
+    unarchive: Boolean,
+) {
     if (!sessionReady) return
     runCatching {
         sendRequestImpl(
             "thread/archive",
             com.dotbrains.agnt.mobile.core.model.JSONValue.Obj(
-                mapOf("thread_id" to com.dotbrains.agnt.mobile.core.model.JSONValue.Str(threadId))
+                mapOf(
+                    "thread_id" to
+                        com.dotbrains.agnt.mobile.core.model.JSONValue
+                            .Str(threadId),
+                ),
             ),
         )
     }
@@ -109,9 +114,10 @@ private suspend fun AgentService.setThreadArchivedLocally(
     val currentThreads = _threads.value.toMutableList()
     val idx = currentThreads.indexOfFirst { it.id == threadId }
     if (idx >= 0) {
-        currentThreads[idx] = currentThreads[idx].copy(
-            syncState = if (isArchived) CodexThreadSyncState.archivedLocal else CodexThreadSyncState.live,
-        )
+        currentThreads[idx] =
+            currentThreads[idx].copy(
+                syncState = if (isArchived) CodexThreadSyncState.archivedLocal else CodexThreadSyncState.live,
+            )
     }
 
     if (_activeThreadId.value == threadId) {

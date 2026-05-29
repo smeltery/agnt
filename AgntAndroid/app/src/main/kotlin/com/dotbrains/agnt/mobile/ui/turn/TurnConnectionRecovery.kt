@@ -21,13 +21,18 @@ import com.dotbrains.agnt.mobile.ui.home.RootReconnectAttempt
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 
-internal enum class TurnConnectionRecoveryStatus(val label: String) {
+internal enum class TurnConnectionRecoveryStatus(
+    val label: String,
+) {
     Interrupted("Interrupted"),
     Reconnecting("Reconnecting"),
 }
 
 internal sealed interface TurnConnectionRecoveryTrailing {
-    data class Action(val label: String) : TurnConnectionRecoveryTrailing
+    data class Action(
+        val label: String,
+    ) : TurnConnectionRecoveryTrailing
+
     data object Progress : TurnConnectionRecoveryTrailing
 }
 

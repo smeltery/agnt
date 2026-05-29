@@ -9,7 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ThreadHistoryDecoderSanitizationTest {
-
     @Test
     fun decodeFromThreadRead_preservesCodeCommentDirectivesInHistoryText() {
         val history =
@@ -36,9 +35,10 @@ class ThreadHistoryDecoderSanitizationTest {
                                                                             JSONValue.Obj(
                                                                                 mapOf(
                                                                                     "type" to JSONValue.Str("text"),
-                                                                                    "text" to JSONValue.Str(
-                                                                                        """Hi ::code-comment{title="Bug" body="Body" file="Foo.kt"} there""",
-                                                                                    ),
+                                                                                    "text" to
+                                                                                        JSONValue.Str(
+                                                                                            """Hi ::code-comment{title="Bug" body="Body" file="Foo.kt"} there""",
+                                                                                        ),
                                                                                 ),
                                                                             ),
                                                                         ),
@@ -144,9 +144,10 @@ class ThreadHistoryDecoderSanitizationTest {
             ThreadHistoryDecoder.decodeCompletedItem(
                 mapOf(
                     "type" to JSONValue.Str("reasoning"),
-                    "summary" to JSONValue.Str(
-                        """::code-comment{title="Bug" body="Body" file="Foo.kt"}<thinking>Deep reasoning</thinking>""",
-                    ),
+                    "summary" to
+                        JSONValue.Str(
+                            """::code-comment{title="Bug" body="Body" file="Foo.kt"}<thinking>Deep reasoning</thinking>""",
+                        ),
                 ),
             )
 
@@ -183,7 +184,8 @@ class ThreadHistoryDecoderSanitizationTest {
                                     mapOf(
                                         "path" to JSONValue.Str("Turn/CopyBlockButton.swift"),
                                         "kind" to JSONValue.Str("update"),
-                                        "totals" to JSONValue.Obj(mapOf("additions" to JSONValue.NumLong(1), "deletions" to JSONValue.NumLong(2))),
+                                        "totals" to
+                                            JSONValue.Obj(mapOf("additions" to JSONValue.NumLong(1), "deletions" to JSONValue.NumLong(2))),
                                         "diff" to JSONValue.Str("@@ -1,1 +1,1 @@\n- a\n+ b\n"),
                                     ),
                                 ),
@@ -223,12 +225,12 @@ class ThreadHistoryDecoderSanitizationTest {
                     "diff" to
                         JSONValue.Str(
                             """
-                            diff --git a/src/App.kt b/src/App.kt
-                            --- a/src/App.kt
-                            +++ b/src/App.kt
-                            @@ -1 +1,2 @@
-                             class App
-                            +val enabled = true
+							diff --git a/src/App.kt b/src/App.kt
+							--- a/src/App.kt
+							+++ b/src/App.kt
+							@@ -1 +1,2 @@
+							 class App
+							+val enabled = true
                             """.trimIndent(),
                         ),
                 ),

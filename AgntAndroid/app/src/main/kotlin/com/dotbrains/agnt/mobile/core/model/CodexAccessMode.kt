@@ -9,7 +9,9 @@ enum class CodexAccessMode {
     onRequest,
 
     @SerialName("full-access")
-    fullAccess;
+    fullAccess,
+
+    ;
 
     val displayName: String
         get() =

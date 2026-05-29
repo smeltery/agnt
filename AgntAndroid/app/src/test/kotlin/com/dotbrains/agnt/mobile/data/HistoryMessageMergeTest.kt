@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.data
 
+import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageDeliveryState
-import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import java.time.Instant
@@ -286,9 +286,10 @@ class HistoryMessageMergeTest {
             listOf(
                 message(
                     id = "diff-1",
-                    text = """
-                    Edited src/App.kt +2 -1
-                    """.trimIndent(),
+                    text =
+                        """
+						Edited src/App.kt +2 -1
+                        """.trimIndent(),
                     turnId = "turn-1",
                     itemId = "filechange-1",
                     isStreaming = true,
@@ -299,10 +300,11 @@ class HistoryMessageMergeTest {
             listOf(
                 message(
                     id = "diff-2",
-                    text = """
-                    Edited src/App.kt +4 -2
-                    Edited src/Composer.kt +6 -2
-                    """.trimIndent(),
+                    text =
+                        """
+						Edited src/App.kt +4 -2
+						Edited src/Composer.kt +6 -2
+                        """.trimIndent(),
                     turnId = "turn-1",
                     itemId = "turn-diff-1",
                     isStreaming = false,
@@ -322,13 +324,14 @@ class HistoryMessageMergeTest {
             listOf(
                 message(
                     id = "diff-1",
-                    text = """
-                    Status: completed
+                    text =
+                        """
+						Status: completed
 
-                    Path: src/App.kt
-                    Kind: update
-                    Totals: +2 -1
-                    """.trimIndent(),
+						Path: src/App.kt
+						Kind: update
+						Totals: +2 -1
+                        """.trimIndent(),
                     turnId = "turn-1",
                     itemId = "turn-diff-1",
                     isStreaming = false,
@@ -339,13 +342,14 @@ class HistoryMessageMergeTest {
             listOf(
                 message(
                     id = "diff-2",
-                    text = """
-                    Status: completed
+                    text =
+                        """
+						Status: completed
 
-                    Path: src/Composer.kt
-                    Kind: update
-                    Totals: +3 -1
-                    """.trimIndent(),
+						Path: src/Composer.kt
+						Kind: update
+						Totals: +3 -1
+                        """.trimIndent(),
                     turnId = "turn-1",
                     itemId = "turn-diff-2",
                     isStreaming = false,

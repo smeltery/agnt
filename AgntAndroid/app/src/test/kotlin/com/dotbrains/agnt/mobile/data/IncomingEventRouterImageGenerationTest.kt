@@ -6,11 +6,11 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class IncomingEventRouterImageGenerationTest {
     @Test
@@ -41,7 +41,10 @@ class IncomingEventRouterImageGenerationTest {
                     ),
             )
 
-            val row = timeline.messagesByThread.value["thread-1"].orEmpty().single()
+            val row =
+                timeline.messagesByThread.value["thread-1"]
+                    .orEmpty()
+                    .single()
             assertEquals(CodexMessageRole.assistant, row.role)
             assertEquals("ig-1", row.itemId)
             assertEquals("", row.text)
@@ -83,9 +86,7 @@ class IncomingEventRouterImageGenerationTest {
             assertEquals("ig-1", messages.single().itemId)
         }
 
-    private fun newRouter(
-        messageTimeline: MessageTimelineStore = MessageTimelineStore(),
-    ): IncomingEventRouter =
+    private fun newRouter(messageTimeline: MessageTimelineStore = MessageTimelineStore()): IncomingEventRouter =
         IncomingEventRouter(
             scope = kotlinx.coroutines.CoroutineScope(Dispatchers.Unconfined),
             threads = MutableStateFlow<List<CodexThread>>(emptyList()),

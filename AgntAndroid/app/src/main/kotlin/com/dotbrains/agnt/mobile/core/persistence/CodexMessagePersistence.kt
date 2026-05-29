@@ -5,12 +5,12 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.security.CodexSecureKeys
 import com.dotbrains.agnt.mobile.core.security.SecureStore
-import java.io.File
-import java.security.MessageDigest
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.security.MessageDigest
 
 /**
  * Per-thread message timelines: encrypted per-thread cache + v6 bin / plaintext legacy fallbacks.
@@ -134,8 +134,7 @@ class CodexMessagePersistence(
                 val threadId = threadIdFromFile(file) ?: return@mapNotNull null
                 val messages = loadThreadFile(file) ?: return@mapNotNull null
                 threadId to messages
-            }
-            .toMap()
+            }.toMap()
 
     private fun loadThread(threadId: String): List<CodexMessage>? {
         val tid = threadId.trim().takeIf { it.isNotEmpty() } ?: return null
@@ -245,8 +244,10 @@ class CodexMessagePersistence(
     }
 
     private fun hashedThreadId(threadId: String): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(threadId.toByteArray(Charsets.UTF_8))
+        val digest =
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest(threadId.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
     }
 

@@ -54,8 +54,7 @@ internal class TurnDraftQueueStore {
                             collaborationMode = draft.collaborationMode,
                         )
                     }
-                }
-                .filterValues { it.isNotEmpty() }
+                }.filterValues { it.isNotEmpty() }
     }
 
     suspend fun enqueue(
@@ -81,7 +80,10 @@ internal class TurnDraftQueueStore {
             val q = queues.getOrPut(tid) { ArrayDeque() }
             val draft =
                 QueuedTurnDraft(
-                    id = java.util.UUID.randomUUID().toString(),
+                    id =
+                        java.util.UUID
+                            .randomUUID()
+                            .toString(),
                     text = trimmed,
                     attachments = readyAttachments,
                     skillMentions = skillMentions.normalizeSkillMentions(),
@@ -107,11 +109,9 @@ internal class TurnDraftQueueStore {
                     name = mention.name?.trim()?.takeIf { it.isNotEmpty() },
                     path = mention.path?.trim()?.takeIf { it.isNotEmpty() },
                 )
-            }
-            .distinctBy { mention ->
+            }.distinctBy { mention ->
                 mention.id.lowercase() + "|" + mention.name.orEmpty().lowercase() + "|" + mention.path.orEmpty().lowercase()
-            }
-            .toList()
+            }.toList()
 
     private fun List<CodexTurnMention>.normalizeFileMentions(): List<CodexTurnMention> =
         asSequence()
@@ -120,11 +120,9 @@ internal class TurnDraftQueueStore {
                 val path = mention.path.trim()
                 if (name.isEmpty() || path.isEmpty()) return@mapNotNull null
                 CodexTurnMention(name = name, path = path)
-            }
-            .distinctBy { mention ->
+            }.distinctBy { mention ->
                 mention.name.lowercase() + "|" + mention.path.lowercase()
-            }
-            .toList()
+            }.toList()
 
     suspend fun poll(threadId: String): QueuedTurnDraft? {
         val tid = threadId.trim()

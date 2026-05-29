@@ -111,13 +111,14 @@ data class WorkspaceCheckpointRestoreApplyResult(
                 backupCheckpointRef = json["backupCheckpointRef"]?.stringValue?.trim().orEmpty(),
                 backupCommit = json["backupCommit"]?.stringValue?.trim().orEmpty(),
                 restoredFiles = json.stringList("restoredFiles"),
-                conflicts = json["conflicts"]?.arrayValue?.mapNotNull { value ->
-                    val obj = value.objectValue ?: return@mapNotNull null
-                    RevertConflict(
-                        path = obj["path"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() } ?: "unknown",
-                        message = obj["message"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() } ?: "Patch conflict.",
-                    )
-                } ?: emptyList(),
+                conflicts =
+                    json["conflicts"]?.arrayValue?.mapNotNull { value ->
+                        val obj = value.objectValue ?: return@mapNotNull null
+                        RevertConflict(
+                            path = obj["path"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() } ?: "unknown",
+                            message = obj["message"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() } ?: "Patch conflict.",
+                        )
+                    } ?: emptyList(),
                 unsupportedReasons = json.stringList("unsupportedReasons"),
                 stagedFiles = json.stringList("stagedFiles"),
                 status = json["status"]?.objectValue?.let { GitRepoSyncResult.fromJson(it) },

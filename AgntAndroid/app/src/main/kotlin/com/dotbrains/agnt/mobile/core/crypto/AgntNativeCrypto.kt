@@ -1,11 +1,10 @@
 package com.dotbrains.agnt.mobile.core.crypto
 
-import java.security.MessageDigest
-import java.security.SecureRandom
 import org.bouncycastle.crypto.agreement.X25519Agreement
 import org.bouncycastle.crypto.digests.SHA256Digest
-import org.bouncycastle.crypto.generators.X25519KeyPairGenerator
 import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator
+import org.bouncycastle.crypto.generators.HKDFBytesGenerator
+import org.bouncycastle.crypto.generators.X25519KeyPairGenerator
 import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
@@ -13,7 +12,8 @@ import org.bouncycastle.crypto.params.HKDFParameters
 import org.bouncycastle.crypto.params.X25519KeyGenerationParameters
 import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters
-import org.bouncycastle.crypto.generators.HKDFBytesGenerator
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 /**
  * Curve25519 / Ed25519 / HKDF-SHA256 aligned with Swift CryptoKit usage in
@@ -55,7 +55,9 @@ internal object AgntNativeCrypto {
         message: ByteArray,
         privateKey32: ByteArray,
     ): ByteArray {
-        val signer = org.bouncycastle.crypto.signers.Ed25519Signer()
+        val signer =
+            org.bouncycastle.crypto.signers
+                .Ed25519Signer()
         signer.init(true, Ed25519PrivateKeyParameters(privateKey32, 0))
         signer.update(message, 0, message.size)
         return signer.generateSignature()
@@ -66,7 +68,9 @@ internal object AgntNativeCrypto {
         signature: ByteArray,
         publicKey32: ByteArray,
     ): Boolean {
-        val verifier = org.bouncycastle.crypto.signers.Ed25519Signer()
+        val verifier =
+            org.bouncycastle.crypto.signers
+                .Ed25519Signer()
         verifier.init(false, Ed25519PublicKeyParameters(publicKey32, 0))
         verifier.update(message, 0, message.size)
         return verifier.verifySignature(signature)

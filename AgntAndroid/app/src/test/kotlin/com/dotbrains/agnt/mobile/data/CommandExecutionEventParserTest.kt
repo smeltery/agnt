@@ -108,9 +108,10 @@ class CommandExecutionEventParserTest {
         status: String?,
         method: String = "item/commandExecution/outputDelta",
     ): String =
-        CommandExecutionEventParser.parse(
-            params = status?.let { mapOf("status" to JSONValue.Str(it)) },
-            eventObject = null,
-            method = method,
-        ).phase
+        CommandExecutionEventParser
+            .parse(
+                params = status?.let { mapOf("status" to JSONValue.Str(it)) },
+                eventObject = null,
+                method = method,
+            ).phase
 }

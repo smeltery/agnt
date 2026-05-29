@@ -84,5 +84,6 @@ internal object TurnDirectiveRenderCache {
 internal fun clearTimelineRenderCaches() {
     TurnMarkdownRenderCache.clear()
     TurnDirectiveRenderCache.clear()
-    com.dotbrains.agnt.mobile.data.TurnTimelineRichContentCache.clear()
+    com.dotbrains.agnt.mobile.data.TurnTimelineRichContentCache
+        .clear()
 }

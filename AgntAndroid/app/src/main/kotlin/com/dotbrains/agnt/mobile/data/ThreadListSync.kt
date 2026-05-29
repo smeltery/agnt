@@ -3,9 +3,9 @@ package com.dotbrains.agnt.mobile.data
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.CodexThreadSyncState
 import com.dotbrains.agnt.mobile.core.model.JSONValue
-import java.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import java.time.Instant
 
 /**
  * Fetches `thread/list` pages (parity with [AgentService.fetchServerThreads] on iOS) and merges

@@ -30,16 +30,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.core.terminal.TerminalController
 import com.dotbrains.agnt.mobile.core.terminal.TerminalProfile
 import com.dotbrains.agnt.mobile.core.terminal.TerminalSnapshot
 import com.dotbrains.agnt.mobile.core.terminal.TerminalStatus
-import com.dotbrains.agnt.mobile.core.terminal.TerminalSize
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import com.composables.icons.lucide.R as LucideR
 
 /**
  * Full-screen on-device SSH terminal route. Mirrors `TerminalScreen.swift`.
@@ -83,10 +82,14 @@ fun TerminalScreen(
                 controller.hasPrivateKey(draftPrivateKey)
         }
     }
-    val isRunning = activeSnapshot.status == TerminalStatus.Running ||
-        activeSnapshot.status == TerminalStatus.Starting
+    val isRunning =
+        activeSnapshot.status == TerminalStatus.Running ||
+            activeSnapshot.status == TerminalStatus.Starting
 
-    fun openTerminalNow(targetId: String, profile: TerminalProfile) {
+    fun openTerminalNow(
+        targetId: String,
+        profile: TerminalProfile,
+    ) {
         coroutineScope.launch {
             actionError = null
             val finalProfile = profile.normalizedForSave()
@@ -178,7 +181,8 @@ fun TerminalScreen(
 
     val sessionItems by remember(snapshots, activeTerminalId) {
         derivedStateOf {
-            controller.knownSnapshots()
+            controller
+                .knownSnapshots()
                 .filter { it.terminalId == activeTerminalId || it.status.isRunning }
                 .map { snap ->
                     val index = snap.terminalId.removePrefix("term-").toIntOrNull() ?: 1
@@ -240,9 +244,11 @@ fun TerminalScreen(
                         onSelectSession = { activeTerminalId = it },
                         onOpenNewTerminal = {
                             val nextIndex =
-                                (sessionItems.maxOfOrNull {
-                                    it.terminalId.removePrefix("term-").toIntOrNull() ?: 0
-                                } ?: 0) + 1
+                                (
+                                    sessionItems.maxOfOrNull {
+                                        it.terminalId.removePrefix("term-").toIntOrNull() ?: 0
+                                    } ?: 0
+                                ) + 1
                             val nextId = "term-${nextIndex.coerceAtLeast(1)}"
                             actionError = null
                             activeTerminalId = nextId
@@ -277,16 +283,17 @@ fun TerminalScreen(
         containerColor = backgroundColor,
     ) { padding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(backgroundColor),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(backgroundColor),
         ) {
             if (!hasConnectionConfiguration) {
                 TerminalUnavailableView(theme, onOpenEditor = { showEditor = true })
             } else if (nativeAvailable) {
                 TerminalWebViewSurface(
-                    terminalKey = "${activeTerminalId}:${activeSnapshot.instanceId.orEmpty()}",
+                    terminalKey = "$activeTerminalId:${activeSnapshot.instanceId.orEmpty()}",
                     initialBuffer = activeSnapshot.bufferData,
                     fontSize = fontSize,
                     theme = theme,
@@ -368,10 +375,11 @@ private fun TerminalUnavailableView(
     onOpenEditor: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(android.graphics.Color.parseColor(theme.background)))
-            .padding(24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color(android.graphics.Color.parseColor(theme.background)))
+                .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

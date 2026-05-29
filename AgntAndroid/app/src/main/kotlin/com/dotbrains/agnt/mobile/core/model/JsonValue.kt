@@ -6,11 +6,11 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
@@ -26,18 +26,30 @@ fun JsonObject.toRpcObject(): RPCObject = mapValues { (_, v) -> JSONValue.fromJs
 
 @Serializable(JSONValueSerializer::class)
 sealed class JSONValue {
-    data class Str(val value: String) : JSONValue()
+    data class Str(
+        val value: String,
+    ) : JSONValue()
 
     /** Whole JSON numbers that fit in a long (matches typical RPC payloads). */
-    data class NumLong(val value: Long) : JSONValue()
+    data class NumLong(
+        val value: Long,
+    ) : JSONValue()
 
-    data class NumDouble(val value: Double) : JSONValue()
+    data class NumDouble(
+        val value: Double,
+    ) : JSONValue()
 
-    data class Bool(val value: Boolean) : JSONValue()
+    data class Bool(
+        val value: Boolean,
+    ) : JSONValue()
 
-    data class Obj(val map: Map<String, JSONValue>) : JSONValue()
+    data class Obj(
+        val map: Map<String, JSONValue>,
+    ) : JSONValue()
 
-    data class Arr(val elements: List<JSONValue>) : JSONValue()
+    data class Arr(
+        val elements: List<JSONValue>,
+    ) : JSONValue()
 
     data object Null : JSONValue()
 

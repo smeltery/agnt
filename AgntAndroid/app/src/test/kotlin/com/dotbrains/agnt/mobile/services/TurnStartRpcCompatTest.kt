@@ -13,7 +13,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TurnStartRpcCompatTest {
-
     @Test
     fun serviceTierBridgeUpdateCommand_matchesIosRuntimeCompatPrompt() {
         assertEquals("bun install -g @dotbrains/agnt", SERVICE_TIER_BRIDGE_UPDATE_COMMAND)
@@ -95,7 +94,10 @@ class TurnStartRpcCompatTest {
                 userText = "Use this",
                 attachments = emptyList(),
                 imageUrlKey = "url",
-                skillMentions = listOf(CodexTurnSkillMention(id = "skill-builder", name = "Skill Builder", path = "/skills/skill-builder/SKILL.md")),
+                skillMentions =
+                    listOf(
+                        CodexTurnSkillMention(id = "skill-builder", name = "Skill Builder", path = "/skills/skill-builder/SKILL.md"),
+                    ),
                 fileMentions = listOf(CodexTurnMention(name = "Main.kt", path = "app/src/main/Main.kt")),
             )
 

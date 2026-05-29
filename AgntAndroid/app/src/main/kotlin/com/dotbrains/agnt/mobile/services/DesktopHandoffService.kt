@@ -115,7 +115,11 @@ class DesktopHandoffService(
         }
 
     private fun mapRpcFailure(error: AgentServiceError.RpcFailure): DesktopHandoffError {
-        val errorCode = error.rpcError.data?.objectValue?.get("errorCode")?.stringValue
+        val errorCode =
+            error.rpcError.data
+                ?.objectValue
+                ?.get("errorCode")
+                ?.stringValue
         val message =
             when (errorCode) {
                 "missing_thread_id" -> "This chat does not have a valid thread id yet."
@@ -123,7 +127,10 @@ class DesktopHandoffService(
                 "handoff_failed" -> error.rpcError.message.ifBlank { "Could not open Codex on your desktop." }
                 "wake_display_failed" -> error.rpcError.message.ifBlank { "Could not wake your computer's display right now." }
                 "saved_pair_required" -> error.rpcError.message.ifBlank { "Reconnect to your paired computer or scan a new QR code first." }
-                "unsupported_bridge_preferences" -> error.rpcError.message.ifBlank { "Update the Remodex bridge on your computer to sync this setting." }
+                "unsupported_bridge_preferences" ->
+                    error.rpcError.message.ifBlank {
+                        "Update the Remodex bridge on your computer to sync this setting."
+                    }
                 "invalid_bridge_preferences" -> error.rpcError.message.ifBlank { "The computer bridge rejected this setting update." }
                 else -> error.rpcError.message.ifBlank { "Could not continue this chat on your desktop." }
             }

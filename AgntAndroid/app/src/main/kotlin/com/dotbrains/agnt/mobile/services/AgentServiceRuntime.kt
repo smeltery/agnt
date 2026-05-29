@@ -25,18 +25,20 @@ internal suspend fun AgentService.refreshModelsInternal() {
                         ),
                     ),
             )
-        val result = response.result?.objectValue
-            ?: throw AgentServiceError.InvalidResponse("model/list missing result")
+        val result =
+            response.result?.objectValue
+                ?: throw AgentServiceError.InvalidResponse("model/list missing result")
         val items =
             result["items"]?.arrayValue
                 ?: result["data"]?.arrayValue
                 ?: result["models"]?.arrayValue
                 ?: emptyList()
         val decoded =
-            items.mapNotNull { item ->
-                val obj = item as? JSONValue.Obj ?: return@mapNotNull null
-                runCatching { CodexModelOption.fromJsonObject(jsonObjectFromRpc(obj)) }.getOrNull()
-            }.filter { it.model.isNotBlank() || it.id.isNotBlank() }
+            items
+                .mapNotNull { item ->
+                    val obj = item as? JSONValue.Obj ?: return@mapNotNull null
+                    runCatching { CodexModelOption.fromJsonObject(jsonObjectFromRpc(obj)) }.getOrNull()
+                }.filter { it.model.isNotBlank() || it.id.isNotBlank() }
 
         _availableModels.value = decoded
         _modelsErrorMessage.value = null
@@ -92,7 +94,11 @@ internal fun AgentService.selectedModelOption(): CodexModelOption? {
 
 internal fun AgentService.runtimeModelIdentifierForTurn(threadId: String): String? =
     selectedModelOption()?.model?.trim()?.takeIf { it.isNotEmpty() }
-        ?: _threads.value.firstOrNull { it.id == threadId }?.model?.trim()?.takeIf { it.isNotEmpty() }
+        ?: _threads.value
+            .firstOrNull { it.id == threadId }
+            ?.model
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
 internal fun AgentService.selectedReasoningEffortForSelectedModel(): String? {
     val model = selectedModelOption() ?: return null

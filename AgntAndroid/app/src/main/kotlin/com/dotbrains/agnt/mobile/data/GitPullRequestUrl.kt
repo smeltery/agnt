@@ -23,8 +23,7 @@ fun agntBuildPullRequestUrl(
     return "https://github.com/$ownerRepo/compare/$encodedBase...$encodedBranch?quick_pull=1&title=$t&body=$b"
 }
 
-private fun urlEncodeQuery(value: String): String =
-    URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
+private fun urlEncodeQuery(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
 
 private fun urlEncodePath(value: String): String =
     value.split("/").joinToString("/") { segment ->

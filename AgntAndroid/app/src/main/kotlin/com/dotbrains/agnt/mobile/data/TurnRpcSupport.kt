@@ -8,16 +8,44 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
  */
 internal fun extractTurnIdFromRpcResult(result: JSONValue?): String? {
     val m = (result as? JSONValue.Obj)?.map ?: return null
-    m["turnId"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-    m["turn_id"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    m["turnId"]
+        ?.stringValue
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { return it }
+    m["turn_id"]
+        ?.stringValue
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { return it }
     (m["turn"] as? JSONValue.Obj)?.map?.let { turn ->
-        turn["id"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        turn["turnId"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        turn["turn_id"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        turn["id"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        turn["turnId"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        turn["turn_id"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
     }
     (m["item"] as? JSONValue.Obj)?.map?.let { item ->
-        item["turnId"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        item["turn_id"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        item["turnId"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        item["turn_id"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
     }
     return null
 }

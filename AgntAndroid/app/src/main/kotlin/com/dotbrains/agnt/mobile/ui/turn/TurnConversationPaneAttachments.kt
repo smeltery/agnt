@@ -5,8 +5,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexFileAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import java.io.ByteArrayOutputStream
 
-internal fun List<TurnComposerAttachment>.withLoadingAttachment(attachmentId: String): List<TurnComposerAttachment> =
-    this + TurnComposerAttachment(attachmentId, TurnComposerAttachmentState.Loading)
+internal fun List<TurnComposerAttachment>.withLoadingAttachment(attachmentId: String): List<TurnComposerAttachment> = this + TurnComposerAttachment(attachmentId, TurnComposerAttachmentState.Loading)
 
 internal fun List<TurnComposerAttachment>.withImageAttachmentResult(
     attachmentId: String,

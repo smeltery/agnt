@@ -11,8 +11,8 @@ import com.dotbrains.agnt.mobile.core.terminal.TerminalPrivateKeyStore
 import com.dotbrains.agnt.mobile.core.terminal.TerminalProfileStore
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.services.AgentService
-import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 /** Application-wide services (secure store, persistence, OkHttp, bridge client). */
 object AppContainer {
@@ -71,7 +71,8 @@ object AppContainer {
         aiChangeSetPersistence = AIChangeSetPersistence(app)
         sessionPersistence = SessionPersistence(secureStore, app)
         httpCallClient =
-            OkHttpClient.Builder()
+            OkHttpClient
+                .Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .writeTimeout(20, TimeUnit.SECONDS)
@@ -79,7 +80,8 @@ object AppContainer {
                 .retryOnConnectionFailure(false)
                 .build()
         httpClient =
-            httpCallClient.newBuilder()
+            httpCallClient
+                .newBuilder()
                 .pingInterval(30, TimeUnit.SECONDS)
                 .readTimeout(0, TimeUnit.SECONDS)
                 .callTimeout(0, TimeUnit.SECONDS)

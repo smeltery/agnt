@@ -211,11 +211,12 @@ class SidebarThreadGroupingTest {
         val group = SidebarThreadGrouping.makeGroups(threads).first { it.kind == SidebarThreadGroupKind.Project }
 
         val limited =
-            SidebarThreadGrouping.applyGroupLimit(
-                groups = listOf(group),
-                limit = 5,
-                expandedGroupIds = setOf(group.id),
-            ).first()
+            SidebarThreadGrouping
+                .applyGroupLimit(
+                    groups = listOf(group),
+                    limit = 5,
+                    expandedGroupIds = setOf(group.id),
+                ).first()
 
         assertEquals(7, limited.visibleThreads.size)
         assertEquals(0, limited.hiddenCount)
@@ -234,11 +235,12 @@ class SidebarThreadGroupingTest {
         val group = SidebarThreadGrouping.makeGroups(threads).first { it.kind == SidebarThreadGroupKind.Project }
 
         val limited =
-            SidebarThreadGrouping.applyGroupLimit(
-                groups = listOf(group),
-                limit = 5,
-                pinnedThreadIds = setOf("t1"),
-            ).first()
+            SidebarThreadGrouping
+                .applyGroupLimit(
+                    groups = listOf(group),
+                    limit = 5,
+                    pinnedThreadIds = setOf("t1"),
+                ).first()
 
         assertTrue(limited.visibleThreads.map { it.id }.contains("t1"))
         assertEquals(6, limited.visibleThreads.size)

@@ -7,8 +7,7 @@ object ThemePreferences {
     /** Matches [AppFontPreferences] so one SharedPreferences file drives UI options. */
     internal const val PREFS_NAME: String = "remodex_ui"
 
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun read(context: Context): AppThemePreference {
         val raw = prefs(context).getString(AppThemePreference.storageKey, null)

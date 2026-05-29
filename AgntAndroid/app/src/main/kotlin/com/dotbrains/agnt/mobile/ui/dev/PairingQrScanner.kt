@@ -40,7 +40,8 @@ fun PairingQrScanner(
     val barcodeScanner =
         remember {
             BarcodeScanning.getClient(
-                BarcodeScannerOptions.Builder()
+                BarcodeScannerOptions
+                    .Builder()
                     .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
                     .build(),
             )
@@ -73,11 +74,13 @@ fun PairingQrScanner(
                     return@Runnable
                 }
                 val preview =
-                    Preview.Builder()
+                    Preview
+                        .Builder()
                         .build()
                         .also { it.surfaceProvider = previewView.surfaceProvider }
                 val analysis =
-                    ImageAnalysis.Builder()
+                    ImageAnalysis
+                        .Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                 analysis.setAnalyzer(analysisExecutor) { imageProxy ->
@@ -99,14 +102,14 @@ fun PairingQrScanner(
                         .process(input)
                         .addOnSuccessListener { barcodes ->
                             val raw =
-                                barcodes.firstNotNullOfOrNull { it.rawValue }
+                                barcodes
+                                    .firstNotNullOfOrNull { it.rawValue }
                                     ?.trim()
                                     .orEmpty()
                             if (raw.startsWith("{") && decoded.compareAndSet(false, true)) {
                                 mainExecutor.execute { onDecodedPayload(raw) }
                             }
-                        }
-                        .addOnCompleteListener { imageProxy.close() }
+                        }.addOnCompleteListener { imageProxy.close() }
                 }
                 try {
                     provider.unbindAll()

@@ -37,14 +37,33 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
+      # Style gate: ktlint with our editorconfig overrides. Runs before tests
+      # so a style-only PR fails fast rather than burning ~30s on Kotlin
+      # compile + unit-test work that won't be merged anyway.
+      - name: ktlint
+        working-directory: AgntAndroid
+        run: ./gradlew :app:ktlintCheck --no-daemon
+
       - name: Run unit tests
         working-directory: AgntAndroid
         run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       # `assembleDebug` is the cheapest signal that the Kotlin compile, the
-      # resources, and the build script all hang together. We don't upload the
-      # artifact — for that there's a separate signed-build workflow once
-      # release signing is set up.
+      # resources, and the build script all hang together. A separate signed-
+      # build workflow handles release artifacts once release signing is set
+      # up; the unsigned debug APK below is for PR-side smoke-testing only.
       - name: Assemble debug
         working-directory: AgntAndroid
         run: ./gradlew :app:assembleDebug --no-daemon
+
+      # Unsigned debug APK so reviewers can install a PR build on a device
+      # without recompiling locally. Skipped on push events (the artifact
+      # would just shadow the released signed build).
+      - name: Upload debug APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agnt-debug-${{ github.event.pull_request.number }}
+          path: AgntAndroid/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

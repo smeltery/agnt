@@ -3,8 +3,8 @@ package com.dotbrains.agnt.mobile.services
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitWindow
 import com.dotbrains.agnt.mobile.core.model.JSONValue
-import kotlin.test.assertEquals
 import org.junit.Test
+import kotlin.test.assertEquals
 
 class RateLimitPayloadCodecTest {
     @Test

@@ -11,7 +11,6 @@ import com.dotbrains.agnt.mobile.ui.design.GenerationStepStatus
 import kotlinx.coroutines.delay
 
 class MockDesignRepository : DesignRepository {
-
     override suspend fun generateDesign(
         projectId: String,
         prompt: String,
@@ -19,16 +18,17 @@ class MockDesignRepository : DesignRepository {
     ): GenerationState {
         val genId = "gen_${System.currentTimeMillis()}"
         val docId = "doc_${System.currentTimeMillis()}"
-        val snapshotUrl = "https://picsum.photos/seed/${docId}/800/600"
+        val snapshotUrl = "https://picsum.photos/seed/$docId/800/600"
 
-        val steps = listOf(
-            GenerationStep("Understanding prompt", GenerationStepStatus.PENDING),
-            GenerationStep("Creating layout", GenerationStepStatus.PENDING),
-            GenerationStep("Adding components", GenerationStepStatus.PENDING),
-            GenerationStep("Styling screen", GenerationStepStatus.PENDING),
-            GenerationStep("Rendering preview", GenerationStepStatus.PENDING),
-            GenerationStep("Creating snapshot", GenerationStepStatus.PENDING),
-        )
+        val steps =
+            listOf(
+                GenerationStep("Understanding prompt", GenerationStepStatus.PENDING),
+                GenerationStep("Creating layout", GenerationStepStatus.PENDING),
+                GenerationStep("Adding components", GenerationStepStatus.PENDING),
+                GenerationStep("Styling screen", GenerationStepStatus.PENDING),
+                GenerationStep("Rendering preview", GenerationStepStatus.PENDING),
+                GenerationStep("Creating snapshot", GenerationStepStatus.PENDING),
+            )
 
         val stepLabels = steps.map { it.label }
         for (i in stepLabels.indices) {
@@ -45,26 +45,24 @@ class MockDesignRepository : DesignRepository {
         )
     }
 
-    override suspend fun getGenerationStatus(generationId: String): GenerationState {
-        return GenerationState(
+    override suspend fun getGenerationStatus(generationId: String): GenerationState =
+        GenerationState(
             generationId = generationId,
             status = "done",
             steps = listOf(),
         )
-    }
 
-    override suspend fun getDocument(documentId: String): DesignDocument {
-        return DesignDocument(
+    override suspend fun getDocument(documentId: String): DesignDocument =
+        DesignDocument(
             id = documentId,
             projectId = "mock_project",
             version = 1,
             opFileUrl = null,
             localOpJson = null,
-            snapshotUrl = "https://picsum.photos/seed/${documentId}/800/600",
+            snapshotUrl = "https://picsum.photos/seed/$documentId/800/600",
             thumbnailUrl = null,
             status = DesignDocumentStatus.READY,
         )
-    }
 
     override suspend fun editDocument(
         documentId: String,
@@ -73,15 +71,16 @@ class MockDesignRepository : DesignRepository {
     ): GenerationState {
         delay(1200)
         val newVersion = 2
-        val snapshotUrl = "https://picsum.photos/seed/${documentId}_v${newVersion}/800/600"
+        val snapshotUrl = "https://picsum.photos/seed/${documentId}_v$newVersion/800/600"
 
         return GenerationState(
             generationId = "edit_${System.currentTimeMillis()}",
             status = "done",
-            steps = listOf(
-                GenerationStep("Applying edit", GenerationStepStatus.DONE),
-                GenerationStep("Rendering preview", GenerationStepStatus.DONE),
-            ),
+            steps =
+                listOf(
+                    GenerationStep("Applying edit", GenerationStepStatus.DONE),
+                    GenerationStep("Rendering preview", GenerationStepStatus.DONE),
+                ),
             documentId = documentId,
             documentVersion = newVersion,
             snapshotUrl = snapshotUrl,
@@ -94,43 +93,49 @@ class MockDesignRepository : DesignRepository {
     ): ExportResult {
         delay(800)
 
-        val files = when (target) {
-            ExportTarget.JETPACK_COMPOSE -> listOf(
-                ExportFile(
-                    path = "OnboardingScreen.kt",
-                    language = "kotlin",
-                    content = composeStub(),
-                ),
-            )
-            ExportTarget.REACT_NATIVE -> listOf(
-                ExportFile(
-                    path = "OnboardingScreen.tsx",
-                    language = "typescript",
-                    content = reactNativeStub(),
-                ),
-            )
-            ExportTarget.FLUTTER -> listOf(
-                ExportFile(
-                    path = "onboarding_screen.dart",
-                    language = "dart",
-                    content = flutterStub(),
-                ),
-            )
-            ExportTarget.REACT_TAILWIND -> listOf(
-                ExportFile(
-                    path = "OnboardingScreen.tsx",
-                    language = "typescript",
-                    content = reactTailwindStub(),
-                ),
-            )
-            ExportTarget.HTML_CSS -> listOf(
-                ExportFile(
-                    path = "index.html",
-                    language = "html",
-                    content = htmlCssStub(),
-                ),
-            )
-        }
+        val files =
+            when (target) {
+                ExportTarget.JETPACK_COMPOSE ->
+                    listOf(
+                        ExportFile(
+                            path = "OnboardingScreen.kt",
+                            language = "kotlin",
+                            content = composeStub(),
+                        ),
+                    )
+                ExportTarget.REACT_NATIVE ->
+                    listOf(
+                        ExportFile(
+                            path = "OnboardingScreen.tsx",
+                            language = "typescript",
+                            content = reactNativeStub(),
+                        ),
+                    )
+                ExportTarget.FLUTTER ->
+                    listOf(
+                        ExportFile(
+                            path = "onboarding_screen.dart",
+                            language = "dart",
+                            content = flutterStub(),
+                        ),
+                    )
+                ExportTarget.REACT_TAILWIND ->
+                    listOf(
+                        ExportFile(
+                            path = "OnboardingScreen.tsx",
+                            language = "typescript",
+                            content = reactTailwindStub(),
+                        ),
+                    )
+                ExportTarget.HTML_CSS ->
+                    listOf(
+                        ExportFile(
+                            path = "index.html",
+                            language = "html",
+                            content = htmlCssStub(),
+                        ),
+                    )
+            }
 
         return ExportResult(
             exportId = "exp_${System.currentTimeMillis()}",
@@ -138,7 +143,8 @@ class MockDesignRepository : DesignRepository {
         )
     }
 
-    private fun composeStub(): String = """
+    private fun composeStub(): String =
+        """
 @Composable
 fun OnboardingScreen(onGetStarted: () -> Unit) {
     Column(
@@ -156,9 +162,10 @@ fun OnboardingScreen(onGetStarted: () -> Unit) {
         }
     }
 }
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun reactNativeStub(): String = """
+    private fun reactNativeStub(): String =
+        """
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
@@ -179,9 +186,10 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   buttonText: { color: '#fff', fontSize: 16 },
 });
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun flutterStub(): String = """
+    private fun flutterStub(): String =
+        """
 import 'package:flutter/material.dart';
 
 class OnboardingScreen extends StatelessWidget {
@@ -208,9 +216,10 @@ class OnboardingScreen extends StatelessWidget {
     );
   }
 }
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun reactTailwindStub(): String = """
+    private fun reactTailwindStub(): String =
+        """
 export default function OnboardingScreen({ onGetStarted }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6">
@@ -224,9 +233,10 @@ export default function OnboardingScreen({ onGetStarted }) {
     </div>
   );
 }
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun htmlCssStub(): String = """
+    private fun htmlCssStub(): String =
+        """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -247,5 +257,5 @@ export default function OnboardingScreen({ onGetStarted }) {
   </div>
 </body>
 </html>
-    """.trimIndent()
+        """.trimIndent()
 }

@@ -1,11 +1,11 @@
 package com.dotbrains.agnt.mobile.core.model
 
-import java.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import java.time.Instant
 
 enum class CodexThreadSyncState {
     live,
@@ -252,8 +252,7 @@ data class CodexThread(
                 windowsDrivePathRegex.matches(value) ||
                 value.startsWith("\\\\")
 
-        private fun isAdHocCodexCwd(cwd: String): Boolean =
-            adHocCodexCwdPatterns.any { it.containsMatchIn(cwd) }
+        private fun isAdHocCodexCwd(cwd: String): Boolean = adHocCodexCwdPatterns.any { it.containsMatchIn(cwd) }
 
         fun isGenericPlaceholderTitle(value: String?): Boolean {
             val trimmed = value?.trim()?.takeIf { it.isNotEmpty() } ?: return false
@@ -445,4 +444,8 @@ private fun JsonObject.stringOrThrow(key: String): String =
         ?: error("Missing key $key")
 
 private fun JsonObject.stringOrNull(key: String): String? =
-    this[key]?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotEmpty() }
+    this[key]
+        ?.jsonPrimitive
+        ?.content
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }

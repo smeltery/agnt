@@ -8,8 +8,7 @@ internal class TimelineBoundedCache<K, V>(
 ) {
     private val entries =
         object : LinkedHashMap<K, V>(maxEntries, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean =
-                size > maxEntries
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean = size > maxEntries
         }
 
     init {

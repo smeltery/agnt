@@ -5,13 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -70,11 +69,12 @@ internal fun StructuredInputDialog(
                 selectedOptionByQuestionId = selectedOptionByQuestionId,
             )
         } ?: true
-    val payload = buildStructuredInputAnswersPayload(
-        questions = questions,
-        typedAnswersByQuestionId = typedAnswersByQuestionId,
-        selectedOptionByQuestionId = selectedOptionByQuestionId,
-    )
+    val payload =
+        buildStructuredInputAnswersPayload(
+            questions = questions,
+            typedAnswersByQuestionId = typedAnswersByQuestionId,
+            selectedOptionByQuestionId = selectedOptionByQuestionId,
+        )
     val canSubmit = !isSubmitting && !hasSubmittedResponse && payload != null
     val canAdvance = !isSubmitting && !hasSubmittedResponse && activeQuestionAnswered
     val showStepper = questions.size > 1
@@ -122,27 +122,30 @@ internal fun StructuredInputDialog(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = stringResourceOrDefault(
-                            request.questions.firstOrNull()?.header,
-                            R.string.structured_input_default_title,
-                        ),
+                        text =
+                            stringResourceOrDefault(
+                                request.questions.firstOrNull()?.header,
+                                R.string.structured_input_default_title,
+                            ),
                         style = MaterialTheme.typography.titleLarge,
                     )
                     Text(
-                        text = stringResourceOrDefault(
-                            request.questions.firstOrNull()?.question,
-                            R.string.structured_input_default_body,
-                        ),
+                        text =
+                            stringResourceOrDefault(
+                                request.questions.firstOrNull()?.question,
+                                R.string.structured_input_default_body,
+                            ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (showStepper && activeQuestion != null) {
                         Text(
-                            text = androidx.compose.ui.res.stringResource(
-                                R.string.structured_input_question_n_of_m,
-                                currentQuestionIndex + 1,
-                                questions.size,
-                            ),
+                            text =
+                                androidx.compose.ui.res.stringResource(
+                                    R.string.structured_input_question_n_of_m,
+                                    currentQuestionIndex + 1,
+                                    questions.size,
+                                ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -160,7 +163,9 @@ internal fun StructuredInputDialog(
                 ) {
                     if (activeQuestion == null) {
                         Text(
-                            text = androidx.compose.ui.res.stringResource(R.string.structured_input_default_body),
+                            text =
+                                androidx.compose.ui.res
+                                    .stringResource(R.string.structured_input_default_body),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -186,26 +191,32 @@ internal fun StructuredInputDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                        TextButton(
-                            enabled = !isSubmitting && !hasSubmittedResponse,
-                            onClick = { skipRequest() },
-                        ) {
-                            Text(
-                                text =
-                                    if (isSubmitting && !hasSubmittedResponse) {
-                                        androidx.compose.ui.res.stringResource(R.string.structured_input_skipping)
-                                    } else {
-                                        androidx.compose.ui.res.stringResource(R.string.structured_input_skip)
-                                    },
-                            )
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
+                    TextButton(
+                        enabled = !isSubmitting && !hasSubmittedResponse,
+                        onClick = { skipRequest() },
+                    ) {
+                        Text(
+                            text =
+                                if (isSubmitting && !hasSubmittedResponse) {
+                                    androidx.compose.ui.res
+                                        .stringResource(R.string.structured_input_skipping)
+                                } else {
+                                    androidx.compose.ui.res
+                                        .stringResource(R.string.structured_input_skip)
+                                },
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
                     if (showStepper && currentQuestionIndex > 0) {
                         TextButton(
                             enabled = !isSubmitting && !hasSubmittedResponse,
                             onClick = { currentQuestionIndex -= 1 },
                         ) {
-                            Text(text = androidx.compose.ui.res.stringResource(R.string.structured_input_previous))
+                            Text(
+                                text =
+                                    androidx.compose.ui.res
+                                        .stringResource(R.string.structured_input_previous),
+                            )
                         }
                     }
                     if (showStepper && activeQuestion != null && currentQuestionIndex < lastQuestionIndex) {
@@ -213,7 +224,11 @@ internal fun StructuredInputDialog(
                             enabled = canAdvance,
                             onClick = { currentQuestionIndex += 1 },
                         ) {
-                            Text(text = androidx.compose.ui.res.stringResource(R.string.structured_input_next))
+                            Text(
+                                text =
+                                    androidx.compose.ui.res
+                                        .stringResource(R.string.structured_input_next),
+                            )
                         }
                     } else {
                         TextButton(
@@ -226,9 +241,17 @@ internal fun StructuredInputDialog(
                                     strokeWidth = 2.dp,
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = androidx.compose.ui.res.stringResource(R.string.structured_input_sending))
+                                Text(
+                                    text =
+                                        androidx.compose.ui.res
+                                            .stringResource(R.string.structured_input_sending),
+                                )
                             } else {
-                                Text(text = androidx.compose.ui.res.stringResource(R.string.structured_input_send))
+                                Text(
+                                    text =
+                                        androidx.compose.ui.res
+                                            .stringResource(R.string.structured_input_send),
+                                )
                             }
                         }
                     }
@@ -285,7 +308,13 @@ private fun StructuredInputQuestionPage(
             onValueChange = onTypedValueChange,
             enabled = !isBusy,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(text = androidx.compose.ui.res.stringResource(R.string.structured_input_field_label)) },
+            label = {
+                Text(
+                    text =
+                        androidx.compose.ui.res
+                            .stringResource(R.string.structured_input_field_label),
+                )
+            },
             singleLine = false,
             minLines = 2,
             maxLines = 4,
@@ -366,7 +395,8 @@ internal fun shouldMaskStructuredInput(question: PendingStructuredInputQuestion)
 @Composable
 private fun structuredInputQuestionTitle(question: PendingStructuredInputQuestion): String =
     question.header.trim().ifBlank {
-        androidx.compose.ui.res.stringResource(R.string.structured_input_default_title)
+        androidx.compose.ui.res
+            .stringResource(R.string.structured_input_default_title)
     }
 
 @Composable
@@ -376,6 +406,10 @@ private fun structuredInputQuestionBody(question: PendingStructuredInputQuestion
     }
 
 @Composable
-private fun stringResourceOrDefault(value: String?, fallbackResId: Int): String =
+private fun stringResourceOrDefault(
+    value: String?,
+    fallbackResId: Int,
+): String =
     value?.trim()?.takeIf { it.isNotEmpty() }
-        ?: androidx.compose.ui.res.stringResource(fallbackResId)
+        ?: androidx.compose.ui.res
+            .stringResource(fallbackResId)

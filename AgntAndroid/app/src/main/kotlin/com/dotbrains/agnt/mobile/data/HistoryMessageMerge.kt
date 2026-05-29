@@ -10,8 +10,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
  * Simplified vs iOS [AgentService.mergeHistoryMessages] but same keying idea.
  */
 internal object HistoryMessageMerge {
-    fun normalize(messages: List<CodexMessage>): List<CodexMessage> =
-        messages.dedupeCompatibleUserChats()
+    fun normalize(messages: List<CodexMessage>): List<CodexMessage> = messages.dedupeCompatibleUserChats()
 
     fun merge(
         existing: List<CodexMessage>,
@@ -103,9 +102,10 @@ internal object HistoryMessageMerge {
                 }
             }
 
-            val duplicateFileChangeIndex = merged.indexOfLast { existingMessage ->
-                isCompatibleFileChangeDuplicate(existingMessage, m)
-            }
+            val duplicateFileChangeIndex =
+                merged.indexOfLast { existingMessage ->
+                    isCompatibleFileChangeDuplicate(existingMessage, m)
+                }
             if (duplicateFileChangeIndex >= 0) {
                 val current = merged[duplicateFileChangeIndex]
                 keys.remove(historyKey(current))
@@ -115,9 +115,10 @@ internal object HistoryMessageMerge {
                 continue
             }
 
-            val duplicateUserIndex = merged.indexOfLast { existingMessage ->
-                isCompatibleUserChatDuplicate(existingMessage, m)
-            }
+            val duplicateUserIndex =
+                merged.indexOfLast { existingMessage ->
+                    isCompatibleUserChatDuplicate(existingMessage, m)
+                }
             if (duplicateUserIndex >= 0) {
                 val current = merged[duplicateUserIndex]
                 keys.remove(historyKey(current))
@@ -279,11 +280,9 @@ internal object HistoryMessageMerge {
     private fun compatibleAttachments(
         existing: CodexMessage,
         incoming: CodexMessage,
-    ): Boolean =
-        UserChatAttachmentMatcher.compatible(existing.attachments, incoming.attachments)
+    ): Boolean = UserChatAttachmentMatcher.compatible(existing.attachments, incoming.attachments)
 
-    private fun normalizedMessageText(text: String): String =
-        text.trim().replace("\\s+".toRegex(), " ")
+    private fun normalizedMessageText(text: String): String = text.trim().replace("\\s+".toRegex(), " ")
 
     private fun isFileChangePlaceholder(text: String): Boolean =
         text.trim().equals("[file change]", ignoreCase = true) ||

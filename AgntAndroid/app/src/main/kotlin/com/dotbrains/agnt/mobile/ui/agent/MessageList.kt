@@ -1,7 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.agent
 
 import android.content.ClipData
-import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,21 +18,22 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -50,8 +50,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.valentinilk.shimmer.shimmer
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.AIChangeSet
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
@@ -60,7 +58,9 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
 import com.dotbrains.agnt.mobile.ui.turn.TurnMessageRow
 import com.dotbrains.agnt.mobile.ui.turn.TurnTimelineGroupedRunsRow
+import com.valentinilk.shimmer.shimmer
 import kotlinx.coroutines.launch
+import com.composables.icons.lucide.R as LucideR
 
 private val MessageListTopFadeStart = 108.dp
 private val MessageListTopFadeLength = 76.dp
@@ -262,10 +262,11 @@ fun MessageList(
                                         if (copyEnabled) {
                                             scope.launch {
                                                 clipboard.setClipEntry(
-                                                    ClipData.newPlainText(
-                                                        copyActionLabel,
-                                                        lastAssistantText,
-                                                    ).toClipEntry(),
+                                                    ClipData
+                                                        .newPlainText(
+                                                            copyActionLabel,
+                                                            lastAssistantText,
+                                                        ).toClipEntry(),
                                                 )
                                             }
                                         }
@@ -295,7 +296,7 @@ fun MessageList(
                                                 MaterialTheme.colorScheme.onSurfaceVariant
                                             } else {
                                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                        },
+                                            },
                                     )
                                 }
                                 IconButton(
@@ -346,8 +347,7 @@ private fun Modifier.topContentFadeMask(
     this
         .graphicsLayer {
             compositingStrategy = CompositingStrategy.Offscreen
-        }
-        .drawWithContent {
+        }.drawWithContent {
             drawContent()
             if (size.height <= 0f) return@drawWithContent
             val height = size.height
@@ -411,8 +411,7 @@ private fun TimelineListItemContent(
     }
 }
 
-private fun CodexMessage.timelineContentType(): String =
-    "${role.name}_${kind.name}"
+private fun CodexMessage.timelineContentType(): String = "${role.name}_${kind.name}"
 
 internal fun shouldShowAssistantTrailingActions(
     lastAssistantMessage: CodexMessage?,
@@ -509,8 +508,7 @@ private fun TransientActivityStatusRow(
                 .background(
                     color = colors.surfaceVariant.copy(alpha = 0.16f),
                     shape = RoundedCornerShape(8.dp),
-                )
-                .padding(horizontal = 10.dp, vertical = 7.dp)
+                ).padding(horizontal = 10.dp, vertical = 7.dp)
                 .shimmer(),
         verticalAlignment = Alignment.CenterVertically,
     ) {

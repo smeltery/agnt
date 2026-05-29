@@ -22,9 +22,10 @@ internal fun dampScrollDelta(
     maxSensitivity: Float = 1.00f,
 ): Float {
     val t =
-        ((speedPxPerSecond - lowSpeedPxPerSecond) /
-            (highSpeedPxPerSecond - lowSpeedPxPerSecond))
-            .coerceIn(0f, 1f)
+        (
+            (speedPxPerSecond - lowSpeedPxPerSecond) /
+                (highSpeedPxPerSecond - lowSpeedPxPerSecond)
+        ).coerceIn(0f, 1f)
 
     val eased = t * t
     val sensitivity = maxSensitivity - ((maxSensitivity - minSensitivity) * eased)
@@ -89,9 +90,7 @@ internal fun rememberChatScrollPacingNestedScrollConnection(
 }
 
 @Composable
-internal fun rememberCappedChatFlingBehavior(
-    maxFlingVelocityPxPerSecond: Float = 3000f,
-): FlingBehavior {
+internal fun rememberCappedChatFlingBehavior(maxFlingVelocityPxPerSecond: Float = 3000f): FlingBehavior {
     val defaultFlingBehavior = ScrollableDefaults.flingBehavior()
 
     return remember(defaultFlingBehavior, maxFlingVelocityPxPerSecond) {

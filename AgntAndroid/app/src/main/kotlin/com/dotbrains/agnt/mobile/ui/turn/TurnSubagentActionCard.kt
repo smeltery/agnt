@@ -26,11 +26,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.data.TurnSubagentAgentPresentation
 import com.dotbrains.agnt.mobile.data.TurnTimelineRichContentCache
 import com.dotbrains.agnt.mobile.ui.theme.AgntGitAddition
+import com.composables.icons.lucide.R as LucideR
 
 @Composable
 internal fun TurnSubagentActionCard(
@@ -343,7 +343,10 @@ private fun parseSubagentLabel(label: String): SubagentLabelParts {
     )
 }
 
-private fun subagentAccentColor(name: String, fallback: Color): Color {
+private fun subagentAccentColor(
+    name: String,
+    fallback: Color,
+): Color {
     val accents =
         listOf(
             Color(0xFFE64D4D),
@@ -423,8 +426,8 @@ private fun readableSubagentStatus(
     }
 }
 
-private fun normalizedStatusLabel(rawStatus: String?): String {
-    return when (
+private fun normalizedStatusLabel(rawStatus: String?): String =
+    when (
         rawStatus
             ?.trim()
             ?.lowercase()
@@ -439,4 +442,3 @@ private fun normalizedStatusLabel(rawStatus: String?): String {
         "queued", "pending" -> "queued"
         else -> "idle"
     }
-}

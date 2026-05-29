@@ -11,4 +11,3 @@ class TurnTimelineCacheKeyTest {
         assertNotEquals(first, second)
     }
 }
-

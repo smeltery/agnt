@@ -6,7 +6,6 @@ package com.dotbrains.agnt.mobile.ui.turn
  * - **Speed** section listing “Normal” (`[TURN_COMPOSER_RUNTIME_AUTO_ID]`) plus each configured service tier row.
  */
 internal object TurnComposerRuntimeToolbarMenuBuilder {
-
     fun build(
         labels: TurnComposerToolbarLabels = TurnComposerToolbarLabels(),
         runtime: TurnComposerRuntimeControlsState,

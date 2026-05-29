@@ -37,7 +37,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.dotbrains.agnt.mobile.R
 
 /**
  * One-time intro before first QR scan. Mirrors the iOS paged, dark setup flow.
@@ -75,8 +74,7 @@ fun OnboardingScreen(
                         Brush.verticalGradient(
                             listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f), Color.Black),
                         ),
-                    )
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                    ).padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {

@@ -72,7 +72,8 @@ internal object TurnAttachmentCodec {
         if (!metadata.startsWith("data:image") || !metadata.contains(";base64")) return null
         val base64Part = dataUri.substring(commaIndex + 1)
         if (base64Part.length > encodedBase64Limit(MAX_ATTACHMENT_BYTES)) return null
-        return runCatching { Base64.decode(base64Part, Base64.DEFAULT) }.getOrNull()
+        return runCatching { Base64.decode(base64Part, Base64.DEFAULT) }
+            .getOrNull()
             ?.takeIf { it.size <= MAX_ATTACHMENT_BYTES }
     }
 
@@ -154,8 +155,7 @@ internal object TurnAttachmentCodec {
         return out.toByteArray()
     }
 
-    private fun encodedBase64Limit(decodedBytes: Int): Int =
-        ((decodedBytes + 2) / 3) * 4 + 128
+    private fun encodedBase64Limit(decodedBytes: Int): Int = ((decodedBytes + 2) / 3) * 4 + 128
 
     private fun calculateInSampleSize(
         width: Int,

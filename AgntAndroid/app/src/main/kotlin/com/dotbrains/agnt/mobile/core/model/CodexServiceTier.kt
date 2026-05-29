@@ -4,7 +4,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class CodexServiceTier {
-    fast;
+    fast,
+    ;
 
     val displayName: String
         get() =

@@ -34,20 +34,25 @@ import java.util.concurrent.atomic.AtomicReference
 class NativeSshTerminal(
     private val knownHostStore: TerminalKnownHostStore,
 ) {
-    sealed class TerminalError(message: String) : Exception(message) {
+    sealed class TerminalError(
+        message: String,
+    ) : Exception(message) {
         object MissingPrivateKey :
             TerminalError("Paste your SSH private key before connecting.")
 
         object HostKeyChanged :
             TerminalError("The SSH host key changed. Check the host before reconnecting.")
 
-        class UnsupportedPrivateKey(reason: String) :
-            TerminalError("This SSH key type is not supported yet: $reason. Use an Ed25519, ECDSA, or RSA private key.")
+        class UnsupportedPrivateKey(
+            reason: String,
+        ) : TerminalError("This SSH key type is not supported yet: $reason. Use an Ed25519, ECDSA, or RSA private key.")
 
         object SessionNotRunning :
             TerminalError("The SSH terminal is not running.")
 
-        class Network(message: String) : TerminalError(message)
+        class Network(
+            message: String,
+        ) : TerminalError(message)
     }
 
     fun interface OutputSink {
@@ -192,7 +197,10 @@ class NativeSshTerminal(
         }
     }
 
-    suspend fun resize(cols: Int, rows: Int) {
+    suspend fun resize(
+        cols: Int,
+        rows: Int,
+    ) {
         val current = active.get() ?: return
         withContext(Dispatchers.IO) {
             runCatching {
@@ -238,7 +246,9 @@ class NativeSshTerminal(
         }
     }
 
-    private class FixedPassphrase(passphrase: String) : PasswordFinder {
+    private class FixedPassphrase(
+        passphrase: String,
+    ) : PasswordFinder {
         private val chars: CharArray = passphrase.toCharArray()
 
         override fun reqPassword(resource: Resource<*>?): CharArray = chars.copyOf()
@@ -251,7 +261,11 @@ class NativeSshTerminal(
         private val host: String,
         private val port: Int,
     ) : HostKeyVerifier {
-        override fun verify(hostname: String?, p1: Int, key: PublicKey?): Boolean {
+        override fun verify(
+            hostname: String?,
+            p1: Int,
+            key: PublicKey?,
+        ): Boolean {
             if (key == null) return false
             val encoded = encodeOpenSshPublicKey(key) ?: return false
             val stored = store.load(host, port)
@@ -265,7 +279,10 @@ class NativeSshTerminal(
             }
         }
 
-        override fun findExistingAlgorithms(hostname: String?, p1: Int): MutableList<String> = mutableListOf()
+        override fun findExistingAlgorithms(
+            hostname: String?,
+            p1: Int,
+        ): MutableList<String> = mutableListOf()
 
         private fun encodeOpenSshPublicKey(key: PublicKey): String? =
             runCatching {
@@ -273,7 +290,7 @@ class NativeSshTerminal(
                 val buffer = Buffer.PlainBuffer()
                 keyType.putPubKeyIntoBuffer(key, buffer)
                 val base64 = Base64.encodeToString(buffer.compactData, Base64.NO_WRAP)
-                "${keyType.toString()} $base64"
+                "$keyType $base64"
             }.getOrNull()
     }
 }

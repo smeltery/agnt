@@ -12,13 +12,13 @@ import com.dotbrains.agnt.mobile.core.model.CodexSubagentAction
 import com.dotbrains.agnt.mobile.core.model.CodexSubagentRef
 import com.dotbrains.agnt.mobile.core.model.CodexSubagentState
 import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
-import java.time.Instant
-import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
+import java.util.UUID
 
 /**
  * In-memory timeline + encrypted persistence (iOS [messagesByThread] + persistMessages).
@@ -51,9 +51,10 @@ internal class MessageTimelineStore(
             }
         CodexMessageOrderCounter.seedFrom(normalizedInitialMessages)
         rebuildSubagentIdentityDirectory(normalizedInitialMessages.values.flatten())
-        _messagesByThread.value = normalizedInitialMessages.mapValues { (_, messages) ->
-            messages.map(::resolveSubagentMessageIdentities)
-        }
+        _messagesByThread.value =
+            normalizedInitialMessages.mapValues { (_, messages) ->
+                messages.map(::resolveSubagentMessageIdentities)
+            }
     }
 
     constructor(
@@ -95,7 +96,8 @@ internal class MessageTimelineStore(
             val existing = map[threadId].orEmpty()
             rebuildSubagentIdentityDirectory(existing + incoming)
             map[threadId] =
-                HistoryMessageMerge.merge(existing, incoming)
+                HistoryMessageMerge
+                    .merge(existing, incoming)
                     .map(::resolveSubagentMessageIdentities)
             publishMessages(map)
         }
@@ -281,8 +283,10 @@ internal class MessageTimelineStore(
                     m.role == CodexMessageRole.system &&
                         m.kind == kind &&
                         m.isStreaming &&
-                        ((itemId != null && m.itemId == itemId) ||
-                            (itemId == null && turnId != null && m.turnId == turnId))
+                        (
+                            (itemId != null && m.itemId == itemId) ||
+                                (itemId == null && turnId != null && m.turnId == turnId)
+                        )
                 }
             if (!existing) {
                 list.add(
@@ -318,8 +322,10 @@ internal class MessageTimelineStore(
                 list.indexOfLast { m ->
                     m.role == CodexMessageRole.system &&
                         m.kind == CodexMessageKind.thinking &&
-                        ((itemId != null && m.itemId == itemId) ||
-                            (itemId == null && turnId != null && m.turnId == turnId))
+                        (
+                            (itemId != null && m.itemId == itemId) ||
+                                (itemId == null && turnId != null && m.turnId == turnId)
+                        )
                 }
             if (idx < 0) {
                 return@withLock false
@@ -331,7 +337,7 @@ internal class MessageTimelineStore(
                     isStreaming = false,
                     turnId = turnId ?: m.turnId,
                     itemId = itemId ?: m.itemId,
-            )
+                )
             map[threadId] = list
             publishMessages(map)
             true
@@ -526,8 +532,12 @@ internal class MessageTimelineStore(
                         message.kind == CodexMessageKind.subagentAction &&
                         (
                             (itemId != null && message.itemId == itemId) ||
-                                (itemId == null && turnId != null && message.turnId == turnId &&
-                                    message.subagentAction?.normalizedTool == incomingAction.normalizedTool)
+                                (
+                                    itemId == null &&
+                                        turnId != null &&
+                                        message.turnId == turnId &&
+                                        message.subagentAction?.normalizedTool == incomingAction.normalizedTool
+                                )
                         )
                 }
 
@@ -585,7 +595,7 @@ internal class MessageTimelineStore(
                             turnId = resolvedTurnId,
                             itemId = resolvedItemId,
                         )
-            }
+                }
             if (idx >= 0) {
                 val m = list[idx]
                 list[idx] =
@@ -952,9 +962,10 @@ internal class MessageTimelineStore(
                 val insertionIndex =
                     turnId
                         ?.let { resolvedTurnId ->
-                            list.indexOfFirst { message ->
-                                message.turnId == resolvedTurnId && message.role != CodexMessageRole.user
-                            }.takeIf { it >= 0 }
+                            list
+                                .indexOfFirst { message ->
+                                    message.turnId == resolvedTurnId && message.role != CodexMessageRole.user
+                                }.takeIf { it >= 0 }
                         }
                         ?: list.size
                 list.add(
@@ -1051,6 +1062,7 @@ internal class MessageTimelineStore(
         receiverThreadIds.addAll(incoming.receiverThreadIds)
 
         val receiverAgentsByThread = LinkedHashMap<String, CodexSubagentRef>()
+
         fun addAgent(agent: CodexSubagentRef) {
             val key = agent.threadId.trim()
             if (key.isEmpty()) return
@@ -1197,8 +1209,7 @@ internal class MessageTimelineStore(
         return merged.takeIf { it.hasMetadata }
     }
 
-    private fun normalizedSubagentIdentifier(value: String?): String? =
-        value?.trim()?.takeIf { it.isNotEmpty() }
+    private fun normalizedSubagentIdentifier(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun absorbAssistantSubagentSummary(
         list: MutableList<CodexMessage>,
@@ -1246,8 +1257,7 @@ internal class MessageTimelineStore(
                     message.kind == CodexMessageKind.chat &&
                     message.turnId == turnId &&
                     parseAssistantSubagentSummaryRefs(message.text).isNotEmpty()
-            }
-            ?.let { parseAssistantSubagentSummaryRefs(it.text) }
+            }?.let { parseAssistantSubagentSummaryRefs(it.text) }
             .orEmpty()
     }
 
@@ -1346,7 +1356,12 @@ internal class MessageTimelineStore(
                 continue
             }
             val name = pendingName
-            val id = idRegex.find(line)?.groupValues?.getOrNull(1)?.trim()
+            val id =
+                idRegex
+                    .find(line)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.trim()
             if (name != null && !id.isNullOrBlank()) {
                 refs += CodexSubagentRef(threadId = id, nickname = name)
                 pendingName = null
@@ -1404,8 +1419,11 @@ internal class MessageTimelineStore(
                 m.role == CodexMessageRole.system &&
                     m.kind == kind &&
                     (m.isStreaming || (allowCompletedFileChange && kind == CodexMessageKind.fileChange)) &&
-                    (itemId != null && m.itemId == itemId ||
-                        (itemId == null && turnId != null && m.turnId == turnId))
+                    (
+                        itemId != null &&
+                            m.itemId == itemId ||
+                            (itemId == null && turnId != null && m.turnId == turnId)
+                    )
             }
         if (direct >= 0) return direct
 
@@ -1618,14 +1636,12 @@ internal class MessageTimelineStore(
         return normalized.takeIf { it.isNotEmpty() }?.lowercase()
     }
 
-    private fun normalizedMessageText(text: String): String =
-        text.trim().replace("\\s+".toRegex(), " ")
+    private fun normalizedMessageText(text: String): String = text.trim().replace("\\s+".toRegex(), " ")
 
     private fun compatibleUserAttachments(
         existing: List<CodexImageAttachment>,
         incoming: List<CodexImageAttachment>,
-    ): Boolean =
-        UserChatAttachmentMatcher.compatible(existing, incoming)
+    ): Boolean = UserChatAttachmentMatcher.compatible(existing, incoming)
 
     private fun reassignOrderIndexesInCurrentOrder(list: MutableList<CodexMessage>) {
         for (index in list.indices) {

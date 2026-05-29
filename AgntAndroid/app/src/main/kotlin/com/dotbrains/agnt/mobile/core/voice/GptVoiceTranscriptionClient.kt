@@ -1,6 +1,5 @@
 package com.dotbrains.agnt.mobile.core.voice
 
-import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -12,6 +11,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.UUID
 
 /**
  * Direct ChatGPT transcription upload (parity with [GPTVoiceTranscriptionManager.transcribe] on iOS).
@@ -21,7 +21,6 @@ class GptVoiceTranscriptionClient(
     private val httpClient: OkHttpClient,
     private val transcriptionUrl: HttpUrl = DEFAULT_TRANSCRIPTION_URL,
 ) {
-
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -34,13 +33,15 @@ class GptVoiceTranscriptionClient(
         val boundary = "Remodex-${UUID.randomUUID()}"
         val fileBody = wavBytes.toRequestBody("audio/wav".toMediaType())
         val multipart =
-            MultipartBody.Builder(boundary)
+            MultipartBody
+                .Builder(boundary)
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("file", "voice.wav", fileBody)
                 .build()
 
         val request =
-            Request.Builder()
+            Request
+                .Builder()
                 .url(transcriptionUrl)
                 .post(multipart)
                 .header("Authorization", "Bearer $token")

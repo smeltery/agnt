@@ -4,7 +4,9 @@ package com.dotbrains.agnt.mobile.core.terminal
  * Status enum mirrored from `RemodexTerminalStatus`
  * (`AgntMobile/AgntMobile/Services/Terminal/RemodexTerminalModels.swift`).
  */
-enum class TerminalStatus(val displayTitle: String) {
+enum class TerminalStatus(
+    val displayTitle: String,
+) {
     Idle("Idle"),
     Starting("Connecting"),
     Running("Running"),

@@ -8,7 +8,11 @@ import com.dotbrains.agnt.mobile.core.notification.RunCompletionAttentionKind
 private fun AgentService.threadDisplayTitleForNotification(threadId: String): String {
     val tid = threadId.trim()
     if (tid.isEmpty()) return appContext.getString(R.string.notification_default_thread_title)
-    return _threads.value.firstOrNull { it.id == tid }?.displayTitle?.trim()?.takeIf { it.isNotEmpty() }
+    return _threads.value
+        .firstOrNull { it.id == tid }
+        ?.displayTitle
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
         ?: appContext.getString(R.string.notification_default_thread_title)
 }
 

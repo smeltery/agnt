@@ -54,7 +54,7 @@ class TurnSmartScrollNavigationTest {
                 lastVisibleItemIndex = 5,
                 anchors = anchors(6),
                 isNearBottom = true,
-        )
+            )
 
         assertEquals(emptyList(), state.actions)
     }

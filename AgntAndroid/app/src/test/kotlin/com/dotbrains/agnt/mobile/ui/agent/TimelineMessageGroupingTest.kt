@@ -192,7 +192,10 @@ class TimelineMessageGroupingTest {
 
     @Test
     fun assistantWorkGroup_waitsForFinalAssistantAndCollapsesEarlierTurnItems() {
-        fun user(id: String, seconds: Long): CodexMessage =
+        fun user(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             CodexMessage(
                 id = id,
                 threadId = "t1",
@@ -202,7 +205,11 @@ class TimelineMessageGroupingTest {
                 createdAt = t0.plusSeconds(seconds),
                 turnId = "turn-1",
             )
-        fun assistant(id: String, seconds: Long): CodexMessage =
+
+        fun assistant(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             CodexMessage(
                 id = id,
                 threadId = "t1",
@@ -212,7 +219,11 @@ class TimelineMessageGroupingTest {
                 createdAt = t0.plusSeconds(seconds),
                 turnId = "turn-1",
             )
-        fun turnCommand(id: String, seconds: Long): CodexMessage =
+
+        fun turnCommand(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             cmd(id).copy(
                 createdAt = t0.plusSeconds(seconds),
                 turnId = "turn-1",
@@ -285,8 +296,9 @@ class TimelineMessageGroupingTest {
                 isStreaming = streaming,
             )
 
-        val items = listOf(assistant("step-1", 0), assistant("summary", 70, streaming = true))
-            .toTimelineListItems(collapseLatestTurn = true)
+        val items =
+            listOf(assistant("step-1", 0), assistant("summary", 70, streaming = true))
+                .toTimelineListItems(collapseLatestTurn = true)
 
         assertEquals(2, items.size)
         assertTrue(items.all { it is TimelineListItem.Single })
@@ -294,7 +306,10 @@ class TimelineMessageGroupingTest {
 
     @Test
     fun assistantWorkGroup_doesNotCollapseActiveTurnBeforeCompletion() {
-        fun assistant(id: String, seconds: Long): CodexMessage =
+        fun assistant(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             CodexMessage(
                 id = id,
                 threadId = "t1",
@@ -304,7 +319,11 @@ class TimelineMessageGroupingTest {
                 createdAt = t0.plusSeconds(seconds),
                 turnId = "turn-1",
             )
-        fun turnCommand(id: String, seconds: Long): CodexMessage =
+
+        fun turnCommand(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             cmd(id).copy(
                 createdAt = t0.plusSeconds(seconds),
                 turnId = "turn-1",
@@ -416,7 +435,10 @@ class TimelineMessageGroupingTest {
 
     @Test
     fun assistantWorkGroup_keepsLastAssistantMessageEvenWhenToolArrivesAfterIt() {
-        fun assistant(id: String, seconds: Long): CodexMessage =
+        fun assistant(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             CodexMessage(
                 id = id,
                 threadId = "t1",
@@ -426,7 +448,11 @@ class TimelineMessageGroupingTest {
                 createdAt = t0.plusSeconds(seconds),
                 turnId = "turn-1",
             )
-        fun turnCommand(id: String, seconds: Long): CodexMessage =
+
+        fun turnCommand(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             cmd(id).copy(
                 createdAt = t0.plusSeconds(seconds),
                 turnId = "turn-1",
@@ -450,7 +476,10 @@ class TimelineMessageGroupingTest {
 
     @Test
     fun assistantWorkGroup_collapsesLatestTurnByDefaultWithStableTurnKey() {
-        fun assistant(id: String, seconds: Long): CodexMessage =
+        fun assistant(
+            id: String,
+            seconds: Long,
+        ): CodexMessage =
             CodexMessage(
                 id = id,
                 threadId = "t1",

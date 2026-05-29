@@ -31,7 +31,12 @@ class CommandExecutionDetailsStoreTest {
         store.upsertFromState("item-1", "git status --short", null, null, null)
         store.upsertFromState("item-1", "git status", null, null, null)
 
-        assertEquals("git status --short", store.detailsByItemId.value.getValue("item-1").fullCommand)
+        assertEquals(
+            "git status --short",
+            store.detailsByItemId.value
+                .getValue("item-1")
+                .fullCommand,
+        )
     }
 
     @Test
@@ -58,7 +63,11 @@ class CommandExecutionDetailsStoreTest {
             chunk = (1..35).joinToString("\n") { "line-$it" },
         )
 
-        val lines = store.detailsByItemId.value.getValue("item-1").outputTail.lines()
+        val lines =
+            store.detailsByItemId.value
+                .getValue("item-1")
+                .outputTail
+                .lines()
         assertEquals(CommandExecutionDetails.MAX_OUTPUT_LINES, lines.size)
         assertEquals("line-6", lines.first())
         assertEquals("line-35", lines.last())

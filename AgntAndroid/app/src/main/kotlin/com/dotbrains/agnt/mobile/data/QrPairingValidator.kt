@@ -10,11 +10,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.HttpUrl
 import java.util.Base64
 
 private val pairingJson =
@@ -145,7 +145,8 @@ suspend fun resolvePairingCode(
                 .encodeToString(PairingCodeResolveRequest(trimmedCode))
                 .toRequestBody(pairingJsonMediaType)
         val request =
-            Request.Builder()
+            Request
+                .Builder()
                 .url(endpoint.resolveUrl)
                 .post(body)
                 .build()
@@ -288,8 +289,7 @@ private fun validatePairingFields(
     return null
 }
 
-private fun containsUnsafePairingChars(value: String): Boolean =
-    value.any { it.isISOControl() || it.isWhitespace() }
+private fun containsUnsafePairingChars(value: String): Boolean = value.any { it.isISOControl() || it.isWhitespace() }
 
 private data class PairingCodeResolveRoute(
     val resolveUrl: HttpUrl,
@@ -309,7 +309,8 @@ private fun pairingCodeResolveRoute(rawRelayUrl: String): PairingCodeResolveRout
             listOf("v1", "pairing", "code", "resolve")
         }
     val resolveUrl =
-        validation.httpUrl.newBuilder()
+        validation.httpUrl
+            .newBuilder()
             .encodedPath("/" + resolveSegments.joinToString("/"))
             .query(null)
             .fragment(null)

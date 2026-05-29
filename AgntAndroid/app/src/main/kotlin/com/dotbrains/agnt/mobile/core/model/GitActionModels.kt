@@ -5,6 +5,7 @@ import java.util.UUID
 enum class GitWorktreeChangeTransferMode {
     move,
     copy,
+
     /** No tracked-change transfer; parity with iOS [GitWorktreeChangeTransferMode.none]. */
     none,
 }
@@ -92,8 +93,7 @@ data class GitRepoDiffResult(
     val patch: String,
 ) {
     companion object {
-        fun fromJson(json: RPCObject): GitRepoDiffResult =
-            GitRepoDiffResult(patch = json["patch"]?.stringValue ?: "")
+        fun fromJson(json: RPCObject): GitRepoDiffResult = GitRepoDiffResult(patch = json["patch"]?.stringValue ?: "")
     }
 }
 
@@ -104,8 +104,9 @@ data class GitInitResult(
     companion object {
         fun fromJson(json: RPCObject): GitInitResult =
             GitInitResult(
-                repoRoot = json["repoRoot"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
-                    ?: json["path"]?.stringValue?.trim().orEmpty(),
+                repoRoot =
+                    json["repoRoot"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: json["path"]?.stringValue?.trim().orEmpty(),
                 status = json["status"]?.objectValue?.let { GitRepoSyncResult.fromJson(it) },
             )
     }
@@ -338,11 +339,12 @@ data class GitBranchesWithStatusResult(
 
 private fun stringDictionary(json: Map<String, JSONValue>?): Map<String, String> {
     if (json == null) return emptyMap()
-    return json.entries.mapNotNull { (k, v) ->
-        val key = k.trim()
-        val value = v.stringValue?.trim().orEmpty()
-        if (key.isEmpty() || value.isEmpty()) null else key to value
-    }.toMap()
+    return json.entries
+        .mapNotNull { (k, v) ->
+            val key = k.trim()
+            val value = v.stringValue?.trim().orEmpty()
+            if (key.isEmpty() || value.isEmpty()) null else key to value
+        }.toMap()
 }
 
 enum class TurnGitActionKind {
@@ -353,7 +355,8 @@ enum class TurnGitActionKind {
     commitAndPush,
     createPR,
     previewCommitPushToast,
-    discardRuntimeChangesAndSync;
+    discardRuntimeChangesAndSync,
+    ;
 
     val title: String
         get() =

@@ -35,15 +35,17 @@ fun TerminalAccessoryBar(
     val accent = parseHex(theme.palette.getOrElse(10) { theme.foreground })
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(parseHex(theme.background)),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(parseHex(theme.background)),
     ) {
         Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-                .height(40.dp),
+            modifier =
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .height(40.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -60,10 +62,11 @@ fun TerminalAccessoryBar(
                     onClick = { onAction(action) },
                     enabled = isEnabled,
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .widthIn(min = if (action.label.length > 1) 44.dp else 36.dp)
-                        .background(bgColor, RoundedCornerShape(10.dp))
-                        .border(1.dp, if (isActive) accent.copy(alpha = 0.32f) else borderColor, RoundedCornerShape(10.dp)),
+                    modifier =
+                        Modifier
+                            .widthIn(min = if (action.label.length > 1) 44.dp else 36.dp)
+                            .background(bgColor, RoundedCornerShape(10.dp))
+                            .border(1.dp, if (isActive) accent.copy(alpha = 0.32f) else borderColor, RoundedCornerShape(10.dp)),
                 ) {
                     Text(
                         text = if (action.isModifier) action.label.uppercase() else action.label,

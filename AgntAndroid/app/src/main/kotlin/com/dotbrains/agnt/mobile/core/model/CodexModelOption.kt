@@ -17,8 +17,18 @@ data class CodexModelOption(
 ) {
     companion object {
         fun fromJsonObject(obj: JsonObject): CodexModelOption {
-            val modelValue = obj["model"]?.jsonPrimitive?.content?.trim().orEmpty()
-            val idValue = obj["id"]?.jsonPrimitive?.content?.trim().orEmpty()
+            val modelValue =
+                obj["model"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?.trim()
+                    .orEmpty()
+            val idValue =
+                obj["id"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?.trim()
+                    .orEmpty()
             val rawModel = modelValue.ifEmpty { idValue }
             val normalizedModel = rawModel.trim()
             val rawId = idValue.ifEmpty { normalizedModel }
@@ -33,11 +43,12 @@ data class CodexModelOption(
             val efforts =
                 when (effortsObj) {
                     is JsonArray ->
-                        effortsObj.mapNotNull { el ->
-                            runCatching { el.jsonObject }.getOrNull()?.let {
-                                CodexReasoningEffortOption.fromJsonObject(it)
-                            }
-                        }.filter { it.reasoningEffort.isNotBlank() }
+                        effortsObj
+                            .mapNotNull { el ->
+                                runCatching { el.jsonObject }.getOrNull()?.let {
+                                    CodexReasoningEffortOption.fromJsonObject(it)
+                                }
+                            }.filter { it.reasoningEffort.isNotBlank() }
                     else -> emptyList()
                 }
 

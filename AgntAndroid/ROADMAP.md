@@ -180,10 +180,34 @@ Open follow-ups:
 
 ## Build / CI
 
-- [ ] Add `ktlint` or `detekt` to `:app:check`.
-- [ ] Add `:app:assembleDebug` artifact upload on PRs (unsigned APK).
-- [ ] Consider Gradle dependency-version catalog (`libs.versions.toml`) for
-      cross-module bumps.
+- [x] **ktlint wired into CI.** `org.jlleitschuh.gradle.ktlint` 12.1.2
+      (ktlint 1.4.1, android-mode on) applied to `:app`. A new
+      `.editorconfig` at `AgntAndroid/.editorconfig` locks 4-space indent
+      and disables five default rules that fight our codebase
+      conventions: `function-naming` (Compose @Composable PascalCase),
+      `string-template-indent` (test fixtures), `enum-entry-name-case`
+      (enums mirror wire-format JSON), `property-naming` +
+      `backing-property-naming` (the `_foo: MutableStateFlow` + public
+      `val foo: StateFlow` pattern), and `filename` (purpose-named files
+      that group multiple related types). CI runs `./gradlew
+      :app:ktlintCheck --no-daemon` as the style gate before tests.
+      Adopted intentionally on top of `:app:ktlintCheck` rather than the
+      Gradle `:app:check` lifecycle task because the latter pulls in
+      Android Lint, which currently has 20 pre-existing errors that are
+      separate housekeeping work (track in a follow-up if anyone wants a
+      Lint baseline).
+- [x] **Unsigned debug APK uploaded on PRs.** The existing
+      `assembleDebug` step now publishes
+      `app/build/outputs/apk/debug/*.apk` as
+      `agnt-debug-<PR#>.apk` artifact (14-day retention) via
+      `actions/upload-artifact@v4`. Only on `pull_request` events so push
+      builds don't shadow signed releases.
+- [x] **Gradle dependency-version catalog.** Migrated all dependencies
+      and plugin coordinates from inline string literals to
+      `AgntAndroid/gradle/libs.versions.toml`. 24 versions / 35 library
+      aliases / 5 plugin aliases. Both `build.gradle.kts` files now use
+      `alias(libs.plugins.…)` and `libs.<bundle>`, making cross-module
+      bumps a single-toml edit.
 
 ## Finishing the upstream parity audit
 

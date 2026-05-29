@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
+import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexPlanState
@@ -286,9 +286,10 @@ internal object ThreadHistoryDecoder {
             }
             "plan" -> {
                 val body =
-                    decodeItemText(itemObject).ifEmpty {
-                        itemObject["summary"]?.stringValue?.trim().orEmpty()
-                    }.ifEmpty { "[plan]" }
+                    decodeItemText(itemObject)
+                        .ifEmpty {
+                            itemObject["summary"]?.stringValue?.trim().orEmpty()
+                        }.ifEmpty { "[plan]" }
                 DecodedCompletedItem(
                     CodexMessageRole.system,
                     CodexMessageKind.plan,
@@ -346,8 +347,7 @@ internal object ThreadHistoryDecoder {
         )
     }
 
-    private fun normalizedItemType(raw: String): String =
-        raw.replace("_", "").replace("-", "").lowercase()
+    private fun normalizedItemType(raw: String): String = raw.replace("_", "").replace("-", "").lowercase()
 
     private fun isSubagentItemType(norm: String): Boolean =
         norm == "collabagenttoolcall" ||
@@ -439,10 +439,42 @@ internal object ThreadHistoryDecoder {
                 ) ?: return@mapIndexedNotNull null
             CodexSubagentRef(
                 threadId = threadId,
-                agentId = normalizedIdentifier(firstStringValue(obj, "agentId", "agent_id", "receiverAgentId", "receiver_agent_id", "newAgentId", "new_agent_id", "id")),
-                nickname = normalizedIdentifier(firstStringValue(obj, "agentNickname", "agent_nickname", "receiverAgentNickname", "receiver_agent_nickname", "newAgentNickname", "new_agent_nickname", "nickname", "name")),
-                role = normalizedIdentifier(firstStringValue(obj, "agentRole", "agent_role", "receiverAgentRole", "receiver_agent_role", "newAgentRole", "new_agent_role", "agentType", "agent_type")),
-                model = normalizedIdentifier(firstStringValue(obj, "modelProvider", "model_provider", "modelProviderId", "model_provider_id", "modelName", "model_name", "model")),
+                agentId =
+                    normalizedIdentifier(
+                        firstStringValue(obj, "agentId", "agent_id", "receiverAgentId", "receiver_agent_id", "newAgentId", "new_agent_id", "id"),
+                    ),
+                nickname =
+                    normalizedIdentifier(
+                        firstStringValue(
+                            obj,
+                            "agentNickname",
+                            "agent_nickname",
+                            "receiverAgentNickname",
+                            "receiver_agent_nickname",
+                            "newAgentNickname",
+                            "new_agent_nickname",
+                            "nickname",
+                            "name",
+                        ),
+                    ),
+                role =
+                    normalizedIdentifier(
+                        firstStringValue(
+                            obj,
+                            "agentRole",
+                            "agent_role",
+                            "receiverAgentRole",
+                            "receiver_agent_role",
+                            "newAgentRole",
+                            "new_agent_role",
+                            "agentType",
+                            "agent_type",
+                        ),
+                    ),
+                model =
+                    normalizedIdentifier(
+                        firstStringValue(obj, "modelProvider", "model_provider", "modelProviderId", "model_provider_id", "modelName", "model_name", "model"),
+                    ),
                 prompt = normalizedIdentifier(firstStringValue(obj, "prompt", "instructions", "instruction", "task", "message")),
             )
         }
@@ -506,9 +538,45 @@ internal object ThreadHistoryDecoder {
             CodexSubagentRef(
                 threadId = threadId,
                 agentId = normalizedIdentifier(firstStringValue(itemObject, "newAgentId", "new_agent_id", "agentId", "agent_id")),
-                nickname = normalizedIdentifier(firstStringValue(itemObject, "newAgentNickname", "new_agent_nickname", "agentNickname", "agent_nickname", "receiverAgentNickname", "receiver_agent_nickname")),
-                role = normalizedIdentifier(firstStringValue(itemObject, "receiverAgentRole", "receiver_agent_role", "newAgentRole", "new_agent_role", "agentRole", "agent_role", "agentType", "agent_type")),
-                model = normalizedIdentifier(firstStringValue(itemObject, "modelProvider", "model_provider", "modelProviderId", "model_provider_id", "modelName", "model_name", "model")),
+                nickname =
+                    normalizedIdentifier(
+                        firstStringValue(
+                            itemObject,
+                            "newAgentNickname",
+                            "new_agent_nickname",
+                            "agentNickname",
+                            "agent_nickname",
+                            "receiverAgentNickname",
+                            "receiver_agent_nickname",
+                        ),
+                    ),
+                role =
+                    normalizedIdentifier(
+                        firstStringValue(
+                            itemObject,
+                            "receiverAgentRole",
+                            "receiver_agent_role",
+                            "newAgentRole",
+                            "new_agent_role",
+                            "agentRole",
+                            "agent_role",
+                            "agentType",
+                            "agent_type",
+                        ),
+                    ),
+                model =
+                    normalizedIdentifier(
+                        firstStringValue(
+                            itemObject,
+                            "modelProvider",
+                            "model_provider",
+                            "modelProviderId",
+                            "model_provider_id",
+                            "modelName",
+                            "model_name",
+                            "model",
+                        ),
+                    ),
                 prompt = normalizedIdentifier(firstStringValue(itemObject, "prompt", "instructions", "instruction", "task", "message")),
             ),
         )
@@ -546,15 +614,15 @@ internal object ThreadHistoryDecoder {
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
 
-    private fun normalizedIdentifier(value: String?): String? =
-        value?.trim()?.takeIf { it.isNotEmpty() }
+    private fun normalizedIdentifier(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun foldSubagentAssistantSummaries(messages: List<CodexMessage>): List<CodexMessage> {
         if (messages.none { it.kind == CodexMessageKind.subagentAction }) return messages
         val out = messages.toMutableList()
         val summaryByTurn = LinkedHashMap<String, List<CodexSubagentRef>>()
         val allRefs = ArrayList<CodexSubagentRef>()
-        out.filter { it.role == CodexMessageRole.assistant && it.kind == CodexMessageKind.chat }
+        out
+            .filter { it.role == CodexMessageRole.assistant && it.kind == CodexMessageKind.chat }
             .forEach { message ->
                 val refs = parseAssistantSubagentSummaryRefs(message.text)
                 if (refs.isEmpty()) return@forEach
@@ -649,7 +717,12 @@ internal object ThreadHistoryDecoder {
                 pendingName = bullet.groupValues[1].trim().takeIf { it.isNotEmpty() }
                 continue
             }
-            val id = idRegex.find(line)?.groupValues?.getOrNull(1)?.trim()
+            val id =
+                idRegex
+                    .find(line)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.trim()
             val name = pendingName
             if (name != null && !id.isNullOrBlank()) {
                 refs += CodexSubagentRef(threadId = id, nickname = name)
@@ -708,14 +781,26 @@ internal object ThreadHistoryDecoder {
         }
         val joined = parts.joinToString("\n").trim()
         if (joined.isNotEmpty()) return joined
-        itemObject["text"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        itemObject["message"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        itemObject["text"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        itemObject["message"]
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
         return ""
     }
 
     private fun decodeReasoningText(itemObject: Map<String, JSONValue>): String {
         listOf("summary", "text", "content").forEach { k ->
-            itemObject[k]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            itemObject[k]
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return decodeItemText(itemObject).ifEmpty { "[reasoning]" }
     }
@@ -821,7 +906,11 @@ internal object ThreadHistoryDecoder {
             ?: decodeFileChangePreview(itemObject)
 
     private fun decodeToolOrDiffPreview(itemObject: Map<String, JSONValue>): String {
-        FileChangeItemBodyRenderer.renderFromIncomingItem(itemObject)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        FileChangeItemBodyRenderer
+            .renderFromIncomingItem(itemObject)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
         return decodeItemText(itemObject)
             .trim()
             .takeIf { FileChangeItemBodyRenderer.hasFileChangeEvidence(it) }
@@ -855,10 +944,11 @@ internal object ThreadHistoryDecoder {
                     status.contains("success", ignoreCase = true) -> "completed"
                 else -> "running"
             }
-        val trimCmd = cmd.trim().ifBlank { "command" }.let { c ->
-            val max = 8192
-            if (c.length <= max) c else c.take(max - 1) + "…"
-        }
+        val trimCmd =
+            cmd.trim().ifBlank { "command" }.let { c ->
+                val max = 8192
+                if (c.length <= max) c else c.take(max - 1) + "…"
+            }
         // `phase> cmd` matches parseCommandExecution's inlined phase header and preserves the full command.
         return "$phase> $trimCmd"
     }
@@ -868,7 +958,11 @@ internal object ThreadHistoryDecoder {
         keys: List<String>,
     ): String? {
         for (k in keys) {
-            obj[k]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            obj[k]
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return null
     }

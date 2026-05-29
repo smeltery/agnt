@@ -15,9 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Archive
@@ -49,7 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.composables.icons.lucide.R as LucideR
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.GitWorktreeChangeTransferMode
@@ -67,6 +66,7 @@ import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
 import com.dotbrains.agnt.mobile.ui.shared.ThreadRenameDialog
 import com.dotbrains.agnt.mobile.ui.theme.AgntDropdownMenu
 import kotlinx.coroutines.launch
+import com.composables.icons.lucide.R as LucideR
 
 private const val SIDEBAR_THREADS_PER_GROUP = 5
 
@@ -713,10 +713,11 @@ fun SidebarScreen(
                                                     worktreeChatBusy = true
                                                     scope.launch {
                                                         runCatching {
-                                                            com.dotbrains.agnt.mobile.services.GitActionsService(
-                                                                repository,
-                                                                pending.baseProjectPath,
-                                                            ).pull()
+                                                            com.dotbrains.agnt.mobile.services
+                                                                .GitActionsService(
+                                                                    repository,
+                                                                    pending.baseProjectPath,
+                                                                ).pull()
                                                         }.onFailure { e ->
                                                             worktreeChatError =
                                                                 GitBranchDisplayMapper.userVisibleMessage(e)
@@ -906,8 +907,11 @@ private fun RepoHeader(
             if (canCollapse) {
                 Icon(
                     imageVector =
-                        if (collapsed) Icons.AutoMirrored.Filled.KeyboardArrowRight
-                        else Icons.Filled.KeyboardArrowDown,
+                        if (collapsed) {
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight
+                        } else {
+                            Icons.Filled.KeyboardArrowDown
+                        },
                     contentDescription = null,
                     tint = colors.mutedText,
                     modifier = Modifier.size(18.dp),

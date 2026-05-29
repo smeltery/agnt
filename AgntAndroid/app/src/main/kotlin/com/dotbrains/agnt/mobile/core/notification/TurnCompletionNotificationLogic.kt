@@ -28,8 +28,7 @@ object TurnCompletionNotificationLogic {
             .replace("-", "")
             .replace(" ", "")
 
-    fun envelopeEventObject(params: Map<String, JSONValue>?): Map<String, JSONValue>? =
-        params?.get("msg")?.objectValue ?: params?.get("event")?.objectValue
+    fun envelopeEventObject(params: Map<String, JSONValue>?): Map<String, JSONValue>? = params?.get("msg")?.objectValue ?: params?.get("event")?.objectValue
 
     fun parseTurnFailureMessage(params: Map<String, JSONValue>?): String? {
         val p = params ?: return null
@@ -39,7 +38,11 @@ object TurnCompletionNotificationLogic {
                 ?: p["status"]?.stringValue?.trim()
         if (status != "failed") return null
         val errObj = turnObject?.get("error")?.objectValue ?: p["error"]?.objectValue
-        return errObj?.get("message")?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
+        return errObj
+            ?.get("message")
+            ?.stringValue
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
             ?: p["errorMessage"]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }
             ?: "Turn failed with no details"
     }
@@ -79,9 +82,7 @@ object TurnCompletionNotificationLogic {
         return TurnTerminalStateForNotification.Completed
     }
 
-    fun attentionKindFromTerminalState(
-        state: TurnTerminalStateForNotification,
-    ): RunCompletionAttentionKind? =
+    fun attentionKindFromTerminalState(state: TurnTerminalStateForNotification): RunCompletionAttentionKind? =
         when (state) {
             TurnTerminalStateForNotification.Completed -> RunCompletionAttentionKind.Completed
             TurnTerminalStateForNotification.Failed -> RunCompletionAttentionKind.Failed
@@ -94,7 +95,11 @@ object TurnCompletionNotificationLogic {
     ): String? {
         if (obj == null) return null
         for (k in keys) {
-            obj[k]?.stringValue?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            obj[k]
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
         }
         return null
     }

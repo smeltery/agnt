@@ -42,8 +42,10 @@ internal data class TurnComposerToolbarActionKey(
 internal enum class TurnComposerToolbarIconKind {
     /** iOS `slider.horizontal.3` — host maps to Material symbol or icon. */
     ChatRuntimeRoot,
+
     /** iOS `brain` */
     ReasoningSection,
+
     /** iOS `bolt.fill` */
     SpeedSection,
 }

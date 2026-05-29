@@ -47,11 +47,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.stringResource
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexProjectDirectoryEntry
 import com.dotbrains.agnt.mobile.core.model.CodexProjectDirectoryListing
@@ -60,8 +60,8 @@ import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.projectDisplayLabelFor
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.services.ProjectFolderService
-import java.time.Instant
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 private enum class NewThreadSessionType {
     LocalWorkspace,
@@ -228,8 +228,7 @@ fun SidebarProjectPickerSheet(
                     .getOrElse {
                         loadingError = it.message?.takeIf { msg -> msg.isNotBlank() } ?: it.javaClass.simpleName
                         emptyList()
-                    }
-                    .sortedForWorkspacePicker()
+                    }.sortedForWorkspacePicker()
             listing = null
         } else {
             listing =
@@ -333,9 +332,10 @@ fun SidebarProjectPickerSheet(
                     SectionLabel(
                         text = stringResource(R.string.sidebar_project_picker_recent_workspaces),
                         colors = colors,
-                        actionText = stringResource(R.string.sidebar_project_picker_view_all).takeIf {
-                            recentWorkspaces.size > 3 && !showAllRecentWorkspaces
-                        },
+                        actionText =
+                            stringResource(R.string.sidebar_project_picker_view_all).takeIf {
+                                recentWorkspaces.size > 3 && !showAllRecentWorkspaces
+                            },
                         onAction = { showAllRecentWorkspaces = true },
                     )
                 }
@@ -1135,8 +1135,7 @@ private fun recentWorkspaceSummaries(
                 metadata = workspaceMetadata(representative.workspaceBranch()),
                 relativeTime = SidebarRelativeTimeFormatter.compactLabel(representative),
             )
-        }
-        .sortedWith(
+        }.sortedWith(
             compareByDescending<NewThreadWorkspaceSummary> { summary ->
                 threads
                     .filter { it.normalizedProjectPath == summary.path }
@@ -1146,8 +1145,7 @@ private fun recentWorkspaceSummaries(
         )
 }
 
-private fun workspaceMetadata(branch: String?): String =
-    listOfNotNull(branch?.trim()?.takeIf { it.isNotEmpty() }, "Local").joinToString(" · ")
+private fun workspaceMetadata(branch: String?): String = listOfNotNull(branch?.trim()?.takeIf { it.isNotEmpty() }, "Local").joinToString(" · ")
 
 private fun CodexThread.workspaceBranch(): String? =
     firstMetadataString(
@@ -1182,10 +1180,10 @@ private fun List<CodexProjectDirectoryEntry>.sortedForWorkspacePicker(): List<Co
 private fun List<CodexProjectLocation>.preferredQuickLocations(): List<CodexProjectLocation> {
     val wanted = listOf("home", "desktop", "documents")
     return mapNotNull { location ->
-        val key = location.id.lowercase().takeIf { it in wanted }
-            ?: location.label.lowercase().takeIf { it in wanted }
+        val key =
+            location.id.lowercase().takeIf { it in wanted }
+                ?: location.label.lowercase().takeIf { it in wanted }
         key?.let { wanted.indexOf(it) to location }
-    }
-        .sortedBy { it.first }
+    }.sortedBy { it.first }
         .map { it.second }
 }

@@ -18,11 +18,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,15 +39,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dotbrains.agnt.mobile.R
+import com.dotbrains.agnt.mobile.core.model.TurnTimelineCacheKey
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.rememberMarkdownState
-import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.core.model.TurnTimelineCacheKey
-import java.net.URI
 import kotlinx.coroutines.launch
+import java.net.URI
 
 private const val CODE_BLOCK_PREVIEW_MAX_LINES = 160
 private const val CODE_BLOCK_PREVIEW_MAX_CHARS = 8_000
@@ -135,8 +135,7 @@ fun TurnMarkdownBody(
                                                     .copy(
                                                         fontWeight = FontWeight.SemiBold,
                                                         textDecoration = TextDecoration.Underline,
-                                                    )
-                                                    .toSpanStyle(),
+                                                    ).toSpanStyle(),
                                         ),
                                 ),
                             components =
@@ -290,7 +289,9 @@ private fun codeBlockPreview(raw: String): String {
 }
 
 internal sealed interface MarkdownFenceSegment {
-    data class Text(val markdown: String) : MarkdownFenceSegment
+    data class Text(
+        val markdown: String,
+    ) : MarkdownFenceSegment
 
     data class Code(
         val code: String,

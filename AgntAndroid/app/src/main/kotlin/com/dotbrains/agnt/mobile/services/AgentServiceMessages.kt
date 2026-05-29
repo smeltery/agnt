@@ -1,14 +1,14 @@
 package com.dotbrains.agnt.mobile.services
 
 import android.util.Log
-import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
-import java.util.UUID
+import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.UUID
 
 private const val REMODEX_WIRE_LOG_TAG = "RemodexWire"
 
@@ -172,7 +172,9 @@ internal suspend fun AgentService.initializeSession() {
 internal fun AgentService.captureActiveProviderFromInitializeResponse(response: RPCMessage) {
     val resultObject = (response.result as? JSONValue.Obj)?.map ?: return
     val providerId = resultObject["providerId"]?.stringValue
-    _activeProvider.value = com.dotbrains.agnt.mobile.core.model.ActiveProvider.fromBridgeId(providerId)
+    _activeProvider.value =
+        com.dotbrains.agnt.mobile.core.model.ActiveProvider
+            .fromBridgeId(providerId)
 }
 
 private fun shouldRetryInitializeWithoutCapabilities(e: Throwable): Boolean {
@@ -204,5 +206,4 @@ internal suspend fun AgentService.rpcRequestWhileHandshaking(
     }
 }
 
-internal fun AgentService.readAppVersion(): String =
-    readAgntAppVersionName(appContext)
+internal fun AgentService.readAppVersion(): String = readAgntAppVersionName(appContext)

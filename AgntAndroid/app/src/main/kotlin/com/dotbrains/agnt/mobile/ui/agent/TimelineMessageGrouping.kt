@@ -17,7 +17,9 @@ private const val TIMELINE_ASSISTANT_CHUNK_MIN_CHARS = 1_600
 internal sealed interface TimelineListItem {
     val stableKey: String
 
-    data class Single(val message: CodexMessage) : TimelineListItem {
+    data class Single(
+        val message: CodexMessage,
+    ) : TimelineListItem {
         override val stableKey: String get() = message.id
     }
 
@@ -42,7 +44,9 @@ internal sealed interface TimelineListItem {
         override val stableKey: String get() = groupKey
     }
 
-    data class CommandExecutionGroup(val messages: List<CodexMessage>) : TimelineListItem {
+    data class CommandExecutionGroup(
+        val messages: List<CodexMessage>,
+    ) : TimelineListItem {
         init {
             require(messages.isNotEmpty())
         }
@@ -50,7 +54,9 @@ internal sealed interface TimelineListItem {
         override val stableKey: String get() = "${messages.first().id}-cmd-group"
     }
 
-    data class FileChangeGroup(val messages: List<CodexMessage>) : TimelineListItem {
+    data class FileChangeGroup(
+        val messages: List<CodexMessage>,
+    ) : TimelineListItem {
         init {
             require(messages.isNotEmpty())
         }
@@ -122,8 +128,7 @@ internal fun List<CodexMessage>.toTimelineListItems(
     )
 }
 
-internal fun List<CodexMessage>.toActivityDetailTimelineListItems(): List<TimelineListItem> =
-    toTimelineListItems(collapseAssistantWork = false)
+internal fun List<CodexMessage>.toActivityDetailTimelineListItems(): List<TimelineListItem> = toTimelineListItems(collapseAssistantWork = false)
 
 internal fun List<CodexMessage>.deriveTransientActivityStatus(
     isThreadRunning: Boolean,
@@ -164,7 +169,8 @@ private fun fileChangeStatus(text: String): String {
     val normalized = text.lowercase()
     if ("patch" in normalized || "apply_patch" in normalized) return "applying patch..."
     val filename =
-        text.lineSequence()
+        text
+            .lineSequence()
             .map { it.trim().trim('-', '*').trim() }
             .firstOrNull { it.contains('.') || it.contains('/') || it.contains('\\') }
             ?.let(::compactTimelinePath)
@@ -193,7 +199,8 @@ private fun commandExecutionStatus(text: String): String {
 }
 
 private fun normalizedCommandText(text: String): String =
-    text.trim()
+    text
+        .trim()
         .replace(Regex("""^(running|completed|complete|ran|failed|stopped|error)\s*>?\s*""", RegexOption.IGNORE_CASE), "")
         .lowercase()
 
@@ -365,8 +372,7 @@ private fun List<IndexedTurnItem>.lastAssistantChatMessageOrNull(): CodexMessage
                     }
                 else -> indexedItem.messages.asSequence()
             }
-        }
-        .firstOrNull { message ->
+        }.firstOrNull { message ->
             message.role == CodexMessageRole.assistant &&
                 message.kind == CodexMessageKind.chat
         }

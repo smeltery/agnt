@@ -7,5 +7,4 @@ internal enum class BranchPickerCloseCause {
     StateInvalidated,
 }
 
-internal fun shouldConsumeBranchPickerOpenRequest(cause: BranchPickerCloseCause): Boolean =
-    cause != BranchPickerCloseCause.StateInvalidated
+internal fun shouldConsumeBranchPickerOpenRequest(cause: BranchPickerCloseCause): Boolean = cause != BranchPickerCloseCause.StateInvalidated

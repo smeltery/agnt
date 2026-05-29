@@ -9,12 +9,12 @@ import java.time.Instant
  * Path normalization / comparison for Git worktrees (parity CodexMobile [TurnWorktreeRouting]).
  */
 object TurnWorktreePathRouting {
-
     /** Stable comparison key for cwd / bridge-reported repo paths when matching threads. */
     fun comparableGitProjectPath(raw: String?): String? {
         val trimmed = CodexThread.normalizeProjectPath(raw) ?: return null
         return runCatching {
-            File(trimmed).canonicalFile.absolutePath
+            File(trimmed)
+                .canonicalFile.absolutePath
                 .replace('\\', '/')
                 .trimEnd('/')
         }.getOrElse {

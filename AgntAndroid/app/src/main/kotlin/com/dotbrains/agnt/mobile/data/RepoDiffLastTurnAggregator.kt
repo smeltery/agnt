@@ -29,9 +29,11 @@ internal object RepoDiffLastTurnAggregator {
 
         for (msg in segment) {
             var rowSeq = 0
+
             fun nextKey(tag: String) = "${msg.id}:$tag:${rowSeq++}"
             val unified =
-                TurnTimelineRichContentCache.unifiedPatchForFileChangeMessage(msg)
+                TurnTimelineRichContentCache
+                    .unifiedPatchForFileChangeMessage(msg)
                     .trim()
             if (unified.isEmpty() || isTimelinePlaceholderOnly(unified)) continue
 
@@ -58,7 +60,8 @@ internal object RepoDiffLastTurnAggregator {
                             entry.path.trim().takeIf { it.isNotEmpty() }
                                 ?: guessedPathFromChunk(chunk)
                         val synthSplit =
-                            AIUnifiedPatchParser.splitUnifiedPatchIntoFileChunks(chunk)
+                            AIUnifiedPatchParser
+                                .splitUnifiedPatchIntoFileChunks(chunk)
                                 .takeIf { sub ->
                                     sub.size > 1 && entriesLookLikeSyntheticFileNames(sub)
                                 }

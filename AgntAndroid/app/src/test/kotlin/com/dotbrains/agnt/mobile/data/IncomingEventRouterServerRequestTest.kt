@@ -1,21 +1,21 @@
 package com.dotbrains.agnt.mobile.data
 
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 private const val ROUTER_TEST_TIMEOUT_MS = 5_000L
 
@@ -178,11 +178,12 @@ class IncomingEventRouterServerRequestTest {
     @Test
     fun dispatchServerRequest_autoApprovesWhenFullAccessIsEnabled() =
         runBlocking {
-            val response = routerResponseFor(
-                method = "desktop/custom/requestApproval",
-                requestId = JSONValue.NumLong(42),
-                shouldAutoApproveRequests = true,
-            )
+            val response =
+                routerResponseFor(
+                    method = "desktop/custom/requestApproval",
+                    requestId = JSONValue.NumLong(42),
+                    shouldAutoApproveRequests = true,
+                )
 
             assertEquals(JSONValue.NumLong(42), response.id)
             assertEquals(JSONValue.Obj(mapOf("decision" to JSONValue.Str("accept"))), response.result)
@@ -237,7 +238,14 @@ class IncomingEventRouterServerRequestTest {
             val (request, respond) = withTimeout(ROUTER_TEST_TIMEOUT_MS) { pending.await() }
             assertEquals("mode", request.questions.single().id)
             assertEquals("Pick a mode", request.questions.single().question)
-            assertEquals("Plan", request.questions.single().options.single().label)
+            assertEquals(
+                "Plan",
+                request.questions
+                    .single()
+                    .options
+                    .single()
+                    .label,
+            )
             respond(mapOf("mode" to listOf("Plan")))
 
             val message = withTimeout(ROUTER_TEST_TIMEOUT_MS) { response.await() }
@@ -358,10 +366,11 @@ class IncomingEventRouterServerRequestTest {
     @Test
     fun dispatchServerRequest_rejectsUnsupportedServerRequest() =
         runBlocking {
-            val response = routerResponseFor(
-                method = "item/tool/unsupported",
-                requestId = JSONValue.Str("unsupported-1"),
-            )
+            val response =
+                routerResponseFor(
+                    method = "item/tool/unsupported",
+                    requestId = JSONValue.Str("unsupported-1"),
+                )
 
             assertEquals(JSONValue.Str("unsupported-1"), response.id)
             assertEquals(-32601, response.error?.code)

@@ -6,12 +6,12 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.flow.MutableStateFlow
 
 class IncomingEventRouterCommandExecutionTest {
     @Test
@@ -68,7 +68,12 @@ class IncomingEventRouterCommandExecutionTest {
                 ),
         )
 
-        assertEquals("line 1\n", detailsStore.detailsByItemId.value.getValue("call-1").outputTail)
+        assertEquals(
+            "line 1\n",
+            detailsStore.detailsByItemId.value
+                .getValue("call-1")
+                .outputTail,
+        )
     }
 
     @Test
@@ -188,7 +193,10 @@ class IncomingEventRouterCommandExecutionTest {
                     ),
             )
 
-            val before = timeline.messagesByThread.value["thread-1"]?.single()?.text
+            val before =
+                timeline.messagesByThread.value["thread-1"]
+                    ?.single()
+                    ?.text
 
             router.dispatchNotification(
                 method = "exec_command_output_delta",
@@ -203,9 +211,17 @@ class IncomingEventRouterCommandExecutionTest {
                     ),
             )
 
-            val after = timeline.messagesByThread.value["thread-1"]?.single()?.text
+            val after =
+                timeline.messagesByThread.value["thread-1"]
+                    ?.single()
+                    ?.text
             assertEquals(before, after)
-            assertEquals("line 1\n", detailsStore.detailsByItemId.value.getValue("call-1").outputTail)
+            assertEquals(
+                "line 1\n",
+                detailsStore.detailsByItemId.value
+                    .getValue("call-1")
+                    .outputTail,
+            )
         }
 
     @Test

@@ -1,14 +1,14 @@
 package com.dotbrains.agnt.mobile.ui.settings
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.Manifest
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -42,8 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,18 +57,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.launch
-import com.dotbrains.agnt.mobile.R
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotbrains.agnt.mobile.AppContainer
+import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.AppFontStyle
 import com.dotbrains.agnt.mobile.core.model.AppLanguagePreference
 import com.dotbrains.agnt.mobile.core.model.AppThemePreference
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
+import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.notification.LocalNotificationSettings
 import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
@@ -78,6 +77,7 @@ import com.dotbrains.agnt.mobile.data.LanguagePreferences
 import com.dotbrains.agnt.mobile.data.ThemePreferences
 import com.dotbrains.agnt.mobile.ui.shared.UsageStatusSummary
 import com.dotbrains.agnt.mobile.ui.theme.agntScreenTopAppBarColors
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -272,8 +272,7 @@ private fun SettingsOptionRow(
                     selected = selected,
                     onClick = onClick,
                     role = Role.RadioButton,
-                )
-                .padding(vertical = 2.dp),
+                ).padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(
@@ -334,13 +333,14 @@ private fun SettingsNotificationSection(context: Context) {
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
-                text = stringResource(
-                    if (notificationsEnabled) {
-                        R.string.settings_notifications_status_enabled
-                    } else {
-                        R.string.settings_notifications_status_disabled
-                    }
-                ),
+                text =
+                    stringResource(
+                        if (notificationsEnabled) {
+                            R.string.settings_notifications_status_enabled
+                        } else {
+                            R.string.settings_notifications_status_disabled
+                        },
+                    ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -393,8 +393,7 @@ private fun SettingsNavigationRow(
                     selected = false,
                     onClick = onClick,
                     role = Role.Button,
-                )
-                .padding(vertical = 6.dp),
+                ).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -415,9 +414,7 @@ private fun SettingsNavigationRow(
 }
 
 @Composable
-private fun SettingsUsageRateLimitsSection(
-    repository: CodexRepository,
-) {
+private fun SettingsUsageRateLimitsSection(repository: CodexRepository) {
     val sessionReady by repository.isSessionReady.collectAsStateWithLifecycle()
     val conn by repository.connectionState.collectAsStateWithLifecycle()
     val hasResolved by repository.hasResolvedRateLimitsSnapshot.collectAsStateWithLifecycle()
@@ -538,7 +535,7 @@ private fun SettingsUsageRateLimitsSection(
                             u.tokensUsedFormatted,
                             u.tokenLimitFormatted,
                             u.percentUsed,
-                    ),
+                        ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -658,8 +655,7 @@ private fun settingsLanguageSubtitleRes(option: AppLanguagePreference): Int =
         AppLanguagePreference.system -> R.string.settings_language_system_subtitle
     }
 
-private fun readAppVersionName(context: Context): String =
-    readAgntAppVersionName(context)
+private fun readAppVersionName(context: Context): String = readAgntAppVersionName(context)
 
 private fun openSystemNotificationSettings(context: Context) {
     val appPackage = Uri.fromParts("package", context.packageName, null)

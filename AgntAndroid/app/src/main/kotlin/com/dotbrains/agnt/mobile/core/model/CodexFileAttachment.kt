@@ -14,4 +14,3 @@ data class CodexFileAttachment(
     val textContent: String?,
     val sourceUri: String? = null,
 )
-
