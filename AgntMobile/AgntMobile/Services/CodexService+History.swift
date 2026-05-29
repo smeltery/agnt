@@ -13,7 +13,7 @@ private enum RunningThreadHistoryCatchupPolicy {
     nonisolated static let cancellationCheckInterval = 32
 }
 
-fileprivate struct UserMessageSemanticKey: Equatable {
+fileprivate nonisolated struct UserMessageSemanticKey: Equatable {
     let text: String
     let skillMentions: Set<String>
     let pluginMentions: Set<String>

@@ -6,7 +6,7 @@
 
 import Foundation
 
-struct CodexImageAttachment: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct CodexImageAttachment: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let thumbnailBase64JPEG: String
     let payloadDataURL: String?
@@ -50,11 +50,11 @@ struct CodexImageAttachment: Identifiable, Codable, Hashable, Sendable {
     }
 
     // Used by timeline renderers to avoid empty image placeholders from path-only history items.
-    nonisolated var hasPreviewPayload: Bool {
+    var hasPreviewPayload: Bool {
         !thumbnailBase64JPEG.isEmpty || normalizedPayloadDataURL != nil
     }
 
-    nonisolated private var normalizedPayloadDataURL: String? {
+    private var normalizedPayloadDataURL: String? {
         let trimmed = payloadDataURL?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? nil : trimmed
     }

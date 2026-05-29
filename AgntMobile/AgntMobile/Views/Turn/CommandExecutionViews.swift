@@ -64,7 +64,7 @@ struct AssistantMarkdownImageReference: Identifiable, Equatable {
         AssistantMarkdownImageReferenceParser.isTemporaryScreenshotImagePath(path)
     }
 
-    var isCodexGeneratedImage: Bool {
+    nonisolated var isCodexGeneratedImage: Bool {
         AssistantMarkdownImageReferenceParser.isCodexGeneratedImagePath(path)
     }
 
@@ -310,7 +310,7 @@ enum AssistantMarkdownImageReferenceParser {
             || (normalized.hasPrefix("/private/var/folders/") && normalized.contains("/t/"))
     }
 
-    static func isCodexGeneratedImagePath(_ path: String) -> Bool {
+    nonisolated static func isCodexGeneratedImagePath(_ path: String) -> Bool {
         path.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\\", with: "/")
             .lowercased()

@@ -8,7 +8,7 @@ import Foundation
 
 typealias RPCObject = [String: JSONValue]
 
-struct RPCMessage: Codable, Sendable {
+nonisolated struct RPCMessage: Codable, Sendable {
     let jsonrpc: String?
     let id: JSONValue?
     let method: String?

@@ -211,7 +211,7 @@ enum TurnComposerReviewTarget: String, Codable, Equatable, Sendable {
     }
 }
 
-struct TurnComposerReviewSelection: Codable, Equatable, Sendable {
+nonisolated struct TurnComposerReviewSelection: Codable, Equatable, Sendable {
     let command: TurnComposerSlashCommand
     let target: TurnComposerReviewTarget?
 }

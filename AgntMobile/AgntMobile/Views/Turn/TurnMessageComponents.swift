@@ -3140,11 +3140,11 @@ private struct CachedWorkspaceImagePreview: Sendable {
 private final class CommandImagePreviewPayload: @unchecked Sendable {
     let image: UIImage
 
-    init(image: UIImage) {
+    nonisolated init(image: UIImage) {
         self.image = image
     }
 
-    var estimatedMemoryCost: Int {
+    nonisolated var estimatedMemoryCost: Int {
         guard let cgImage = image.cgImage else {
             return 1
         }

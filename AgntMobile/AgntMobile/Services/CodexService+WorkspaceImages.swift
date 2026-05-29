@@ -25,7 +25,7 @@ struct WorkspaceImageReadResult: Sendable {
     let data: Data?
     let isNotModified: Bool
 
-    var metadata: WorkspaceImageMetadata {
+    nonisolated var metadata: WorkspaceImageMetadata {
         WorkspaceImageMetadata(
             path: path,
             fileName: fileName,

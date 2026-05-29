@@ -7,6 +7,7 @@
 import CryptoKit
 import Foundation
 import Network
+import os
 import Security
 
 // Keeps encrypted relay envelopes under one explicit ceiling across all iPhone websocket APIs.
@@ -86,7 +87,7 @@ private struct CodexManualWebSocketEndpoint {
     let scheme: String
 }
 
-private func codexLogPairingTransport(_ message: String) {
+nonisolated private func codexLogPairingTransport(_ message: String) {
     print("[PAIRING] \(message)")
 }
 
@@ -506,21 +507,16 @@ extension CodexService {
             guard let self else { return }
 
             // Extract text and pre-decode off the main actor.
-            var wireText: String?
-            var preDecoded: WireMessagePreDecoder.Classification?
-            if case .success(let message) = result {
+            // Bind as `let` so Swift 6 strict concurrency allows capture into the @MainActor Task below.
+            let wireText: String? = {
+                guard case .success(let message) = result else { return nil }
                 switch message {
-                case .string(let text):
-                    wireText = text
-                case .data(let data):
-                    wireText = String(data: data, encoding: .utf8)
-                @unknown default:
-                    break
+                case .string(let text): return text
+                case .data(let data): return String(data: data, encoding: .utf8)
+                @unknown default: return nil
                 }
-                if let text = wireText {
-                    preDecoded = WireMessagePreDecoder.classify(text)
-                }
-            }
+            }()
+            let preDecoded = wireText.flatMap(WireMessagePreDecoder.classify)
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -798,31 +794,43 @@ extension CodexService {
         configuration: CodexConnectionReadyWaitConfiguration
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let lock = NSLock()
-            var didFinish = false
-            var timeoutTask: Task<Void, Never>?
-            var lastObservedStateDescription = "setup"
-            var lastWaitingErrorDescription: String?
+            // Shared mutable state across the NW callback (webSocketQueue) and the timeout Task.
+            // OSAllocatedUnfairLock is async-safe (unlike NSLock) and serializes every access.
+            struct WaitState: Sendable {
+                var didFinish = false
+                var timeoutTask: Task<Void, Never>?
+                var lastObservedStateDescription = "setup"
+                var lastWaitingErrorDescription: String?
+            }
+            let lockedState = OSAllocatedUnfairLock(initialState: WaitState())
 
-            func finish(_ result: Result<Void, Error>) {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !didFinish else { return }
-                didFinish = true
-                timeoutTask?.cancel()
+            @Sendable func finish(_ result: Result<Void, Error>) {
+                let shouldResume = lockedState.withLock { state -> Bool in
+                    guard !state.didFinish else { return false }
+                    state.didFinish = true
+                    state.timeoutTask?.cancel()
+                    return true
+                }
+                guard shouldResume else { return }
                 continuation.resume(with: result)
                 // Ignore future state transitions after first completion.
                 connection.stateUpdateHandler = { _ in }
             }
 
-            connection.stateUpdateHandler = { state in
-                lastObservedStateDescription = String(describing: state)
-                codexLogPairingTransport("\(configuration.logLabel) state: \(state)")
-                switch state {
+            connection.stateUpdateHandler = { nwState in
+                lockedState.withLock { state in
+                    state.lastObservedStateDescription = String(describing: nwState)
+                    if case .waiting(let error) = nwState {
+                        state.lastWaitingErrorDescription = String(describing: error)
+                    }
+                }
+
+                codexLogPairingTransport("\(configuration.logLabel) state: \(nwState)")
+                switch nwState {
                 case .ready:
                     finish(.success(()))
-                case .waiting(let error):
-                    lastWaitingErrorDescription = String(describing: error)
+                case .waiting:
+                    break
                 case .failed(let error):
                     codexLogPairingTransport("\(configuration.logLabel) failed: \(error)")
                     finish(.failure(error))
@@ -834,18 +842,22 @@ extension CodexService {
             }
 
             connection.start(queue: webSocketQueue)
-            timeoutTask = Task { [weak connection] in
+            let task = Task { [weak connection] in
                 try? await Task.sleep(nanoseconds: configuration.timeoutNanoseconds)
                 guard !Task.isCancelled else { return }
                 let timeoutError = CodexServiceError.invalidInput(configuration.timeoutMessage)
-                var timeoutLog = "\(configuration.logLabel) timed out while state=\(lastObservedStateDescription)"
-                if let lastWaitingErrorDescription {
-                    timeoutLog += " waitingError=\(lastWaitingErrorDescription)"
+                let (observedState, waitingError) = lockedState.withLock { state in
+                    (state.lastObservedStateDescription, state.lastWaitingErrorDescription)
+                }
+                var timeoutLog = "\(configuration.logLabel) timed out while state=\(observedState)"
+                if let waitingError {
+                    timeoutLog += " waitingError=\(waitingError)"
                 }
                 codexLogPairingTransport(timeoutLog)
                 finish(.failure(timeoutError))
                 connection?.cancel()
             }
+            lockedState.withLock { $0.timeoutTask = task }
         }
     }
 
