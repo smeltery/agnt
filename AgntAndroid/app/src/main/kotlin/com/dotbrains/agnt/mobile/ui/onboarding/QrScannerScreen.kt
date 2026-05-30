@@ -88,6 +88,9 @@ fun QrScannerScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    // Hoisted out of scope.launch / non-Composable callbacks so they re-cache on configuration change.
+    val cameraDeniedMessage = stringResource(R.string.qr_scanner_camera_denied)
+    val pairingValidMessage = stringResource(R.string.qr_scanner_valid)
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var connecting by remember { mutableStateOf(false) }
@@ -125,7 +128,7 @@ fun QrScannerScreen(
             if (cameraPermissionGranted) {
                 resetScanner()
             } else {
-                errorMessage = context.getString(R.string.qr_scanner_camera_denied)
+                errorMessage = cameraDeniedMessage
             }
         }
 
@@ -150,7 +153,7 @@ fun QrScannerScreen(
         scope.launch {
             connecting = true
             errorMessage = null
-            statusMessage = context.getString(R.string.qr_scanner_valid)
+            statusMessage = pairingValidMessage
             try {
                 applyQrPayloadAndConnect(
                     repository = repository,

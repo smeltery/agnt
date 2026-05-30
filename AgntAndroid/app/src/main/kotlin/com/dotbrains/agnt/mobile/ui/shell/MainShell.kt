@@ -109,6 +109,11 @@ fun MainShell(
     val showShellHeader = currentRoute == AppRoutes.Home
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Hoisted out of scope.launch so they re-cache on configuration change.
+    val gitRepoDiffLoadErrorMessage = stringResource(R.string.git_repo_diff_load_error)
+    val gitInitInitializingMessage = stringResource(R.string.git_init_initializing)
+    val gitInitInitializedMessage = stringResource(R.string.git_init_initialized)
+
     val ready by repository.isSessionReady.collectAsStateWithLifecycle()
     val currentReady by rememberUpdatedState(ready)
     var backgroundedWhileReady by remember { mutableStateOf(false) }
@@ -301,7 +306,7 @@ fun MainShell(
                             if (rawMessage.isNotBlank() && userVisibleMessage == null) {
                                 null
                             } else {
-                                userVisibleMessage ?: context.getString(R.string.git_repo_diff_load_error)
+                                userVisibleMessage ?: gitRepoDiffLoadErrorMessage
                             }
                     }
                 repoDiffSheetFullLoading = false
@@ -592,7 +597,7 @@ fun MainShell(
         if (!showGitControls || gitActionBusy) return
         scope.launch {
             gitActionBusy = true
-            gitActionProgressMessage = context.getString(R.string.git_init_initializing)
+            gitActionProgressMessage = gitInitInitializingMessage
             gitInitError = null
             try {
                 withTimeout(GIT_OPERATION_TIMEOUT_MS) {
@@ -604,7 +609,7 @@ fun MainShell(
                     branchesWithStatusSnapshot = runCatching { git.branchesWithStatus() }.getOrNull()
                     defaultGitBaseBranch = branchesWithStatusSnapshot?.defaultBranch
                     showGitInitPrompt = false
-                    gitActionProgressMessage = context.getString(R.string.git_init_initialized)
+                    gitActionProgressMessage = gitInitInitializedMessage
                 }
             } catch (e: Throwable) {
                 gitActionProgressMessage = null

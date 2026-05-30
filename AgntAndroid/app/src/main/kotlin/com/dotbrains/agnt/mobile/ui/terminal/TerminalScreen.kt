@@ -72,6 +72,17 @@ fun TerminalScreen(
 
     val activeSnapshot = snapshots[activeTerminalId] ?: TerminalSnapshot.idle(activeTerminalId)
 
+    // Lift the per-terminal Flow chain out of composition: `Flow.filter { }.map { }` allocates
+    // a brand-new Flow every recomposition, which churns subscribers downstream. `remember` keys
+    // on the inputs that actually change the upstream (activeTerminalId + controller) so the same
+    // Flow instance is reused across recompositions.
+    val incomingTerminalOutput =
+        remember(activeTerminalId, controller) {
+            controller.outputEvents
+                .filter { it.terminalId == activeTerminalId }
+                .map { it.bytes }
+        }
+
     val resolvedProfile by remember {
         derivedStateOf { draftProfile.applyingConnectionString(connectionDraft).normalizedForSave() }
     }
@@ -297,10 +308,7 @@ fun TerminalScreen(
                     initialBuffer = activeSnapshot.bufferData,
                     fontSize = fontSize,
                     theme = theme,
-                    incomingOutput =
-                        controller.outputEvents
-                            .filter { it.terminalId == activeTerminalId }
-                            .map { it.bytes },
+                    incomingOutput = incomingTerminalOutput,
                     isUnavailableSignal = { reason ->
                         nativeAvailable = false
                         actionError = reason
@@ -320,10 +328,7 @@ fun TerminalScreen(
                 )
             } else {
                 TermuxTerminalSurface(
-                    output =
-                        controller.outputEvents
-                            .filter { it.terminalId == activeTerminalId }
-                            .map { it.bytes },
+                    output = incomingTerminalOutput,
                     onInput = { bytes ->
                         if (activeSnapshot.status != TerminalStatus.Running) return@TermuxTerminalSurface
                         coroutineScope.launch {

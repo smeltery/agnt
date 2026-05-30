@@ -171,6 +171,10 @@ fun TurnConversationPane(
     modifier: Modifier = Modifier,
 ) {
     val ready by repository.isSessionReady.collectAsStateWithLifecycle()
+    // Hoisted out of scope.launch / non-Composable callbacks so they re-cache on configuration change.
+    val undoMissingCwdMessage = stringResource(R.string.turn_usage_revert_reason_missing_cwd)
+    val undoFailedMessage = stringResource(R.string.turn_message_action_undo_failed)
+    val checkoutElsewhereBlockedMessage = stringResource(R.string.git_branch_checkout_elsewhere_blocked)
     val availableModels by repository.availableModels.collectAsStateWithLifecycle()
     val isLoadingModels by repository.isLoadingModels.collectAsStateWithLifecycle()
     val selectedModelId by repository.selectedModelId.collectAsStateWithLifecycle()
@@ -1290,7 +1294,7 @@ fun TurnConversationPane(
                     onUndoAssistantChanges = { changeSet ->
                         val workingDirectory = changeSet.repoRoot ?: activeThread?.cwd
                         if (workingDirectory.isNullOrBlank()) {
-                            inlineUndoError = context.getString(R.string.turn_usage_revert_reason_missing_cwd)
+                            inlineUndoError = undoMissingCwdMessage
                             return@MessageList
                         }
                         scope.launch {
@@ -1314,7 +1318,7 @@ fun TurnConversationPane(
                                     val message =
                                         applyResult.unsupportedReasons.firstOrNull()
                                             ?: applyResult.conflicts.firstOrNull()?.message
-                                            ?: context.getString(R.string.turn_message_action_undo_failed)
+                                            ?: undoFailedMessage
                                     inlineUndoError = message
                                     aiChangeSetPersistence.save(
                                         TurnUsageSheetLogic.recordChangeSetRevertError(
@@ -1328,7 +1332,7 @@ fun TurnConversationPane(
                             }.onFailure { error ->
                                 val message =
                                     error.message?.ifBlank { null }
-                                        ?: context.getString(R.string.turn_message_action_undo_failed)
+                                        ?: undoFailedMessage
                                 inlineUndoError = message
                                 aiChangeSetPersistence.save(
                                     TurnUsageSheetLogic.recordChangeSetRevertError(
@@ -1529,8 +1533,7 @@ fun TurnConversationPane(
                         elsewhereSet.contains(selectedBranch) &&
                             elsewherePathRaw.isNullOrEmpty()
                     if (selectedElsewhereUnresolved) {
-                        gitBranchCheckoutError =
-                            context.getString(R.string.git_branch_checkout_elsewhere_blocked)
+                        gitBranchCheckoutError = checkoutElsewhereBlockedMessage
                         return@checkout
                     }
                     if (

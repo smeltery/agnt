@@ -94,6 +94,10 @@ fun SidebarScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val sidebarColors = rememberSidebarColorPalette()
+    // Hoisted out of scope.launch so they re-cache on configuration change.
+    val noLocalProjectMessage = stringResource(R.string.sidebar_worktree_chat_no_local_project)
+    val noBaseBranchMessage = stringResource(R.string.sidebar_worktree_chat_no_base_branch)
+    val threadRenameEmptyMessage = stringResource(R.string.thread_rename_dialog_empty)
 
     var query by remember { mutableStateOf("") }
     var newChatBusy by remember { mutableStateOf(false) }
@@ -152,8 +156,7 @@ fun SidebarScreen(
                         ?: baseProjectPath?.trim()?.takeIf { it.isNotEmpty() }
                         ?: WorktreeNewChatDefaults.baseProjectPath(activeId, threads)
                         ?: run {
-                            worktreeChatError =
-                                context.getString(R.string.sidebar_worktree_chat_no_local_project)
+                            worktreeChatError = noLocalProjectMessage
                             return@launch
                         }
                 val branch =
@@ -165,13 +168,13 @@ fun SidebarScreen(
                                 loaded.getOrNull() ?: run {
                                     worktreeChatError =
                                         loaded.exceptionOrNull()?.let { GitBranchDisplayMapper.userVisibleMessage(it) }
-                                            ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)
+                                            ?: noBaseBranchMessage
                                     return@launch
                                 }
                             WorktreeNewChatDefaults.baseBranch(GitBranchDisplayMapper.summaryFrom(gitResult))
                                 ?: run {
                                     worktreeChatError =
-                                        context.getString(R.string.sidebar_worktree_chat_no_base_branch)
+                                        noBaseBranchMessage
                                     return@launch
                                 }
                         }
@@ -181,7 +184,7 @@ fun SidebarScreen(
                         loaded.getOrNull() ?: run {
                             worktreeChatError =
                                 loaded.exceptionOrNull()?.let { GitBranchDisplayMapper.userVisibleMessage(it) }
-                                    ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)
+                                    ?: noBaseBranchMessage
                             return@launch
                         }
                     val alert =
@@ -434,7 +437,7 @@ fun SidebarScreen(
             onConfirm = { newName ->
                 val target = renameTarget ?: return@ThreadRenameDialog
                 if (newName.isBlank()) {
-                    renameError = context.getString(R.string.thread_rename_dialog_empty)
+                    renameError = threadRenameEmptyMessage
                     return@ThreadRenameDialog
                 }
                 renameBusy = true

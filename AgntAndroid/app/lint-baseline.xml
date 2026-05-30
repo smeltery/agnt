@@ -211,204 +211,6 @@
     </issue>
 
     <issue
-        id="FlowOperatorInvokedInComposition"
-        message="Flow operator functions should not be invoked within composition"
-        errorLine1="                            .filter { it.terminalId == activeTerminalId }"
-        errorLine2="                             ~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
-            line="302"
-            column="30"/>
-    </issue>
-
-    <issue
-        id="FlowOperatorInvokedInComposition"
-        message="Flow operator functions should not be invoked within composition"
-        errorLine1="                            .map { it.bytes },"
-        errorLine2="                             ~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
-            line="303"
-            column="30"/>
-    </issue>
-
-    <issue
-        id="FlowOperatorInvokedInComposition"
-        message="Flow operator functions should not be invoked within composition"
-        errorLine1="                            .filter { it.terminalId == activeTerminalId }"
-        errorLine2="                             ~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
-            line="325"
-            column="30"/>
-    </issue>
-
-    <issue
-        id="FlowOperatorInvokedInComposition"
-        message="Flow operator functions should not be invoked within composition"
-        errorLine1="                            .map { it.bytes },"
-        errorLine2="                             ~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
-            line="326"
-            column="30"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                                userVisibleMessage ?: context.getString(R.string.git_repo_diff_load_error)"
-        errorLine2="                                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
-            line="304"
-            column="55"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="            gitActionProgressMessage = context.getString(R.string.git_init_initializing)"
-        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
-            line="595"
-            column="40"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                    gitActionProgressMessage = context.getString(R.string.git_init_initialized)"
-        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
-            line="607"
-            column="48"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                errorMessage = context.getString(R.string.qr_scanner_camera_denied)"
-        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
-            line="128"
-            column="32"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="            statusMessage = context.getString(R.string.qr_scanner_valid)"
-        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
-            line="153"
-            column="29"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                                context.getString(R.string.sidebar_worktree_chat_no_local_project)"
-        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
-            line="156"
-            column="33"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                                            ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)"
-        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
-            line="168"
-            column="48"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                                        context.getString(R.string.sidebar_worktree_chat_no_base_branch)"
-        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
-            line="174"
-            column="41"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                                    ?: context.getString(R.string.sidebar_worktree_chat_no_base_branch)"
-        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
-            line="184"
-            column="40"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                    renameError = context.getString(R.string.thread_rename_dialog_empty)"
-        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
-            line="437"
-            column="35"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                            inlineUndoError = context.getString(R.string.turn_usage_revert_reason_missing_cwd)"
-        errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
-            line="1293"
-            column="47"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                                            ?: context.getString(R.string.turn_message_action_undo_failed)"
-        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
-            line="1317"
-            column="48"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                                        ?: context.getString(R.string.turn_message_action_undo_failed)"
-        errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
-            line="1331"
-            column="44"/>
-    </issue>
-
-    <issue
-        id="LocalContextGetResourceValueCall"
-        message="Querying resource values using LocalContext.current"
-        errorLine1="                            context.getString(R.string.git_branch_checkout_elsewhere_blocked)"
-        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
-            line="1533"
-            column="29"/>
-    </issue>
-
-    <issue
         id="LocalContextResourcesRead"
         message="Reading Resources using LocalContext.current.resources"
         errorLine1="            TurnMarkdownRenderCache.toolExecutionUi(preview, details, context.resources)"
@@ -960,7 +762,7 @@
         errorLine2="                                             ~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
-            line="139"
+            line="144"
             column="46"/>
     </issue>
 
@@ -971,7 +773,7 @@
         errorLine2="                                        ~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
-            line="100"
+            line="103"
             column="41"/>
     </issue>
 
@@ -1004,7 +806,7 @@
         errorLine2="                                                              ~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
-            line="216"
+            line="220"
             column="63"/>
     </issue>
 
@@ -1675,7 +1477,7 @@
         errorLine2="                                                         ~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
-            line="413"
+            line="418"
             column="58"/>
     </issue>
 
@@ -1884,7 +1686,7 @@
         errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
-            line="381"
+            line="386"
             column="35"/>
     </issue>
 
@@ -1895,7 +1697,7 @@
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
-            line="389"
+            line="394"
             column="27"/>
     </issue>
 
@@ -1906,7 +1708,7 @@
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
-            line="394"
+            line="399"
             column="27"/>
     </issue>
 
