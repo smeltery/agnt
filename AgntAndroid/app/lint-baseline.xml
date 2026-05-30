@@ -2,28 +2,6 @@
 <issues format="6" by="lint 8.10.1" type="baseline" client="gradle" dependencies="false" name="AGP (8.10.1)" variant="all" version="8.10.1">
 
     <issue
-        id="MissingPermission"
-        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
-        errorLine1="        NotificationManagerCompat.from(appContext).notify(tag, notificationId, notification)"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
-            line="169"
-            column="9"/>
-    </issue>
-
-    <issue
-        id="MissingPermission"
-        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
-        errorLine1="                    AudioRecord("
-        errorLine2="                    ^">
-        <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/voice/BridgeVoiceRecorder.kt"
-            line="157"
-            column="21"/>
-    </issue>
-
-    <issue
         id="AppBundleLocaleChanges"
         message="Found dynamic locale changes, but did not find corresponding Play Core library calls for downloading languages and splitting by language is not disabled in the `bundle` configuration"
         errorLine1="            config.setLocales(LocaleList(englishLocale))"
@@ -898,7 +876,7 @@
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
-            line="143"
+            line="144"
             column="21"/>
     </issue>
 
@@ -909,7 +887,7 @@
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
-            line="224"
+            line="236"
             column="17"/>
     </issue>
 
@@ -1653,7 +1631,7 @@
         errorLine2="            ~~~~~~~~~~~~">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
-            line="219"
+            line="231"
             column="13"/>
     </issue>
 
@@ -1664,7 +1642,7 @@
         errorLine2="            ^">
         <location
             file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
-            line="272"
+            line="284"
             column="13"/>
     </issue>
 

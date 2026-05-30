@@ -161,6 +161,11 @@ class BridgeVoiceRecorder {
                         AudioFormat.ENCODING_PCM_16BIT,
                         bufferSize,
                     )
+                } catch (_: SecurityException) {
+                    // RECORD_AUDIO was revoked between the upstream permission
+                    // gate and this constructor call; treat the same as any
+                    // other init failure and fall through to the next sample rate.
+                    continue
                 } catch (_: Exception) {
                     continue
                 }

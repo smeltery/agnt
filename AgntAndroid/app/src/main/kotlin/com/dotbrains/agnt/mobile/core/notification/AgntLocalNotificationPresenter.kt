@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.dotbrains.agnt.mobile.MainActivity
@@ -166,7 +167,17 @@ class AgntLocalNotificationPresenter(
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)
                 .build()
-        NotificationManagerCompat.from(appContext).notify(tag, notificationId, notification)
+        // canPostNotifications() gates the caller, but POST_NOTIFICATIONS can be
+        // revoked between that check and this call (e.g. user toggled it in
+        // Settings while the app was backgrounded). Swallow the resulting
+        // SecurityException so a race-condition revoke doesn't crash the app —
+        // the notification just doesn't show, which matches what the user just
+        // asked for anyway.
+        try {
+            NotificationManagerCompat.from(appContext).notify(tag, notificationId, notification)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "notify($tag) denied — POST_NOTIFICATIONS revoked at runtime: ${e.message}")
+        }
     }
 
     private fun runCompletionDedupeKey(
@@ -195,6 +206,7 @@ class AgntLocalNotificationPresenter(
         const val SOURCE_PENDING_APPROVAL = "remodex.pendingApproval"
         const val SOURCE_STRUCTURED_INPUT = "remodex.structuredUserInput"
 
+        private const val TAG = "AgntLocalNotificationPresenter"
         private const val DEDUPE_WINDOW_MS = 60_000L
         private const val NOTIFICATION_ID_RUN_BASE = 10_000
         private const val NOTIFICATION_ID_APPROVAL_BASE = 20_000
