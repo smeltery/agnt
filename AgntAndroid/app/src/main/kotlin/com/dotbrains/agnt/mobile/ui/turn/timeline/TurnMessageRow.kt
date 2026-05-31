@@ -257,6 +257,13 @@ fun TurnMessageRow(
                                 }
                             }
                         }
+                        if (message.role == CodexMessageRole.assistant && message.kind == CodexMessageKind.chat) {
+                            TurnSearchCitationAccessory(
+                                markdown = bodyMarkdown,
+                                isStreaming = message.isStreaming,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
                 if (directiveOutcome.findings.isNotEmpty()) {

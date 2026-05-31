@@ -41,6 +41,9 @@
     <string name="turn_timeline_group_executed_commands">Commands executed</string>
     <string name="turn_timeline_group_modified_files">Modified files</string>
     <string name="turn_timeline_group_work_details">Activity details</string>
+    <string name="turn_search_citations_title">Searches</string>
+    <string name="turn_search_citations_show">Show searches</string>
+    <string name="turn_search_citations_hide">Hide searches</string>
     <string name="turn_timeline_group_toggle_expand_cd">Show %1$d items</string>
     <string name="turn_timeline_group_toggle_collapse_cd">Hide group</string>
     <string name="turn_timeline_kind_plan">Plan</string>

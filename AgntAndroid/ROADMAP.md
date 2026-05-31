@@ -327,6 +327,8 @@ project picker, settings, onboarding, and terminal editor flows. Two items
 remain:
 
 - [ ] Final markdown/message pixel polish (upstream commit c7843aa).
+      Collapsible search citation rows are ported; finish the rest from
+      screenshot/device comparison rather than more code-only inference.
 - [ ] Manual device pairing + visual screenshot verification. This is the next
       useful source of truth before more subjective UI changes; do it with
       paired iOS/Android screenshots instead of more inferred code-only tweaks.
