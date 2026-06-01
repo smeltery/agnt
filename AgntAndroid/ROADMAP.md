@@ -355,6 +355,46 @@ Open follow-ups:
       `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:lintDebug` green.
       Visual verification on a device still pending.
 
+### P2.9 — upstream `55fe4c1c` parity ports (local-first)
+
+Four local-first Android surfaces from upstream Stivy-01/remodex commit
+`55fe4c1c` ("port android local-first parity changes", landed the day after
+agnt's snapshot import). The self-contained pieces (models, services, prefs,
+palette, draft logic) were ported faithfully with tests; the UI wiring that
+conflicts with agnt's structure was deferred rather than forced.
+
+- [x] **Relay health client** — `core/model/RelayHealthModels.kt`,
+      `services/RelayHealthClient.kt` (polls the relay `GET /health` route in
+      `relay/server.js`; log tag rebranded `RemodexRelayHealth` → `AgntRelayHealth`),
+      parser test. Reuses `SessionPersistence.loadRelaySnapshot()` +
+      `validateRelayUrl()`. Fully self-contained — no deferred wiring.
+- [x] **Workspace text-file preview (component)** — `WorkspaceTextFileModels`,
+      `services/workspace/WorkspaceTextFileService` (uses the existing
+      `workspace/readFile` RPC), `ui/turn/WorkspaceTextFilePreviewDialog`
+      (`AgntModalBottomSheet`), service test.
+  - [ ] **Wire to a tap target.** Upstream triggers the dialog from a
+        file-mention tap inside its timeline; agnt's timeline differs
+        structurally. Attach from a file link/mention in `ui/turn/...` when the
+        timeline edit is in scope.
+- [x] **User bubble color (palette + prefs)** — `core/model/UserBubbleColor.kt`,
+      `data/UserBubblePreferences.kt` (key `codex.userBubbleColor` →
+      `agnt.userBubbleColor`, reuses `ThemePreferences` store),
+      `ui/theme/UserBubbleColorPalette.kt`, two tests.
+  - [ ] **Apply in user-message rendering.** Palette/prefs are ready; applying
+        the selected color spans several `ui/turn/...` user-bubble files — a
+        broader UI change left as follow-up. (Also add a Settings picker.)
+- [x] **New-chat draft (logic + models)** — `ui/draft/NewChatDraftLogic.kt`,
+      `NewChatDraftModels.kt`, logic test. `GitRepoSyncResult` / `GitChangedFile`
+      match upstream.
+  - [ ] **`NewChatDraftScreen.kt` deferred.** Upstream depends on a freemium
+        `SubscriptionService` (absent in agnt by design — a hosted-monetization
+        concern) and is wired into upstream's `AppNavHost`/`AppRoutes`/
+        `SidebarDrawerContent`, which differ from agnt's nav. Porting the screen
+        means re-pointing it at agnt's nav and dropping the subscription gate.
+
+`:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:assembleDebug` green.
+All package/identifier rebrands applied; banned-identifier sweep clean.
+
 ## Finishing the upstream parity audit
 
 Per `ios-android-parity-plan.md`, the reasonable code-inspection parity gaps
