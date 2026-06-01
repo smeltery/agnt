@@ -84,6 +84,7 @@ import com.dotbrains.agnt.mobile.ui.home.RootViewModel
 import com.dotbrains.agnt.mobile.ui.home.ThreadCompletionBanner
 import com.dotbrains.agnt.mobile.ui.navigation.AppNavHost
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
+import com.dotbrains.agnt.mobile.ui.pet.PetCompanionHost
 import com.dotbrains.agnt.mobile.ui.turn.timeline.LocalOpenRepoDiffForMarkdownLink
 import com.dotbrains.agnt.mobile.ui.turn.timeline.RepoMarkdownFileLink
 import kotlinx.coroutines.TimeoutCancellationException
@@ -978,6 +979,12 @@ fun MainShell(
                                 .then(if (showShellHeader) Modifier.statusBarsPadding() else Modifier),
                     )
                 }
+                // Optional companion pet, drawn above content. Interaction is limited
+                // to Home so drags don't fight other screens' gestures.
+                PetCompanionHost(
+                    bottomExclusionHeightDp = 140f,
+                    isInteractionEnabled = showShellHeader,
+                )
                 if (showShellHeader) {
                     ConversationHeader(
                         title = activeThreadTitle,

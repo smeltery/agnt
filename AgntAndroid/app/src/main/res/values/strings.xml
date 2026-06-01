@@ -391,6 +391,14 @@
     <string name="settings_theme_dark_subtitle">Always use dark appearance.</string>
     <string name="settings_about_version">Version %1$s</string>
     <string name="settings_more_coming">Trusted Mac and runtime defaults will land as Android service parity grows.</string>
+    <string name="settings_section_pet">Companion pet</string>
+    <string name="settings_pet_hint">Show an optional animated pet that reacts to your chats. Pets are loaded from ~/.codex/pets on your paired computer.</string>
+    <string name="settings_pet_enable_title">Show companion pet</string>
+    <string name="settings_pet_connect_first">Connect to your computer to load local pets.</string>
+    <string name="settings_pet_loading">Loading pets…</string>
+    <string name="settings_pet_empty">No pets found in ~/.codex/pets.</string>
+    <string name="settings_pet_default_description">A custom companion pet.</string>
+    <string name="settings_pet_refresh">Refresh pets</string>
     <string name="about_agnt_title">About agnt</string>
     <string name="about_agnt_description">Android companion for the local agnt bridge.</string>
     <string name="about_agnt_local_first_title">Local-first</string>
