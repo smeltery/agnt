@@ -48,7 +48,10 @@ Code that originated in [Remodex](https://github.com/Emanuele-web04/remodex) (th
 
 ### Prerequisites
 
-- **Node.js** v18+
+- **[Flox](https://flox.dev)** (recommended) — provides the pinned Node, Bun, JDK,
+  and Rust toolchain in one step (see [Flox toolchain](#flox-toolchain-recommended)
+  below). If you'd rather use your own toolchain, install **Node.js** v18+ (CI
+  pins Node 20) and **[Bun](https://bun.sh)** 1.3.11 instead.
 - At least one supported agent CLI:
   - **[Codex CLI](https://github.com/openai/codex)** — native, full feature parity
   - **[Claude Code](https://docs.claude.com/en/docs/claude-code)** — full chat, tools, interrupts, approvals
@@ -58,6 +61,40 @@ Code that originated in [Remodex](https://github.com/Emanuele-web04/remodex) (th
 - **macOS** (required for the macOS launchd daemon and the Codex desktop refresh; core bridge works on any OS)
 - **Xcode 16+** (only for building the iOS app)
 - **iPhone** with the agnt app (or built from source)
+
+### Flox toolchain (recommended)
+
+The repo ships a [Flox](https://flox.dev) environment under [`.flox/`](.flox/) that
+pins the exact Node 20, Bun 1.3.11, JDK 17, and Rust toolchain used by CI — so
+"works on my machine" matches "works in CI." Install Flox once, then activate the
+environment from the repo root:
+
+```sh
+git clone https://github.com/dotbrains/agnt.git
+cd agnt
+
+flox activate            # drops you into a shell with the full toolchain
+node --version           # v20.x — no nvm/asdf needed
+```
+
+Everything below works the same inside or outside the Flox shell; inside it you
+don't have to install Node/Bun/JDK/Rust yourself. The agent CLIs (Codex, Claude
+Code, opencode, Cursor) and Xcode are **not** managed by Flox — install those
+separately.
+
+Boot the whole local stack (relay + bridge) with the bundled services, which
+self-install their dependencies on first run:
+
+```sh
+flox activate --start-services    # starts the relay + bridge services
+flox services status              # check what's running
+flox services logs bridge         # tail a service
+```
+
+CI uses the same environment via [`flox/install-flox-action`](https://github.com/flox/install-flox-action)
+and runs each step with `flox activate -d "$GITHUB_WORKSPACE" -- <cmd>`, so the
+toolchain is identical locally and in GitHub Actions. The Android SDK is still
+provisioned by Gradle/AGP (Flox owns the JDK, not the platform SDK).
 
 ### Bridge setup
 

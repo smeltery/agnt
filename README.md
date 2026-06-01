@@ -108,6 +108,8 @@ The full set (push notifications, APNs, desktop refresher tuning, test overrides
 
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. Short version: small focused PRs welcome, contributions ship under [PolyForm Shield 1.0.0](LICENSE) (the same license as the rest of the project), and the playbook for adding a new provider is at [`docs/development/adding-a-provider.md`](docs/development/adding-a-provider.md).
 
+The repo ships a [Flox](https://flox.dev) environment ([`.flox/`](.flox/)) that pins the Node, Bun, JDK, and Rust toolchain CI uses — run `flox activate` from the repo root to get it, or `flox activate --start-services` to boot the relay + bridge. See [the Flox toolchain section](CONTRIBUTING.md#flox-toolchain-recommended) in `CONTRIBUTING.md`.
+
 Bridge tests live under `agnt-bridge/test/` (400 unit tests, run with `(cd agnt-bridge && bun run test)`). The CI badges above run on every push.
 
 ### Note for bun users installing the bridge globally

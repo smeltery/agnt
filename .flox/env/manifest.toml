@@ -1,0 +1,103 @@
+## Flox Environment Manifest for agnt (local-first, multi-provider)
+##
+## This is the single source of truth for the agnt development toolchain.
+## `flox activate` gives every contributor (and CI, via flox/install-flox-action)
+## the same pinned Node, Bun, JDK, and Rust regardless of host package manager.
+##
+## Components covered:
+##   - agnt-bridge / relay  -> Node 20 (runtime) + Bun (installer/test runner)
+##   - agnt-web / agnt-host  -> Node 20 + Bun (Vite/React/Vitest)
+##   - agnt-host (Tauri)     -> Rust toolchain (macOS-leaning; see CLAUDE.md)
+##   - AgntAndroid           -> JDK 17 (Gradle still pulls the Android SDK itself)
+##   - AgntMobile (iOS)      -> Xcode-only; not provisioned by Flox.
+##
+## Docs: https://flox.dev/docs/reference/command-reference/manifest.toml/
+schema-version = "1.12.0"
+
+
+## Install Packages --------------------------------------------------
+[install]
+# Node is the runtime for agnt-bridge + relay (require() + node:test) and the
+# build host for agnt-web/agnt-host. Pinned to 20 to match CI.
+nodejs.pkg-path = "nodejs_20"
+
+# Bun is the installer + test runner across all JS components (bun.lock).
+# Pinned to match `packageManager` in package.json and the CI setup-bun step.
+bun.pkg-path = "bun"
+bun.version = "1.3.11"
+
+# JDK 17 for AgntAndroid Gradle builds. JAVA_HOME is wired up in [hook] below.
+# The Android SDK itself is provisioned by Gradle/AGP, not Flox.
+jdk.pkg-path = "jdk17"
+
+# Rust toolchain for the agnt-host Tauri supervisor. Pinned >= the Cargo
+# rust-version (1.77.2). Tauri's Linux system libs are out of scope here
+# (the host is macOS-leaning per CLAUDE.md); this covers the Rust side.
+rustc.pkg-path = "rustc"
+cargo.pkg-path = "cargo"
+
+# git is always present in CI but not guaranteed in a bare container; pin it so
+# activation hooks and tooling behave identically everywhere.
+git.pkg-path = "git"
+
+
+## Environment Variables ---------------------------------------------
+[vars]
+# Marker so scripts/hooks can detect they're running inside the Flox env.
+AGNT_FLOX = "1"
+
+
+## Activation Hook ---------------------------------------------------
+##  Runs in bash on `flox activate`. Keep it fast and idempotent — no installs.
+[hook]
+on-activate = '''
+  # Point Gradle/Kotlin at the Flox-provided JDK. All Flox packages merge into
+  # $FLOX_ENV, so its root doubles as JAVA_HOME (it has bin/java + lib/).
+  export JAVA_HOME="$FLOX_ENV"
+
+  # Keep Bun's global cache inside the env cache dir so it survives across
+  # activations without polluting $HOME.
+  export BUN_INSTALL_CACHE_DIR="$FLOX_ENV_CACHE/bun"
+'''
+
+
+## Profile script ----------------------------------------------------
+##  Sourced by your interactive shell on `flox activate`. Banner only — quiet
+##  in CI (gate on an interactive TTY and an opt-out var).
+[profile]
+common = '''
+  if [ -t 1 ] && [ -z "${AGNT_FLOX_QUIET:-}" ]; then
+    echo "agnt dev env ready — node $(node --version), bun $(bun --version)"
+    echo "  Install deps:   (cd agnt-bridge && bun install)   # repeat per JS component"
+    echo "  Run the stack:  flox activate --start-services    # relay + bridge"
+  fi
+'''
+
+
+## Services ---------------------------------------------------------
+##  $ flox activate --start-services   <- relay + bridge together
+##  $ flox services start relay        <- one at a time
+##  Commands run from $FLOX_ENV_PROJECT (the repo root) and self-install deps
+##  on first run so a fresh clone boots with a single command.
+[services]
+relay.command = '''
+  cd "$FLOX_ENV_PROJECT/relay"
+  [ -d node_modules ] || bun install --frozen-lockfile
+  exec node ./server.js
+'''
+
+bridge.command = '''
+  cd "$FLOX_ENV_PROJECT/agnt-bridge"
+  [ -d node_modules ] || bun install --frozen-lockfile
+  exec node ./bin/agnt.js up
+'''
+
+
+## Other Environment Options -----------------------------------------
+[options]
+systems = [
+  "aarch64-darwin",
+  "x86_64-darwin",
+  "aarch64-linux",
+  "x86_64-linux",
+]

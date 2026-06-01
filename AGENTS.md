@@ -132,3 +132,11 @@ npm start
 # or, with explicit provider:
 node ./bin/agnt.js up --provider codex
 ```
+
+The repo ships a [Flox](https://flox.dev) environment (`.flox/`) that pins the
+Node 20 / Bun 1.3.11 / JDK 17 / Rust toolchain CI uses. `flox activate` from the
+repo root gives you that toolchain; `flox activate --start-services` boots the
+relay + bridge services. CI installs Flox via `flox/install-flox-action` and runs
+each step with `flox activate -d "$GITHUB_WORKSPACE" -- <cmd>`, so the toolchain
+is byte-identical locally and in GitHub Actions. The agent CLIs and Xcode are not
+managed by Flox; the Android SDK is still provisioned by Gradle/AGP.
