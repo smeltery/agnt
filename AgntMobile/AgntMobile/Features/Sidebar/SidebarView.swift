@@ -15,10 +15,17 @@ struct SidebarView: View {
     @Binding var isSearchActive: Bool
     var showsInlineCloseButton: Bool = false
     var isVisible: Bool = true
+    var isSwitchingMac: Bool = false
+    var switchingMacDeviceId: String? = nil
+    var macSwitchNotice: String? = nil
 
     let onClose: () -> Void
     let onOpenTerminal: () -> Void
     let onOpenMyMacs: () -> Void
+    let onSwitchTrustedMac: (String) -> Void
+    let onForgetTrustedMac: (String) -> Void
+    let onScanTrustedMac: () -> Void
+    let onCancelMacSwitch: () -> Void
     let onOpenNewChatDraft: (NewChatDraftSource, String?) -> Void
     let onNewChatCreationStateChange: (Bool) -> Void
     let onOpenThread: (CodexThread) -> Void
@@ -171,6 +178,13 @@ struct SidebarView: View {
             SidebarFloatingSettingsButton(colorScheme: colorScheme, action: openSettings)
             SidebarFloatingMacsButton(colorScheme: colorScheme, action: openMyMacs)
             SidebarFloatingTerminalButton(colorScheme: colorScheme, action: openTerminal)
+            SidebarDevicesMenuButton(
+                colorScheme: colorScheme,
+                isSwitchingMac: isSwitchingMac,
+                switchingMacDeviceId: switchingMacDeviceId,
+                onSelectDevice: handleSwitcherSelectDevice,
+                onOpenDevicesSettings: openDevicesSettings
+            )
             Spacer(minLength: 0)
             if let trustedPairPresentation = codex.trustedPairPresentation {
                 SidebarComputerConnectionStatusView(
@@ -461,6 +475,18 @@ struct SidebarView: View {
         onClose()
     }
 
+    // Quick-switch from the sidebar switcher closes the drawer so the switch overlay reads cleanly.
+    private func handleSwitcherSelectDevice(_ deviceId: String) {
+        searchText = ""
+        isSearchActive = false
+        onClose()
+        onSwitchTrustedMac(deviceId)
+    }
+
+    private func openDevicesSettings() {
+        activeSidebarSheet = .devicesSettings
+    }
+
     // Clears sidebar-only input state before navigation so full-width search mode cannot hold the drawer open.
     private func prepareSidebarForChatNavigation() {
         searchText = ""
@@ -686,6 +712,7 @@ private extension SidebarView {
 private enum SidebarPresentedSheet: String, Identifiable {
     case newChatProjectPicker
     case localFolderBrowser
+    case devicesSettings
 
     var id: String { rawValue }
 }
@@ -718,6 +745,26 @@ private extension SidebarView {
                 activeSidebarSheet = nil
                 handleNewChatTap(preferredProjectPath: projectPath)
             }
+        case .devicesSettings:
+            MyDevicesSettingsSheet(
+                isSwitchingMac: isSwitchingMac,
+                switchingDeviceId: switchingMacDeviceId,
+                switchNotice: macSwitchNotice,
+                onSelectDevice: { deviceId in
+                    activeSidebarSheet = nil
+                    onSwitchTrustedMac(deviceId)
+                },
+                onForgetDevice: { deviceId in
+                    onForgetTrustedMac(deviceId)
+                },
+                onAddConnection: {
+                    activeSidebarSheet = nil
+                    onScanTrustedMac()
+                },
+                onCancelSwitch: {
+                    onCancelMacSwitch()
+                }
+            )
         }
     }
 }
