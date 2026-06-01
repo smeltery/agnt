@@ -106,12 +106,8 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
     params: { threadId: "thread-ipc" },
   }));
 
-  const baselineRead = await waitForMessage(fakeCodex.sent, (message) => message.method === "thread/read");
-  assert.deepEqual(baselineRead.params, {
-    threadId: "thread-ipc",
-    includeTurns: false,
-  });
-
+  // Opening a thread connects the IPC bus but must not eagerly read a baseline;
+  // a desktop snapshot below establishes state without any thread/read.
   await waitFor(() => ipcServerSocket);
   writeFrame(ipcServerSocket, {
     type: "broadcast",
@@ -171,6 +167,7 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
       && message.params?.requestId === "req-ipc"
   );
   assert.equal(resolvedMessage.params.threadId, "thread-ipc");
+  assert.equal(fakeCodex.sent.some((message) => message.method === "thread/read"), false);
 });
 
 function requireOptionalWebSocket(t) {
