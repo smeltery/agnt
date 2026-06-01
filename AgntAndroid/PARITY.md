@@ -61,6 +61,10 @@ applicable iOS commits ported, 1 partial, and 7 iOS-only. Notable areas:
 | End-to-end local flow validation    | done            |
 | Markdown / message pixel polish (upstream commit c7843aa) | partial — collapsible search citation accessory ported; remaining pixel-level differences still need screenshot/device verification |
 | Manual device pairing + visual screenshot verification | pending — remaining iOS/Android visual differences should be verified on device or screenshot baselines rather than inferred from code inspection |
+| Workspace text-file preview (upstream Stivy-01/remodex `55fe4c1c`) | partial — `core/model/WorkspaceTextFileModels.kt`, `services/workspace/WorkspaceTextFileService.kt` (uses the existing `workspace/readFile` RPC), and `ui/turn/WorkspaceTextFilePreviewDialog.kt` (`AgntModalBottomSheet`) ported with tests. Component is ready but not yet attached to a file-mention tap target in the timeline — see ROADMAP P2.9. |
+| User bubble color (upstream `55fe4c1c`) | partial — `core/model/UserBubbleColor.kt`, `data/UserBubblePreferences.kt` (storage key rebranded `codex.userBubbleColor` → `agnt.userBubbleColor`, reuses `ThemePreferences` store), `ui/theme/UserBubbleColorPalette.kt` ported with tests. Palette/prefs are ready but not yet applied in user-message rendering — see ROADMAP P2.9. |
+| Relay health client (upstream `55fe4c1c`) | done — `core/model/RelayHealthModels.kt` + `services/RelayHealthClient.kt` (polls the relay `GET /health` exposed by `relay/server.js`; log tag rebranded `RemodexRelayHealth` → `AgntRelayHealth`) with parser test. Reuses agnt's `SessionPersistence.loadRelaySnapshot()` + `validateRelayUrl()`. |
+| New-chat draft flow (upstream `55fe4c1c`) | partial — `ui/draft/NewChatDraftLogic.kt` + `NewChatDraftModels.kt` ported with tests. `NewChatDraftScreen.kt` deferred: upstream depends on a freemium `SubscriptionService` (absent in agnt by design) and a different nav host — see ROADMAP P2.9. |
 
 ## Build / CI
 

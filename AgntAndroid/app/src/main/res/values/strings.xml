@@ -67,6 +67,9 @@
     <string name="turn_mermaid_preview_action">Preview</string>
     <string name="turn_mermaid_preview_title">Mermaid preview</string>
     <string name="turn_preview_close">Close</string>
+    <string name="workspace_text_preview_title">File preview</string>
+    <string name="workspace_text_preview_error">Could not load file preview.</string>
+    <string name="workspace_text_preview_retry">Retry</string>
     <string name="turn_timeline_command_running">Running</string>
     <string name="turn_timeline_command_completed">Execution completed</string>
     <string name="turn_timeline_command_failed">Execution failed</string>
