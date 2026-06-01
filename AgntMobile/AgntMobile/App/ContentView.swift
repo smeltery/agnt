@@ -375,12 +375,27 @@ struct ContentView: View {
                         isSearchActive: $isSearchActive,
                         showsInlineCloseButton: shouldUseFullWidthSidebar,
                         isVisible: sidebarVisible,
+                        isSwitchingMac: viewModel.isSwitchingMac,
+                        switchingMacDeviceId: viewModel.switchingMacDeviceId,
+                        macSwitchNotice: viewModel.macSwitchNotice,
                         onClose: { closeSidebar() },
                         onOpenTerminal: {
                             openTerminal(preferredWorkingDirectory: nil)
                         },
                         onOpenMyMacs: {
                             openMyMacsFromSidebar()
+                        },
+                        onSwitchTrustedMac: { deviceId in
+                            switchToTrustedMac(deviceId)
+                        },
+                        onForgetTrustedMac: { deviceId in
+                            forgetTrustedMac(deviceId)
+                        },
+                        onScanTrustedMac: {
+                            presentMyMacsScanner()
+                        },
+                        onCancelMacSwitch: {
+                            cancelMacSwitch()
                         },
                         onOpenNewChatDraft: { source, preferredProjectPath in
                             openNewChatDraftFromSidebar(source: source, preferredProjectPath: preferredProjectPath)
