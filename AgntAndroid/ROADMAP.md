@@ -319,6 +319,42 @@ Open follow-ups:
       `alias(libs.plugins.…)` and `libs.<bundle>`, making cross-module
       bumps a single-toml edit.
 
+### P2.8 — companion pet overlay (iOS `Features/Pet/` parity)
+
+- [x] **Ported the optional companion pet from iOS.** The bridge handler
+      (`agnt-bridge/src/handlers/pet-handler.js`, `pet/list` + `pet/read` over
+      `~/.codex/pets` / `~/.codex/avatars`) was already provider-agnostic, so
+      this was a client-only port:
+        - `core/model/PetCompanion.kt` — `PetCompanion`, `PetCompanionPhase`
+          (atlas rows/frame counts/per-frame durations kept byte-identical to
+          iOS so the same spritesheets animate the same way), `PetCompanionPosition`,
+          `PetCompanionStatusSnapshot`, and a pure `PetCompanionLayout` (clamp /
+          point / normalized round-trip).
+        - `services/agent/pet/AgentServicePets.kt` — `CodexRepository.listPets` /
+          `readPet` extensions (metadata-only list + separate spritesheet hydrate,
+          with the iOS `pet/read` → `pet/list(includeData)` fallback for older
+          bridges).
+        - `data/PetCompanionStore.kt` — persists enabled / selected / position in
+          a dedicated `agnt_pet` SharedPreferences file, exposes
+          `availablePets` / `renderedPet` / `isLoading` / `errorMessage` flows,
+          and resets in-memory state on disconnect. `PetCompanionStatus.kt` holds
+          a pure `derivePetStatusSnapshot` (idle / running / waiting) over the
+          pet-relevant repo state slice.
+        - `ui/pet/PetCompanionOverlay.kt` — decodes the base64 atlas to a
+          `Bitmap`, crops 192×208 cells into cached `ImageBitmap` frames, runs the
+          play-3×-then-idle animation loop, supports drag-to-reposition + tap-to-jump,
+          and renders the status pill. `PetCompanionHost.kt` wires the store to the
+          bridge + drives the 1 s status refresh while work runs; mounted in
+          `MainShell` (interaction limited to Home).
+        - Settings gains a `Companion pet` card (enable switch + pet picker +
+          refresh).
+      Status: iOS's `failed` / `review` / completion-banner phases degrade to
+      idle until Android exposes per-thread failed/ready/completion state.
+      Coverage: `PetCompanionTest` (atlas math + layout), `PetCompanionStatusTest`
+      (snapshot derivation + prompt sanitizing), `AgentServicePetsTest` (parsing).
+      `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:lintDebug` green.
+      Visual verification on a device still pending.
+
 ## Finishing the upstream parity audit
 
 Per `ios-android-parity-plan.md`, the reasonable code-inspection parity gaps

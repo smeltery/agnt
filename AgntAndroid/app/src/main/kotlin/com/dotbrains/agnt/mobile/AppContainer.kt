@@ -10,6 +10,7 @@ import com.dotbrains.agnt.mobile.core.terminal.TerminalKnownHostStore
 import com.dotbrains.agnt.mobile.core.terminal.TerminalPrivateKeyStore
 import com.dotbrains.agnt.mobile.core.terminal.TerminalProfileStore
 import com.dotbrains.agnt.mobile.data.CodexRepository
+import com.dotbrains.agnt.mobile.data.PetCompanionStore
 import com.dotbrains.agnt.mobile.services.agent.AgentService
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -63,6 +64,10 @@ object AppContainer {
     lateinit var terminalController: TerminalController
         private set
 
+    /** Optional companion-pet state; shared by the shell overlay and Settings. */
+    lateinit var petCompanionStore: PetCompanionStore
+        private set
+
     fun initialize(context: Context) {
         val app = context.applicationContext
         appContext = app
@@ -102,5 +107,6 @@ object AppContainer {
                 privateKeyStore = TerminalPrivateKeyStore(secureStore),
                 knownHostStore = TerminalKnownHostStore(secureStore),
             )
+        petCompanionStore = PetCompanionStore(app)
     }
 }
