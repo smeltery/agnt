@@ -25,7 +25,7 @@ object AppEnvironment {
     fun relayBaseURL(context: Context): String {
         val raw =
             readMetaDataString(context, DEFAULT_RELAY_URL_META_KEY)
-                ?: readStringResource(context, "phodex_default_relay_url")
+                ?: readStringResource(context, "agnt_default_relay_url")
         val trimmed = raw?.trim().orEmpty()
         if (trimmed.isEmpty()) return defaultRelayURLString
         if (trimmed.startsWith("$(") && trimmed.endsWith(")")) {

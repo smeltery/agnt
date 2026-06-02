@@ -7,10 +7,12 @@ import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
+import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRecord
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
@@ -145,6 +147,30 @@ interface CodexRepository {
 
     /** Recoverable npm / pairing prompts from the service layer (bridge upgrade, unsupported runtime fields). */
     val bridgeUpdatePrompt: StateFlow<CodexBridgeUpdatePrompt?>
+
+    /** Trusted Mac registry records surfaced for the "My Devices" multi-device switcher. */
+    val trustedDevices: StateFlow<List<CodexTrustedMacRecord>>
+        get() = MutableStateFlow(emptyList())
+
+    /** Device id currently being switched to (non-null while a switch is in flight). */
+    val switchingDeviceId: StateFlow<String?>
+        get() = MutableStateFlow(null)
+
+    /** Transient user-facing notice from the last device switch (e.g. offline / cancelled). */
+    val deviceSwitchNotice: StateFlow<String?>
+        get() = MutableStateFlow(null)
+
+    /** Locally selected trusted device, even when the relay session is not yet live. */
+    val currentTrustedMacDeviceId: StateFlow<String?>
+        get() = MutableStateFlow(null)
+
+    /** Previously selected trusted device, used to offer a quick switch-back. */
+    val previousTrustedMacDeviceId: StateFlow<String?>
+        get() = MutableStateFlow(null)
+
+    /** Trusted device backing the live relay session, if any. */
+    val relayMacDeviceId: StateFlow<String?>
+        get() = MutableStateFlow(null)
 
     /**
      * Relay `x-role`: `mac` (bridge) or `iphone` (mobile client). When [role] is null, Android sends
@@ -336,4 +362,22 @@ interface CodexRepository {
         method: String,
         params: JSONValue?,
     )
+
+    /** Switches the live relay session to a previously paired trusted device ("My Devices"). */
+    suspend fun switchToTrustedDevice(deviceId: String) = Unit
+
+    /** Pairs with a freshly scanned device and switches the live session to it. */
+    suspend fun switchToScannedDevice(payload: CodexPairingQRPayload) = Unit
+
+    /** Cancels an in-flight device switch and restores the previous selection. */
+    suspend fun cancelDeviceSwitch() = Unit
+
+    /** Toggles whether [deviceId] appears in the sidebar quick-switch menu. */
+    fun setDeviceMenuVisible(
+        deviceId: String,
+        visible: Boolean,
+    ) = Unit
+
+    /** Removes [deviceId] from the trusted-Mac registry and clears its local scoped state. */
+    fun forgetTrustedDevice(deviceId: String) = Unit
 }

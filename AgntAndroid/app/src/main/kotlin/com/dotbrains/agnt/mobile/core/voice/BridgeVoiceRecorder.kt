@@ -31,7 +31,7 @@ class BridgeVoiceRecorder {
             inputSampleRateHz = rate
             captureRunning = true
             captureThread =
-                thread(start = true, name = "remodex-voice") {
+                thread(start = true, name = "agnt-voice") {
                     runCapture(rec, onAudioLevel)
                 }
             return true

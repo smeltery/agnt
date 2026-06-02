@@ -21,7 +21,7 @@ class OnboardingPreferences(
     }
 
     private companion object {
-        const val PREFS_NAME = "remodex_onboarding"
+        const val PREFS_NAME = "agnt_onboarding"
         const val KEY_HAS_SEEN_ONBOARDING = "codex.hasSeenOnboarding"
     }
 }

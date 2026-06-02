@@ -23,7 +23,7 @@ import com.dotbrains.agnt.mobile.R
  * Step-by-step PowerShell snippets the user can run on a Windows PC to expose an
  * OpenSSH server that the on-device terminal can connect to. Ported from upstream
  * Stivy-01/remodex `TerminalWindowsSetupGuide.kt` (245ea8a) with branding scrubbed
- * and the bespoke `remodexFlatControlChrome` modifier replaced with Material 3
+ * and the bespoke upstream flat-control-chrome modifier replaced with Material 3
  * `Surface` so the component is self-contained.
  */
 @Composable

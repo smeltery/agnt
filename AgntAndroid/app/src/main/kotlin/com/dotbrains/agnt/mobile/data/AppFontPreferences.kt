@@ -4,7 +4,7 @@ import android.content.Context
 import com.dotbrains.agnt.mobile.core.model.AppFontStyle
 
 object AppFontPreferences {
-    private const val PREFS_NAME = "remodex_ui"
+    private const val PREFS_NAME = "agnt_ui"
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
