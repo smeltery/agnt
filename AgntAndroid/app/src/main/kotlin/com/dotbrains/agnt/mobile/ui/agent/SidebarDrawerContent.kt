@@ -216,6 +216,20 @@ fun SidebarDrawerContent(
                         onClick = {
                             drawerScope.launch {
                                 closeDrawer()
+                                navController.navigate(AppRoutes.MyDevices)
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(LucideR.drawable.lucide_ic_monitor_smartphone),
+                            contentDescription = stringResource(R.string.my_devices_open_cd),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            drawerScope.launch {
+                                closeDrawer()
                                 onOpenPairingScanner()
                             }
                         },

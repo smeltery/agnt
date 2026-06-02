@@ -406,6 +406,59 @@ conflicts with agnt's structure was deferred rather than forced.
 `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:assembleDebug` green.
 All package/identifier rebrands applied; banned-identifier sweep clean.
 
+### P3.0 — multi-device switcher / "My Devices" (iOS PR #100 parity)
+
+Ports the upstream Stivy-01/remodex "My Devices" surface so a phone paired with
+multiple computers can switch between them, with per-device local session state.
+Provider-agnostic — the upstream freemium/`SubscriptionService` gate is dropped
+(device switching is available on every provider). Trusted-session resolve is
+built on QR pairing + the phone/Mac identity keys, not any ChatGPT token.
+
+- [x] **Mac-scoped local session store** — `core/persistence/MacScopedSessionStore.kt`
+      namespaces cached threads, active thread, renames, associated worktrees,
+      runtime selection, and locally-deleted/archived ids per `macDeviceId`
+      (SharedPrefs `agnt_mac_scoped_state`). Scoped base keys reuse the
+      `SessionPersistence` `KEY_*` literal strings so the first scoping read falls
+      back to existing un-scoped data. Our `CodexThread` has no `collaborationMode`,
+      so the cached-thread snapshot drops that column.
+- [x] **Trusted-session resolve client** — `services/agent/connection/AgntTrustedSessionResolveClient.kt`
+      signs a per-request transcript with the phone identity key, POSTs it to the
+      relay `/v1/trusted/session/resolve`, and verifies the relay's signed response.
+- [x] **AgentService device-switch state + actions** — `services/agent/devices/`
+      (`AgentServiceTrustedDevices`, `AgentServiceDeviceSwitch`). `AgentService`
+      now exposes `trustedDevices`, `switchingDeviceId`, `deviceSwitchNotice`,
+      `currentTrustedMacDeviceId`, `previousTrustedMacDeviceId`, `relayMacDeviceId`
+      StateFlows and `switchToTrustedDevice` / `switchToScannedDevice` /
+      `cancelDeviceSwitch` / `forgetTrustedDevice` / `setDeviceMenuVisible`.
+      `initializeTrustedDeviceState()` runs from the service init; the secure
+      handshake now refreshes the device list + `relayMacDeviceId` after recording
+      the trusted-Mac registry (covers both QR bootstrap and trusted resume).
+- [x] **My Devices UI** — `ui/mydevices/MyDevicesScreen.kt` +
+      `MyDevicesPresentation.kt` (pure presentation + row/sort logic). Registered
+      as nav route `AppRoutes.MyDevices` in `AppNavHost`, opened from a sidebar
+      icon button (`lucide_ic_monitor_smartphone`) in `SidebarDrawerContent`. Scan
+      QR / Pair with Code both route through the existing single QR scanner screen.
+- [x] **`CodexRepository` device-switch surface** — flows + actions added with
+      defaulted bodies so existing test fakes keep compiling.
+- [x] **Tests** — `ui/mydevices/MyDevicesPresentationTest`,
+      `core/persistence/MacScopedSessionStoreTest` (adapted: no composer-draft key,
+      no `collaborationMode`).
+- [ ] **Mac-scoped message-timeline store (deferred).** Per-device persistence
+      currently covers thread metadata + runtime selection; the message timeline
+      stays in the un-scoped `CodexMessagePersistence` (cleared/reloaded on switch
+      rather than namespaced). `CodexMessagePersistence` / `SessionPersistence`
+      were not given a `macDeviceId` param because that scoping cascades across the
+      whole timeline read/write path. iOS PR #100 keeps the same un-scoped timeline.
+- [ ] **Composer-draft scoping (deferred).** Upstream's `MacScopedSessionStore`
+      has a composer-draft column; agnt has no per-thread composer-draft store yet,
+      so that surface is omitted.
+- [ ] **`SidebarDevicesMenuButton` quick-switch dropdown (deferred).** The iOS
+      inline sidebar device-switch dropdown (`shouldShowDeviceSwitcher`) is not yet
+      surfaced; the helper exists in `MyDevicesPresentation` for a follow-up.
+
+`:app:ktlintCheck` + `:app:testDebugUnitTest` green (607 tests, 0 failures).
+Banned-identifier sweep clean over added/changed files.
+
 ## Finishing the upstream parity audit
 
 Per `ios-android-parity-plan.md`, the reasonable code-inspection parity gaps
