@@ -73,6 +73,7 @@ import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.services.agent.connection.DesktopHandoffService
 import com.dotbrains.agnt.mobile.services.git.GitActionsError
 import com.dotbrains.agnt.mobile.services.git.GitActionsService
+import com.dotbrains.agnt.mobile.services.workspace.WorkspaceTextFileService
 import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
 import com.dotbrains.agnt.mobile.ui.agent.ConversationHeader
 import com.dotbrains.agnt.mobile.ui.agent.SidebarDrawerContent
@@ -85,6 +86,8 @@ import com.dotbrains.agnt.mobile.ui.home.ThreadCompletionBanner
 import com.dotbrains.agnt.mobile.ui.navigation.AppNavHost
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
 import com.dotbrains.agnt.mobile.ui.pet.PetCompanionHost
+import com.dotbrains.agnt.mobile.ui.turn.WorkspaceTextFilePreviewDialog
+import com.dotbrains.agnt.mobile.ui.turn.WorkspaceTextFilePreviewRequest
 import com.dotbrains.agnt.mobile.ui.turn.timeline.LocalOpenRepoDiffForMarkdownLink
 import com.dotbrains.agnt.mobile.ui.turn.timeline.RepoMarkdownFileLink
 import kotlinx.coroutines.TimeoutCancellationException
@@ -167,6 +170,8 @@ fun MainShell(
     var pendingGitOperation by remember { mutableStateOf<PendingGitOperation?>(null) }
     var showNothingToCommit by remember { mutableStateOf(false) }
     var showPathDialog by remember { mutableStateOf(false) }
+    var workspaceTextFilePreview by remember { mutableStateOf<WorkspaceTextFilePreviewRequest?>(null) }
+    val workspaceTextFileService = remember(repository) { WorkspaceTextFileService(repository) }
     val clipboard = LocalClipboard.current
     val showTurnStop =
         ready &&
@@ -328,8 +333,24 @@ fun MainShell(
         enqueueRepoDiffFullTreePrefetch()
     }
 
+    fun openWorkspaceTextFilePreview(link: String) {
+        val normalizedPath = RepoMarkdownFileLink.normalizePath(link).takeIf { it.isNotBlank() } ?: return
+        workspaceTextFilePreview =
+            WorkspaceTextFilePreviewRequest(
+                path = normalizedPath,
+                cwd = threadPathFull,
+            )
+    }
+
     fun openRepoDiffSheetFromMarkdown(link: String) {
-        if (repoDiffTotals?.hasChanges != true || !showGitControls || activeThreadId == null) return
+        // When the repo has working-tree changes, open the diff sheet so a tapped path lands on its
+        // diff (LastTurn if it was edited this turn, otherwise the full working tree). When there is
+        // no diff to show (clean tree, no git controls, or no active thread) fall back to the
+        // read-only workspace text preview instead of silently doing nothing.
+        if (repoDiffTotals?.hasChanges != true || !showGitControls || activeThreadId == null) {
+            openWorkspaceTextFilePreview(link)
+            return
+        }
         val q = RepoMarkdownFileLink.canonicalFilenameQuery(link)
         repoDiffMarkdownFocusQuery = q
         val lastRows = RepoDiffLastTurnAggregator.fileRowsFromLastTurn(threadMessages)
@@ -1417,6 +1438,14 @@ fun MainShell(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .padding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues()),
+        )
+    }
+
+    workspaceTextFilePreview?.let { request ->
+        WorkspaceTextFilePreviewDialog(
+            request = request,
+            service = workspaceTextFileService,
+            onDismiss = { workspaceTextFilePreview = null },
         )
     }
 }

@@ -372,25 +372,36 @@ conflicts with agnt's structure was deferred rather than forced.
       `services/workspace/WorkspaceTextFileService` (uses the existing
       `workspace/readFile` RPC), `ui/turn/WorkspaceTextFilePreviewDialog`
       (`AgntModalBottomSheet`), service test.
-  - [ ] **Wire to a tap target.** Upstream triggers the dialog from a
-        file-mention tap inside its timeline; agnt's timeline differs
-        structurally. Attach from a file link/mention in `ui/turn/...` when the
-        timeline edit is in scope.
+  - [x] **Wired to a tap target.** Hooked into the existing repo-file-link
+        dispatch in `MainShell` (`openRepoDiffSheetFromMarkdown`): tapping a
+        repo-file link in assistant markdown opens the read-only preview when
+        the repo-diff sheet isn't applicable (clean tree, no git controls, or no
+        active thread). Reuses `RepoMarkdownFileLink.looksLikeLinkToLocalRepoFile`
+        detection — no new fragile file-mention parser.
 - [x] **User bubble color (palette + prefs)** — `core/model/UserBubbleColor.kt`,
       `data/UserBubblePreferences.kt` (key `codex.userBubbleColor` →
       `agnt.userBubbleColor`, reuses `ThemePreferences` store),
       `ui/theme/UserBubbleColorPalette.kt`, two tests.
-  - [ ] **Apply in user-message rendering.** Palette/prefs are ready; applying
-        the selected color spans several `ui/turn/...` user-bubble files — a
-        broader UI change left as follow-up. (Also add a Settings picker.)
+  - [x] **Applied in user-message rendering + Settings picker.** A
+        `LocalUserBubbleColor` CompositionLocal is provided by `AgntTheme`
+        (listens to the pref key so the timeline recomposes on change) and read
+        in `ui/turn/timeline/TurnMessageRow.kt` for the user bubble background +
+        foreground (the hairline outline is kept only for the neutral default).
+        A swatch picker lives in `ui/settings/SettingsScreen.kt`, persisted via
+        `UserBubblePreferences`.
 - [x] **New-chat draft (logic + models)** — `ui/draft/NewChatDraftLogic.kt`,
       `NewChatDraftModels.kt`, logic test. `GitRepoSyncResult` / `GitChangedFile`
       match upstream.
-  - [ ] **`NewChatDraftScreen.kt` deferred.** Upstream depends on a freemium
-        `SubscriptionService` (absent in agnt by design — a hosted-monetization
-        concern) and is wired into upstream's `AppNavHost`/`AppRoutes`/
-        `SidebarDrawerContent`, which differ from agnt's nav. Porting the screen
-        means re-pointing it at agnt's nav and dropping the subscription gate.
+  - [x] **`NewChatDraftScreen.kt` ported + wired.** Adapted from upstream with
+        the freemium `SubscriptionService` / free-send gate dropped entirely
+        (agnt is local-first, no send limits). Wired into agnt's nav via
+        `AppRoutes.NewChatDraft` + an `AppNavHost` destination, reachable from
+        the sidebar "Quick Chat" action (`SidebarScreen` →
+        `SidebarDrawerContent`). The existing project-picker-sheet new-chat path
+        is left intact; the draft screen reuses `SidebarProjectPickerSheet` for
+        folder selection only (the screen owns `thread/start` so the first
+        prompt is sent atomically). General chat with no folder starts a rootless
+        thread (`cwd = null`) — agnt has no upstream `createRootlessChatRoot` RPC.
 
 `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:assembleDebug` green.
 All package/identifier rebrands applied; banned-identifier sweep clean.
