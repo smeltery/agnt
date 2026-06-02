@@ -4,6 +4,9 @@ package com.dotbrains.agnt.mobile.ui.navigation
 object AppRoutes {
     const val Home = "home"
     const val Settings = "settings"
+
+    /** Multi-device switcher ("My Devices"): list paired computers, switch, forget, manage menu visibility. */
+    const val MyDevices = "my_devices"
     const val Archived = "archived"
     const val About = "about"
     const val WhatsNew = "whats_new"
