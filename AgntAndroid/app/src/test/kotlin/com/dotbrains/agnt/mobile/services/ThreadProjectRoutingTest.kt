@@ -20,19 +20,19 @@ import kotlin.test.assertTrue
 class ThreadProjectRoutingTest {
     @Test
     fun applyAuthoritative_overridesStaleServerCwd() {
-        val map = mutableMapOf("thread-1" to "/tmp/remodex-worktree")
-        val server = CodexThread(id = "thread-1", title = "Source", cwd = "/tmp/remodex-local")
+        val map = mutableMapOf("thread-1" to "/tmp/agnt-worktree")
+        val server = CodexThread(id = "thread-1", title = "Source", cwd = "/tmp/agnt-local")
         val merged = applyAuthoritativeProjectPathMerge(server, map, true)
-        assertEquals("/tmp/remodex-worktree", merged.gitWorkingDirectory)
+        assertEquals("/tmp/agnt-worktree", merged.gitWorkingDirectory)
         assertTrue(map.isNotEmpty(), "stays in flight until server matches")
     }
 
     @Test
     fun applyAuthoritative_clearsWhenServerMatches() {
-        val map = mutableMapOf("thread-1" to "/tmp/remodex-worktree")
-        val server = CodexThread(id = "thread-1", title = "Source", cwd = "/tmp/remodex-worktree")
+        val map = mutableMapOf("thread-1" to "/tmp/agnt-worktree")
+        val server = CodexThread(id = "thread-1", title = "Source", cwd = "/tmp/agnt-worktree")
         val merged = applyAuthoritativeProjectPathMerge(server, map, true)
-        assertEquals("/tmp/remodex-worktree", merged.gitWorkingDirectory)
+        assertEquals("/tmp/agnt-worktree", merged.gitWorkingDirectory)
         assertTrue(map.isEmpty(), "iOS: treatAsServerState + match clears map")
     }
 

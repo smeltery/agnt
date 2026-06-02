@@ -552,7 +552,7 @@ class TurnTimelineRichContentParserTest {
                 kind = CodexMessageKind.fileChange,
                 text =
                     """
-					Path: C:\Users\dev\apps\remodex\TurnCommandHumanizer.kt
+					Path: C:\Users\dev\apps\agnt\TurnCommandHumanizer.kt
 					Kind: update
 					Totals: +4 -2
 

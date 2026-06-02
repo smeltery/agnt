@@ -7,15 +7,25 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import com.dotbrains.agnt.mobile.core.model.AppFontStyle
+import com.dotbrains.agnt.mobile.core.model.UserBubbleColor
 import com.dotbrains.agnt.mobile.data.AppFontPreferences
 import com.dotbrains.agnt.mobile.data.ThemePreferences
+import com.dotbrains.agnt.mobile.data.UserBubblePreferences
+
+/**
+ * Selected user-message bubble color from Settings. Provided by [AgntTheme] so the timeline
+ * recomposes when the preference changes; defaults to [UserBubbleColor.defaultValue] when unset.
+ */
+val LocalUserBubbleColor = staticCompositionLocalOf { UserBubbleColor.defaultValue }
 
 private val LightColorScheme =
     lightColorScheme(
@@ -77,6 +87,7 @@ fun AgntTheme(
 ) {
     val context = LocalContext.current
     var appFontStyle by remember(context) { mutableStateOf(AppFontPreferences.readFontStyle(context)) }
+    var userBubbleColor by remember(context) { mutableStateOf(UserBubblePreferences.read(context)) }
     DisposableEffect(context) {
         val prefs =
             context.applicationContext.getSharedPreferences(
@@ -87,6 +98,9 @@ fun AgntTheme(
             android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key == AppFontStyle.storageKey || key == AppFontStyle.legacyStorageKey) {
                     appFontStyle = AppFontPreferences.readFontStyle(context)
+                }
+                if (key == UserBubbleColor.storageKey) {
+                    userBubbleColor = UserBubblePreferences.read(context)
                 }
             }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -107,6 +121,9 @@ fun AgntTheme(
         colorScheme = colorScheme,
         typography = agntTypography(appFontStyle),
         shapes = AgntShapes,
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalUserBubbleColor provides userBubbleColor) {
+            content()
+        }
+    }
 }

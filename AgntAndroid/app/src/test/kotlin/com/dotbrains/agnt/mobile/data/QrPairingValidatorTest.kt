@@ -64,10 +64,14 @@ class QrPairingValidatorTest {
                 .replace("/", "_")
                 .replace("=", "")
 
-        val r = validatePairingQrCode("RMX1:$encoded", nowEpochMillis = now)
+        val r = validatePairingQrCode("AGNT1:$encoded", nowEpochMillis = now)
 
         val success = assertIs<QrPairingValidationResult.Success>(r)
         assertEquals("mac", success.payload.macDeviceId)
+
+        val legacy = validatePairingQrCode("RMX1:$encoded", nowEpochMillis = now)
+        val legacySuccess = assertIs<QrPairingValidationResult.Success>(legacy)
+        assertEquals("mac", legacySuccess.payload.macDeviceId)
     }
 
     @Test

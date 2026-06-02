@@ -30,8 +30,12 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
 import com.dotbrains.agnt.mobile.core.model.TurnThinkingDisclosureHints
+import com.dotbrains.agnt.mobile.core.model.UserBubbleColor
 import com.dotbrains.agnt.mobile.ui.agent.FileEditRow
 import com.dotbrains.agnt.mobile.ui.agent.ToolCallRow
+import com.dotbrains.agnt.mobile.ui.theme.LocalUserBubbleColor
+import com.dotbrains.agnt.mobile.ui.theme.bubbleBackground
+import com.dotbrains.agnt.mobile.ui.theme.bubbleForeground
 import com.dotbrains.agnt.mobile.ui.theme.isAgentLightChrome
 import com.dotbrains.agnt.mobile.ui.turn.attachments.MessageAttachmentStrip
 import com.dotbrains.agnt.mobile.ui.turn.subagent.TurnSubagentActionCard
@@ -68,14 +72,10 @@ fun TurnMessageRow(
         }
     val colors = MaterialTheme.colorScheme
     val isLightChrome = isAgentLightChrome()
+    val userBubbleColor = LocalUserBubbleColor.current
     val bubbleColor =
         when (message.role) {
-            CodexMessageRole.user ->
-                if (isLightChrome) {
-                    colors.surfaceVariant.copy(alpha = 1f)
-                } else {
-                    colors.surfaceVariant.copy(alpha = 0.55f)
-                }
+            CodexMessageRole.user -> userBubbleColor.bubbleBackground(colors, isLightChrome)
             CodexMessageRole.assistant -> colors.surface.copy(alpha = 0.0f)
             CodexMessageRole.system ->
                 when (message.kind) {
@@ -93,12 +93,18 @@ fun TurnMessageRow(
         }
     val onBubble =
         when (message.role) {
-            CodexMessageRole.user -> colors.onSurface
+            CodexMessageRole.user -> userBubbleColor.bubbleForeground(colors, isLightChrome)
             CodexMessageRole.assistant -> colors.onBackground
             CodexMessageRole.system -> colors.onSurfaceVariant
         }
+    // The outline border only reads cleanly against the neutral default fill in light chrome;
+    // tinted bubbles supply their own contrast, so skip the hairline outline for them.
     val bubbleBorder =
-        if (message.role == CodexMessageRole.user && isLightChrome) {
+        if (
+            message.role == CodexMessageRole.user &&
+            isLightChrome &&
+            userBubbleColor == UserBubbleColor.default
+        ) {
             BorderStroke(0.5.dp, colors.outline.copy(alpha = 0.42f))
         } else {
             null

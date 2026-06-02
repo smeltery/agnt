@@ -17,7 +17,7 @@ enum class AppThemePreference {
         }
 
     companion object {
-        const val storageKey: String = "remodex.appTheme"
+        const val storageKey: String = "agnt.appTheme"
 
         val default: AppThemePreference = system
 

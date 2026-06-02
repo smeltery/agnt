@@ -2,7 +2,9 @@
 // Mirrors agnt-bridge/src/secure-transport.js encryptEnvelopePayload / decryptEnvelopeBuffer
 // and CodexService+SecureTransport.swift secureWireText / handleEncryptedEnvelopeText.
 
-import { gcm } from "@noble/ciphers/aes";
+// @noble/ciphers 2.x requires the `.js` extension on subpath imports
+// (their package `exports` map only registers `./aes.js`, `./chacha.js`, …).
+import { gcm } from "@noble/ciphers/aes.js";
 // @noble/hashes 2.x requires the `.js` extension on subpath imports
 // (their package `exports` map only registers `./hkdf.js`, `./sha2.js`,
 // …) and consolidated `sha256` into the `sha2` module alongside its
