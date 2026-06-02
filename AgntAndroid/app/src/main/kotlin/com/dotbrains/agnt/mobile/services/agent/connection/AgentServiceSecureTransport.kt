@@ -32,7 +32,7 @@ import java.util.Base64
 
 /**
  * Protocol label for phone→Mac encrypted envelopes (nonce + SecureEnvelope.sender).
- * Must stay `iphone` until phodex-bridge `secure-transport.js` accepts another literal for this direction.
+ * Must stay `iphone` until agnt-bridge `secure-transport.js` accepts another literal for this direction.
  */
 private const val SECURE_ENVELOPE_MOBILE_SENDER = "iphone"
 private const val MAX_CIPHERTEXT_BASE64_LENGTH = 2 * 1024 * 1024
