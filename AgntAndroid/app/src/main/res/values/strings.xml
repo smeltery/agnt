@@ -250,6 +250,13 @@
     <string name="sidebar_search_hint">Search conversations</string>
     <string name="sidebar_new_chat">New chat</string>
     <string name="sidebar_quick_chat">Quick Chat</string>
+    <string name="new_chat_draft_title">New chat</string>
+    <string name="new_chat_draft_prompt">What would you like to work on?</string>
+    <string name="new_chat_draft_quick_chat_hint">No project selected — this starts a general chat.</string>
+    <string name="new_chat_draft_change_project">Project</string>
+    <string name="new_chat_draft_more_actions">More actions</string>
+    <string name="new_chat_draft_open_terminal">Open terminal</string>
+    <string name="new_chat_draft_git_status">Git status</string>
     <string name="sidebar_new_project">New Project</string>
     <string name="sidebar_new_managed_worktree_chat">New worktree</string>
     <string name="sidebar_worktree_chat_no_local_project">No local project to branch from. Open a project chat, then try again.</string>
@@ -386,6 +393,17 @@
     <string name="settings_language_system_subtitle">Use the current device language when needed.</string>
     <string name="settings_theme_title">Theme</string>
     <string name="settings_theme_hint">Use the device setting or lock agnt to light or dark.</string>
+    <string name="settings_bubble_color_title">Message bubble color</string>
+    <string name="settings_bubble_color_hint">Tint your sent message bubbles in the conversation timeline.</string>
+    <string name="settings_bubble_color_selected">Selected: %1$s</string>
+    <string name="settings_bubble_color_default">Default</string>
+    <string name="settings_bubble_color_orange">Orange</string>
+    <string name="settings_bubble_color_yellow">Yellow</string>
+    <string name="settings_bubble_color_green">Green</string>
+    <string name="settings_bubble_color_blue">Blue</string>
+    <string name="settings_bubble_color_pink">Pink</string>
+    <string name="settings_bubble_color_purple">Purple</string>
+    <string name="settings_bubble_color_black">Black</string>
     <string name="settings_theme_system_title">System</string>
     <string name="settings_theme_system_subtitle">Match your device display mode.</string>
     <string name="settings_theme_light_title">Light</string>
@@ -567,4 +585,25 @@
     <string name="terminal_windows_guide_note">Recommended private-key format: OpenSSH Ed25519 with a passphrase, created by ssh-keygen above. ECDSA (P-256/384/521) and RSA keys also work — pass `-t ecdsa` or `-t rsa` to ssh-keygen instead. agnt accepts OpenSSH new-format keys, encrypted PKCS#8, and encrypted legacy PEM keys; unencrypted keys work only if you explicitly enable that option on the profile. In agnt use the Windows username, PC IPv4 address, port 22, and the matching private key. Administrator accounts use C:\\ProgramData\\ssh\\administrators_authorized_keys instead.</string>
     <string name="terminal_windows_guide_disclosure_show">Need help setting up Windows?</string>
     <string name="terminal_windows_guide_disclosure_hide">Hide Windows setup guide</string>
+
+    <!-- My Devices (multi-device switcher) -->
+    <string name="my_devices_title">My Devices</string>
+    <string name="my_devices_current_device">Current device</string>
+    <string name="my_devices_paired_devices">Paired devices</string>
+    <string name="my_devices_no_paired">No paired devices yet.</string>
+    <string name="my_devices_switch_confirm_title">Switch device?</string>
+    <string name="my_devices_switch_confirm_message">This stops in-progress runs and reloads chats for the other device.</string>
+    <string name="my_devices_forget_title">Forget this device?</string>
+    <string name="my_devices_forget_message">The paired device will be removed from this phone. Scan its QR code again to reconnect.</string>
+    <string name="my_devices_switching_title">Switching device…</string>
+    <string name="my_devices_cancel">Cancel</string>
+    <string name="my_devices_forget">Forget</string>
+    <string name="my_devices_switch">Switch</string>
+    <string name="my_devices_scan_qr">Scan QR</string>
+    <string name="my_devices_scan_qr_code">Scan QR Code</string>
+    <string name="my_devices_pair_code">Pair with Code</string>
+    <string name="my_devices_device_actions_cd">Device actions</string>
+    <string name="my_devices_show_in_menu">Show in sidebar menu</string>
+    <string name="my_devices_hide_from_menu">Hide from sidebar menu</string>
+    <string name="my_devices_open_cd">Open My Devices</string>
 </resources>

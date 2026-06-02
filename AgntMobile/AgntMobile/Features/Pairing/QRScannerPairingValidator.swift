@@ -14,7 +14,11 @@ enum QRScannerPairingValidationResult {
 }
 
 private let qrScannerBridgeUpdateCommand = "npm install -g @dotbrains/agnt@latest"
-private let qrScannerPairingCodePrefix = "RMX1:"
+private let qrScannerPairingCodePrefix = "AGNT1:"
+// Legacy upstream paste-token prefix. agnt never emits it, but we keep accepting it so any
+// token a user still has around (or one from an upstream bridge) decodes without an error.
+private let qrScannerLegacyPairingCodePrefix = "RMX1:"
+private let qrScannerPairingCodePrefixes = [qrScannerPairingCodePrefix, qrScannerLegacyPairingCodePrefix]
 private let qrScannerShortCodePattern = "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8,12}$"
 
 // Distinguishes a usable pairing QR from stale bridge payloads and generic camera mis-scans.
@@ -28,8 +32,8 @@ func validatePairingQRCode(_ code: String, now: Date = Date()) -> QRScannerPairi
         return .shortCode(normalizedShortCode)
     }
     let normalizedCode: String
-    if trimmedCode.hasPrefix(qrScannerPairingCodePrefix) {
-        guard let decodedCode = decodePairingCode(trimmedCode) else {
+    if let matchedPrefix = qrScannerPairingCodePrefixes.first(where: { trimmedCode.hasPrefix($0) }) {
+        guard let decodedCode = decodePairingCode(trimmedCode, prefix: matchedPrefix) else {
             return .scanError("This pairing code is unreadable. Copy it again from the computer bridge.")
         }
         normalizedCode = decodedCode
@@ -79,8 +83,8 @@ func validatePairingQRCode(_ code: String, now: Date = Date()) -> QRScannerPairi
 }
 
 // Reuses the QR validator for manual entry by decoding the bridge's paste-friendly token back into JSON.
-private func decodePairingCode(_ code: String) -> String? {
-    let encoded = String(code.dropFirst(qrScannerPairingCodePrefix.count))
+private func decodePairingCode(_ code: String, prefix: String) -> String? {
+    let encoded = String(code.dropFirst(prefix.count))
         .replacingOccurrences(of: "-", with: "+")
         .replacingOccurrences(of: "_", with: "/")
     let paddingCount = (4 - (encoded.count % 4)) % 4

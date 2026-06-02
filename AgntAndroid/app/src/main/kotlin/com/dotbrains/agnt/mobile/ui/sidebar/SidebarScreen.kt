@@ -83,6 +83,7 @@ fun SidebarScreen(
     activeChatMetadata: SidebarActiveChatMetadata? = null,
     onOpenArchivedChats: () -> Unit = {},
     onThreadSelected: suspend () -> Unit = {},
+    onOpenNewChatDraft: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val threads by repository.threads.collectAsStateWithLifecycle()
@@ -259,7 +260,14 @@ fun SidebarScreen(
                 projectPickerFoldersCollapsed = false
                 showProjectPicker = true
             },
-            onQuickChat = ::startQuickChat,
+            onQuickChat = {
+                if (onOpenNewChatDraft != null) {
+                    newChatError = null
+                    onOpenNewChatDraft()
+                } else {
+                    startQuickChat()
+                }
+            },
             onNewProject = { startManagedWorktreeChat() },
         )
         SidebarCompactActionRow(

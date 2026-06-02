@@ -1,7 +1,7 @@
 package com.dotbrains.agnt.mobile.data
 
 /**
- * Branch picker / checkout guardrails (parity iOS [remodexCurrentBranchSelectionIsDisabled]).
+ * Branch picker / checkout guardrails (parity iOS `currentBranchSelectionIsDisabled`).
  * A branch checked out in another worktree stays disabled only when no [worktreePathByBranch]
  * mapping exists—the open/handoff flow can resolve rebind + navigation when [worktreePathByBranch].
  */

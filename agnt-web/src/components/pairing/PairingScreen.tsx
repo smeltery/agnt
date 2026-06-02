@@ -1,6 +1,6 @@
 // Pairing entrypoint. Three accepted forms:
 //   1. Camera scan of the QR (BarcodeDetector path)
-//   2. Pasted JSON / RMX1 token (offline path)
+//   2. Pasted JSON payload (or an AGNT1: paste token, if one is supplied) — offline path
 //   3. Short pairing code (relay round-trip via /v1/pairing/code/resolve)
 //
 // The bridge prints all three under one banner; web users pick whichever path
@@ -157,8 +157,8 @@ export function PairingScreen() {
             On your Mac, run <code>./scripts/run-local-agnt.sh</code> or <code>npm start</code> in <code>agnt-bridge/</code>.
           </li>
           <li>
-            The bridge prints a QR, a <code>{`{"v":2,...}`}</code> JSON line, an <code>RMX1:</code> token, and a short
-            alphanumeric code under the QR. Use any one.
+            The bridge prints a QR, a <code>{`{"v":2,...}`}</code> JSON line, and a short alphanumeric code under
+            the QR. Use any one.
           </li>
           <li>Use your camera, paste the JSON, or type the short code with the relay URL.</li>
         </ol>

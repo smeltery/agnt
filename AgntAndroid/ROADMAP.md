@@ -372,28 +372,92 @@ conflicts with agnt's structure was deferred rather than forced.
       `services/workspace/WorkspaceTextFileService` (uses the existing
       `workspace/readFile` RPC), `ui/turn/WorkspaceTextFilePreviewDialog`
       (`AgntModalBottomSheet`), service test.
-  - [ ] **Wire to a tap target.** Upstream triggers the dialog from a
-        file-mention tap inside its timeline; agnt's timeline differs
-        structurally. Attach from a file link/mention in `ui/turn/...` when the
-        timeline edit is in scope.
+  - [x] **Wired to a tap target.** Hooked into the existing repo-file-link
+        dispatch in `MainShell` (`openRepoDiffSheetFromMarkdown`): tapping a
+        repo-file link in assistant markdown opens the read-only preview when
+        the repo-diff sheet isn't applicable (clean tree, no git controls, or no
+        active thread). Reuses `RepoMarkdownFileLink.looksLikeLinkToLocalRepoFile`
+        detection — no new fragile file-mention parser.
 - [x] **User bubble color (palette + prefs)** — `core/model/UserBubbleColor.kt`,
       `data/UserBubblePreferences.kt` (key `codex.userBubbleColor` →
       `agnt.userBubbleColor`, reuses `ThemePreferences` store),
       `ui/theme/UserBubbleColorPalette.kt`, two tests.
-  - [ ] **Apply in user-message rendering.** Palette/prefs are ready; applying
-        the selected color spans several `ui/turn/...` user-bubble files — a
-        broader UI change left as follow-up. (Also add a Settings picker.)
+  - [x] **Applied in user-message rendering + Settings picker.** A
+        `LocalUserBubbleColor` CompositionLocal is provided by `AgntTheme`
+        (listens to the pref key so the timeline recomposes on change) and read
+        in `ui/turn/timeline/TurnMessageRow.kt` for the user bubble background +
+        foreground (the hairline outline is kept only for the neutral default).
+        A swatch picker lives in `ui/settings/SettingsScreen.kt`, persisted via
+        `UserBubblePreferences`.
 - [x] **New-chat draft (logic + models)** — `ui/draft/NewChatDraftLogic.kt`,
       `NewChatDraftModels.kt`, logic test. `GitRepoSyncResult` / `GitChangedFile`
       match upstream.
-  - [ ] **`NewChatDraftScreen.kt` deferred.** Upstream depends on a freemium
-        `SubscriptionService` (absent in agnt by design — a hosted-monetization
-        concern) and is wired into upstream's `AppNavHost`/`AppRoutes`/
-        `SidebarDrawerContent`, which differ from agnt's nav. Porting the screen
-        means re-pointing it at agnt's nav and dropping the subscription gate.
+  - [x] **`NewChatDraftScreen.kt` ported + wired.** Adapted from upstream with
+        the freemium `SubscriptionService` / free-send gate dropped entirely
+        (agnt is local-first, no send limits). Wired into agnt's nav via
+        `AppRoutes.NewChatDraft` + an `AppNavHost` destination, reachable from
+        the sidebar "Quick Chat" action (`SidebarScreen` →
+        `SidebarDrawerContent`). The existing project-picker-sheet new-chat path
+        is left intact; the draft screen reuses `SidebarProjectPickerSheet` for
+        folder selection only (the screen owns `thread/start` so the first
+        prompt is sent atomically). General chat with no folder starts a rootless
+        thread (`cwd = null`) — agnt has no upstream `createRootlessChatRoot` RPC.
 
 `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:assembleDebug` green.
 All package/identifier rebrands applied; banned-identifier sweep clean.
+
+### P3.0 — multi-device switcher / "My Devices" (iOS PR #100 parity)
+
+Ports the upstream Stivy-01/remodex "My Devices" surface so a phone paired with
+multiple computers can switch between them, with per-device local session state.
+Provider-agnostic — the upstream freemium/`SubscriptionService` gate is dropped
+(device switching is available on every provider). Trusted-session resolve is
+built on QR pairing + the phone/Mac identity keys, not any ChatGPT token.
+
+- [x] **Mac-scoped local session store** — `core/persistence/MacScopedSessionStore.kt`
+      namespaces cached threads, active thread, renames, associated worktrees,
+      runtime selection, and locally-deleted/archived ids per `macDeviceId`
+      (SharedPrefs `agnt_mac_scoped_state`). Scoped base keys reuse the
+      `SessionPersistence` `KEY_*` literal strings so the first scoping read falls
+      back to existing un-scoped data. Our `CodexThread` has no `collaborationMode`,
+      so the cached-thread snapshot drops that column.
+- [x] **Trusted-session resolve client** — `services/agent/connection/AgntTrustedSessionResolveClient.kt`
+      signs a per-request transcript with the phone identity key, POSTs it to the
+      relay `/v1/trusted/session/resolve`, and verifies the relay's signed response.
+- [x] **AgentService device-switch state + actions** — `services/agent/devices/`
+      (`AgentServiceTrustedDevices`, `AgentServiceDeviceSwitch`). `AgentService`
+      now exposes `trustedDevices`, `switchingDeviceId`, `deviceSwitchNotice`,
+      `currentTrustedMacDeviceId`, `previousTrustedMacDeviceId`, `relayMacDeviceId`
+      StateFlows and `switchToTrustedDevice` / `switchToScannedDevice` /
+      `cancelDeviceSwitch` / `forgetTrustedDevice` / `setDeviceMenuVisible`.
+      `initializeTrustedDeviceState()` runs from the service init; the secure
+      handshake now refreshes the device list + `relayMacDeviceId` after recording
+      the trusted-Mac registry (covers both QR bootstrap and trusted resume).
+- [x] **My Devices UI** — `ui/mydevices/MyDevicesScreen.kt` +
+      `MyDevicesPresentation.kt` (pure presentation + row/sort logic). Registered
+      as nav route `AppRoutes.MyDevices` in `AppNavHost`, opened from a sidebar
+      icon button (`lucide_ic_monitor_smartphone`) in `SidebarDrawerContent`. Scan
+      QR / Pair with Code both route through the existing single QR scanner screen.
+- [x] **`CodexRepository` device-switch surface** — flows + actions added with
+      defaulted bodies so existing test fakes keep compiling.
+- [x] **Tests** — `ui/mydevices/MyDevicesPresentationTest`,
+      `core/persistence/MacScopedSessionStoreTest` (adapted: no composer-draft key,
+      no `collaborationMode`).
+- [ ] **Mac-scoped message-timeline store (deferred).** Per-device persistence
+      currently covers thread metadata + runtime selection; the message timeline
+      stays in the un-scoped `CodexMessagePersistence` (cleared/reloaded on switch
+      rather than namespaced). `CodexMessagePersistence` / `SessionPersistence`
+      were not given a `macDeviceId` param because that scoping cascades across the
+      whole timeline read/write path. iOS PR #100 keeps the same un-scoped timeline.
+- [ ] **Composer-draft scoping (deferred).** Upstream's `MacScopedSessionStore`
+      has a composer-draft column; agnt has no per-thread composer-draft store yet,
+      so that surface is omitted.
+- [ ] **`SidebarDevicesMenuButton` quick-switch dropdown (deferred).** The iOS
+      inline sidebar device-switch dropdown (`shouldShowDeviceSwitcher`) is not yet
+      surfaced; the helper exists in `MyDevicesPresentation` for a follow-up.
+
+`:app:ktlintCheck` + `:app:testDebugUnitTest` green (607 tests, 0 failures).
+Banned-identifier sweep clean over added/changed files.
 
 ## Finishing the upstream parity audit
 
