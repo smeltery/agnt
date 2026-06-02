@@ -23,7 +23,7 @@ class SessionPersistence(
 ) {
     private val prefs =
         context.applicationContext.getSharedPreferences(
-            "remodex_session_state",
+            "agnt_session_state",
             Context.MODE_PRIVATE,
         )
 
@@ -269,8 +269,8 @@ class SessionPersistence(
 
     private companion object {
         const val KEY_LAST_ACTIVE_THREAD = "codex.ui.lastActiveThreadId"
-        const val KEY_FORCE_QR_BOOTSTRAP = "remodex.secure.forceQrBootstrap"
-        const val KEY_LOCAL_RELAY_HOST_OVERRIDE = "remodex.localRelayHostOverride"
+        const val KEY_FORCE_QR_BOOTSTRAP = "agnt.secure.forceQrBootstrap"
+        const val KEY_LOCAL_RELAY_HOST_OVERRIDE = "agnt.localRelayHostOverride"
         const val KEY_RUNTIME_MODEL_ID = "codex.runtime.selectedModelId"
         const val KEY_RUNTIME_REASONING_EFFORT = "codex.runtime.selectedReasoningEffort"
         const val KEY_RUNTIME_ACCESS_MODE = "codex.runtime.selectedAccessMode"

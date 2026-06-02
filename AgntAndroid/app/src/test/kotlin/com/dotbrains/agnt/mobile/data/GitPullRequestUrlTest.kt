@@ -7,9 +7,9 @@ class GitPullRequestUrlTest {
     @Test
     fun agntBuildPullRequestUrl_buildsPlainCompareWhenTitleAndBodyBlank() {
         assertEquals(
-            "https://github.com/remodex/remodex/compare/main...feature?expand=1",
+            "https://github.com/dotbrains/agnt/compare/main...feature?expand=1",
             agntBuildPullRequestUrl(
-                ownerRepo = "remodex/remodex",
+                ownerRepo = "dotbrains/agnt",
                 branch = "feature",
                 base = "main",
                 title = "   ",
@@ -21,9 +21,9 @@ class GitPullRequestUrlTest {
     @Test
     fun agntBuildPullRequestUrl_encodesQueryParamsWhenPrefillPresent() {
         assertEquals(
-            "https://github.com/remodex/remodex/compare/main...feature?quick_pull=1&title=Fix%20login&body=Line%201%0ALine%202",
+            "https://github.com/dotbrains/agnt/compare/main...feature?quick_pull=1&title=Fix%20login&body=Line%201%0ALine%202",
             agntBuildPullRequestUrl(
-                ownerRepo = "remodex/remodex",
+                ownerRepo = "dotbrains/agnt",
                 branch = "feature",
                 base = "main",
                 title = "Fix login",

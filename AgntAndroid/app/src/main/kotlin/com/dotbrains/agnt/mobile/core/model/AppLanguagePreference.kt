@@ -7,7 +7,6 @@ enum class AppLanguagePreference {
 
     companion object {
         const val storageKey: String = "agnt.appLanguage"
-        const val legacyStorageKey: String = "remodex.appLanguage"
 
         val default: AppLanguagePreference = english
 
