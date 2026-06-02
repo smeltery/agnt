@@ -26,7 +26,14 @@ describe("validatePairingInput", () => {
     expect(result.kind).toBe("error");
   });
 
-  it("decodes RMX1: tokens before parsing JSON", () => {
+  it("decodes AGNT1: tokens before parsing JSON", () => {
+    const json = JSON.stringify(validPayload);
+    const tokenBody = btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    const result = validatePairingInput(`AGNT1:${tokenBody}`);
+    expect(result.kind).toBe("payload");
+  });
+
+  it("still decodes legacy RMX1: tokens", () => {
     const json = JSON.stringify(validPayload);
     const tokenBody = btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
     const result = validatePairingInput(`RMX1:${tokenBody}`);

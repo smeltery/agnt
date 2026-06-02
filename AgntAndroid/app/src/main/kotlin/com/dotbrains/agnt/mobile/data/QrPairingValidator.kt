@@ -27,7 +27,13 @@ private const val QR_SCANNER_BRIDGE_UPDATE_COMMAND = "bun install -g @dotbrains/
 private val pairingJsonMediaType = "application/json; charset=utf-8".toMediaType()
 private const val MAX_PAIRING_FIELD_LENGTH = 256
 private const val ED25519_PUBLIC_KEY_BYTES = 32
-private const val QR_SCANNER_PAIRING_CODE_PREFIX = "RMX1:"
+private const val QR_SCANNER_PAIRING_CODE_PREFIX = "AGNT1:"
+
+// Legacy upstream paste-token prefix. agnt never emits it, but we keep accepting it so any
+// token a user still has around (or one from an upstream bridge) decodes without an error.
+private const val QR_SCANNER_LEGACY_PAIRING_CODE_PREFIX = "RMX1:"
+private val QR_SCANNER_PAIRING_CODE_PREFIXES =
+    listOf(QR_SCANNER_PAIRING_CODE_PREFIX, QR_SCANNER_LEGACY_PAIRING_CODE_PREFIX)
 private val qrScannerShortCodeRegex = Regex("^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8,12}$")
 private val pairingIdRegex = Regex("^[A-Za-z0-9._:-]{1,$MAX_PAIRING_FIELD_LENGTH}$")
 
@@ -81,9 +87,10 @@ fun validatePairingQrCode(
         return QrPairingValidationResult.ShortCode(normalizedShortCode)
     }
 
+    val matchedPrefix = QR_SCANNER_PAIRING_CODE_PREFIXES.firstOrNull { trimmed.startsWith(it) }
     val normalizedCode =
-        if (trimmed.startsWith(QR_SCANNER_PAIRING_CODE_PREFIX)) {
-            decodePasteablePairingCode(trimmed)
+        if (matchedPrefix != null) {
+            decodePasteablePairingCode(trimmed, matchedPrefix)
                 ?: return QrPairingValidationResult.ScanError(
                     "This pairing code is unreadable. Copy it again from the computer bridge.",
                 )
@@ -266,10 +273,13 @@ fun normalizeShortPairingCode(code: String): String =
         .replace(" ", "")
 
 // Reuses the QR validator for manual entry by decoding the bridge's paste-friendly token back into JSON.
-private fun decodePasteablePairingCode(code: String): String? {
+private fun decodePasteablePairingCode(
+    code: String,
+    prefix: String,
+): String? {
     val encoded =
         code
-            .drop(QR_SCANNER_PAIRING_CODE_PREFIX.length)
+            .drop(prefix.length)
             .replace("-", "+")
             .replace("_", "/")
     val padding = (4 - (encoded.length % 4)) % 4
