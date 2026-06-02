@@ -12,9 +12,14 @@ on:
       - ".flox/**"
       - "AgntAndroid/**"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android-check:
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
 
     env:
       AGNT_FLOX_QUIET: "1"

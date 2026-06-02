@@ -12,9 +12,14 @@ on:
       - ".flox/**"
       - "agnt-bridge/**"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   bridge-check:
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
 
     # Silence the Flox activation banner in logs (see .flox/env/manifest.toml).
     env:

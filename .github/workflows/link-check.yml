@@ -16,9 +16,14 @@ on:
       - ".lycheeignore"
       - ".github/workflows/link-check.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   link-check:
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
 
     permissions:
       contents: read
