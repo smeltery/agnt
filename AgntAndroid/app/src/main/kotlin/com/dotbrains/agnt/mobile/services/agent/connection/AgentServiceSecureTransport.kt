@@ -25,6 +25,8 @@ import com.dotbrains.agnt.mobile.core.security.CodexSecureKeys
 import com.dotbrains.agnt.mobile.core.security.PhoneIdentityStore
 import com.dotbrains.agnt.mobile.core.transport.CodexSecureTransportErrorEvent
 import com.dotbrains.agnt.mobile.services.agent.AgentService
+import com.dotbrains.agnt.mobile.services.agent.devices.refreshTrustedDevices
+import com.dotbrains.agnt.mobile.services.agent.devices.setCurrentTrustedMacDeviceId
 import com.dotbrains.agnt.mobile.services.agent.threads.dispatchIncomingRpc
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import java.time.Instant
@@ -32,7 +34,7 @@ import java.util.Base64
 
 /**
  * Protocol label for phone→Mac encrypted envelopes (nonce + SecureEnvelope.sender).
- * Must stay `iphone` until phodex-bridge `secure-transport.js` accepts another literal for this direction.
+ * Must stay `iphone` until agnt-bridge `secure-transport.js` accepts another literal for this direction.
  */
 private const val SECURE_ENVELOPE_MOBILE_SENDER = "iphone"
 private const val MAX_CIPHERTEXT_BASE64_LENGTH = 2 * 1024 * 1024
@@ -47,10 +49,10 @@ internal fun AgentService.secureWireText(plaintext: String): String {
         synchronized(secureSessionLock) {
             val current =
                 secureSession
-                    ?: throw CodexSecureTransportError.InvalidHandshake("The secure Remodex session is not ready yet. Try reconnecting.")
+                    ?: throw CodexSecureTransportError.InvalidHandshake("The secure agnt session is not ready yet. Try reconnecting.")
             if (current.nextOutboundCounter == Int.MAX_VALUE) {
                 throw CodexSecureTransportError.InvalidHandshake(
-                    "The secure Remodex session reached its message limit. Reconnect and try again.",
+                    "The secure agnt session reached its message limit. Reconnect and try again.",
                 )
             }
             secureSession = current.copy(nextOutboundCounter = current.nextOutboundCounter + 1)
@@ -201,7 +203,7 @@ internal suspend fun AgentService.performSecureHandshake() {
 
     if (serverHello.protocolVersion != AGNT_SECURE_PROTOCOL_VERSION) {
         throw CodexSecureTransportError.IncompatibleVersion(
-            "This bridge is using a different secure transport version. Update Remodex on the phone or Mac and try again.",
+            "This bridge is using a different secure transport version. Update agnt on the phone or Mac and try again.",
         )
     }
     if (serverHello.sessionId != sessionId) {
@@ -304,7 +306,13 @@ internal suspend fun AgentService.performSecureHandshake() {
             )
         secureStore.writeCodable(CodexSecureKeys.trustedMacRegistry, nextRegistry)
         secureStore.writeString(CodexSecureKeys.lastTrustedMacDeviceId, macDeviceId)
+        setCurrentTrustedMacDeviceId(macDeviceId)
     }
+
+    // Surface the connected device in the "My Devices" switcher as soon as the secure session
+    // settles (covers both QR bootstrap and trusted resume, mirroring the registry write above).
+    _relayMacDeviceId.value = macDeviceId
+    refreshTrustedDevices()
 
     sessionPersistence.setForceQrBootstrapOnNextHandshake(false)
 

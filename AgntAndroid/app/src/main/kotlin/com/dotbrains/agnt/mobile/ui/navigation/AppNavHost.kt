@@ -17,6 +17,7 @@ import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftScreen
 import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftSource
 import com.dotbrains.agnt.mobile.ui.home.HomeMainContent
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
+import com.dotbrains.agnt.mobile.ui.mydevices.MyDevicesScreen
 import com.dotbrains.agnt.mobile.ui.settings.SettingsScreen
 import com.dotbrains.agnt.mobile.ui.terminal.TerminalScreen
 
@@ -52,6 +53,16 @@ fun AppNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToAbout = { navController.navigate(AppRoutes.About) },
                 onNavigateToWhatsNew = { navController.navigate(AppRoutes.WhatsNew) },
+            )
+        }
+        composable(AppRoutes.MyDevices) {
+            // Single QR/manual scanner screen handles both QR and pairing-code entry, so both
+            // affordances route through onOpenPairingScanner.
+            MyDevicesScreen(
+                repository = repository,
+                onNavigateBack = { navController.popBackStack() },
+                onScanQrCode = onOpenPairingScanner,
+                onPairWithCode = onOpenPairingScanner,
             )
         }
         composable(AppRoutes.Archived) {
