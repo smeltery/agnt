@@ -1,11 +1,14 @@
 // Faithful port of QRScannerPairingValidator.swift.
-// Accepts: raw JSON pairing payloads, RMX1: base64url-encoded payloads, and short pairing codes.
-// Web build can't (yet) scan a QR with the camera, so users paste the payload string the
-// bridge prints alongside the QR. RMX1: tokens come from the same generator.
+// Accepts: raw JSON pairing payloads, AGNT1: base64url-encoded paste tokens, and short pairing codes.
+// Web build can't (yet) scan a QR with the camera, so users paste the JSON payload the bridge
+// prints alongside the QR (the bridge does not emit a prefixed token; the AGNT1: path is a paste
+// convenience). RMX1: is the legacy upstream prefix, still accepted for back-compat.
 
 import { PAIRING_QR_VERSION } from "../crypto";
 
-const PAIRING_CODE_PREFIX = "RMX1:";
+const PAIRING_CODE_PREFIX = "AGNT1:";
+const LEGACY_PAIRING_CODE_PREFIX = "RMX1:";
+const PAIRING_CODE_PREFIXES = [PAIRING_CODE_PREFIX, LEGACY_PAIRING_CODE_PREFIX];
 const SHORT_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8,12}$/;
 const PAIRING_KEYS = ["relay", "sessionId", "macDeviceId", "macIdentityPublicKey", "expiresAt", "v"] as const;
 // Mirrors codexSecureClockSkewToleranceSeconds in iOS (60s).
@@ -35,7 +38,8 @@ export function validatePairingInput(raw: string, now: Date = new Date()): Pairi
     return { kind: "shortCode", code: normalizedShort };
   }
 
-  const candidateJson = trimmed.startsWith(PAIRING_CODE_PREFIX) ? decodePairingToken(trimmed) : trimmed;
+  const matchedPrefix = PAIRING_CODE_PREFIXES.find((prefix) => trimmed.startsWith(prefix));
+  const candidateJson = matchedPrefix ? decodePairingToken(trimmed, matchedPrefix) : trimmed;
   if (!candidateJson) return error("This pairing code is unreadable. Copy it again from the bridge.");
 
   let parsed: unknown;
@@ -69,8 +73,8 @@ export function validatePairingInput(raw: string, now: Date = new Date()): Pairi
   return { kind: "payload", payload: parsed };
 }
 
-function decodePairingToken(token: string): string | null {
-  const encoded = token.slice(PAIRING_CODE_PREFIX.length).replace(/-/g, "+").replace(/_/g, "/");
+function decodePairingToken(token: string, prefix: string): string | null {
+  const encoded = token.slice(prefix.length).replace(/-/g, "+").replace(/_/g, "/");
   const padding = (4 - (encoded.length % 4)) % 4;
   try {
     const binary = atob(encoded + "=".repeat(padding));
