@@ -74,7 +74,7 @@ class SecureStore(
     }
 
     companion object {
-        private const val PREFS_NAME = "remodex_secure_store"
+        private const val PREFS_NAME = "agnt_secure_store"
 
         @PublishedApi
         internal val jsonFormat =

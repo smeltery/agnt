@@ -67,7 +67,7 @@ final class QRScannerPairingValidatorTests: XCTestCase {
             .replacingOccurrences(of: "=", with: "")
 
         let result = validatePairingQRCode(
-            "RMX1:\(encoded)",
+            "AGNT1:\(encoded)",
             now: Date(timeIntervalSince1970: 1_800_000_000)
         )
 
@@ -77,6 +77,29 @@ final class QRScannerPairingValidatorTests: XCTestCase {
 
         XCTAssertEqual(payload.macDeviceId, "mac-123")
         XCTAssertEqual(payload.macIdentityPublicKey, "pub-key")
+    }
+
+    func testLegacyRmx1PasteablePairingCodeReturnsSuccess() {
+        let json = pairingQRCode(
+            v: codexPairingQRVersion,
+            expiresAt: 1_900_000_000_000
+        )
+        let encoded = Data(json.utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+
+        let result = validatePairingQRCode(
+            "RMX1:\(encoded)",
+            now: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+
+        guard case .success(let payload) = result else {
+            return XCTFail("Expected the legacy RMX1: prefix to still decode.")
+        }
+
+        XCTAssertEqual(payload.macDeviceId, "mac-123")
     }
 
     func testShortPairingCodeReturnsLookupRequest() {

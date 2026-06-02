@@ -196,22 +196,25 @@ class AgntLocalNotificationPresenter(
     }
 
     companion object {
-        const val CHANNEL_ID = "remodex_local_attention"
-        const val EXTRA_THREAD_ID = "remodex.extra.THREAD_ID"
-        const val EXTRA_TURN_ID = "remodex.extra.TURN_ID"
-        const val EXTRA_SOURCE = "remodex.extra.SOURCE"
-        const val EXTRA_LAUNCH_TOKEN = "remodex.extra.LAUNCH_TOKEN"
+        const val CHANNEL_ID = "agnt_local_attention"
+        const val EXTRA_THREAD_ID = "agnt.extra.THREAD_ID"
+        const val EXTRA_TURN_ID = "agnt.extra.TURN_ID"
+        const val EXTRA_SOURCE = "agnt.extra.SOURCE"
+        const val EXTRA_LAUNCH_TOKEN = "agnt.extra.LAUNCH_TOKEN"
 
-        const val SOURCE_RUN_COMPLETION = "remodex.runCompletion"
-        const val SOURCE_PENDING_APPROVAL = "remodex.pendingApproval"
-        const val SOURCE_STRUCTURED_INPUT = "remodex.structuredUserInput"
+        const val SOURCE_RUN_COMPLETION = "agnt.runCompletion"
+        const val SOURCE_PENDING_APPROVAL = "agnt.pendingApproval"
+        const val SOURCE_STRUCTURED_INPUT = "agnt.structuredUserInput"
 
         private const val TAG = "AgntLocalNotificationPresenter"
+
+        // Legacy upstream channel id; deleted on first channel create so it doesn't linger in settings.
+        private const val LEGACY_CHANNEL_ID = "remodex_local_attention"
         private const val DEDUPE_WINDOW_MS = 60_000L
         private const val NOTIFICATION_ID_RUN_BASE = 10_000
         private const val NOTIFICATION_ID_APPROVAL_BASE = 20_000
         private const val NOTIFICATION_ID_INPUT_BASE = 30_000
-        private const val LAUNCH_TOKEN_PREFS = "remodex_notification_launch_tokens"
+        private const val LAUNCH_TOKEN_PREFS = "agnt_notification_launch_tokens"
         private const val LAUNCH_TOKEN_BYTES = 32
         private val launchThreadIdRegex = Regex("^[A-Za-z0-9_-]{1,128}$")
         private val launchTokenRandom = SecureRandom()
@@ -236,6 +239,8 @@ class AgntLocalNotificationPresenter(
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
             val ctx = appContext.applicationContext
             val mgr = ctx.getSystemService(NotificationManager::class.java) ?: return
+            // Retire the upstream-named channel so a stale entry doesn't linger in system settings.
+            runCatching { mgr.deleteNotificationChannel(LEGACY_CHANNEL_ID) }
             val channel =
                 NotificationChannel(
                     CHANNEL_ID,

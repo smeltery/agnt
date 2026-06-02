@@ -1,6 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -11,8 +12,12 @@ import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.ui.about.AboutScreen
 import com.dotbrains.agnt.mobile.ui.about.WhatsNewScreen
 import com.dotbrains.agnt.mobile.ui.archived.ArchivedChatsScreen
+import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftRoute
+import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftScreen
+import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftSource
 import com.dotbrains.agnt.mobile.ui.home.HomeMainContent
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
+import com.dotbrains.agnt.mobile.ui.mydevices.MyDevicesScreen
 import com.dotbrains.agnt.mobile.ui.settings.SettingsScreen
 import com.dotbrains.agnt.mobile.ui.terminal.TerminalScreen
 
@@ -50,6 +55,16 @@ fun AppNavHost(
                 onNavigateToWhatsNew = { navController.navigate(AppRoutes.WhatsNew) },
             )
         }
+        composable(AppRoutes.MyDevices) {
+            // Single QR/manual scanner screen handles both QR and pairing-code entry, so both
+            // affordances route through onOpenPairingScanner.
+            MyDevicesScreen(
+                repository = repository,
+                onNavigateBack = { navController.popBackStack() },
+                onScanQrCode = onOpenPairingScanner,
+                onPairWithCode = onOpenPairingScanner,
+            )
+        }
         composable(AppRoutes.Archived) {
             ArchivedChatsScreen(
                 repository = repository,
@@ -83,6 +98,47 @@ fun AppNavHost(
             TerminalScreen(
                 onNavigateBack = { navController.popBackStack() },
                 preferredWorkingDirectory = preferredCwd,
+            )
+        }
+        composable(
+            route = AppRoutes.NewChatDraft,
+            arguments =
+                listOf(
+                    navArgument(AppRoutes.NewChatDraftArgSource) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument(AppRoutes.NewChatDraftArgPath) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+        ) { backStackEntry ->
+            val args = backStackEntry.arguments
+            val rawSource = args?.getString(AppRoutes.NewChatDraftArgSource)
+            val source =
+                NewChatDraftSource.entries.firstOrNull { it.name == rawSource }
+                    ?: NewChatDraftSource.generalChat
+            val preferredPath =
+                args?.getString(AppRoutes.NewChatDraftArgPath)?.takeIf { it.isNotBlank() }
+            // Stable across recomposition so the draft text/state survives; keyed by the back-stack
+            // entry's id, which is unique per navigation to this destination.
+            val draftRoute =
+                remember(backStackEntry.id) {
+                    NewChatDraftRoute.create(source = source, preferredProjectPath = preferredPath)
+                }
+            NewChatDraftScreen(
+                route = draftRoute,
+                repository = repository,
+                onNavigateBack = { navController.popBackStack() },
+                onThreadStarted = {
+                    navController.popBackStack(AppRoutes.Home, inclusive = false)
+                },
+                onOpenTerminal = { cwd ->
+                    navController.navigate(AppRoutes.terminalRoute(cwd))
+                },
             )
         }
     }

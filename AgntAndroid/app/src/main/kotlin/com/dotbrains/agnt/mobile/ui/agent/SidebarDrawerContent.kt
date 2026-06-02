@@ -30,6 +30,7 @@ import androidx.navigation.NavHostController
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
+import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftSource
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
@@ -110,6 +111,12 @@ fun SidebarDrawerContent(
                     }
                 },
                 onThreadSelected = closeDrawer,
+                onOpenNewChatDraft = {
+                    drawerScope.launch {
+                        closeDrawer()
+                        navController.navigate(AppRoutes.newChatDraftRoute(NewChatDraftSource.generalChat.name))
+                    }
+                },
                 modifier =
                     Modifier
                         .weight(1f)
@@ -202,6 +209,20 @@ fun SidebarDrawerContent(
                         Icon(
                             painter = painterResource(LucideR.drawable.lucide_ic_terminal),
                             contentDescription = stringResource(R.string.nav_terminal),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            drawerScope.launch {
+                                closeDrawer()
+                                navController.navigate(AppRoutes.MyDevices)
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(LucideR.drawable.lucide_ic_monitor_smartphone),
+                            contentDescription = stringResource(R.string.my_devices_open_cd),
                             modifier = Modifier.size(20.dp),
                         )
                     }

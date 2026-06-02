@@ -8,11 +8,13 @@ import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexModelOption
+import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexSecureSession
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRecord
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
@@ -25,6 +27,7 @@ import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import com.dotbrains.agnt.mobile.core.model.ThreadHistoryPaginationState
 import com.dotbrains.agnt.mobile.core.notification.AgntLocalNotificationPresenter
 import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
+import com.dotbrains.agnt.mobile.core.persistence.MacScopedSessionStore
 import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
 import com.dotbrains.agnt.mobile.core.protocol.JsonRpcCodec
 import com.dotbrains.agnt.mobile.core.security.SecureStore
@@ -37,9 +40,16 @@ import com.dotbrains.agnt.mobile.data.MessageTimelineStore
 import com.dotbrains.agnt.mobile.data.QueuedTurnDraft
 import com.dotbrains.agnt.mobile.data.QueuedTurnDraftPreview
 import com.dotbrains.agnt.mobile.data.TurnDraftQueueStore
+import com.dotbrains.agnt.mobile.services.agent.connection.AgntTrustedSessionResolveClient
 import com.dotbrains.agnt.mobile.services.agent.connection.connectImpl
 import com.dotbrains.agnt.mobile.services.agent.connection.disconnectImpl
 import com.dotbrains.agnt.mobile.services.agent.connection.setActiveThreadIdImpl
+import com.dotbrains.agnt.mobile.services.agent.devices.cancelDeviceSwitchImpl
+import com.dotbrains.agnt.mobile.services.agent.devices.forgetTrustedDeviceImpl
+import com.dotbrains.agnt.mobile.services.agent.devices.initializeTrustedDeviceState
+import com.dotbrains.agnt.mobile.services.agent.devices.refreshTrustedDevices
+import com.dotbrains.agnt.mobile.services.agent.devices.switchToScannedDeviceImpl
+import com.dotbrains.agnt.mobile.services.agent.devices.switchToTrustedDeviceImpl
 import com.dotbrains.agnt.mobile.services.agent.notifications.enqueuePendingApprovalRequest
 import com.dotbrains.agnt.mobile.services.agent.notifications.enqueuePendingStructuredInputRequest
 import com.dotbrains.agnt.mobile.services.agent.notifications.notifyRunCompletionAttention
@@ -87,6 +97,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -293,6 +304,49 @@ class AgentService(
     @Volatile
     internal var hasPresentedThreadForkBridgeUpdatePrompt: Boolean = false
 
+    /**
+     * Multi-device ("My Devices") state. Mac-scoped local session/UI snapshots are namespaced per
+     * paired computer so switching devices restores that computer's cached threads, active thread,
+     * renames, and runtime selections. See [AgentServiceTrustedDevices] /
+     * [com.dotbrains.agnt.mobile.services.agent.devices.AgentServiceDeviceSwitch].
+     */
+    internal val macScopedSessionStore = MacScopedSessionStore(sessionPersistence, appContext)
+
+    internal val _trustedDevices = MutableStateFlow<List<CodexTrustedMacRecord>>(emptyList())
+    override val trustedDevices: StateFlow<List<CodexTrustedMacRecord>> = _trustedDevices.asStateFlow()
+
+    internal val _switchingDeviceId = MutableStateFlow<String?>(null)
+    override val switchingDeviceId: StateFlow<String?> = _switchingDeviceId.asStateFlow()
+
+    internal val _deviceSwitchNotice = MutableStateFlow<String?>(null)
+    override val deviceSwitchNotice: StateFlow<String?> = _deviceSwitchNotice.asStateFlow()
+
+    internal val _currentTrustedMacDeviceId = MutableStateFlow<String?>(null)
+    override val currentTrustedMacDeviceId: StateFlow<String?> = _currentTrustedMacDeviceId.asStateFlow()
+
+    internal val _previousTrustedMacDeviceId = MutableStateFlow<String?>(null)
+    override val previousTrustedMacDeviceId: StateFlow<String?> = _previousTrustedMacDeviceId.asStateFlow()
+
+    internal val _relayMacDeviceId = MutableStateFlow<String?>(null)
+    override val relayMacDeviceId: StateFlow<String?> = _relayMacDeviceId.asStateFlow()
+
+    /** Lazily constructed on first trusted-session resolve; cancellable across a device switch. */
+    internal var trustedSessionResolveClientLazy: AgntTrustedSessionResolveClient? = null
+    internal val deviceSwitchMutex = Mutex()
+    internal var isCancellingDeviceSwitch = false
+
+    /**
+     * Forces mac-scoped persistence/load to target a specific device while a switch is mid-flight,
+     * overriding the persisted "current" id until the new session settles.
+     */
+    internal var macScopedContextOverrideDeviceId: String? = null
+
+    /** Suppresses automatic mac-scoped saves during a switch so partial state is never persisted. */
+    internal var suspendAutomaticMacScopedPersistence = false
+
+    /** Guards reentrant StateFlow writes while applying a loaded mac-scoped snapshot. */
+    internal var isApplyingMacScopedState = false
+
     internal val turnDraftQueueStore = TurnDraftQueueStore()
 
     internal val pendingApprovalResponders =
@@ -321,6 +375,7 @@ class AgentService(
         scope.launch {
             runCatching { messagePersistence.migrateLegacyMonolithToPerThreadIfNeeded() }
         }
+        initializeTrustedDeviceState()
     }
 
     /** Local-only background alerts (turn completion, approvals, structured input). */
@@ -663,4 +718,23 @@ class AgentService(
     override fun currentAuthoritativeProjectPathFor(threadId: String) = currentAuthoritativeProjectPathForImpl(threadId)
 
     override fun associatedManagedWorktreePathFor(threadId: String) = associatedManagedWorktreePathForImpl(threadId)
+
+    override suspend fun switchToTrustedDevice(deviceId: String) = switchToTrustedDeviceImpl(deviceId)
+
+    override suspend fun switchToScannedDevice(payload: CodexPairingQRPayload) = switchToScannedDeviceImpl(payload)
+
+    override suspend fun cancelDeviceSwitch() = cancelDeviceSwitchImpl()
+
+    override fun setDeviceMenuVisible(
+        deviceId: String,
+        visible: Boolean,
+    ) {
+        com.dotbrains.agnt.mobile.ui.mydevices.MyDeviceMenuVisibilityStore
+            .setVisible(visible, deviceId)
+        refreshTrustedDevices()
+    }
+
+    override fun forgetTrustedDevice(deviceId: String) {
+        forgetTrustedDeviceImpl(deviceId)
+    }
 }

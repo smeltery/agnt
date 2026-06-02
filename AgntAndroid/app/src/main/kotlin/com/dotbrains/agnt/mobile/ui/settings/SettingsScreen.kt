@@ -9,9 +9,14 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,11 +28,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -52,6 +59,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -69,6 +77,7 @@ import com.dotbrains.agnt.mobile.core.model.AppLanguagePreference
 import com.dotbrains.agnt.mobile.core.model.AppThemePreference
 import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
+import com.dotbrains.agnt.mobile.core.model.UserBubbleColor
 import com.dotbrains.agnt.mobile.core.notification.LocalNotificationSettings
 import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
@@ -76,8 +85,11 @@ import com.dotbrains.agnt.mobile.data.AppFontPreferences
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.LanguagePreferences
 import com.dotbrains.agnt.mobile.data.ThemePreferences
+import com.dotbrains.agnt.mobile.data.UserBubblePreferences
 import com.dotbrains.agnt.mobile.ui.shared.UsageStatusSummary
 import com.dotbrains.agnt.mobile.ui.theme.agntScreenTopAppBarColors
+import com.dotbrains.agnt.mobile.ui.theme.bubbleForeground
+import com.dotbrains.agnt.mobile.ui.theme.swatchColor
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,6 +108,7 @@ fun SettingsScreen(
     var fontStyle by remember { mutableStateOf(AppFontPreferences.readFontStyle(context)) }
     var languagePreference by remember { mutableStateOf(LanguagePreferences.read(context)) }
     var themePreference by remember { mutableStateOf(ThemePreferences.read(context)) }
+    var bubbleColor by remember { mutableStateOf(UserBubblePreferences.read(context)) }
     var localRelayHostOverride by remember {
         mutableStateOf(AppContainer.sessionPersistence.loadLocalRelayHostOverride().orEmpty())
     }
@@ -183,6 +196,21 @@ fun SettingsScreen(
                         subtitle = stringResource(settingsThemeSubtitleRes(option)),
                     )
                 }
+            }
+
+            SettingsCard(title = stringResource(R.string.settings_bubble_color_title)) {
+                Text(
+                    text = stringResource(R.string.settings_bubble_color_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SettingsBubbleColorPicker(
+                    selected = bubbleColor,
+                    onSelect = { option ->
+                        bubbleColor = option
+                        UserBubblePreferences.write(context, option)
+                    },
+                )
             }
 
             SettingsCard(title = stringResource(R.string.settings_section_connection)) {
@@ -294,6 +322,73 @@ private fun SettingsOptionRow(
         }
     }
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingsBubbleColorPicker(
+    selected: UserBubbleColor,
+    onSelect: (UserBubbleColor) -> Unit,
+) {
+    val selectedLabel = stringResource(settingsBubbleColorLabelRes(selected))
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        UserBubbleColor.entries.forEach { option ->
+            val isSelected = option == selected
+            val label = stringResource(settingsBubbleColorLabelRes(option))
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(option.swatchColor())
+                        .border(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color =
+                                if (isSelected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.42f)
+                                },
+                            shape = CircleShape,
+                        ).selectable(
+                            selected = isSelected,
+                            onClick = { onSelect(option) },
+                            role = Role.RadioButton,
+                        ).semantics { contentDescription = label },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = option.bubbleForeground(MaterialTheme.colorScheme, false),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.settings_bubble_color_selected, selectedLabel),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+private fun settingsBubbleColorLabelRes(color: UserBubbleColor): Int =
+    when (color) {
+        UserBubbleColor.default -> R.string.settings_bubble_color_default
+        UserBubbleColor.orange -> R.string.settings_bubble_color_orange
+        UserBubbleColor.yellow -> R.string.settings_bubble_color_yellow
+        UserBubbleColor.green -> R.string.settings_bubble_color_green
+        UserBubbleColor.blue -> R.string.settings_bubble_color_blue
+        UserBubbleColor.pink -> R.string.settings_bubble_color_pink
+        UserBubbleColor.purple -> R.string.settings_bubble_color_purple
+        UserBubbleColor.black -> R.string.settings_bubble_color_black
+    }
 
 @Composable
 private fun SettingsPetSection(repository: CodexRepository) {

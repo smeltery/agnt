@@ -64,8 +64,8 @@ class ProjectFolderServiceTest {
                                                 listOf(
                                                     JSONValue.Obj(
                                                         mapOf(
-                                                            "name" to JSONValue.Str("remodex"),
-                                                            "path" to JSONValue.Str("/Users/me/remodex"),
+                                                            "name" to JSONValue.Str("agnt"),
+                                                            "path" to JSONValue.Str("/Users/me/agnt"),
                                                             "isSymlink" to JSONValue.Bool(false),
                                                         ),
                                                     ),
@@ -77,11 +77,11 @@ class ProjectFolderServiceTest {
                     },
                 )
 
-            val entries = service.searchDirectories("/Users/me", "remo")
+            val entries = service.searchDirectories("/Users/me", "ag")
 
             assertEquals("/Users/me", captured!!["path"]?.stringValue)
-            assertEquals("remo", captured!!["query"]?.stringValue)
+            assertEquals("ag", captured!!["query"]?.stringValue)
             assertEquals(80, captured!!["limit"]?.intValue)
-            assertEquals("/Users/me/remodex", entries.single().path)
+            assertEquals("/Users/me/agnt", entries.single().path)
         }
 }
