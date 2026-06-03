@@ -1,7 +1,8 @@
 // FILE: AgntWidgetBundle.swift
 // Purpose: Entry point for the agnt widget extension. Bundles together the
-//          Lock Screen accessory widget and the iOS 18 Control Center
-//          quick-launch control, both branded with the agnt outline mark.
+//          Lock Screen accessory widget, the iOS 18 Control Center quick-launch
+//          control, and the Live Activity / Dynamic Island that surfaces an
+//          in-flight agnt turn.
 // Layer: Widget Extension
 
 import SwiftUI
@@ -12,6 +13,7 @@ struct AgntWidgetBundle: WidgetBundle {
     @WidgetBundleBuilder
     var body: some Widget {
         AgntLockScreenWidget()
+        AgntLiveActivity()
         if #available(iOS 18.0, *) {
             AgntLaunchControl()
         }
