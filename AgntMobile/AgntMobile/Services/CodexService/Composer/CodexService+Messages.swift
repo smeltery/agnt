@@ -406,13 +406,19 @@ extension CodexService {
 
     // Updates the per-thread active turn mapping and refreshes dependent repo/timeline state.
     func setActiveTurnID(_ turnId: String?, for threadId: String) {
+        let wasActive = activeTurnIdByThread[threadId] != nil
         if let turnId, !turnId.isEmpty {
             activeTurnIdByThread[threadId] = turnId
         } else {
             activeTurnIdByThread.removeValue(forKey: threadId)
         }
+        let isActive = activeTurnIdByThread[threadId] != nil
         refreshBusyRepoRootsAndDependentTimelineStates()
         refreshThreadTimelineState(for: threadId)
+        // Mirror only the active/idle edge into the Lock Screen Live Activity.
+        if wasActive != isActive {
+            syncLiveActivity(threadId: threadId, turnActive: isActive)
+        }
     }
 
     // Toggles the fallback running marker for pre-turn activity while keeping repo-busy state in sync.
