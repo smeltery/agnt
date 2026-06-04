@@ -14,7 +14,8 @@ extension CodexService {
         if turnActive {
             LiveActivityCoordinator.shared.turnStarted(
                 threadId: threadId,
-                title: liveActivityTitle(for: threadId)
+                title: liveActivityTitle(for: threadId),
+                isActiveChat: activeThreadId == threadId
             )
         } else {
             LiveActivityCoordinator.shared.turnEnded(

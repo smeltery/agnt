@@ -44,8 +44,17 @@ struct AgntMobileApp: App {
                     TurnCacheManager.resetAll()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
-                    guard newPhase == .background else { return }
-                    TurnCacheManager.resetAll()
+                    switch newPhase {
+                    case .background:
+                        TurnCacheManager.resetAll()
+                    case .active:
+                        // Returning to a chat retires its Lock Screen mirror.
+                        LiveActivityCoordinator.shared.dismissIfViewing(
+                            threadId: codexService.activeThreadId
+                        )
+                    default:
+                        break
+                    }
                 }
         }
     }
