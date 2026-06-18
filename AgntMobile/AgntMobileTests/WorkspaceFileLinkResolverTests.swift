@@ -37,4 +37,13 @@ final class WorkspaceFileLinkResolverTests: XCTestCase {
 
         XCTAssertNil(WorkspaceFileLinkResolver.localPath(from: url))
     }
+
+    func testResolvesRelativeSVGPath() throws {
+        let url = try XCTUnwrap(URL(string: "docs/diagram.svg"))
+
+        XCTAssertEqual(
+            WorkspaceFileLinkResolver.localPath(from: url),
+            "docs/diagram.svg"
+        )
+    }
 }
