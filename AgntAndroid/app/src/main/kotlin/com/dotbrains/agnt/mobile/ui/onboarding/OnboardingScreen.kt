@@ -123,9 +123,10 @@ private fun OnboardingPage(
         2 ->
             StepPage(
                 stepNumber = 1,
-                title = "Install Codex CLI",
-                description = "The AI coding agent that lives in your terminal. agnt connects to it from your phone.",
+                title = "Install a coding agent",
+                description = "agnt drives a coding agent on your computer — Codex, Claude Code, opencode, or Cursor. Install whichever you use; the command below sets up Codex.",
                 command = "npm install -g @openai/codex@latest",
+                caption = "Prefer Claude Code? Run npm install -g @anthropic-ai/claude-code. opencode and Cursor ship their own installers.",
                 modifier = modifier,
             )
         3 ->
@@ -169,7 +170,7 @@ private fun WelcomePage(modifier: Modifier) {
         Spacer(modifier = Modifier.height(24.dp))
         Text("agnt", color = Color.White, style = MaterialTheme.typography.headlineLarge)
         Text(
-            text = "Control Codex from your phone.",
+            text = "Control your coding agent from your phone.",
             color = Color.White.copy(alpha = 0.54f),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
@@ -207,7 +208,7 @@ private fun FeaturesPage(modifier: Modifier) {
         FeatureRow("Fast mode", "Lower-latency turns for quick interactions", Color(0xFFFFD84A))
         FeatureRow("Git from your phone", "Commit, push, pull, and switch branches", Color(0xFF34D399))
         FeatureRow("End-to-end encrypted", "The relay never sees your prompts or code", Color(0xFF22D3EE))
-        FeatureRow("Voice mode", "Talk to Codex with speech-to-text", Color(0xFFA78BFA))
+        FeatureRow("Voice mode", "Talk to your coding agent with speech-to-text", Color(0xFFA78BFA))
         FeatureRow("Subagents, skills and /commands", "Spawn and monitor parallel agents", Color(0xFFFB923C))
     }
 }

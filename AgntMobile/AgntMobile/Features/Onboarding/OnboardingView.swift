@@ -9,11 +9,12 @@ import SwiftUI
 struct OnboardingView: View {
     let onContinue: () -> Void
     @State private var currentPage = 0
-    @State private var isShowingCodexInstallReminder = false
+    @State private var isShowingAgentInstallReminder = false
 
     private let pageCount = 5
-    private let codexInstallStepIndex = 2
-    private let codexInstallCommand = "npm install -g @openai/codex@latest"
+    private let agentInstallStepIndex = 2
+    // agnt works with any supported coding agent; Codex is shown as the example.
+    private let agentInstallExampleCommand = "npm install -g @openai/codex@latest"
 
     var body: some View {
         ZStack {
@@ -30,9 +31,10 @@ struct OnboardingView: View {
                     OnboardingStepPage(
                         stepNumber: 1,
                         icon: "terminal",
-                        title: "Install Codex CLI",
-                        description: "The AI coding agent that lives in your terminal. agnt connects to it from your iPhone.",
-                        command: codexInstallCommand
+                        title: "Install a coding agent",
+                        description: "agnt drives a coding agent on your computer — Codex, Claude Code, opencode, or Cursor. Install whichever you use; the command below sets up Codex.",
+                        command: agentInstallExampleCommand,
+                        commandCaption: "Prefer Claude Code? Run `npm install -g @anthropic-ai/claude-code`. opencode and Cursor ship their own installers."
                     )
                     .tag(2)
 
@@ -61,13 +63,13 @@ struct OnboardingView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .alert("Install Codex CLI First", isPresented: $isShowingCodexInstallReminder) {
+        .alert("Install a coding agent first", isPresented: $isShowingAgentInstallReminder) {
             Button("Stay Here", role: .cancel) {}
             Button("Continue Anyway") {
                 advanceToNextPage()
             }
         } message: {
-            Text("Copy and paste \"\(codexInstallCommand)\" on your computer before moving on. agnt will not work until Codex CLI is installed and available in your PATH.")
+            Text("Install one of the supported coding agents (Codex, Claude Code, opencode, or Cursor) on your computer before moving on. agnt will not work until a coding agent is installed and available in your PATH.")
         }
     }
 
@@ -120,9 +122,9 @@ struct OnboardingView: View {
     }
 
     private func handleContinue() {
-        // The CLI install step is a hard requirement, so warn before advancing.
-        if currentPage == codexInstallStepIndex {
-            isShowingCodexInstallReminder = true
+        // Installing a coding agent is a hard requirement, so warn before advancing.
+        if currentPage == agentInstallStepIndex {
+            isShowingAgentInstallReminder = true
             return
         }
 

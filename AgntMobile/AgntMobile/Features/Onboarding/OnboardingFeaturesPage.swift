@@ -47,7 +47,7 @@ struct OnboardingFeaturesPage: View {
                         icon: "waveform",
                         color: .purple,
                         title: "Voice mode",
-                        subtitle: "Talk to Codex with speech-to-text"
+                        subtitle: "Talk to your coding agent with speech-to-text"
                     )
                     featureRow(
                         icon: "point.3.connected.trianglepath.dotted",
