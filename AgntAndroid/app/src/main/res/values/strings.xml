@@ -445,11 +445,6 @@
     <string name="whats_new_sidebar_settings_title">Settings polish</string>
     <string name="whats_new_sidebar_settings_item">Settings usage information and release notes were refreshed for this build.</string>
     <string name="nav_pairing_scan">Scan pairing QR</string>
-    <string name="onboarding_title">Welcome to agnt</string>
-    <string name="onboarding_subtitle">Pair your phone with the agnt bridge on your computer.</string>
-    <string name="onboarding_step_codex_cli">1. Install Codex CLI: npm install -g @openai/codex@latest</string>
-    <string name="onboarding_step_bridge">2. Install the bridge: bun install -g @dotbrains/agnt</string>
-    <string name="onboarding_step_scan">3. Run the bridge, show the pairing QR, then scan it on the next screen.</string>
     <string name="onboarding_continue">Continue to scanner</string>
     <string name="qr_scanner_title">Scan QR</string>
     <string name="qr_scanner_hint">Scan the JSON QR from the bridge terminal. If the relay is 127.0.0.1, enter your PC\'s LAN IP below before connecting.</string>

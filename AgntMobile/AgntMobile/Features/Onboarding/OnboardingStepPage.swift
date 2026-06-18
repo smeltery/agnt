@@ -105,15 +105,16 @@ struct OnboardingStepPage: View {
 
 // MARK: - Previews
 
-#Preview("Step 1 — Codex CLI") {
+#Preview("Step 1 — Coding agent") {
     ZStack {
         Color.black.ignoresSafeArea()
         OnboardingStepPage(
             stepNumber: 1,
             icon: "terminal",
-            title: "Install Codex CLI",
-            description: "The AI coding agent that lives in your terminal. agnt connects to it from your iPhone.",
-            command: "npm install -g @openai/codex@latest"
+            title: "Install a coding agent",
+            description: "agnt drives a coding agent on your computer — Codex, Claude Code, opencode, or Cursor. Install whichever you use; the command below sets up Codex.",
+            command: "npm install -g @openai/codex@latest",
+            commandCaption: "Prefer Claude Code? Run `npm install -g @anthropic-ai/claude-code`. opencode and Cursor ship their own installers."
         )
     }
     .preferredColorScheme(.dark)

@@ -1153,61 +1153,6 @@
 
     <issue
         id="UnusedResources"
-        message="The resource `R.string.onboarding_title` appears to be unused"
-        errorLine1="    &lt;string name=&quot;onboarding_title&quot;>Welcome to agnt&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="416"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.onboarding_subtitle` appears to be unused"
-        errorLine1="    &lt;string name=&quot;onboarding_subtitle&quot;>Pair your phone with the agnt bridge on your computer.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="417"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.onboarding_step_codex_cli` appears to be unused"
-        errorLine1="    &lt;string name=&quot;onboarding_step_codex_cli&quot;>1. Install Codex CLI: npm install -g @openai/codex@latest&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="418"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.onboarding_step_bridge` appears to be unused"
-        errorLine1="    &lt;string name=&quot;onboarding_step_bridge&quot;>2. Install the bridge: bun install -g @dotbrains/agnt&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="419"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.onboarding_step_scan` appears to be unused"
-        errorLine1="    &lt;string name=&quot;onboarding_step_scan&quot;>3. Run the bridge, show the pairing QR, then scan it on the next screen.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="420"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
         message="The resource `R.string.qr_scanner_hint` appears to be unused"
         errorLine1="    &lt;string name=&quot;qr_scanner_hint&quot;>Scan the JSON QR from the bridge terminal. If the relay is 127.0.0.1, enter your PC\&apos;s LAN IP below before connecting.&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">

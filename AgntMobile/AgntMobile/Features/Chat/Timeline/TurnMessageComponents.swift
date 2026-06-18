@@ -2553,6 +2553,7 @@ struct WorkspaceFilePreviewRequest: Identifiable, Equatable {
 private enum WorkspaceLinkedFilePreviewKind {
     case imageFirst
     case textFirst
+    case svg
 }
 
 enum WorkspaceFileLinkResolver {
@@ -2564,6 +2565,8 @@ enum WorkspaceFileLinkResolver {
     private static let imageFileExtensions: Set<String> = [
         "gif", "heic", "heif", "jpeg", "jpg", "png", "webp"
     ]
+    // SVG is text on disk but previews best as rendered artwork, so it gets its own kind.
+    private static let svgFileExtension = "svg"
     private static let extensionlessFileNames: Set<String> = [
         "dockerfile", "gemfile", "makefile", "podfile"
     ]
@@ -2583,6 +2586,9 @@ enum WorkspaceFileLinkResolver {
 
     fileprivate static func preferredPreviewKind(for path: String) -> WorkspaceLinkedFilePreviewKind {
         let fileExtension = (path as NSString).pathExtension.lowercased()
+        if fileExtension == svgFileExtension {
+            return .svg
+        }
         return textFileExtensions.contains(fileExtension) ? .textFirst : .imageFirst
     }
 
@@ -2614,6 +2620,7 @@ enum WorkspaceFileLinkResolver {
         return extensionlessFileNames.contains(fileName)
             || textFileExtensions.contains(fileExtension)
             || imageFileExtensions.contains(fileExtension)
+            || fileExtension == svgFileExtension
     }
 
     private static func looksLikeSchemeLessWebURL(_ value: String) -> Bool {
@@ -2695,9 +2702,16 @@ private struct WorkspacePreviewRetryButton: View {
     }
 }
 
+private struct WorkspaceSVGFilePreviewPayload: Equatable {
+    let source: String
+    let title: String
+    let path: String
+}
+
 private enum WorkspaceLinkedFilePreviewPayload {
     case image(PreviewImagePayload)
     case text(WorkspaceTextFileReadResult)
+    case svg(WorkspaceSVGFilePreviewPayload)
 }
 
 struct WorkspaceLinkedFilePreviewScreen: View {
@@ -2716,6 +2730,10 @@ struct WorkspaceLinkedFilePreviewScreen: View {
                 ZoomableImagePreviewScreen(payload: imagePayload, onDismiss: onDismiss)
             case .text(let file):
                 WorkspaceTextFileViewerScreen(file: file, onDismiss: onDismiss, onReload: {
+                    Task { await loadPreview(force: true) }
+                })
+            case .svg(let svgPayload):
+                WorkspaceSVGFilePreviewScreen(payload: svgPayload, onDismiss: onDismiss, onReload: {
                     Task { await loadPreview(force: true) }
                 })
             case nil:
@@ -2805,6 +2823,24 @@ struct WorkspaceLinkedFilePreviewScreen: View {
             await loadImageThenText(force: force)
         case .textFirst:
             await loadTextThenImage(force: force)
+        case .svg:
+            await loadSVGThenText()
+        }
+    }
+
+    @MainActor
+    private func loadSVGThenText() async {
+        do {
+            payload = .svg(try await loadSVGPayload())
+            return
+        } catch {
+            // Fall back to the raw markup if the file can't be rendered as artwork.
+            let svgError = error
+            do {
+                payload = .text(try await loadTextPayload())
+            } catch {
+                errorMessage = combinedPreviewError(primary: svgError, fallback: error)
+            }
         }
     }
 
@@ -2861,12 +2897,61 @@ struct WorkspaceLinkedFilePreviewScreen: View {
         )
     }
 
+    @MainActor
+    private func loadSVGPayload() async throws -> WorkspaceSVGFilePreviewPayload {
+        let file = try await loadTextPayload()
+        let source = file.content ?? ""
+        guard !source.isEmpty else {
+            throw CodexServiceError.invalidResponse("SVG preview response did not include readable SVG markup.")
+        }
+        return WorkspaceSVGFilePreviewPayload(source: source, title: fileName, path: request.path)
+    }
+
     private func combinedPreviewError(primary: Error, fallback: Error) -> String {
         let primaryMessage = primary.localizedDescription
         let fallbackMessage = fallback.localizedDescription
         guard !primaryMessage.isEmpty else { return fallbackMessage }
         guard !fallbackMessage.isEmpty, fallbackMessage != primaryMessage else { return primaryMessage }
         return "\(primaryMessage)\n\(fallbackMessage)"
+    }
+}
+
+private struct WorkspaceSVGFilePreviewScreen: View {
+    let payload: WorkspaceSVGFilePreviewPayload
+    let onDismiss: () -> Void
+    let onReload: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color(.systemBackground)
+                .ignoresSafeArea()
+
+            WorkspaceSVGWebView(source: payload.source, colorScheme: colorScheme)
+                .ignoresSafeArea()
+
+            topBar
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .zIndex(2)
+        }
+    }
+
+    private var topBar: some View {
+        HStack(spacing: 14) {
+            WorkspacePreviewChromeButton(systemName: "xmark", accessibilityLabel: "Close SVG preview") {
+                onDismiss()
+            }
+
+            WorkspacePreviewTitlePill(title: payload.title.isEmpty ? "SVG" : payload.title)
+
+            Spacer(minLength: 0)
+
+            WorkspacePreviewChromeButton(systemName: "arrow.clockwise", accessibilityLabel: "Reload SVG preview") {
+                onReload()
+            }
+        }
     }
 }
 

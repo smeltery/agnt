@@ -53,6 +53,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `AIChangeSets` | ⛔ deferred | per-turn `RevertSheet` (Session 10) covers the practical "undo what this turn did" workflow; finer-grained per-message patch revert needs reducer to track forward patches captured during streaming |
 | `WorkspaceCheckpoints` | ✅ | 10 (preview + apply per turn; checkpointDiff + Copy not yet wired in UI but bridge-ready) |
 | `WorkspaceImages` | ✅ | 18 + 30 (workspace/readImage wrapper + cache; MarkdownContent resolves non-http image refs against thread cwd; click any inline image to open in the shared Lightbox) |
+| Workspace SVG preview (hardened) | 🟡 | iOS renders `.svg` workspace artifacts as artwork in a sandboxed offline WebKit view (strict CSP + external-`href`/`src` sanitizer; `AgntMobile/.../WorkspaceSVGPreview.swift`). On web the browser renders SVG natively via the image/Lightbox path, but agent-generated SVG should be sandboxed (CSP / isolated `<img>`) before inline rendering to avoid script execution / data exfil — follow-up. |
 | `ProjectFolders` | ✅ | 9 (project/quickLocations + listDirectory + searchDirectories + folder picker UI) |
 | `TrustedPairPresentation` | ✅ | 5 + multi-Mac (Settings lists trusted Macs with per-Mac forget; sidebar `MacSwitcher` row surfaces the active Mac + lets the user switch between paired Macs via `useConnectionStore.switchMac` → `pairingStore.setLastTrustedMac` → `resolveTrustedSession` → reconnect. Threads stay shared across Macs by design.) |
 | `Helpers` | n/a | utility — port functions on demand |
