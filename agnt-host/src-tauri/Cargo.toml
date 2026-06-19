@@ -25,3 +25,9 @@ tauri-plugin-updater = "2.10.1"
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
+# provider_bridge: loopback OpenAI-compatible model shim (Codex Responses ⇄ adapter)
+axum = "0.8"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+futures-util = "0.3"
+thiserror = "2"
+tower-http = { version = "0.6", features = ["trace"] }

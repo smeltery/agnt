@@ -16,6 +16,8 @@ use tauri_plugin_updater::UpdaterExt;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
+mod provider_bridge;
+
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const PET_WINDOW_SIZE: f64 = 80.0;
 const BUNDLE_MANIFEST: &str = "agnt-bundle.json";
@@ -168,6 +170,8 @@ pub struct AppConfig {
     pub bridge_path: Option<String>,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    #[serde(default)]
+    pub provider_bridge: provider_bridge::config::ProviderBridgeConfig,
 }
 
 fn default_relay_mode() -> String { "local".to_string() }
@@ -191,6 +195,7 @@ impl Default for AppConfig {
             relay_path: None,
             bridge_path: None,
             log_level: "info".to_string(),
+            provider_bridge: provider_bridge::config::ProviderBridgeConfig::default(),
         }
     }
 }
@@ -544,6 +549,90 @@ fn config_path() -> std::path::PathBuf {
     } else {
         std::path::PathBuf::from("agnt-host-config.json")
     }
+}
+
+// ─── provider_bridge secrets ─────────────────────────────────
+// The provider-bridge API key is stored apart from config.json so it never
+// rides along with exported/synced settings.
+
+fn provider_bridge_secret_path() -> std::path::PathBuf {
+    if let Some(dir) = dirs::config_dir() {
+        let p = dir
+            .join("agnt-host")
+            .join("provider-bridge-secrets.json");
+        if let Some(parent) = p.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        p
+    } else {
+        std::path::PathBuf::from("agnt-provider-bridge-secrets.json")
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct ProviderBridgeSecrets {
+    // Generic on-disk schema so a second adapter reuses the same file.
+    api_key: Option<String>,
+}
+
+fn load_provider_bridge_secrets() -> ProviderBridgeSecrets {
+    let path = provider_bridge_secret_path();
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(path) {
+            if let Ok(secrets) = serde_json::from_str::<ProviderBridgeSecrets>(&content) {
+                return secrets;
+            }
+        }
+    }
+    ProviderBridgeSecrets::default()
+}
+
+fn save_provider_bridge_secrets(secrets: &ProviderBridgeSecrets) {
+    let path = provider_bridge_secret_path();
+    if let Ok(json) = serde_json::to_string_pretty(secrets) {
+        let _ = fs::write(path, json);
+    }
+}
+
+// Env override precedence: the agnt-prefixed name first, then the DeepSeek
+// adapter's documented var. Add future adapter vars to this list.
+fn provider_bridge_env_api_key() -> Option<String> {
+    ["AGNT_PROVIDER_BRIDGE_API_KEY", "DEEPSEEK_API_KEY"]
+        .into_iter()
+        .find_map(|name| {
+            std::env::var(name)
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+        })
+}
+
+fn provider_bridge_key_status() -> provider_bridge::config::ProviderKeyStatus {
+    let has_env_key = provider_bridge_env_api_key().is_some();
+    let secrets = load_provider_bridge_secrets();
+    let has_stored_key = secrets
+        .api_key
+        .as_ref()
+        .is_some_and(|value| !value.trim().is_empty());
+
+    provider_bridge::config::ProviderKeyStatus {
+        available: has_env_key || has_stored_key,
+        source: if has_env_key {
+            "environment".to_string()
+        } else if has_stored_key {
+            "stored".to_string()
+        } else {
+            "missing".to_string()
+        },
+        has_stored_key,
+    }
+}
+
+fn resolve_provider_bridge_api_key() -> Option<String> {
+    provider_bridge_env_api_key().or_else(|| {
+        load_provider_bridge_secrets()
+            .api_key
+            .filter(|value| !value.trim().is_empty())
+    })
 }
 
 fn add_log(app_handle: &tauri::AppHandle, source: &str, level: &str, message: &str) {
@@ -2155,6 +2244,134 @@ async fn install_update(app_handle: tauri::AppHandle) -> Result<(), String> {
 // ─── Main ───────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[tauri::command]
+async fn start_provider_bridge(
+    app_handle: tauri::AppHandle,
+    runtime: tauri::State<'_, provider_bridge::state::ProviderBridgeRuntime>,
+) -> Result<provider_bridge::state::ProviderBridgeStatus, String> {
+    let config = app_handle
+        .state::<AppState>()
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .provider_bridge
+        .clone();
+
+    let api_key = resolve_provider_bridge_api_key()
+        .ok_or(provider_bridge::errors::ProviderBridgeError::MissingApiKey)
+        .map_err(|e| e.to_string())?;
+
+    let status = match runtime.start(config, api_key).await {
+        Ok(status) => status,
+        Err(error) => {
+            add_log(
+                &app_handle,
+                "provider_bridge",
+                "error",
+                &format!("Failed to start provider bridge: {error}"),
+            );
+            return Err(error.to_string());
+        }
+    };
+
+    add_log(
+        &app_handle,
+        "provider_bridge",
+        "info",
+        &format!("Provider bridge listening at {}", status.base_url),
+    );
+    Ok(status)
+}
+
+#[tauri::command]
+async fn stop_provider_bridge(
+    app_handle: tauri::AppHandle,
+    runtime: tauri::State<'_, provider_bridge::state::ProviderBridgeRuntime>,
+) -> Result<provider_bridge::state::ProviderBridgeStatus, String> {
+    let status = match runtime.stop().await {
+        Ok(status) => status,
+        Err(error) => {
+            add_log(
+                &app_handle,
+                "provider_bridge",
+                "error",
+                &format!("Failed to stop provider bridge: {error}"),
+            );
+            return Err(error.to_string());
+        }
+    };
+    add_log(
+        &app_handle,
+        "provider_bridge",
+        "info",
+        "Provider bridge stopped",
+    );
+    Ok(status)
+}
+
+#[tauri::command]
+fn get_provider_bridge_status(
+    runtime: tauri::State<'_, provider_bridge::state::ProviderBridgeRuntime>,
+    app_handle: tauri::AppHandle,
+) -> Result<provider_bridge::state::ProviderBridgeStatus, String> {
+    let config = app_handle
+        .state::<AppState>()
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .provider_bridge
+        .clone();
+    runtime.status(&config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_provider_bridge_codex_config(
+    app_handle: tauri::AppHandle,
+) -> Result<provider_bridge::config::ProviderBridgeCodexConfig, String> {
+    let config = app_handle
+        .state::<AppState>()
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .provider_bridge
+        .clone();
+    config.codex_config().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_provider_bridge_key_status() -> provider_bridge::config::ProviderKeyStatus {
+    provider_bridge_key_status()
+}
+
+#[tauri::command]
+fn set_provider_bridge_api_key(
+    app_handle: tauri::AppHandle,
+    key: Option<String>,
+) -> provider_bridge::config::ProviderKeyStatus {
+    let normalized = key.and_then(|value| {
+        let trimmed = value.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
+    let mut secrets = load_provider_bridge_secrets();
+    secrets.api_key = normalized;
+    save_provider_bridge_secrets(&secrets);
+    add_log(
+        &app_handle,
+        "provider_bridge",
+        "info",
+        if secrets.api_key.is_some() {
+            "Stored provider bridge API key updated"
+        } else {
+            "Stored provider bridge API key cleared"
+        },
+    );
+    provider_bridge_key_status()
+}
+
 pub fn run() {
     let app_config = load_config();
 
@@ -2175,6 +2392,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state)
+        .manage(provider_bridge::state::ProviderBridgeRuntime::default())
         .setup(move |app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -2390,6 +2608,12 @@ pub fn run() {
             get_diagnostics,
             check_for_update,
             install_update,
+            start_provider_bridge,
+            stop_provider_bridge,
+            get_provider_bridge_status,
+            get_provider_bridge_codex_config,
+            get_provider_bridge_key_status,
+            set_provider_bridge_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
