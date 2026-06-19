@@ -2960,6 +2960,7 @@ private struct WorkspaceTextFileViewerScreen: View {
     let onDismiss: () -> Void
     let onReload: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isShowingCopiedConfirmation = false
 
     private var content: String {
@@ -2968,16 +2969,18 @@ private struct WorkspaceTextFileViewerScreen: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView([.vertical, .horizontal]) {
-                VStack(alignment: .leading, spacing: 12) {
-                    fileMetadataHeader
-                    Text(content)
-                        .font(AppFont.mono(.caption))
-                        .foregroundStyle(.primary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(16)
+            VStack(alignment: .leading, spacing: 0) {
+                fileMetadataHeader
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                // Runestone provides syntax highlighting, line numbers, selection, and
+                // its own scrolling, so it is not wrapped in a SwiftUI ScrollView.
+                WorkspaceRunestoneCodeFileView(
+                    content: content,
+                    fileName: file.fileName,
+                    colorScheme: colorScheme
+                )
             }
             .background(Color(.systemBackground))
             .navigationTitle(file.fileName.isEmpty ? "File" : file.fileName)
