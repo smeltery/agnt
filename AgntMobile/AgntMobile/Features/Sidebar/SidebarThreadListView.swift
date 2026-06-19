@@ -97,7 +97,8 @@ struct SidebarThreadListView: View {
             pinnedGroupSection(group)
         case .project:
             projectGroupSection(group)
-
+        case .chat:
+            chatGroupSection(group)
         case .archived:
             archivedGroupSection(group)
         }
@@ -127,6 +128,38 @@ struct SidebarThreadListView: View {
                         thread,
                         childrenByParentID: hierarchy.childrenByParentID,
                         pinnedRootThreadIDs: Set(hierarchy.rootThreads.map(\.id))
+                    )
+                }
+            }
+            .padding(.bottom, 10)
+        }
+    }
+
+    // Rootless "quick" chats render as a flat tree (subagents still nest) with no
+    // project header or project-scoped archive/delete affordances.
+    private func chatGroupSection(_ group: SidebarThreadGroup) -> some View {
+        let hierarchy = SidebarSubagentHierarchy(groupThreads: group.threads)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: group.iconSystemName)
+                    .font(AppFont.body(weight: .medium))
+                    .foregroundStyle(.primary)
+                Text(group.label)
+                    .font(AppFont.body(weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+            .padding(.bottom, 10)
+
+            VStack(spacing: 4) {
+                ForEach(hierarchy.rootThreads) { thread in
+                    threadRowTree(
+                        thread,
+                        childrenByParentID: hierarchy.childrenByParentID
                     )
                 }
             }
@@ -418,6 +451,16 @@ struct SidebarThreadListView: View {
                     manuallyExpandedGroupIDs: revealedProjectGroupIDs
                 )
                 for rootThread in visibleRootThreads {
+                    collectVisibleSubagentThreadIDs(
+                        from: rootThread,
+                        childrenByParentID: hierarchy.childrenByParentID,
+                        ancestorThreadIDs: [],
+                        into: &visibleThreadIDs
+                    )
+                }
+            case .chat:
+                let hierarchy = SidebarSubagentHierarchy(groupThreads: group.threads)
+                for rootThread in hierarchy.rootThreads {
                     collectVisibleSubagentThreadIDs(
                         from: rootThread,
                         childrenByParentID: hierarchy.childrenByParentID,
