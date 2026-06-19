@@ -58,6 +58,9 @@ On Windows, `npm run tauri:build:windows` produces NSIS + MSI installers.
 | Default remote relay URL | `wss://relay.remodex.app` | `ws://127.0.0.1:9000` (local; user must configure self-hosted relay) |
 | Updater endpoint | Stivy-01/remodex releases | `dotbrains/agnt` releases |
 | Updater pubkey | Stivy-01 minisign key | placeholder — regenerate before release |
+| Provider-bridge secret file | `remodex-host/provider-bridge-secrets.json` | `agnt-host/provider-bridge-secrets.json` |
+| Provider-bridge key env | `DEEPSEEK_API_KEY` | `AGNT_PROVIDER_BRIDGE_API_KEY` (falls back to `DEEPSEEK_API_KEY`) |
+| Provider-bridge secret schema | `{ deepseek_api_key }` | `{ api_key }` (provider-agnostic) |
 | License | ISC | Apache-2.0 |
 
 ## TODO before first release

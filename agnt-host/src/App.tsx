@@ -127,6 +127,28 @@ interface AppConfig {
   relay_path: string | null;
   bridge_path: string | null;
   log_level: string;
+  provider_bridge: ProviderBridgeConfig;
+}
+
+interface ProviderBridgeConfig {
+  bind_host: string;
+  port: number;
+  provider: string;
+  default_model: string;
+}
+
+interface ProviderBridgeStatus {
+  running: boolean;
+  bind_host: string;
+  port: number;
+  base_url: string;
+  provider: string;
+}
+
+interface ProviderKeyStatus {
+  available: boolean;
+  source: "environment" | "stored" | "missing" | string;
+  has_stored_key: boolean;
 }
 
 const STATE_LABELS: Record<string, string> = {
@@ -216,9 +238,29 @@ function App() {
     relay_path: null,
     bridge_path: null,
     log_level: "info",
+    provider_bridge: {
+      bind_host: "127.0.0.1",
+      port: 8787,
+      provider: "deepseek",
+      default_model: "deepseek-v4-pro",
+    },
   });
   const [settingsPort, setSettingsPort] = useState("9000");
   const [portStatus, setPortStatus] = useState<"checking" | "available" | "taken">("available");
+  const [providerBridgeStatus, setProviderBridgeStatus] = useState<ProviderBridgeStatus>({
+    running: false,
+    bind_host: "127.0.0.1",
+    port: 8787,
+    base_url: "http://127.0.0.1:8787",
+    provider: "deepseek",
+  });
+  const [providerKeyStatus, setProviderKeyStatus] = useState<ProviderKeyStatus>({
+    available: false,
+    source: "missing",
+    has_stored_key: false,
+  });
+  const [providerApiKeyInput, setProviderApiKeyInput] = useState("");
+  const [providerBridgeBusy, setProviderBridgeBusy] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const logError = useCallback((msg: string) => {
@@ -249,6 +291,62 @@ function App() {
     }
   }, [tauriReady]);
 
+  const refreshProviderBridgeStatus = useCallback(async () => {
+    if (!tauriReady) return;
+    try {
+      const [bridge, key] = await Promise.all([
+        invoke<ProviderBridgeStatus>("get_provider_bridge_status"),
+        invoke<ProviderKeyStatus>("get_provider_bridge_key_status"),
+      ]);
+      setProviderBridgeStatus(bridge);
+      setProviderKeyStatus(key);
+    } catch {
+      return;
+    }
+  }, [tauriReady]);
+
+  const handleToggleProviderBridge = useCallback(async () => {
+    if (!tauriReady || providerBridgeBusy) return;
+    setProviderBridgeBusy(true);
+    try {
+      const next = providerBridgeStatus.running
+        ? await invoke<ProviderBridgeStatus>("stop_provider_bridge")
+        : await invoke<ProviderBridgeStatus>("start_provider_bridge");
+      setProviderBridgeStatus(next);
+      await refreshProviderBridgeStatus();
+    } catch (e) {
+      logError(`Provider bridge ${providerBridgeStatus.running ? "stop" : "start"} failed: ${e}`);
+    } finally {
+      setProviderBridgeBusy(false);
+    }
+  }, [tauriReady, providerBridgeBusy, providerBridgeStatus.running, refreshProviderBridgeStatus, logError]);
+
+  const handleSaveProviderApiKey = useCallback(async () => {
+    if (!tauriReady) return;
+    try {
+      const next = await invoke<ProviderKeyStatus>("set_provider_bridge_api_key", {
+        key: providerApiKeyInput,
+      });
+      setProviderKeyStatus(next);
+      setProviderApiKeyInput("");
+    } catch (e) {
+      logError(`Provider bridge key save failed: ${e}`);
+    }
+  }, [tauriReady, providerApiKeyInput, logError]);
+
+  const handleClearProviderApiKey = useCallback(async () => {
+    if (!tauriReady) return;
+    try {
+      const next = await invoke<ProviderKeyStatus>("set_provider_bridge_api_key", {
+        key: null,
+      });
+      setProviderKeyStatus(next);
+      setProviderApiKeyInput("");
+    } catch (e) {
+      logError(`Provider bridge key clear failed: ${e}`);
+    }
+  }, [tauriReady, logError]);
+
   // Wait for Tauri to be ready before registering listeners
   useEffect(() => {
     if (!isTauri()) return;
@@ -275,6 +373,12 @@ function App() {
       }
     }).catch(() => {});
   }, [tauriReady]);
+
+  // Refresh provider-bridge state once Tauri is ready
+  useEffect(() => {
+    if (!tauriReady) return;
+    refreshProviderBridgeStatus();
+  }, [tauriReady, refreshProviderBridgeStatus]);
 
 
   // Listen for log entries
@@ -1578,6 +1682,78 @@ function App() {
                   color="#35C759"
                   onClick={handleInstallUpdate}
                   disabled={!updateInfo || !tauriReady || updateStatus !== "idle"}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Provider bridge — loopback model shim for the Codex CLI */}
+          <div
+            style={{
+              marginBottom: "12px",
+              padding: "10px",
+              background: "var(--bg-primary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "6px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-primary)" }}>
+                  Provider bridge
+                </div>
+                <div style={{ fontSize: "10px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                  {providerBridgeStatus.running
+                    ? `Running · ${providerBridgeStatus.base_url}`
+                    : "Stopped"}
+                  {" · "}
+                  {providerBridgeStatus.provider}
+                </div>
+              </div>
+              <ActionBtn
+                label={providerBridgeBusy ? "..." : providerBridgeStatus.running ? "Stop" : "Start"}
+                color={providerBridgeStatus.running ? "#FF5C5C" : "#35C759"}
+                onClick={handleToggleProviderBridge}
+                disabled={
+                  !tauriReady ||
+                  providerBridgeBusy ||
+                  (!providerKeyStatus.available && !providerBridgeStatus.running)
+                }
+              />
+            </div>
+            <div style={{ marginTop: "8px" }}>
+              <label style={{ fontSize: "11px", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>
+                API key ({providerKeyStatus.source})
+              </label>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <input
+                  type="password"
+                  value={providerApiKeyInput}
+                  onChange={(e) => setProviderApiKeyInput(e.target.value)}
+                  placeholder={providerKeyStatus.has_stored_key ? "•••• stored" : "paste API key"}
+                  style={{
+                    flex: 1,
+                    padding: "6px 8px",
+                    fontSize: "10px",
+                    fontFamily: "monospace",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "4px",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                />
+                <ActionBtn
+                  label="Save"
+                  color="#4F8CFF"
+                  onClick={handleSaveProviderApiKey}
+                  disabled={!tauriReady || !providerApiKeyInput.trim()}
+                />
+                <ActionBtn
+                  label="Clear"
+                  color="#9AA4B2"
+                  onClick={handleClearProviderApiKey}
+                  disabled={!tauriReady || !providerKeyStatus.has_stored_key}
                 />
               </div>
             </div>
