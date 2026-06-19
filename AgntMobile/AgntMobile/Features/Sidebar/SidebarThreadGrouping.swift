@@ -1,14 +1,45 @@
 // FILE: SidebarThreadGrouping.swift
-// Purpose: Produces sidebar thread groups by project path (`cwd`) and keeps archived chats separate.
+// Purpose: Produces sidebar thread groups by project path (`cwd`) or rootless chat
+//          scope and keeps archived chats separate.
 // Layer: View Helper
-// Exports: SidebarThreadGroupKind, SidebarThreadGroup, SidebarThreadGrouping
+// Exports: SidebarThreadGroupKind, SidebarContentScope, SidebarThreadGroup,
+//          SidebarThreadGrouping
 
 import Foundation
 
 enum SidebarThreadGroupKind: Equatable {
     case pinned
     case project
+    case chat
     case archived
+}
+
+// Splits the sidebar between project-backed threads and rootless "quick" chats.
+// This is a presentation scope, not a repo filter: each scope still surfaces
+// every thread of that kind the device knows about, just bucketed differently.
+enum SidebarContentScope: String, CaseIterable, Hashable, Identifiable {
+    case projects
+    case chats
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .projects:
+            return "Projects"
+        case .chats:
+            return "Chats"
+        }
+    }
+}
+
+// Grouping-level scope. `.all` is the backward-compatible default (project groups
+// with rootless chats folded into a "No Project" bucket); the sidebar picker maps
+// its `SidebarContentScope` onto the `.projects` / `.chats` cases.
+enum SidebarThreadGroupingScope {
+    case all
+    case projects
+    case chats
 }
 
 struct SidebarProjectChoice: Identifiable, Equatable {
@@ -33,6 +64,8 @@ struct SidebarThreadGroup: Identifiable {
             return "pin"
         case .project:
             return CodexThread.projectIconSystemName(for: projectPath)
+        case .chat:
+            return "bubble.left.and.bubble.right"
         case .archived:
             return "archivebox"
         }
@@ -47,16 +80,18 @@ enum SidebarThreadGrouping {
     static func makeGroups(
         from threads: [CodexThread],
         pinnedThreadIDs: [String] = [],
+        scope: SidebarThreadGroupingScope = .all,
         projectlessRootPaths: [String] = [],
         now _: Date = Date(),
         calendar _: Calendar = .current
     ) -> [SidebarThreadGroup] {
         var groups: [SidebarThreadGroup] = []
         var archivedThreads: [CodexThread] = []
-        let pinnedThreads = collectPinnedThreads(from: threads, pinnedRootThreadIDs: pinnedThreadIDs)
+        let scopedThreads = threadsForScope(scope, from: threads, projectlessRootPaths: projectlessRootPaths)
+        let pinnedThreads = collectPinnedThreads(from: scopedThreads, pinnedRootThreadIDs: pinnedThreadIDs)
         let pinnedThreadIDSet = Set(pinnedThreads.map(\.id))
 
-        for thread in threads {
+        for thread in scopedThreads {
             if thread.syncState == .archivedLocal {
                 archivedThreads.append(thread)
             }
@@ -75,11 +110,21 @@ enum SidebarThreadGrouping {
             )
         }
 
-        groups.append(contentsOf: makeProjectGroups(
-            from: threads,
-            excludingPinnedThreadIDs: pinnedThreadIDSet,
-            projectlessRootPaths: projectlessRootPaths
-        ))
+        switch scope {
+        case .all, .projects:
+            groups.append(contentsOf: makeProjectGroups(
+                from: scopedThreads,
+                excludingPinnedThreadIDs: pinnedThreadIDSet,
+                projectlessRootPaths: projectlessRootPaths
+            ))
+        case .chats:
+            if let chatGroup = makeRootlessChatGroup(
+                from: scopedThreads,
+                excludingPinnedThreadIDs: pinnedThreadIDSet
+            ) {
+                groups.append(chatGroup)
+            }
+        }
 
         let sortedArchived = sortThreadsByRecentActivity(archivedThreads)
         if let firstArchived = sortedArchived.first {
@@ -96,6 +141,44 @@ enum SidebarThreadGrouping {
         }
 
         return groups
+    }
+
+    // Keeps the scope picker from leaking project chats into rootless Chats and vice versa.
+    static func threadsForScope(
+        _ scope: SidebarThreadGroupingScope,
+        from threads: [CodexThread],
+        projectlessRootPaths: [String] = []
+    ) -> [CodexThread] {
+        switch scope {
+        case .all:
+            return threads
+        case .projects:
+            return threads.filter { !isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths) }
+        case .chats:
+            return threads.filter { isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths) }
+        }
+    }
+
+    private static func makeRootlessChatGroup(
+        from threads: [CodexThread],
+        excludingPinnedThreadIDs pinnedThreadIDs: Set<String>
+    ) -> SidebarThreadGroup? {
+        let liveThreads = threads.filter {
+            $0.syncState != .archivedLocal && !pinnedThreadIDs.contains($0.id)
+        }
+        let sortedThreads = sortThreadsByRecentActivity(liveThreads)
+        guard let firstThread = sortedThreads.first else {
+            return nil
+        }
+
+        return SidebarThreadGroup(
+            id: "chats:rootless",
+            label: "Chats",
+            kind: .chat,
+            sortDate: firstThread.updatedAt ?? firstThread.createdAt ?? .distantPast,
+            projectPath: nil,
+            threads: sortedThreads
+        )
     }
 
     // Reuses the sidebar project grouping rules for places like the New Chat chooser.

@@ -112,6 +112,47 @@ final class SidebarThreadGroupingTests: XCTestCase {
         XCTAssertEqual(groups[1].threads.map(\.id), ["archived-thread"])
     }
 
+    func testProjectsScopeExcludesRootlessChats() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "project-thread", updatedAt: now, cwd: "/Users/me/work/app"),
+            makeThread(id: "rootless-thread", updatedAt: now.addingTimeInterval(-30), cwd: nil),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(from: threads, scope: .projects, now: now)
+
+        XCTAssertEqual(groups.map(\.id), ["project:/Users/me/work/app"])
+        XCTAssertEqual(groups[0].threads.map(\.id), ["project-thread"])
+    }
+
+    func testChatsScopeProducesSingleRootlessChatGroup() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "project-thread", updatedAt: now, cwd: "/Users/me/work/app"),
+            makeThread(id: "rootless-a", updatedAt: now.addingTimeInterval(-30), cwd: nil),
+            makeThread(id: "rootless-b", updatedAt: now.addingTimeInterval(-60), cwd: "   "),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(from: threads, scope: .chats, now: now)
+
+        XCTAssertEqual(groups.map(\.id), ["chats:rootless"])
+        XCTAssertEqual(groups[0].kind, .chat)
+        XCTAssertEqual(groups[0].label, "Chats")
+        XCTAssertNil(groups[0].projectPath)
+        XCTAssertEqual(groups[0].threads.map(\.id), ["rootless-a", "rootless-b"])
+    }
+
+    func testChatsScopeIsEmptyWhenNoRootlessChatsExist() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "project-thread", updatedAt: now, cwd: "/Users/me/work/app"),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(from: threads, scope: .chats, now: now)
+
+        XCTAssertTrue(groups.isEmpty)
+    }
+
     func testMakeGroupsLiftsPinnedThreadsIntoDedicatedLeadingSection() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let threads = [

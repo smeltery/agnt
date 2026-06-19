@@ -46,6 +46,21 @@ struct SidebarView: View {
     @State private var lastDiffFingerprint: Int = 0
     @State private var lastBadgeFingerprint: Int = 0
     @State private var projectlessChatRootPaths: [String] = []
+    @AppStorage("agnt.sidebarContentScope")
+    private var contentScopeRawValue = SidebarContentScope.projects.rawValue
+
+    private var contentScope: SidebarContentScope {
+        SidebarContentScope(rawValue: contentScopeRawValue) ?? .projects
+    }
+
+    private var groupingScope: SidebarThreadGroupingScope {
+        switch contentScope {
+        case .projects:
+            return .projects
+        case .chats:
+            return .chats
+        }
+    }
 
     var body: some View {
         mainStack
@@ -123,6 +138,16 @@ struct SidebarView: View {
             )
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
+
+            SidebarContentScopePicker(
+                selection: Binding(
+                    get: { contentScope },
+                    set: { contentScopeRawValue = $0.rawValue }
+                )
+            )
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+            .onChange(of: contentScopeRawValue) { _, _ in rebuildGroupedThreads() }
 
             threadListView
 
@@ -563,6 +588,7 @@ struct SidebarView: View {
         groupedThreads = SidebarThreadGrouping.makeGroups(
             from: source,
             pinnedThreadIDs: codex.pinnedThreadIDs,
+            scope: groupingScope,
             projectlessRootPaths: projectlessChatRootPaths
         )
         debugSidebarLog(
@@ -574,6 +600,7 @@ struct SidebarView: View {
     private func groupingFingerprint(query: String, source: [CodexThread]) -> Int {
         var hasher = Hasher()
         hasher.combine(query)
+        hasher.combine(contentScopeRawValue)
         hasher.combine(codex.pinnedThreadIDs)
         hasher.combine(projectlessChatRootPaths)
         for thread in source {
