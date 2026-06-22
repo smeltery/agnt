@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Toolchain comes from the committed Flox environment (.flox/), so CI runs
       # the exact Node 20 + Bun 1.3.11 pinned for local dev. Every command below
