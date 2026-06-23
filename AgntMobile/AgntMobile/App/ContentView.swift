@@ -78,6 +78,7 @@ struct ContentView: View {
     @State private var sidebarSelectionSuppressedUntil: Date?
     @State private var isOpeningNewChatFromSidebar = false
     @State private var activeNewChatDraftRoute: NewChatDraftRoute?
+    @State private var pendingQuickAction: AgntQuickAction?
     @State private var threadIDsPendingInitialAssistantAnchor: Set<String> = []
     @AppStorage("codex.hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("codex.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion = ""
@@ -176,6 +177,16 @@ struct ContentView: View {
                 debugSidebarLog("threads changed count=\(threads.count) sidebarOpen=\(isSidebarOpen) prewarmed=\(isSidebarPrewarmed)")
                 syncSelectedThread(with: threads)
                 scheduleSidebarPrewarmIfNeeded()
+                AgntQuickActionCenter.updateShortcutItems(for: threads)
+                routePendingQuickActionIfNeeded()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: AgntQuickActionCenter.didReceiveQuickAction)) { notification in
+                _ = AgntQuickActionCenter.consumePendingAction()
+                guard let action = notification.userInfo?["action"] as? AgntQuickAction else {
+                    return
+                }
+                pendingQuickAction = action
+                routePendingQuickActionIfNeeded()
             }
             .onChange(of: scenePhase) { _, phase in
                 debugSidebarLog("scenePhase changed phase=\(String(describing: phase))")
@@ -190,6 +201,8 @@ struct ContentView: View {
                         await attemptSavedMacReconnectRecoveryIfNeeded()
                         scheduleSidebarPrewarmIfNeeded()
                     }
+                    AgntQuickActionCenter.updateShortcutItems(for: codex.threads)
+                    routePendingQuickActionIfNeeded()
                 } else if phase == .background {
                     resetSavedMacWakeRecoveryState()
                     teardownSidebarPrewarm()
@@ -850,6 +863,54 @@ struct ContentView: View {
 
             codex.requestImmediateActiveThreadSync(threadId: thread.id)
         }
+    }
+
+    // MARK: - Home Screen quick actions
+
+    private func routePendingQuickActionIfNeeded() {
+        if pendingQuickAction == nil {
+            pendingQuickAction = AgntQuickActionCenter.consumePendingAction()
+        }
+
+        guard let action = pendingQuickAction else {
+            return
+        }
+
+        // Shortcut callbacks can arrive before SwiftUI has resolved the size class.
+        // Routing too early chooses drawer mode on iPhone and leaves the user at the sidebar root.
+        guard horizontalSizeClass != nil else {
+            return
+        }
+
+        pendingQuickAction = nil
+        handleQuickAction(action)
+    }
+
+    private func handleQuickAction(_ action: AgntQuickAction) {
+        switch action {
+        case .newChat:
+            openNewChatDraftFromSidebar(source: .generalChat, preferredProjectPath: nil)
+        case .thread(let threadId):
+            if let thread = codex.threads.first(where: { $0.id == threadId && $0.syncState == .live }) {
+                sidebarSelectionSuppressedUntil = nil
+                openThreadFromSidebar(thread)
+            } else {
+                routeQuickActionThreadPlaceholder(threadId: threadId)
+            }
+        }
+    }
+
+    private func routeQuickActionThreadPlaceholder(threadId: String) {
+        let normalizedThreadId = threadId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedThreadId.isEmpty else {
+            return
+        }
+
+        let thread = codex.threads.first(where: { $0.id == normalizedThreadId })
+            ?? CodexThread(id: normalizedThreadId, title: CodexThread.defaultDisplayTitle)
+        codex.upsertThread(thread)
+        sidebarSelectionSuppressedUntil = nil
+        openThreadFromSidebar(thread)
     }
 
     // Terminal can be opened from several surfaces with different cwd payloads;
