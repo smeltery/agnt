@@ -352,6 +352,16 @@ interface CodexRepository {
         draftId: String,
     ): QueuedTurnDraft? = null
 
+    /** Per-thread unsent composer text persisted via the mac-scoped session store. */
+    suspend fun loadComposerDraft(threadId: String): String = ""
+
+    suspend fun saveComposerDraft(
+        threadId: String,
+        draft: String,
+    ) = Unit
+
+    suspend fun clearComposerDraft(threadId: String) = saveComposerDraft(threadId, "")
+
     /** Interrompe il turno attivo (`turn/interrupt`). [turnId] opzionale se già noto. */
     suspend fun interruptTurn(
         threadId: String,

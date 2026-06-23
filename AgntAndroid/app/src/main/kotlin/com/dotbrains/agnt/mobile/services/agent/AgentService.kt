@@ -48,6 +48,7 @@ import com.dotbrains.agnt.mobile.services.agent.devices.cancelDeviceSwitchImpl
 import com.dotbrains.agnt.mobile.services.agent.devices.forgetTrustedDeviceImpl
 import com.dotbrains.agnt.mobile.services.agent.devices.initializeTrustedDeviceState
 import com.dotbrains.agnt.mobile.services.agent.devices.refreshTrustedDevices
+import com.dotbrains.agnt.mobile.services.agent.devices.resolvedMacScopedPersistenceDeviceId
 import com.dotbrains.agnt.mobile.services.agent.devices.switchToScannedDeviceImpl
 import com.dotbrains.agnt.mobile.services.agent.devices.switchToTrustedDeviceImpl
 import com.dotbrains.agnt.mobile.services.agent.notifications.enqueuePendingApprovalRequest
@@ -575,6 +576,31 @@ class AgentService(
     override fun dismissBridgeUpdatePrompt() {
         _bridgeUpdatePrompt.value = null
     }
+
+    override suspend fun loadComposerDraft(threadId: String): String =
+        withContext(Dispatchers.IO) {
+            val tid = threadId.trim().takeIf { it.isNotEmpty() } ?: return@withContext ""
+            macScopedSessionStore.loadComposerDrafts(resolvedMacScopedPersistenceDeviceId())[tid].orEmpty()
+        }
+
+    override suspend fun saveComposerDraft(
+        threadId: String,
+        draft: String,
+    ) = withContext(Dispatchers.IO) {
+        macScopedSessionStore.saveComposerDraft(
+            macDeviceId = resolvedMacScopedPersistenceDeviceId(),
+            threadId = threadId,
+            draft = draft,
+        )
+    }
+
+    override suspend fun clearComposerDraft(threadId: String) =
+        withContext(Dispatchers.IO) {
+            macScopedSessionStore.clearComposerDraft(
+                macDeviceId = resolvedMacScopedPersistenceDeviceId(),
+                threadId = threadId,
+            )
+        }
 
     override suspend fun refreshThreads() =
         withContext(Dispatchers.IO) {

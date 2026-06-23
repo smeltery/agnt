@@ -171,6 +171,7 @@ fun TurnConversationPane(
     modifier: Modifier = Modifier,
 ) {
     val ready by repository.isSessionReady.collectAsStateWithLifecycle()
+    val currentTrustedMacDeviceId by repository.currentTrustedMacDeviceId.collectAsStateWithLifecycle()
     // Hoisted out of scope.launch / non-Composable callbacks so they re-cache on configuration change.
     val undoMissingCwdMessage = stringResource(R.string.turn_usage_revert_reason_missing_cwd)
     val undoFailedMessage = stringResource(R.string.turn_message_action_undo_failed)
@@ -202,7 +203,10 @@ fun TurnConversationPane(
     val aiChangeSetPersistence = LocalAIChangeSetPersistence.current
     var sending by remember { mutableStateOf(false) }
     var lastError by remember { mutableStateOf<String?>(null) }
-    var draft by rememberSaveable { mutableStateOf("") }
+    // Per-thread, per-mac so a half-typed message survives thread switches and relaunch
+    // (loaded/saved via the mac-scoped session store) instead of bleeding across threads.
+    var draft by remember(threadId, currentTrustedMacDeviceId) { mutableStateOf("") }
+    var loadedDraftKey by remember { mutableStateOf<String?>(null) }
     var isPlanModeEnabled by rememberSaveable(threadId) { mutableStateOf(false) }
     var expandedPlanAccessoryMessageId by rememberSaveable(threadId) { mutableStateOf<String?>(null) }
     var composerAttachments by remember { mutableStateOf<List<TurnComposerAttachment>>(emptyList()) }
@@ -683,6 +687,22 @@ fun TurnConversationPane(
                 lastError = voiceMicDeniedMessage
             }
         }
+
+    // Restore the saved composer draft for this thread/mac.
+    LaunchedEffect(threadId, currentTrustedMacDeviceId) {
+        draft = runCatching { repository.loadComposerDraft(threadId) }.getOrDefault("")
+        loadedDraftKey = "${currentTrustedMacDeviceId.orEmpty()}|$threadId"
+    }
+
+    // Persist edits once the draft for the current key has loaded. The key guard
+    // prevents the freshly-reset draft from overwriting another thread's draft
+    // before its restore completes.
+    LaunchedEffect(threadId, currentTrustedMacDeviceId, draft, loadedDraftKey) {
+        val draftKey = "${currentTrustedMacDeviceId.orEmpty()}|$threadId"
+        if (loadedDraftKey == draftKey) {
+            runCatching { repository.saveComposerDraft(threadId, draft) }
+        }
+    }
 
     LaunchedEffect(threadId, ready) {
         if (ready) {
