@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 
 /**
- * Theme palette piped into the xterm.js WebView. Mirrors `RemodexTerminalTheme` from
+ * Theme palette piped into the xterm.js WebView. Mirrors `AgntTerminalTheme` from
  * `AgntMobile/AgntMobile/Views/Terminal/GhosttyTerminalSurface.swift`.
  */
 data class TerminalTheme(

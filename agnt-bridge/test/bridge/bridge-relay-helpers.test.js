@@ -1,5 +1,5 @@
 // FILE: bridge-relay-helpers.test.js
-// Purpose: Unit tests for the relay-bound helpers ported from Remodex 1.5.1:
+// Purpose: Unit tests for the relay-bound helpers:
 //          - normalizeRelayBoundJsonRpcMessage / unwrapAppServerPayloadResult
 //          - buildEmergencySingleTurnResponse shrink loop
 //          - maybeBuildJsonlThreadTurnsListFallback codex gating + IO injection

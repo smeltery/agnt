@@ -208,8 +208,6 @@ class AgntLocalNotificationPresenter(
 
         private const val TAG = "AgntLocalNotificationPresenter"
 
-        // Legacy upstream channel id; deleted on first channel create so it doesn't linger in settings.
-        private const val LEGACY_CHANNEL_ID = "remodex_local_attention"
         private const val DEDUPE_WINDOW_MS = 60_000L
         private const val NOTIFICATION_ID_RUN_BASE = 10_000
         private const val NOTIFICATION_ID_APPROVAL_BASE = 20_000
@@ -239,8 +237,6 @@ class AgntLocalNotificationPresenter(
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
             val ctx = appContext.applicationContext
             val mgr = ctx.getSystemService(NotificationManager::class.java) ?: return
-            // Retire the upstream-named channel so a stale entry doesn't linger in system settings.
-            runCatching { mgr.deleteNotificationChannel(LEGACY_CHANNEL_ID) }
             val channel =
                 NotificationChannel(
                     CHANNEL_ID,

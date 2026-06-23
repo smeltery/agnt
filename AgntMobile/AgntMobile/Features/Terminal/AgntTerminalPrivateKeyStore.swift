@@ -1,13 +1,13 @@
-// FILE: RemodexTerminalPrivateKeyStore.swift
+// FILE: AgntTerminalPrivateKeyStore.swift
 // Purpose: Stores the phone-side SSH private key material used by the native terminal.
 // Layer: Service
-// Exports: RemodexTerminalPrivateKeyStore
+// Exports: AgntTerminalPrivateKeyStore
 // Depends on: Foundation, SecureStore
 
 import Foundation
 import Security
 
-enum RemodexTerminalPrivateKeyStore {
+enum AgntTerminalPrivateKeyStore {
     static func loadPrivateKey() -> String {
         SecureStore.readString(for: CodexSecureKeys.terminalSSHPrivateKey) ?? ""
     }

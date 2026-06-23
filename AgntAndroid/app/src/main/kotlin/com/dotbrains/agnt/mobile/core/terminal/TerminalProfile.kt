@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * SSH connection profile persisted in [com.dotbrains.agnt.mobile.core.security.SecureStore].
- * Mirrors `RemodexTerminalProfile` in `AgntMobile/AgntMobile/Services/Terminal/RemodexTerminalModels.swift`.
+ * Mirrors `AgntTerminalProfile` in `AgntMobile/AgntMobile/Services/Terminal/AgntTerminalModels.swift`.
  */
 @Serializable
 data class TerminalProfile(

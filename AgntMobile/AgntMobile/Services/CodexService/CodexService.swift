@@ -506,11 +506,11 @@ final class CodexService {
     // Owns the scarce App Store review prompt budget for successful in-app runs.
     @ObservationIgnored let appReviewPromptCoordinator = AppReviewPromptCoordinator()
     // Interactive SSH terminal state is owned on-device so it can bootstrap a Mac before the bridge runs.
-    var terminalSnapshot: RemodexTerminalSnapshot = .idle
-    var terminalSnapshotsById: [String: RemodexTerminalSnapshot] = [:]
-    var terminalProfile: RemodexTerminalProfile = RemodexTerminalProfileStore.load()
-    @ObservationIgnored let nativeSSHTerminal = RemodexNativeSSHTerminal()
-    @ObservationIgnored var nativeSSHTerminalsById: [String: RemodexNativeSSHTerminal] = [:]
+    var terminalSnapshot: AgntTerminalSnapshot = .idle
+    var terminalSnapshotsById: [String: AgntTerminalSnapshot] = [:]
+    var terminalProfile: AgntTerminalProfile = AgntTerminalProfileStore.load()
+    @ObservationIgnored let nativeSSHTerminal = AgntNativeSSHTerminal()
+    @ObservationIgnored var nativeSSHTerminalsById: [String: AgntNativeSSHTerminal] = [:]
 
     // --- Internal wiring ------------------------------------------------------
 

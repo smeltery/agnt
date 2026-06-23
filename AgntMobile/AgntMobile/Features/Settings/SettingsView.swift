@@ -1038,14 +1038,14 @@ private struct SettingsAboutCard: View {
 
             Button {
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                if let url = URL(string: "https://x.com/emanueledpt") {
+                if let url = URL(string: "https://github.com/dotbrains/agnt") {
                     UIApplication.shared.open(url)
                 }
             } label: {
                 settingsAccessoryRow(
                     title: "Chat & Support",
                     leading: {
-                        Image("x-icon")
+                        Image("github-mark-white")
                             .renderingMode(.template)
                             .resizable()
                             .scaledToFit()

@@ -520,8 +520,7 @@ struct NewChatDraftView: View {
         }
     }
 
-    // SF Symbol fallbacks (the upstream RemodexCentralIcons asset set is not
-    // ported to this fork): chat bubbles for Quick Chat, folder glyph for
+    // SF Symbol fallbacks: chat bubbles for Quick Chat, folder glyph for
     // project-backed drafts.
     private var pickerIcon: some View {
         Image(systemName: placeholderFolderName == nil

@@ -87,7 +87,7 @@ The bridge is normally run as a launchd `LaunchAgent`. The plist is generated at
 3. `writeLaunchAgentPlist()` regenerates the plist.
 4. `restartLaunchAgent()` `bootout`s the old job (if any) and `bootstrap`s the new one.
 
-Stop is the inverse — and as of the Remodex 1.5.1 port, `stopMacOSBridgeService()` also reads the recorded PID from `bridge-status.json` and `SIGTERM`s any orphan `agnt run-service` left behind by a crashed bootout. Verification via `ps -p <pid> -o command=` matching both `agnt` and `run-service` ensures we never kill an unrelated reused PID.
+Stop is the inverse — `stopMacOSBridgeService()` also reads the recorded PID from `bridge-status.json` and `SIGTERM`s any orphan `agnt run-service` left behind by a crashed bootout. Verification via `ps -p <pid> -o command=` matching both `agnt` and `run-service` ensures we never kill an unrelated reused PID.
 
 See `agnt-bridge/test/macos-launch-agent.test.js` for the orphan-cleanup contract — that's the quickest way to read the intended behavior.
 

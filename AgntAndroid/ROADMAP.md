@@ -1,7 +1,7 @@
 # AgntAndroid roadmap
 
 Long-running adaptation work for the Android client, on top of the upstream
-parity audit inherited from Stivy-01/remodex.
+parity audit inherited from the original import.
 
 ## Provider-agnostic adaptation
 
@@ -122,7 +122,7 @@ Open follow-ups:
       require a hardware token round-trip that sshj doesn't support — out
       of scope.
 - [x] Termux-style native terminal renderer (`TermuxTerminalSurface`, ported
-      from upstream Stivy-01/remodex 245ea8a). Apache-2.0 `terminal-view` +
+      from the original import). Apache-2.0 `terminal-view` +
       `terminal-emulator` deps resolved via JitPack. Wired as the WebView
       fallback — strictly better than the previous static-text fallback. To
       promote Termux above WebView, add a user-facing toggle; for now WebView
@@ -135,11 +135,11 @@ Open follow-ups:
       menu. Empty cwd is hidden so unconnected/idle tabs don't show a
       stray subtitle.
 
-### P2.6 — QR pairing hardening (upstream 245ea8a)
+### P2.6 — QR pairing hardening
 
 - [x] **Short pairing codes + pasteable `RMX1:` prefix.** Ported the
-      QR scanner / validator changes from upstream Stivy-01/remodex
-      `245ea8a`: `QrPairingValidator.kt` (+87 lines) gained
+      QR scanner / validator changes from the original import:
+      `QrPairingValidator.kt` (+87 lines) gained
       `QrPairingValidationResult.ShortCode`, the
       `[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8,12}` regex,
       `normalizeShortPairingCode` (public, also lower-cases via
@@ -219,13 +219,13 @@ Open follow-ups:
       `internal` so it could be called from `autocomplete/`.
       Final state: 562/562 tests green, ktlint clean. Note: the upstream
       parity tax flagged in the previous note is now real — future
-      `ui/turn/` backports from Stivy-01/remodex will need path
+      `ui/turn/` backports from upstream will need path
       translation through this layout.
 
 ### P2.5 — beta tester module
 
 - [x] **Removed.** The `beta/` module and `TesterHqScreen` integrated with
-      upstream Remodex's hosted Supabase tester program — a direct
+      the upstream client's hosted Supabase tester program — a direct
       violation of the local-first guardrail in `/CLAUDE.md`. The whole
       surface is gone: the `beta/` and `ui/beta/` source directories
       (8 source files + 4 unit tests), the `BETA_ENABLED` / `BETA_API_BASE_URL` /
@@ -355,13 +355,13 @@ Open follow-ups:
       `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:lintDebug` green.
       Visual verification on a device still pending.
 
-### P2.9 — upstream `55fe4c1c` parity ports (local-first)
+### P2.9 — upstream parity ports (local-first)
 
-Four local-first Android surfaces from upstream Stivy-01/remodex commit
-`55fe4c1c` ("port android local-first parity changes", landed the day after
-agnt's snapshot import). The self-contained pieces (models, services, prefs,
-palette, draft logic) were ported faithfully with tests; the UI wiring that
-conflicts with agnt's structure was deferred rather than forced.
+Four local-first Android surfaces from upstream ("port android local-first
+parity changes", landed the day after agnt's snapshot import). The
+self-contained pieces (models, services, prefs, palette, draft logic) were
+ported faithfully with tests; the UI wiring that conflicts with agnt's
+structure was deferred rather than forced.
 
 - [x] **Relay health client** — `core/model/RelayHealthModels.kt`,
       `services/RelayHealthClient.kt` (polls the relay `GET /health` route in
@@ -408,7 +408,7 @@ All package/identifier rebrands applied; banned-identifier sweep clean.
 
 ### P3.0 — multi-device switcher / "My Devices" (iOS PR #100 parity)
 
-Ports the upstream Stivy-01/remodex "My Devices" surface so a phone paired with
+Ports the upstream "My Devices" surface so a phone paired with
 multiple computers can switch between them, with per-device local session state.
 Provider-agnostic — the upstream freemium/`SubscriptionService` gate is dropped
 (device switching is available on every provider). Trusted-session resolve is

@@ -5,7 +5,7 @@ import com.dotbrains.agnt.mobile.core.security.SecureStore
 
 /**
  * Persists the on-device SSH private key + optional passphrase.
- * Mirrors `RemodexTerminalPrivateKeyStore.swift`.
+ * Mirrors `AgntTerminalPrivateKeyStore.swift`.
  */
 class TerminalPrivateKeyStore(
     private val secureStore: SecureStore,

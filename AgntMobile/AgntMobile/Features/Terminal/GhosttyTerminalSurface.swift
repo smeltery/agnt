@@ -1,13 +1,13 @@
 // FILE: GhosttyTerminalSurface.swift
 // Purpose: SwiftUI wrapper and theme mapping for the native Ghostty terminal view.
 // Layer: View Infrastructure
-// Exports: GhosttyTerminalSurface, RemodexTerminalTheme
+// Exports: GhosttyTerminalSurface, AgntTerminalTheme
 // Depends on: SwiftUI, GhosttyTerminalView
 
 import Foundation
 import SwiftUI
 
-struct RemodexTerminalTheme: Equatable {
+struct AgntTerminalTheme: Equatable {
     let background: String
     let foreground: String
     let mutedForeground: String
@@ -16,11 +16,11 @@ struct RemodexTerminalTheme: Equatable {
     let cursorBackground: String
     let palette: [String]
 
-    static func resolved(for colorScheme: ColorScheme) -> RemodexTerminalTheme {
+    static func resolved(for colorScheme: ColorScheme) -> AgntTerminalTheme {
         colorScheme == .light ? light : dark
     }
 
-    static let light = RemodexTerminalTheme(
+    static let light = AgntTerminalTheme(
         background: "#f2f2f7",
         foreground: "#6C6C71",
         mutedForeground: "#8E8E95",
@@ -35,7 +35,7 @@ struct RemodexTerminalTheme: Equatable {
         ]
     )
 
-    static let dark = RemodexTerminalTheme(
+    static let dark = AgntTerminalTheme(
         background: "#0a0a0a",
         foreground: "#adadb1",
         mutedForeground: "#8e8e95",
@@ -69,7 +69,7 @@ struct GhosttyTerminalSurface: UIViewRepresentable {
     let buffer: Data
     let fontSize: CGFloat
     let colorScheme: ColorScheme
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
     let onInput: (Data) -> Void
     let onResize: (Int, Int) -> Void
     var onNativeAvailabilityChanged: ((Bool) -> Void)? = nil

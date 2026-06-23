@@ -33,7 +33,7 @@ final class DesktopHandoffServiceTests: XCTestCase {
     func testWakeDisplayUsesSavedSessionWhenDisconnected() async throws {
         let service = makeService()
         let macDeviceID = "mac-\(UUID().uuidString)"
-        let relayURL = "ws://macbook-pro-di-emanuele.local:8080/ws"
+        let relayURL = "ws://macbook-pro.local:8080/ws"
         service.trustedMacRegistry.records[macDeviceID] = CodexTrustedMacRecord(
             macDeviceId: macDeviceID,
             macIdentityPublicKey: Data(repeating: 19, count: 32).base64EncodedString(),
@@ -67,7 +67,7 @@ final class DesktopHandoffServiceTests: XCTestCase {
 
         XCTAssertEqual(
             capturedURL,
-            "ws://macbook-pro-di-emanuele.local:8080/ws/session-123"
+            "ws://macbook-pro.local:8080/ws/session-123"
         )
         XCTAssertEqual(capturedMethods, ["desktop/wakeDisplay"])
     }

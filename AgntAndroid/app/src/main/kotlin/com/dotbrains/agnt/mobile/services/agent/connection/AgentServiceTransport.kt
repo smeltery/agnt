@@ -23,7 +23,7 @@ private const val CLOSE_CODE_MESSAGE_TOO_LARGE = 1009
  * envelopes, so keep the WebSocket role on that compatibility path.
  */
 internal const val RELAY_WS_ROLE_ANDROID = "iphone"
-private const val REMODEX_WS_LOG_TAG = "RemodexWs"
+private const val AGNT_WS_LOG_TAG = "AgntWs"
 
 /**
  * Mirrors [AgentService+Transport.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Transport.swift).
@@ -43,7 +43,7 @@ internal suspend fun AgentService.openWebSocketAwaitOpen(
         }
         val request = reqBuilder.build()
         Log.i(
-            REMODEX_WS_LOG_TAG,
+            AGNT_WS_LOG_TAG,
             "opening relay websocket scheme=${httpUrl.scheme} host=${httpUrl.host} role=$resolvedRole hasToken=${t.isNotEmpty()}",
         )
         val listener = newRelayWebSocketListener(handshakeCont = cont)
@@ -60,7 +60,7 @@ internal fun AgentService.newRelayWebSocketListener(handshakeCont: CancellableCo
             response: Response,
         ) {
             Log.i(
-                REMODEX_WS_LOG_TAG,
+                AGNT_WS_LOG_TAG,
                 "websocket open code=${response.code} sessionReady=${svc.sessionReady} queueSize=${webSocket.queueSize()}",
             )
             svc.webSocket = webSocket
@@ -73,7 +73,7 @@ internal fun AgentService.newRelayWebSocketListener(handshakeCont: CancellableCo
             response: Response?,
         ) {
             Log.w(
-                REMODEX_WS_LOG_TAG,
+                AGNT_WS_LOG_TAG,
                 "websocket failure code=${response?.code} sessionReady=${svc.sessionReady} currentSocket=${svc.webSocket === webSocket}: ${t.javaClass.simpleName}: ${t.message}",
             )
             handshakeCont?.takeIf { it.isActive }?.resumeWith(Result.failure(t))
@@ -93,7 +93,7 @@ internal fun AgentService.newRelayWebSocketListener(handshakeCont: CancellableCo
                 webSocket.close(CLOSE_CODE_MESSAGE_TOO_LARGE, "Message too large")
                 return
             }
-            Log.d(REMODEX_WS_LOG_TAG, "websocket message bytes=${bytes.size}")
+            Log.d(AGNT_WS_LOG_TAG, "websocket message bytes=${bytes.size}")
             val result = svc.wireInbound?.trySend(text)
             if (result?.isFailure == true) {
                 webSocket.close(CLOSE_CODE_MESSAGE_TOO_LARGE, "Inbound buffer full")
@@ -106,7 +106,7 @@ internal fun AgentService.newRelayWebSocketListener(handshakeCont: CancellableCo
             reason: String,
         ) {
             Log.i(
-                REMODEX_WS_LOG_TAG,
+                AGNT_WS_LOG_TAG,
                 "websocket closing code=$code reason=$reason sessionReady=${svc.sessionReady} currentSocket=${svc.webSocket === webSocket}",
             )
             webSocket.close(code, reason)
@@ -127,12 +127,12 @@ internal fun AgentService.sendRawText(text: String) {
     }
     if (!ws.send(text)) {
         Log.w(
-            REMODEX_WS_LOG_TAG,
+            AGNT_WS_LOG_TAG,
             "websocket send returned false bytes=${bytes.size} sessionReady=$sessionReady queueSize=${ws.queueSize()}",
         )
         throw AgentServiceError.InvalidInput("WebSocket send failed")
     }
-    Log.d(REMODEX_WS_LOG_TAG, "websocket send queued bytes=${bytes.size} queueSize=${ws.queueSize()}")
+    Log.d(AGNT_WS_LOG_TAG, "websocket send queued bytes=${bytes.size} queueSize=${ws.queueSize()}")
 }
 
 /** OkHttp HttpUrl parses only http/https; relay URLs use ws/wss. */

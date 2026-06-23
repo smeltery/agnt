@@ -28,7 +28,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Phone-side SSH client wrapping [SSHClient]. Mirrors `RemodexNativeSSHTerminal.swift`.
+ * Phone-side SSH client wrapping [SSHClient]. Mirrors `AgntNativeSSHTerminal.swift`.
  * Owns one SSH session at a time; calling [open] tears down any prior session.
  */
 class NativeSshTerminal(

@@ -60,10 +60,10 @@ import kotlinx.coroutines.launch
  * Compose-first draft screen for starting a new chat: pick an optional project folder, type the
  * first prompt, then start the thread + first turn in one step.
  *
- * Adapted from upstream Stivy-01/remodex `NewChatDraftScreen`. The upstream freemium
- * `SubscriptionService` gate is intentionally dropped — agnt is local-first with no send limits, so
- * there is nothing to gate. General-chat without a selected folder starts a rootless thread
- * (`cwd = null`), matching agnt's sidebar quick-chat behavior; agnt has no rootless-root RPC.
+ * A freemium `SubscriptionService` send-gate from the original import is intentionally dropped —
+ * agnt is local-first with no send limits, so there is nothing to gate. General-chat without a
+ * selected folder starts a rootless thread (`cwd = null`), matching agnt's sidebar quick-chat
+ * behavior; agnt has no rootless-root RPC.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

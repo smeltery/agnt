@@ -15,7 +15,7 @@ You may use, copy, modify, and distribute agnt under the terms of PolyForm Shiel
 
 The license includes the standard "AS IS" disclaimer of warranties and liability, which applies in full.
 
-agnt is a fork of [Remodex](https://github.com/Emanuele-web04/remodex), which was originally released under Apache-2.0. Code that originated upstream remains available under that grant for anyone who pulled it; new agnt contributions are released under PolyForm Shield 1.0.0.
+agnt was forked from a project originally released under Apache-2.0. Code that originated upstream remains available under that grant for anyone who pulled it (the `NOTICE` files record the attribution); new agnt contributions are released under PolyForm Shield 1.0.0.
 
 ## 2. No operator-run service
 

@@ -325,7 +325,7 @@ final class GhosttyTerminalView: UIView, UITextFieldDelegate, UIGestureRecognize
 
     var terminalKey: String = "" {
         didSet {
-            accessibilityIdentifier = "remodex-terminal-\(terminalKey)"
+            accessibilityIdentifier = "agnt-terminal-\(terminalKey)"
         }
     }
 
@@ -1553,7 +1553,7 @@ final class GhosttyTerminalView: UIView, UITextFieldDelegate, UIGestureRecognize
         guard !themeConfig.isEmpty else { return nil }
         let configContents = themeConfig
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("remodex-terminal-theme-\(appearance.rawValue).ghostty")
+            .appendingPathComponent("agnt-terminal-theme-\(appearance.rawValue).ghostty")
 
         do {
             if let existing = try? String(contentsOf: url, encoding: .utf8), existing == configContents {

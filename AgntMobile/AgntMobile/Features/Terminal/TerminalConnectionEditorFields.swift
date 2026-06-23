@@ -2,7 +2,7 @@
 // Purpose: Reusable form rows and inputs for the SSH connection editor sheet.
 // Layer: View Component
 // Exports: TerminalEditorSection, TerminalConnectionStringField, TerminalTextField
-// Depends on: SwiftUI, UIKit, RemodexTerminalPrivateKeyStore
+// Depends on: SwiftUI, UIKit, AgntTerminalPrivateKeyStore
 
 import SwiftUI
 import UIKit
@@ -103,7 +103,7 @@ struct TerminalPrivateKeyEditor: View {
                     .buttonStyle(.plain)
             }
 
-            if isShowingKey || !RemodexTerminalPrivateKeyStore.hasPrivateKey(privateKey) {
+            if isShowingKey || !AgntTerminalPrivateKeyStore.hasPrivateKey(privateKey) {
                 TextEditor(text: $privateKey)
                     .font(.system(size: 11, design: .monospaced))
                     .textInputAutocapitalization(.never)

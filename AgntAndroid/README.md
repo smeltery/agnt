@@ -4,8 +4,7 @@ Android client for agnt. Pairs with the local [agnt-bridge](../agnt-bridge/) ove
 the same E2EE-encrypted JSON-RPC protocol that the iOS app (`../AgntMobile/`)
 and the browser client (`../agnt-web/`) speak.
 
-This directory is a fork of the Android client in
-[Stivy-01/remodex](https://github.com/Stivy-01/remodex) (Apache-2.0). See
+This directory is a fork of an Apache-2.0 Android client. See
 [`NOTICE`](./NOTICE) for attribution and the list of modifications applied
 during the import.
 

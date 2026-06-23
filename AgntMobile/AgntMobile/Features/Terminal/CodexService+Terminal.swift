@@ -2,21 +2,21 @@
 // Purpose: Starts and controls the on-device SSH terminal session.
 // Layer: Service Extension
 // Exports: CodexService terminal APIs
-// Depends on: CodexService, RemodexNativeSSHTerminal, RemodexTerminalModels
+// Depends on: CodexService, AgntNativeSSHTerminal, AgntTerminalModels
 
 import Foundation
 
 extension CodexService {
     static let defaultTerminalId = "term-1"
 
-    func terminalSnapshot(for terminalId: String) -> RemodexTerminalSnapshot {
+    func terminalSnapshot(for terminalId: String) -> AgntTerminalSnapshot {
         if terminalId == Self.defaultTerminalId, terminalSnapshotsById[terminalId] == nil {
             return terminalSnapshot
         }
-        return terminalSnapshotsById[terminalId] ?? RemodexTerminalSnapshot.idleSnapshot(terminalId: terminalId)
+        return terminalSnapshotsById[terminalId] ?? AgntTerminalSnapshot.idleSnapshot(terminalId: terminalId)
     }
 
-    func knownTerminalSnapshots() -> [RemodexTerminalSnapshot] {
+    func knownTerminalSnapshots() -> [AgntTerminalSnapshot] {
         var snapshots = terminalSnapshotsById
         snapshots[Self.defaultTerminalId] = snapshots[Self.defaultTerminalId] ?? terminalSnapshot
         return snapshots.values.sorted { lhs, rhs in
@@ -25,7 +25,7 @@ extension CodexService {
     }
 
     func openTerminal(
-        profile: RemodexTerminalProfile,
+        profile: AgntTerminalProfile,
         cols: Int,
         rows: Int
     ) async throws {
@@ -39,7 +39,7 @@ extension CodexService {
 
     func openTerminal(
         terminalId: String,
-        profile: RemodexTerminalProfile,
+        profile: AgntTerminalProfile,
         cols: Int,
         rows: Int
     ) async throws {
@@ -47,8 +47,8 @@ extension CodexService {
         let instanceId = UUID().uuidString
         let terminal = nativeTerminal(for: terminalId)
         terminalProfile = normalizedProfile
-        RemodexTerminalProfileStore.save(normalizedProfile)
-        setTerminalSnapshot(RemodexTerminalSnapshot(
+        AgntTerminalProfileStore.save(normalizedProfile)
+        setTerminalSnapshot(AgntTerminalSnapshot(
             terminalId: terminalId,
             instanceId: instanceId,
             status: .starting,
@@ -61,8 +61,8 @@ extension CodexService {
             resizeSupported: true
         ), for: terminalId)
 
-        let privateKey = RemodexTerminalPrivateKeyStore.loadPrivateKey()
-        let passphrase = RemodexTerminalPrivateKeyStore.loadPassphrase()
+        let privateKey = AgntTerminalPrivateKeyStore.loadPrivateKey()
+        let passphrase = AgntTerminalPrivateKeyStore.loadPassphrase()
         do {
             try await terminal.open(
                 profile: normalizedProfile,
@@ -166,7 +166,7 @@ extension CodexService {
             snapshot.cwd = trimmedCWD
         }
         terminalProfile.cwd = trimmedCWD
-        RemodexTerminalProfileStore.save(terminalProfile)
+        AgntTerminalProfileStore.save(terminalProfile)
         guard terminalSnapshot(for: terminalId).status == .running else { return }
         try await writeTerminalInput(
             Data(shellChangeDirectoryCommand(for: trimmedCWD).utf8),
@@ -218,19 +218,19 @@ extension CodexService {
         terminalSnapshot(for: terminalId).instanceId == instanceId
     }
 
-    private func nativeTerminal(for terminalId: String) -> RemodexNativeSSHTerminal {
+    private func nativeTerminal(for terminalId: String) -> AgntNativeSSHTerminal {
         if terminalId == Self.defaultTerminalId {
             return nativeSSHTerminal
         }
         if let terminal = nativeSSHTerminalsById[terminalId] {
             return terminal
         }
-        let terminal = RemodexNativeSSHTerminal()
+        let terminal = AgntNativeSSHTerminal()
         nativeSSHTerminalsById[terminalId] = terminal
         return terminal
     }
 
-    private func setTerminalSnapshot(_ snapshot: RemodexTerminalSnapshot, for terminalId: String) {
+    private func setTerminalSnapshot(_ snapshot: AgntTerminalSnapshot, for terminalId: String) {
         terminalSnapshotsById[terminalId] = snapshot
         if terminalId == Self.defaultTerminalId {
             terminalSnapshot = snapshot
@@ -239,7 +239,7 @@ extension CodexService {
 
     private func updateTerminalSnapshot(
         for terminalId: String,
-        mutate: (inout RemodexTerminalSnapshot) -> Void
+        mutate: (inout AgntTerminalSnapshot) -> Void
     ) {
         var snapshot = terminalSnapshot(for: terminalId)
         mutate(&snapshot)

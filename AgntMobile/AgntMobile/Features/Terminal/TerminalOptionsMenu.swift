@@ -59,14 +59,14 @@ struct TerminalOptionsMenu: View {
     private var textSizeSection: some View {
         Section("Text size") {
             Button("A- \(String(format: "%.1f", nextSmallerFontSize)) pt") {
-                onAdjustFontSize(-remodexTerminalFontSizeStep)
+                onAdjustFontSize(-agntTerminalFontSizeStep)
             }
-            .disabled(fontSize <= remodexTerminalMinFontSize)
+            .disabled(fontSize <= agntTerminalMinFontSize)
 
             Button("A+ \(String(format: "%.1f", nextLargerFontSize)) pt") {
-                onAdjustFontSize(remodexTerminalFontSizeStep)
+                onAdjustFontSize(agntTerminalFontSizeStep)
             }
-            .disabled(fontSize >= remodexTerminalMaxFontSize)
+            .disabled(fontSize >= agntTerminalMaxFontSize)
         }
     }
 
@@ -116,10 +116,10 @@ struct TerminalOptionsMenu: View {
     }
 
     private var nextSmallerFontSize: Double {
-        max(remodexTerminalMinFontSize, fontSize - remodexTerminalFontSizeStep)
+        max(agntTerminalMinFontSize, fontSize - agntTerminalFontSizeStep)
     }
 
     private var nextLargerFontSize: Double {
-        min(remodexTerminalMaxFontSize, fontSize + remodexTerminalFontSizeStep)
+        min(agntTerminalMaxFontSize, fontSize + agntTerminalFontSizeStep)
     }
 }

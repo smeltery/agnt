@@ -1,16 +1,16 @@
-// FILE: RemodexTerminalModels.swift
+// FILE: AgntTerminalModels.swift
 // Purpose: Defines the native SSH terminal profile and runtime snapshot models.
 // Layer: Service Model
-// Exports: RemodexTerminalProfile, RemodexTerminalSnapshot, RemodexTerminalStatus
+// Exports: AgntTerminalProfile, AgntTerminalSnapshot, AgntTerminalStatus
 // Depends on: Foundation, JSONValue
 
 import Foundation
 
-private let remodexTerminalMaxBufferCharacters = 200_000
-private let remodexTerminalMaxBufferBytes = 200_000
-private let remodexDefaultTerminalId = "term-1"
+private let agntTerminalMaxBufferCharacters = 200_000
+private let agntTerminalMaxBufferBytes = 200_000
+private let agntDefaultTerminalId = "term-1"
 
-enum RemodexTerminalStatus: String, Codable, Equatable, Sendable {
+enum AgntTerminalStatus: String, Codable, Equatable, Sendable {
     case idle
     case starting
     case running
@@ -40,7 +40,7 @@ enum RemodexTerminalStatus: String, Codable, Equatable, Sendable {
     }
 }
 
-struct RemodexTerminalProfile: Codable, Equatable, Sendable {
+struct AgntTerminalProfile: Codable, Equatable, Sendable {
     var host: String
     var username: String
     var port: Int
@@ -72,8 +72,8 @@ struct RemodexTerminalProfile: Codable, Equatable, Sendable {
         nickname = try container.decodeIfPresent(String.self, forKey: .nickname) ?? ""
     }
 
-    static var empty: RemodexTerminalProfile {
-        RemodexTerminalProfile(
+    static var empty: AgntTerminalProfile {
+        AgntTerminalProfile(
             host: "",
             username: "",
             port: 22,
@@ -105,8 +105,8 @@ struct RemodexTerminalProfile: Codable, Equatable, Sendable {
         return "\(trimmedUser)@\(trimmedHost)"
     }
 
-    var normalizedForSave: RemodexTerminalProfile {
-        RemodexTerminalProfile(
+    var normalizedForSave: AgntTerminalProfile {
+        AgntTerminalProfile(
             host: host.trimmingCharacters(in: .whitespacesAndNewlines),
             username: username.trimmingCharacters(in: .whitespacesAndNewlines),
             port: max(1, min(65535, port)),
@@ -149,10 +149,10 @@ struct RemodexTerminalProfile: Codable, Equatable, Sendable {
     }
 }
 
-struct RemodexTerminalSnapshot: Equatable, Sendable {
+struct AgntTerminalSnapshot: Equatable, Sendable {
     var terminalId: String
     var instanceId: String?
-    var status: RemodexTerminalStatus
+    var status: AgntTerminalStatus
     var buffer: String
     var bufferData: Data
     var cwd: String
@@ -162,8 +162,8 @@ struct RemodexTerminalSnapshot: Equatable, Sendable {
     var resizeSupported: Bool
     var bracketedPasteEnabled: Bool
 
-    static let idle = RemodexTerminalSnapshot(
-        terminalId: remodexDefaultTerminalId,
+    static let idle = AgntTerminalSnapshot(
+        terminalId: agntDefaultTerminalId,
         instanceId: nil,
         status: .idle,
         buffer: "",
@@ -176,7 +176,7 @@ struct RemodexTerminalSnapshot: Equatable, Sendable {
         bracketedPasteEnabled: false
     )
 
-    static func idleSnapshot(terminalId: String) -> RemodexTerminalSnapshot {
+    static func idleSnapshot(terminalId: String) -> AgntTerminalSnapshot {
         var snapshot = idle
         snapshot.terminalId = terminalId
         return snapshot
@@ -185,7 +185,7 @@ struct RemodexTerminalSnapshot: Equatable, Sendable {
     init(
         terminalId: String,
         instanceId: String?,
-        status: RemodexTerminalStatus,
+        status: AgntTerminalStatus,
         buffer: String,
         bufferData: Data,
         cwd: String,
@@ -209,16 +209,16 @@ struct RemodexTerminalSnapshot: Equatable, Sendable {
     }
 
     init(resultObject: [String: JSONValue]) {
-        let rawStatus = resultObject["status"]?.stringValue ?? RemodexTerminalStatus.idle.rawValue
+        let rawStatus = resultObject["status"]?.stringValue ?? AgntTerminalStatus.idle.rawValue
         let historyText = resultObject["history"]?.stringValue ?? resultObject["buffer"]?.stringValue ?? ""
         let historyData = Self.dataFromBase64(resultObject["historyBase64"]?.stringValue ?? resultObject["history_base64"]?.stringValue)
             ?? Self.dataFromBase64(resultObject["dataBase64"]?.stringValue ?? resultObject["data_base64"]?.stringValue)
             ?? Data(historyText.utf8)
         let decodedHistoryText = historyText.isEmpty ? String(decoding: historyData, as: UTF8.self) : historyText
         self.init(
-            terminalId: resultObject["terminalId"]?.stringValue ?? resultObject["terminal_id"]?.stringValue ?? remodexDefaultTerminalId,
+            terminalId: resultObject["terminalId"]?.stringValue ?? resultObject["terminal_id"]?.stringValue ?? agntDefaultTerminalId,
             instanceId: Self.instanceId(in: resultObject),
-            status: RemodexTerminalStatus(rawValue: rawStatus) ?? .idle,
+            status: AgntTerminalStatus(rawValue: rawStatus) ?? .idle,
             buffer: Self.trimmedBuffer(decodedHistoryText),
             bufferData: Self.trimmedBufferData(historyData),
             cwd: resultObject["cwd"]?.stringValue ?? "",
@@ -241,7 +241,7 @@ struct RemodexTerminalSnapshot: Equatable, Sendable {
             self.terminalId = terminalId
         }
         if let rawStatus = paramsObject["status"]?.stringValue,
-           let status = RemodexTerminalStatus(rawValue: rawStatus) {
+           let status = AgntTerminalStatus(rawValue: rawStatus) {
             self.status = status
         }
         if let history = paramsObject["history"]?.stringValue {
@@ -323,17 +323,17 @@ struct RemodexTerminalSnapshot: Equatable, Sendable {
     }
 
     private static func trimmedBuffer(_ value: String) -> String {
-        guard value.count > remodexTerminalMaxBufferCharacters else {
+        guard value.count > agntTerminalMaxBufferCharacters else {
             return value
         }
-        return String(value.suffix(remodexTerminalMaxBufferCharacters))
+        return String(value.suffix(agntTerminalMaxBufferCharacters))
     }
 
     private static func trimmedBufferData(_ value: Data) -> Data {
-        guard value.count > remodexTerminalMaxBufferBytes else {
+        guard value.count > agntTerminalMaxBufferBytes else {
             return value
         }
-        return Data(value.suffix(remodexTerminalMaxBufferBytes))
+        return Data(value.suffix(agntTerminalMaxBufferBytes))
     }
 
     private static func dataFromBase64(_ value: String?) -> Data? {

@@ -5,7 +5,7 @@ import com.dotbrains.agnt.mobile.core.security.SecureStore
 
 /**
  * Persists [TerminalProfile] in [SecureStore] (Android Keystore-backed prefs).
- * Mirrors `RemodexTerminalProfileStore.swift`.
+ * Mirrors `AgntTerminalProfileStore.swift`.
  */
 class TerminalProfileStore(
     private val secureStore: SecureStore,

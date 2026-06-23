@@ -238,7 +238,7 @@ sealed class CodexSecureTransportError(
         message: String,
     ) : CodexSecureTransportError(message)
 
-    data object DecryptFailed : CodexSecureTransportError("Unable to decrypt the secure Remodex payload.")
+    data object DecryptFailed : CodexSecureTransportError("Unable to decrypt the secure agnt payload.")
 
     class TimedOut(
         message: String,

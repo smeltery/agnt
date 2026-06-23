@@ -13,7 +13,7 @@ The implementation lives at module scope in `agnt-bridge/src/bridge.js`, anchore
 | Initial page cap | `RELAY_TURNS_LIST_MAX_INITIAL_LIMIT` | 5 | Cap how many turns we even ask the upstream for in one go, so a misbehaving turn can't single-handedly blow the byte budget. |
 | Safe-retry cap | `RELAY_TURNS_LIST_SAFE_RETRY_LIMIT` | 5 | Worst-case shrink target before we drop to a single-turn emergency response. |
 
-Time-budget handling existed in agnt prior to the Remodex 1.5.1 port. Byte-cap handling and the emergency single-turn fallback were added in that port. The two limits fire **independently** — whichever trips first wins.
+Time-budget handling predates byte-cap handling and the emergency single-turn fallback. The two limits fire **independently** — whichever trips first wins.
 
 ## State machine
 
