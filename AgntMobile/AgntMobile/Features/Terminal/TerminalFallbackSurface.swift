@@ -2,14 +2,14 @@
 // Purpose: Text-based terminal fallback used when the native Ghostty renderer cannot initialize.
 // Layer: View Component
 // Exports: TerminalFallbackSurface
-// Depends on: SwiftUI, RemodexTerminalModels, RemodexTerminalTheme
+// Depends on: SwiftUI, AgntTerminalModels, AgntTerminalTheme
 
 import SwiftUI
 
 struct TerminalFallbackSurface: View {
-    let snapshot: RemodexTerminalSnapshot
+    let snapshot: AgntTerminalSnapshot
     let fontSize: CGFloat
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
     let isRunning: Bool
     let onInput: (String) -> Void
     let onResize: (Int, Int) -> Void
@@ -73,7 +73,7 @@ private struct TerminalFallbackBuffer: View {
     let statusLabel: String
     let renderedBuffer: String
     let fontSize: CGFloat
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -100,7 +100,7 @@ private struct TerminalFallbackBuffer: View {
 private struct TerminalFallbackInputBar: View {
     @Binding var input: String
 
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
     let isRunning: Bool
     let onSubmit: () -> Void
     let onInterrupt: () -> Void

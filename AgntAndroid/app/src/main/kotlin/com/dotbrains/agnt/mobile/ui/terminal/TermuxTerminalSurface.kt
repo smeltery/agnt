@@ -44,10 +44,9 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Native (non-WebView) terminal renderer using Termux's terminal-view +
- * terminal-emulator (Apache-2.0, jackpal lineage). Ported from upstream
- * Stivy-01/remodex `TermuxTerminalSurface.kt` (245ea8a); the upstream
- * `rememberTerminalViewportBackground` helper is inlined as a constant since
- * we don't carry the upstream `isAgentLightChrome` theme machinery.
+ * terminal-emulator (Apache-2.0, jackpal lineage). A
+ * `rememberTerminalViewportBackground` helper from the original import is inlined
+ * as a constant since we don't carry its `isAgentLightChrome` theme machinery.
  *
  * Used as the WebView-unavailable fallback in `TerminalScreen`. Strictly better
  * than a static text view: parses ANSI escapes, supports scrollback, repaints

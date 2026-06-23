@@ -2,14 +2,14 @@
 // Purpose: Navigation title, accessory key bar, and empty-state chrome for the terminal route.
 // Layer: View Component
 // Exports: TerminalRouteTitle, TerminalRouteAccessoryBar, TerminalRouteUnavailableView
-// Depends on: SwiftUI, RemodexTerminalTheme, TerminalUIModels
+// Depends on: SwiftUI, AgntTerminalTheme, TerminalUIModels
 
 import SwiftUI
 
 struct TerminalRouteTitle: View {
     let topLine: String
     let bottomLine: String
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
 
     var body: some View {
         VStack(spacing: 1) {
@@ -31,7 +31,7 @@ struct TerminalRouteTitle: View {
 struct TerminalRouteAccessoryBar: View {
     let actions: [TerminalToolbarAction]
     let pendingModifier: TerminalPendingModifier?
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
     let isEnabled: Bool
     let onAction: (TerminalToolbarAction) -> Void
 
@@ -50,7 +50,7 @@ struct TerminalRouteAccessoryBar: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .frame(minHeight: remodexTerminalAccessoryHeight)
+            .frame(minHeight: agntTerminalAccessoryHeight)
         }
         .background(Color(hexString: theme.background))
         .overlay(alignment: .top) {
@@ -64,7 +64,7 @@ struct TerminalRouteAccessoryBar: View {
 private struct TerminalRouteKeyButton: View {
     let action: TerminalToolbarAction
     let isActive: Bool
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
     let isEnabled: Bool
     let onAction: (TerminalToolbarAction) -> Void
 
@@ -111,7 +111,7 @@ private struct TerminalRouteKeyButton: View {
 struct TerminalRouteUnavailableView: View {
     let title: String
     let detail: String
-    let theme: RemodexTerminalTheme
+    let theme: AgntTerminalTheme
     let action: () -> Void
 
     var body: some View {

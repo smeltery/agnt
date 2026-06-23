@@ -69,7 +69,6 @@ class GitActionsService(
                 "git/createBranch",
                 mapOf(
                     "name" to JSONValue.Str(branch),
-                    "prefixRemodex" to JSONValue.Bool(false),
                 ),
             )
         return GitCreateBranchResult.fromJson(json)

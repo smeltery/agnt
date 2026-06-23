@@ -1,12 +1,12 @@
-// FILE: RemodexSSHKnownHostStore.swift
+// FILE: AgntSSHKnownHostStore.swift
 // Purpose: Persists SSH host keys for trust-on-first-use validation.
 // Layer: Service
-// Exports: RemodexSSHKnownHostStore
+// Exports: AgntSSHKnownHostStore
 // Depends on: Foundation, SecureStore
 
 import Foundation
 
-enum RemodexSSHKnownHostStore {
+enum AgntSSHKnownHostStore {
     nonisolated static func load(host: String, port: Int) -> String? {
         SecureStore.readString(for: storageKey(host: host, port: port))
     }

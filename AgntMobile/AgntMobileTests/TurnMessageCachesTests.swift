@@ -218,13 +218,13 @@ final class TurnMessageCachesTests: XCTestCase {
     }
 
     func testAssistantMarkdownSegmentsKeepTemporaryImagePosition() {
-        let text = "Before\n![mobile](/tmp/emanuele-mobile.png)\nAfter"
+        let text = "Before\n![mobile](/tmp/sample-mobile.png)\nAfter"
         let segments = AssistantMarkdownImageReferenceParser.contentSegmentsPreservingTemporaryImages(from: text)
 
         XCTAssertEqual(segments.count, 3)
         XCTAssertEqual(segments[0], .text(id: 0, value: "Before\n"))
         XCTAssertEqual(segments[1], .image(AssistantMarkdownImageReference(
-            path: "/tmp/emanuele-mobile.png",
+            path: "/tmp/sample-mobile.png",
             altText: "mobile",
             occurrenceIndex: 0
         )))

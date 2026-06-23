@@ -2,7 +2,7 @@
 // Purpose: Full-page Ghostty SSH terminal route modeled after t3code-mobile's terminal screen.
 // Layer: View
 // Exports: TerminalScreen
-// Depends on: CodexService, GhosttyTerminalSurface, RemodexTerminalModels
+// Depends on: CodexService, GhosttyTerminalSurface, AgntTerminalModels
 
 import Foundation
 import SwiftUI
@@ -11,10 +11,10 @@ import UIKit
 struct TerminalScreen: View {
     @Environment(CodexService.self) private var codex
     @Environment(\.colorScheme) private var colorScheme
-    @State private var draftProfile = RemodexTerminalProfileStore.load()
-    @State private var connectionDraft = RemodexTerminalProfileStore.load().connectionString
-    @State private var privateKeyDraft = RemodexTerminalPrivateKeyStore.loadPrivateKey()
-    @State private var passphraseDraft = RemodexTerminalPrivateKeyStore.loadPassphrase()
+    @State private var draftProfile = AgntTerminalProfileStore.load()
+    @State private var connectionDraft = AgntTerminalProfileStore.load().connectionString
+    @State private var privateKeyDraft = AgntTerminalPrivateKeyStore.loadPrivateKey()
+    @State private var passphraseDraft = AgntTerminalPrivateKeyStore.loadPassphrase()
     @State private var isShowingConnectionEditor = false
     @State private var activeTerminalId = CodexService.defaultTerminalId
     @State private var bootstrappedTerminalIds = Set<String>()
@@ -23,12 +23,12 @@ struct TerminalScreen: View {
     @State private var actionErrorMessage: String?
     @State private var didApplyPreferredWorkingDirectory = false
     @State private var pendingModifier: TerminalPendingModifier?
-    @AppStorage("codex.terminal.fontSize") private var terminalFontSize = remodexTerminalDefaultFontSize
+    @AppStorage("codex.terminal.fontSize") private var terminalFontSize = agntTerminalDefaultFontSize
 
     let preferredWorkingDirectory: String?
 
-    private var theme: RemodexTerminalTheme {
-        RemodexTerminalTheme.resolved(for: colorScheme)
+    private var theme: AgntTerminalTheme {
+        AgntTerminalTheme.resolved(for: colorScheme)
     }
 
     private var hostPlatform: TerminalHostPlatform {
@@ -43,7 +43,7 @@ struct TerminalScreen: View {
         )
     }
 
-    private var profileResolvedFromConnection: RemodexTerminalProfile {
+    private var profileResolvedFromConnection: AgntTerminalProfile {
         var profile = draftProfile
         profile.applyConnectionString(connectionDraft)
         return profile.normalizedForSave
@@ -53,7 +53,7 @@ struct TerminalScreen: View {
         let profile = profileResolvedFromConnection
         return !profile.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !profile.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && RemodexTerminalPrivateKeyStore.hasPrivateKey(privateKeyDraft)
+            && AgntTerminalPrivateKeyStore.hasPrivateKey(privateKeyDraft)
     }
 
     private var isRunning: Bool {
@@ -64,7 +64,7 @@ struct TerminalScreen: View {
         "\(activeTerminalId):\(activeSnapshot.instanceId ?? "idle")"
     }
 
-    private var activeSnapshot: RemodexTerminalSnapshot {
+    private var activeSnapshot: AgntTerminalSnapshot {
         codex.terminalSnapshot(for: activeTerminalId)
     }
 
@@ -401,9 +401,9 @@ struct TerminalScreen: View {
         }
 
         actionErrorMessage = nil
-        RemodexTerminalProfileStore.save(draftProfile)
-        RemodexTerminalPrivateKeyStore.savePrivateKey(privateKeyDraft)
-        RemodexTerminalPrivateKeyStore.savePassphrase(passphraseDraft)
+        AgntTerminalProfileStore.save(draftProfile)
+        AgntTerminalPrivateKeyStore.savePrivateKey(privateKeyDraft)
+        AgntTerminalPrivateKeyStore.savePassphrase(passphraseDraft)
 
         do {
             try await codex.openTerminal(
@@ -432,7 +432,7 @@ struct TerminalScreen: View {
         guard !profile.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
-        RemodexSSHKnownHostStore.delete(host: profile.host, port: profile.port)
+        AgntSSHKnownHostStore.delete(host: profile.host, port: profile.port)
         actionErrorMessage = nil
     }
 
@@ -540,8 +540,8 @@ struct TerminalScreen: View {
 
     private func adjustFontSize(_ delta: Double) {
         terminalFontSize = min(
-            remodexTerminalMaxFontSize,
-            max(remodexTerminalMinFontSize, terminalFontSize + delta)
+            agntTerminalMaxFontSize,
+            max(agntTerminalMinFontSize, terminalFontSize + delta)
         )
     }
 

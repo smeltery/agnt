@@ -30,7 +30,7 @@ class GptVoiceTranscriptionClient(
         wavBytes: ByteArray,
         token: String,
     ): String {
-        val boundary = "Remodex-${UUID.randomUUID()}"
+        val boundary = "Agnt-${UUID.randomUUID()}"
         val fileBody = wavBytes.toRequestBody("audio/wav".toMediaType())
         val multipart =
             MultipartBody

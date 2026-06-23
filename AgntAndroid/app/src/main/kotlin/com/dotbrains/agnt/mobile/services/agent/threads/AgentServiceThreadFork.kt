@@ -55,7 +55,7 @@ internal suspend fun AgentService.forkThreadInternal(
         } catch (e: Throwable) {
             if (consumeUnsupportedThreadFork(e)) {
                 throw AgentServiceError.InvalidInput(
-                    "This computer bridge does not support native thread forks yet. Update Remodex on your computer and retry.",
+                    "This computer bridge does not support native thread forks yet. Update agnt on your computer and retry.",
                 )
             }
             throw e
@@ -212,10 +212,10 @@ private fun AgentService.markThreadForkUnsupportedForCurrentBridge() {
     hasPresentedThreadForkBridgeUpdatePrompt = true
     _bridgeUpdatePrompt.value =
         CodexBridgeUpdatePrompt(
-            title = "Update Remodex on your computer to use /fork",
+            title = "Update agnt on your computer to use /fork",
             message =
                 "This computer bridge does not support native conversation forks yet. " +
-                    "Update the Remodex npm package to use /fork and worktree fork flows.",
+                    "Update the agnt npm package to use /fork and worktree fork flows.",
             command = "bun install -g @dotbrains/agnt",
         )
 }

@@ -5,7 +5,7 @@ import com.dotbrains.agnt.mobile.core.security.SecureStore
 
 /**
  * Trust-on-first-use SSH host key registry.
- * Mirrors `RemodexSSHKnownHostStore.swift`.
+ * Mirrors `AgntSSHKnownHostStore.swift`.
  */
 class TerminalKnownHostStore(
     private val secureStore: SecureStore,

@@ -166,7 +166,7 @@ test("trusted session resolve returns the current live session for a trusted iph
         "x-role": "mac",
         "x-mac-device-id": "mac-1",
         "x-mac-identity-public-key": "mac-public-key-1",
-        "x-machine-name": "Emanuele-Mac",
+        "x-machine-name": "Test-Mac",
         "x-trusted-phone-device-id": phoneIdentity.phoneDeviceId,
         "x-trusted-phone-public-key": phoneIdentity.phoneIdentityPublicKey,
       },
@@ -190,7 +190,7 @@ test("trusted session resolve returns the current live session for a trusted iph
       ok: true,
       macDeviceId: "mac-1",
       macIdentityPublicKey: "mac-public-key-1",
-      displayName: "Emanuele-Mac",
+      displayName: "Test-Mac",
       sessionId: "live-session-1",
     });
 

@@ -2,14 +2,14 @@
 // Purpose: Owns the SSH connection editor sheet and its form sections.
 // Layer: View Component
 // Exports: TerminalConnectionEditorSheet
-// Depends on: SwiftUI, UIKit, RemodexTerminalModels, RemodexTerminalPrivateKeyStore
+// Depends on: SwiftUI, UIKit, AgntTerminalModels, AgntTerminalPrivateKeyStore
 
 import SwiftUI
 import UIKit
 
 struct TerminalConnectionEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var profile: RemodexTerminalProfile
+    @Binding var profile: AgntTerminalProfile
     @Binding var connection: String
     @Binding var privateKey: String
     @Binding var passphrase: String
@@ -24,7 +24,7 @@ struct TerminalConnectionEditorSheet: View {
     @State private var isShowingConnectionHelp = false
 
     private var keyLabel: String {
-        RemodexTerminalPrivateKeyStore.hasPrivateKey(privateKey) ? "Imported" : "Import"
+        AgntTerminalPrivateKeyStore.hasPrivateKey(privateKey) ? "Imported" : "Import"
     }
 
     private var advancedLabel: String {
@@ -146,7 +146,7 @@ private struct TerminalAuthenticationSection: View {
                 }
                 .buttonStyle(.plain)
 
-                if isShowingKeyEditor || !RemodexTerminalPrivateKeyStore.hasPrivateKey(privateKey) {
+                if isShowingKeyEditor || !AgntTerminalPrivateKeyStore.hasPrivateKey(privateKey) {
                     TerminalPrivateKeyEditor(privateKey: $privateKey, passphrase: $passphrase)
                         .padding(.top, 14)
                 }
@@ -164,7 +164,7 @@ private struct TerminalAuthenticationSection: View {
 }
 
 private struct TerminalSSHSection: View {
-    @Binding var profile: RemodexTerminalProfile
+    @Binding var profile: AgntTerminalProfile
     let portBinding: Binding<String>
     @Binding var isShowingAdvanced: Bool
     @Binding var isConfirmingKnownHostReset: Bool

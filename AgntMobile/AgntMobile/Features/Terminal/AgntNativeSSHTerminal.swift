@@ -1,7 +1,7 @@
-// FILE: RemodexNativeSSHTerminal.swift
+// FILE: AgntNativeSSHTerminal.swift
 // Purpose: Owns the phone-side SSH client and bridges raw TTY bytes to Ghostty.
 // Layer: Service
-// Exports: RemodexNativeSSHTerminal, RemodexNativeSSHTerminalError
+// Exports: AgntNativeSSHTerminal, AgntNativeSSHTerminalError
 // Depends on: Citadel, Crypto, Foundation, NIOCore
 
 import Citadel
@@ -11,7 +11,7 @@ import NIO
 import NIOCore
 import NIOSSH
 
-enum RemodexNativeSSHTerminalError: LocalizedError {
+enum AgntNativeSSHTerminalError: LocalizedError {
     case missingPrivateKey
     case hostKeyChanged
     case unsupportedPrivateKey(String)
@@ -32,7 +32,7 @@ enum RemodexNativeSSHTerminalError: LocalizedError {
 }
 
 @MainActor
-final class RemodexNativeSSHTerminal {
+final class AgntNativeSSHTerminal {
     private var client: SSHClient?
     private var writer: TTYStdinWriter?
     private var sessionTask: Task<Void, Never>?
@@ -46,7 +46,7 @@ final class RemodexNativeSSHTerminal {
     }
 
     func open(
-        profile: RemodexTerminalProfile,
+        profile: AgntTerminalProfile,
         privateKey: String,
         passphrase: String,
         cols: Int,
@@ -76,7 +76,7 @@ final class RemodexNativeSSHTerminal {
                         host: profile.host,
                         port: profile.port,
                         authenticationMethod: authenticationMethod,
-                        hostKeyValidator: .custom(RemodexSSHKnownHostValidator(
+                        hostKeyValidator: .custom(AgntSSHKnownHostValidator(
                             host: profile.host,
                             port: profile.port
                         )),
@@ -155,7 +155,7 @@ final class RemodexNativeSSHTerminal {
 
     func write(_ data: Data) async throws {
         guard let writer else {
-            throw RemodexNativeSSHTerminalError.sessionNotRunning
+            throw AgntNativeSSHTerminalError.sessionNotRunning
         }
         var buffer = ByteBufferAllocator().buffer(capacity: data.count)
         buffer.writeBytes(data)
@@ -228,7 +228,7 @@ final class RemodexNativeSSHTerminal {
             .replacingOccurrences(of: "\r\n", with: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedKey.isEmpty else {
-            throw RemodexNativeSSHTerminalError.missingPrivateKey
+            throw AgntNativeSSHTerminalError.missingPrivateKey
         }
 
         let decryptionKey = passphrase.isEmpty ? nil : Data(passphrase.utf8)
@@ -247,12 +247,12 @@ final class RemodexNativeSSHTerminal {
             )
             return .rsa(username: username, privateKey: key)
         default:
-            throw RemodexNativeSSHTerminalError.unsupportedPrivateKey(keyType.description)
+            throw AgntNativeSSHTerminalError.unsupportedPrivateKey(keyType.description)
         }
     }
 }
 
-private struct RemodexSSHKnownHostValidator: NIOSSHClientServerAuthenticationDelegate, Sendable {
+private struct AgntSSHKnownHostValidator: NIOSSHClientServerAuthenticationDelegate, Sendable {
     let host: String
     let port: Int
 
@@ -266,16 +266,16 @@ private struct RemodexSSHKnownHostValidator: NIOSSHClientServerAuthenticationDel
         validationCompletePromise: EventLoopPromise<Void>
     ) {
         let currentHostKey = String(openSSHPublicKey: hostKey)
-        if let storedHostKey = RemodexSSHKnownHostStore.load(host: host, port: port) {
+        if let storedHostKey = AgntSSHKnownHostStore.load(host: host, port: port) {
             if storedHostKey == currentHostKey {
                 validationCompletePromise.succeed(())
             } else {
-                validationCompletePromise.fail(RemodexNativeSSHTerminalError.hostKeyChanged)
+                validationCompletePromise.fail(AgntNativeSSHTerminalError.hostKeyChanged)
             }
             return
         }
 
-        RemodexSSHKnownHostStore.save(currentHostKey, host: host, port: port)
+        AgntSSHKnownHostStore.save(currentHostKey, host: host, port: port)
         validationCompletePromise.succeed(())
     }
 }

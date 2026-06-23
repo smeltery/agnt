@@ -129,7 +129,7 @@ class DesktopHandoffService(
                 "saved_pair_required" -> error.rpcError.message.ifBlank { "Reconnect to your paired computer or scan a new QR code first." }
                 "unsupported_bridge_preferences" ->
                     error.rpcError.message.ifBlank {
-                        "Update the Remodex bridge on your computer to sync this setting."
+                        "Update the agnt bridge on your computer to sync this setting."
                     }
                 "invalid_bridge_preferences" -> error.rpcError.message.ifBlank { "The computer bridge rejected this setting update." }
                 else -> error.rpcError.message.ifBlank { "Could not continue this chat on your desktop." }

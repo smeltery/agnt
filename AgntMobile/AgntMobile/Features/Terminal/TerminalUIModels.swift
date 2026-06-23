@@ -2,15 +2,15 @@
 // Purpose: Shared presentation constants and small value types for the SSH terminal route.
 // Layer: View Model
 // Exports: TerminalPendingModifier, TerminalHostPlatform, TerminalToolbarAction, TerminalStatusTone
-// Depends on: SwiftUI, RemodexTerminalModels
+// Depends on: SwiftUI, AgntTerminalModels
 
 import SwiftUI
 
-let remodexTerminalDefaultFontSize = 10.0
-let remodexTerminalFontSizeStep = 0.5
-let remodexTerminalMinFontSize = 6.0
-let remodexTerminalMaxFontSize = 14.0
-let remodexTerminalAccessoryHeight: CGFloat = 52
+let agntTerminalDefaultFontSize = 10.0
+let agntTerminalFontSizeStep = 0.5
+let agntTerminalMinFontSize = 6.0
+let agntTerminalMaxFontSize = 14.0
+let agntTerminalAccessoryHeight: CGFloat = 52
 
 enum TerminalPendingModifier: Equatable {
     case ctrl
@@ -52,7 +52,7 @@ struct TerminalStatusTone {
 struct TerminalMenuSessionItem: Identifiable {
     let terminalId: String
     let displayLabel: String
-    let status: RemodexTerminalStatus
+    let status: AgntTerminalStatus
     let cwd: String
 
     var id: String { terminalId }

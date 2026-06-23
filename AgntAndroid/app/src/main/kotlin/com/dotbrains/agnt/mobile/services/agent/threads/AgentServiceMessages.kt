@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.UUID
 
-private const val REMODEX_WIRE_LOG_TAG = "RemodexWire"
+private const val AGNT_WIRE_LOG_TAG = "AgntWire"
 
 /**
  * Mirrors [AgentService+Messages.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+Messages.swift).
@@ -85,7 +85,7 @@ private fun AgentService.wireMessageKind(text: String): String? =
         val el = json.parseToJsonElement(text)
         (el as? JsonObject)?.get("kind")?.jsonPrimitive?.content
     } catch (e: Exception) {
-        Log.w(REMODEX_WIRE_LOG_TAG, "dropped malformed secure-control message bytes=${text.toByteArray().size}: ${e.javaClass.simpleName}")
+        Log.w(AGNT_WIRE_LOG_TAG, "dropped malformed secure-control message bytes=${text.toByteArray().size}: ${e.javaClass.simpleName}")
         null
     }
 

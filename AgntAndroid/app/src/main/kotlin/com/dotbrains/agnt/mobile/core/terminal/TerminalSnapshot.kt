@@ -1,8 +1,8 @@
 package com.dotbrains.agnt.mobile.core.terminal
 
 /**
- * Status enum mirrored from `RemodexTerminalStatus`
- * (`AgntMobile/AgntMobile/Services/Terminal/RemodexTerminalModels.swift`).
+ * Status enum mirrored from `AgntTerminalStatus`
+ * (`AgntMobile/AgntMobile/Services/Terminal/AgntTerminalModels.swift`).
  */
 enum class TerminalStatus(
     val displayTitle: String,
@@ -21,7 +21,7 @@ enum class TerminalStatus(
 
 /**
  * Live snapshot of an SSH terminal session.
- * Mirrors `RemodexTerminalSnapshot` from the iOS service layer.
+ * Mirrors `AgntTerminalSnapshot` from the iOS service layer.
  */
 data class TerminalSnapshot(
     val terminalId: String,
