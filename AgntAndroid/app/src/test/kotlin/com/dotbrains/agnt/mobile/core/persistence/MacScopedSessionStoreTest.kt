@@ -41,6 +41,16 @@ class MacScopedSessionStoreTest {
     }
 
     @Test
+    fun composerDraftsKey_usesAgntNamespaceAndScopesPerMac() {
+        // New key intentionally uses the agnt namespace (drafts are ephemeral, no migration).
+        assertEquals("agnt.composer.draftsByThread", MacScopedSessionStore.KEY_COMPOSER_DRAFTS)
+        assertEquals(
+            "mac.mac-a.agnt.composer.draftsByThread",
+            MacScopedSessionStore.formatScopedKey(MacScopedSessionStore.KEY_COMPOSER_DRAFTS, "mac-a"),
+        )
+    }
+
+    @Test
     fun cachedThreadSnapshot_roundTripsMetadataAndEscapedText() {
         // Our CodexThread has no collaborationMode column, so the snapshot drops it (vs upstream).
         val original =

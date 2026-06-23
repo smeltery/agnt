@@ -71,6 +71,33 @@ class MacScopedSessionStore(
         markLegacyMigrated()
     }
 
+    /** Per-thread unsent composer text, so a half-typed message survives thread switches and relaunch. */
+    fun loadComposerDrafts(macDeviceId: String?): Map<String, String> = decodeStringMap(readScopedStringSet(KEY_COMPOSER_DRAFTS, macDeviceId)).orEmpty()
+
+    fun saveComposerDraft(
+        macDeviceId: String?,
+        threadId: String,
+        draft: String,
+    ) {
+        val tid = threadId.trim()
+        if (tid.isEmpty()) return
+        val next = loadComposerDrafts(macDeviceId).toMutableMap()
+        if (draft.isEmpty()) {
+            next.remove(tid)
+        } else {
+            next[tid] = draft
+        }
+        writeScopedStringSet(KEY_COMPOSER_DRAFTS, macDeviceId, encodeStringMap(next))
+        markLegacyMigrated()
+    }
+
+    fun clearComposerDraft(
+        macDeviceId: String?,
+        threadId: String,
+    ) {
+        saveComposerDraft(macDeviceId, threadId, "")
+    }
+
     fun loadAssociatedManagedWorktreePaths(macDeviceId: String?): Map<String, String> =
         decodeStringMap(readScopedStringSet(KEY_ASSOCIATED_WORKTREES, macDeviceId))
             ?: if (shouldLoadLegacyFallback(macDeviceId)) {
@@ -254,6 +281,9 @@ class MacScopedSessionStore(
         private const val KEY_CACHED_THREADS = "codex.thread.cachedThreads"
         const val KEY_LAST_ACTIVE_THREAD = "codex.ui.lastActiveThreadId"
         const val KEY_THREAD_RENAMES = "codex.thread.renamedThreadNames"
+
+        // New key uses the agnt namespace (drafts are ephemeral, so no migration needed).
+        const val KEY_COMPOSER_DRAFTS = "agnt.composer.draftsByThread"
         const val KEY_ASSOCIATED_WORKTREES = "codex.thread.associatedManagedWorktrees"
         const val KEY_RUNTIME_SELECTION = "codex.runtime.selection"
         const val KEY_LOCALLY_DELETED = "codex.locallyDeletedThreadIDs"
@@ -269,6 +299,7 @@ class MacScopedSessionStore(
                 KEY_RUNTIME_SELECTION,
                 KEY_LOCALLY_DELETED,
                 KEY_LOCALLY_ARCHIVED,
+                KEY_COMPOSER_DRAFTS,
             )
 
         internal fun encodeCachedThreadSnapshot(threads: List<CodexThread>): String =
