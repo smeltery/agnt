@@ -106,7 +106,7 @@ Contract tests for the abstractions:
 
 ## Android client guardrails (`AgntAndroid/`)
 
-- `AgntAndroid` is a third client for the same relay+bridge stack — it is **not** a hosted service. Imported from [Stivy-01/remodex](https://github.com/Stivy-01/remodex) (Apache-2.0); see `AgntAndroid/NOTICE` for attribution. Modifications relative to upstream must be reflected in `NOTICE` if they affect copyright/attribution.
+- `AgntAndroid` is a third client for the same relay+bridge stack — it is **not** a hosted service. Apache-2.0 attribution lives in `AgntAndroid/NOTICE`; modifications relative to upstream must be reflected there if they affect copyright/attribution.
 - The Android secure-transport (`AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt` + `core/crypto/SecureEnvelopeCipher.kt`) must stay byte-for-byte aligned with `agnt-bridge/src/secure-transport.js` and `agnt-web/src/crypto/transcript.ts`. Any change to transcript framing, nonce layout, or HKDF info must land in all three modules in the same PR.
 - Android can't set custom WebSocket headers reliably either; it uses `?role=iphone` like the browser. Don't start trusting query-string roles for the Mac side.
 - The package is `com.dotbrains.agnt.mobile`. Upstream identifiers (`com.remodex.mobile`, `remodex-e2ee-v1`, `remodex-trusted-session-resolve-*-v1`, `refs/remodex/checkpoints`, `PHODEX_DEFAULT_RELAY_URL`) must not be reintroduced — they break the agnt protocol contract.
@@ -117,12 +117,12 @@ Contract tests for the abstractions:
 
 ## Desktop host guardrails (`agnt-host/`)
 
-- `agnt-host` is a Tauri 2 desktop app (Rust + React 19 + Vite) that supervises the local `agnt-bridge` and `relay` processes and presents a system-tray + popup UI for pairing. Ported from upstream `Stivy-01/remodex` `remodex-host`; see `agnt-host/README.md` for the branding-deltas table.
+- `agnt-host` is a Tauri 2 desktop app (Rust + React 19 + Vite) that supervises the local `agnt-bridge` and `relay` processes and presents a system-tray + popup UI for pairing. See `agnt-host/README.md` for the identifier/branding table.
 - `agnt-host/src-tauri/bundled/` is generated at build time by `copy-bundled.mjs`, which snapshots `../agnt-bridge` and `../relay`. Do not commit `bundled/`; it's gitignored. Do not edit files inside it — change the source dirs instead.
 - The Tauri updater is preconfigured with placeholder pubkey + endpoint. Before publishing a release: generate a minisign keypair, replace the `pubkey` in `src-tauri/tauri.conf.json`, and verify the `endpoints` URL points at the dotbrains/agnt release manifest. Never commit the private key.
 - The bundled bridge entry point is `agnt-bridge/bin/agnt.js` and the bundle manifest is `agnt-bundle.json`. Env-var prefix for the host is `AGNT_HOST_*` (e.g. `AGNT_HOST_UPDATE_TAG`); env-vars consumed by the spawned bridge follow the `AGNT_*` convention (e.g. `AGNT_RELAY`, `AGNT_PRINT_PAIRING_JSON`).
 - The animated relay companion (`agnt-host/public/pets/relay/`) is opt-in cosmetic UI. `agnt-host/run-pet/` is the asset-generation toolchain — historical inputs, not loaded at runtime. Keep both, but they're optional to maintain.
-- Inherited Stivy-01 app icons in `agnt-host/src-tauri/icons/` must be replaced with agnt-branded artwork before public release.
+- Inherited app icons in `agnt-host/src-tauri/icons/` must be replaced with agnt-branded artwork before public release.
 
 ## Local quick runbook
 

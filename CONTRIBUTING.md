@@ -40,7 +40,7 @@ agnt is **source-available** under [PolyForm Shield 1.0.0](LICENSE), not open so
 
 If you're unsure whether your employer's IP policy allows you to contribute, please clear it on your side before opening a PR. There is no separate CLA to sign; the act of submitting the PR is the agreement.
 
-Code that originated in [Remodex](https://github.com/Emanuele-web04/remodex) (the Apache-2.0 upstream agnt was forked from) retains its Apache-2.0 grant for anyone who pulled it. New contributions to agnt are PolyForm Shield 1.0.0.
+Code that originated in the Apache-2.0 project agnt was forked from retains its Apache-2.0 grant for anyone who pulled it (see the `NOTICE` files for attribution details). New contributions to agnt are PolyForm Shield 1.0.0.
 
 ---
 

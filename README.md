@@ -32,7 +32,7 @@ flowchart LR
 - **Bridge** runs on your Mac or Linux host. It picks a provider, spawns the matching CLI, and translates between JSON-RPC and whatever native protocol the CLI uses (stream-json, REST+SSE, …). The built-in service installer uses launchd on macOS and systemd-user on Linux; on other operating systems `agnt up` runs in the foreground.
 - **Relay** routes ciphertext bytes only. Run it locally for LAN use, or self-host it on a VPS / Tailscale for off-network access.
 
-agnt is a fork of [Remodex](https://github.com/Emanuele-web04/remodex) (Apache-2.0). Remodex was Codex-only; agnt generalizes the transport behind a provider plugin contract so other agents can be added without touching the bridge core.
+agnt started from a Codex-only transport and generalizes it behind a provider plugin contract so other agents can be added without touching the bridge core.
 
 ## Quickstart
 
@@ -63,7 +63,7 @@ If the advertised host in the QR is not reachable from your phone, pass the LAN 
 Pair from any client:
 
 - **iOS app** — install [agnt](https://github.com/dotbrains/agnt), scan the QR. The phone reconnects automatically afterward.
-- **Android app** — build from `AgntAndroid/` (`./gradlew :app:installDebug`), scan the QR. Alpha — see [`AgntAndroid/README.md`](AgntAndroid/README.md) and [`AgntAndroid/PARITY.md`](AgntAndroid/PARITY.md) for status. Imported from [Stivy-01/remodex](https://github.com/Stivy-01/remodex) (Apache-2.0); attribution in [`AgntAndroid/NOTICE`](AgntAndroid/NOTICE).
+- **Android app** — build from `AgntAndroid/` (`./gradlew :app:installDebug`), scan the QR. Alpha — see [`AgntAndroid/README.md`](AgntAndroid/README.md) and [`AgntAndroid/PARITY.md`](AgntAndroid/PARITY.md) for status. Apache-2.0 attribution in [`AgntAndroid/NOTICE`](AgntAndroid/NOTICE).
 - **Browser** — `cd agnt-web && bun install && bun run dev`, open `http://localhost:5173`, then paste the JSON, type the short code, or scan the QR with your camera. Same E2EE handshake. See [`agnt-web/README.md`](agnt-web/README.md) for static-build deployment (Tailscale, VPS, S3+CloudFront, …).
 
 For self-hosting (Tailscale, public VPS, etc.) see [`docs/operations/self-hosting.md`](docs/operations/self-hosting.md).
@@ -127,4 +127,4 @@ Or stick with `npm install -g @dotbrains/agnt` if you prefer the automatic flow.
 
 ## License
 
-[PolyForm Shield 1.0.0](LICENSE) — source-available with a non-compete: you may use, copy, modify, and distribute the software, but not to provide a product or service that competes with agnt or with anything dotbrains offers that includes it. Upstream Remodex code retains its original Apache-2.0 grant. See [`legal/TERMS_OF_USE.md`](legal/TERMS_OF_USE.md) for the human-readable summary; `LICENSE` is authoritative.
+[PolyForm Shield 1.0.0](LICENSE) — source-available with a non-compete: you may use, copy, modify, and distribute the software, but not to provide a product or service that competes with agnt or with anything dotbrains offers that includes it. Code inherited from the Apache-2.0 project this was forked from retains its original Apache-2.0 grant. See [`legal/TERMS_OF_USE.md`](legal/TERMS_OF_USE.md) for the human-readable summary; `LICENSE` is authoritative.
