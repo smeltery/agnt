@@ -136,8 +136,8 @@ internal class IncomingEventRouter(
             -> handleAgentDelta(obj)
             "item/completed",
             "codex/event/item_completed",
-            "codex/event/agent_message",
             -> handleItemCompleted(obj)
+            "codex/event/agent_message" -> handleItemCompleted(obj, completesTurn = true)
             "codex/event/user_message" -> handleUserMirrored(obj)
             "codex/event/background_event" -> handleBackgroundEvent(obj)
             "codex/event/image_generation_end" -> handleImageGenerationEnd(obj)
@@ -536,17 +536,20 @@ internal class IncomingEventRouter(
         }
     }
 
-    private fun handleItemCompleted(params: Map<String, JSONValue>?) {
+    private fun handleItemCompleted(
+        params: Map<String, JSONValue>?,
+        completesTurn: Boolean = false,
+    ) {
         val p = params ?: return
         val ev = envelopeEventObject(p)
         val itemObj = IncomingNotificationParsers.extractIncomingItemObject(p, ev)
         if (itemObj == null) {
-            handleLegacyAgentCompleted(p)
+            handleLegacyAgentCompleted(p, completesTurn)
             return
         }
         val decoded = ThreadHistoryDecoder.decodeCompletedItem(itemObj)
         if (decoded == null) {
-            handleLegacyAgentCompleted(p)
+            handleLegacyAgentCompleted(p, completesTurn)
             return
         }
         val threadId = resolveThreadId(p) ?: IncomingNotificationParsers.extractThreadId(p) ?: return
@@ -570,6 +573,9 @@ internal class IncomingEventRouter(
                                 attachments = decoded.attachments,
                                 assistantPhase = assistantPhase,
                             )
+                        }
+                        if (completesTurn && turnId.isNullOrBlank()) {
+                            onTurnFinished(threadId)
                         }
                     }
                     CodexMessageRole.user -> {
@@ -650,7 +656,10 @@ internal class IncomingEventRouter(
         return IncomingNotificationParsers.extractItemId(params)
     }
 
-    private fun handleLegacyAgentCompleted(params: Map<String, JSONValue>) {
+    private fun handleLegacyAgentCompleted(
+        params: Map<String, JSONValue>,
+        completesTurn: Boolean = false,
+    ) {
         val threadId = resolveThreadId(params) ?: return
         val turnId = IncomingNotificationParsers.extractTurnId(params)
         val itemId = IncomingNotificationParsers.extractItemId(params)
@@ -669,6 +678,9 @@ internal class IncomingEventRouter(
                 text = text,
                 assistantPhase = assistantPhase,
             )
+        }
+        if (completesTurn && turnId.isNullOrBlank()) {
+            onTurnFinished(threadId)
         }
     }
 
