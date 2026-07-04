@@ -4,7 +4,7 @@
 //          rollout schema (`session_meta`, `event_msg`, `response_item`); other providers
 //          reconstruct history through their own translator's reconstructThreadFrom*().
 // Layer: provider plugin (codex)
-// Exports: parseSessionJsonlTurns, readThreadTurnsListPageFromSessionJsonl
+// Exports: parseSessionJsonlMetadata, parseSessionJsonlTurns, readThreadTurnsListPageFromSessionJsonl
 // Depends on: fs
 
 const fs = require("fs");
@@ -35,6 +35,44 @@ function readThreadTurnsListPageFromSessionJsonl(filePath, {
     nextCursor: turns.length > pageTurns.length ? "agnt-jsonl-fallback-older-unavailable" : null,
     agntJsonlFallback: true,
   };
+}
+
+function parseSessionJsonlMetadata(content) {
+  const metadata = {};
+  const lines = String(content || "").split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+
+    if (entry?.type !== "session_meta") {
+      continue;
+    }
+
+    const payload = objectValue(entry.payload);
+    if (!payload) {
+      continue;
+    }
+
+    metadata.threadId ||= normalizeString(payload.id)
+      || normalizeString(payload.thread_id)
+      || normalizeString(payload.threadId);
+    metadata.cwd ||= normalizeString(payload.cwd)
+      || normalizeString(payload.current_working_directory)
+      || normalizeString(payload.currentWorkingDirectory)
+      || normalizeString(payload.working_directory)
+      || normalizeString(payload.workingDirectory);
+  }
+
+  return metadata;
 }
 
 function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
@@ -198,6 +236,7 @@ function normalizeString(value) {
 }
 
 module.exports = {
+  parseSessionJsonlMetadata,
   parseSessionJsonlTurns,
   readThreadTurnsListPageFromSessionJsonl,
 };
