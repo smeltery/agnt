@@ -17,7 +17,12 @@ const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
 const DEFAULT_POLL_INTERVAL_MS = 700;
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 60_000;
+const DEFAULT_ACTIVITY_HEARTBEAT_MS = 5_000;
+// Bootstrap replay must not revive old runs whose rollout stopped growing
+// before a terminal event was written.
+const DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS = 10 * 60_000;
 const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
+const TERMINAL_TASK_EVENT_TYPES = new Set(["task_complete", "turn_aborted", "error"]);
 
 // Observes desktop-authored rollout files and replays the currently active run as
 // bridge notifications so the phone can render live thinking/tool activity.
@@ -31,6 +36,8 @@ function createRolloutLiveMirrorController({
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   lookupTimeoutMs = DEFAULT_LOOKUP_TIMEOUT_MS,
   idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
+  activityHeartbeatMs = DEFAULT_ACTIVITY_HEARTBEAT_MS,
+  staleActiveRunMaxAgeMs = DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS,
 } = {}) {
   const mirrorsByThreadId = new Map();
 
@@ -64,6 +71,8 @@ function createRolloutLiveMirrorController({
       pollIntervalMs,
       lookupTimeoutMs,
       idleTimeoutMs,
+      activityHeartbeatMs,
+      staleActiveRunMaxAgeMs,
       onStop() {
         if (mirrorsByThreadId.get(threadId) === mirror) {
           mirrorsByThreadId.delete(threadId);
@@ -99,6 +108,8 @@ function createThreadRolloutLiveMirror({
   pollIntervalMs,
   lookupTimeoutMs,
   idleTimeoutMs,
+  activityHeartbeatMs,
+  staleActiveRunMaxAgeMs,
   onStop = () => {},
 }) {
   const startedAt = now();
@@ -109,6 +120,7 @@ function createThreadRolloutLiveMirror({
   let lastSize = 0;
   let partialLine = "";
   let lastActivityAt = startedAt;
+  let lastHeartbeatAt = startedAt;
   let didBootstrap = false;
 
   const intervalId = setIntervalFn(tick, pollIntervalMs);
@@ -146,6 +158,8 @@ function createThreadRolloutLiveMirror({
           state,
           fsModule,
           sendApplicationResponse,
+          nowMs: currentTime,
+          staleActiveRunMaxAgeMs,
         });
         lastSize = fileSize;
         lastActivityAt = currentTime;
@@ -159,6 +173,8 @@ function createThreadRolloutLiveMirror({
         const chunk = readFileSlice(rolloutPath, lastSize, fileSize, fsModule);
         lastSize = fileSize;
         lastActivityAt = currentTime;
+        lastHeartbeatAt = currentTime;
+        state.suppressLiveActivityUntilGrowth = false;
         if (!chunk) {
           return;
         }
@@ -168,6 +184,20 @@ function createThreadRolloutLiveMirror({
         partialLine = lines.pop() || "";
         processRolloutLines(lines, state, sendApplicationResponse);
         return;
+      }
+
+      if (
+        state.isDesktopOrigin !== false
+        && state.activeTurnId
+        && !state.suppressLiveActivityUntilGrowth
+        && currentTime - lastHeartbeatAt >= activityHeartbeatMs
+      ) {
+        lastHeartbeatAt = currentTime;
+        sendApplicationResponse(JSON.stringify(createNotification("codex/event/background_event", {
+          threadId: state.threadId,
+          turnId: state.activeTurnId,
+          message: "Still running on desktop",
+        })));
       }
 
       if (currentTime - lastActivityAt >= idleTimeoutMs) {
@@ -205,6 +235,8 @@ function bootstrapFromExistingRollout({
   state,
   fsModule,
   sendApplicationResponse,
+  nowMs = Date.now(),
+  staleActiveRunMaxAgeMs = DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS,
 }) {
   const initialContents = readFileSlice(rolloutPath, 0, fileSize, fsModule);
   if (!initialContents) {
@@ -256,7 +288,7 @@ function bootstrapFromExistingRollout({
     }
 
     activeRunLines.push(line);
-    if (taskEventType === "task_complete") {
+    if (TERMINAL_TASK_EVENT_TYPES.has(taskEventType)) {
       insideActiveRun = false;
       activeTurnId = "";
       activeRunLines.length = 0;
@@ -273,7 +305,26 @@ function bootstrapFromExistingRollout({
   if (activeTurnId) {
     state.activeTurnId = activeTurnId;
   }
+
+  if (
+    activeRunLines.length > 0
+    && isRolloutFileStale(rolloutPath, fsModule, nowMs, staleActiveRunMaxAgeMs)
+  ) {
+    state.suppressLiveActivityUntilGrowth = true;
+    processRolloutLines(activeRunLines, state, () => {});
+    return;
+  }
+
   processRolloutLines(activeRunLines, state, sendApplicationResponse);
+}
+
+function isRolloutFileStale(rolloutPath, fsModule, nowMs, staleActiveRunMaxAgeMs) {
+  try {
+    const modifiedAtMs = fsModule.statSync(rolloutPath).mtimeMs;
+    return Number.isFinite(modifiedAtMs) && nowMs - modifiedAtMs >= staleActiveRunMaxAgeMs;
+  } catch {
+    return false;
+  }
 }
 
 function processRolloutLines(lines, state, sendApplicationResponse) {
@@ -383,6 +434,27 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
         turnId,
         id: turnId,
       }));
+      resetRunState(state);
+      return notifications;
+    }
+
+    if (eventType === "turn_aborted" || eventType === "error") {
+      const turnId = resolveRolloutEventTurnId(state, payload);
+      if (!turnId) {
+        return [];
+      }
+
+      const params = {
+        threadId: state.threadId,
+        turnId,
+        id: turnId,
+        status: eventType === "error" ? "failed" : "aborted",
+      };
+      const errorMessage = readString(payload.message);
+      if (eventType === "error" && errorMessage) {
+        params.error = { message: errorMessage };
+      }
+      notifications.push(createNotification("turn/completed", params));
       resetRunState(state);
       return notifications;
     }
@@ -801,6 +873,7 @@ function createMirrorState(threadId) {
     applyPatchCalls: new Map(),
     emittedPatchApplyEndCalls: new Set(),
     pendingUserMessages: [],
+    suppressLiveActivityUntilGrowth: false,
   };
 }
 
