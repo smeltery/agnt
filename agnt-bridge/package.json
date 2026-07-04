@@ -43,5 +43,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "node-gyp": "12.1.0"
   }
 }
