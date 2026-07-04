@@ -86,6 +86,36 @@ test("trimThreadPayloadForRelay returns the encoded payload when an under-cap th
   assert.equal(parsed.result.thread.id, "t1");
 });
 
+test("trimThreadPayloadForRelay preserves pre-omitted turn counts when the working window fits", () => {
+  const parsed = {
+    id: "r-pre-omitted",
+    result: {
+      thread: {
+        id: "t-pre-omitted",
+        turns: [
+          { id: "turn-new-1", items: [{ id: "item-new-1", type: "message", text: "new 1" }] },
+          { id: "turn-new-2", items: [{ id: "item-new-2", type: "message", text: "new 2" }] },
+        ],
+      },
+    },
+  };
+
+  const out = trimThreadPayloadForRelay(parsed, undefined, {
+    preOmittedTurnCount: 3,
+    compactionIdSource: { id: "turn-old-1" },
+  });
+  assert.ok(out != null);
+  const rewritten = JSON.parse(out);
+
+  assert.equal(rewritten.result.thread.agntHistoryCompacted, true);
+  assert.equal(rewritten.result.thread.agntOmittedTurnCount, 3);
+  assert.equal(rewritten.result.thread.agntKeptTurnCount, 2);
+  assert.deepEqual(
+    rewritten.result.thread.turns.map((turn) => turn.id),
+    ["agnt-history-compacted-turn-old-1", "turn-new-1", "turn-new-2"]
+  );
+});
+
 test("trimThreadPayloadForRelay drops older turns and prepends the agnt-history-compacted marker when over cap", () => {
   // Build a payload that's deliberately oversized: lots of turns each with a
   // big text item so the encoded size exceeds the 4 MiB soft cap.
