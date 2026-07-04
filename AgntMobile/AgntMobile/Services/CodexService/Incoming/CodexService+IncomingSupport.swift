@@ -142,6 +142,11 @@ func toolActivitySummaryLine(
     return "\(statusLabel) \(descriptorLabel)"
 }
 
+func isReplayedBridgeEvent(_ paramsObject: IncomingParamsObject?) -> Bool {
+    paramsObject?["agntReplayedEvent"]?.boolValue == true
+        || paramsObject?["remodexReplayedEvent"]?.boolValue == true
+}
+
 func extractContextWindowUsage(from object: IncomingParamsObject?) -> ContextWindowUsage? {
     guard let object else { return nil }
 

@@ -3057,7 +3057,7 @@ extension CodexService {
         }
 
         messagesByThread[threadId]?[messageIndex].text = nextText
-        messagesByThread[threadId]?[messageIndex].isStreaming = true
+        messagesByThread[threadId]?[messageIndex].isStreaming = !isApplyingReplayedBridgeEvent
         applyAssistantPhaseIfNeeded(
             threadId: threadId,
             messageIndex: messageIndex,
@@ -4305,7 +4305,8 @@ extension CodexService {
             threadId: threadId,
             turnId: turnId.trimmingCharacters(in: .whitespacesAndNewlines),
             itemId: normalizedItemId,
-            assistantPhase: normalizedPhase
+            assistantPhase: normalizedPhase,
+            isReplayed: isApplyingReplayedBridgeEvent
         )
         if pendingAssistantDeltaByStreamID[streamID] == nil,
            !pendingAssistantDeltaStreamOrder.contains(streamID) {
@@ -4330,7 +4331,7 @@ extension CodexService {
             return
         }
 
-        let fallbackPhase = pendingAssistantDeltaContextByStreamID[fallbackStreamID]?.assistantPhase
+        let fallbackContext = pendingAssistantDeltaContextByStreamID[fallbackStreamID]
         pendingAssistantDeltaContextByStreamID.removeValue(forKey: fallbackStreamID)
         pendingAssistantDeltaStreamOrder.removeAll { $0 == fallbackStreamID }
         if pendingAssistantDeltaByStreamID[destinationStreamID] == nil,
@@ -4345,7 +4346,8 @@ extension CodexService {
             threadId: threadId,
             turnId: turnId.trimmingCharacters(in: .whitespacesAndNewlines),
             itemId: normalizedItemId,
-            assistantPhase: fallbackPhase
+            assistantPhase: fallbackContext?.assistantPhase,
+            isReplayed: fallbackContext?.isReplayed ?? isApplyingReplayedBridgeEvent
         )
     }
 
@@ -4447,6 +4449,10 @@ extension CodexService {
 
                 pendingAssistantDeltaByStreamID.removeValue(forKey: streamID)
                 pendingAssistantDeltaContextByStreamID.removeValue(forKey: streamID)
+                let previousReplayScope = isApplyingReplayedBridgeEvent
+                if context.isReplayed {
+                    isApplyingReplayedBridgeEvent = true
+                }
                 applyAssistantDeltaBatch(
                     threadId: context.threadId,
                     turnId: context.turnId,
@@ -4454,6 +4460,7 @@ extension CodexService {
                     assistantPhase: context.assistantPhase,
                     delta: delta
                 )
+                isApplyingReplayedBridgeEvent = previousReplayScope
             }
             pendingAssistantDeltaStreamOrder.removeAll { flushedStreamIDs.contains($0) }
         }
@@ -4846,10 +4853,13 @@ extension CodexService {
 
     func appendMessage(_ message: CodexMessage) {
         var normalizedMessage = message
+        if isApplyingReplayedBridgeEvent {
+            normalizedMessage.isStreaming = false
+        }
         normalizedMessage.proposedPlan = derivedProposedPlan(for: normalizedMessage)
-        if message.isStreaming {
+        if normalizedMessage.isStreaming {
             // Keep sidebar run state independent from timeline scanning cost.
-            markThreadAsRunning(message.threadId)
+            markThreadAsRunning(normalizedMessage.threadId)
         }
         if normalizedMessage.role == .assistant,
            let existingIndex = messagesByThread[message.threadId]?.firstIndex(where: { $0.id == normalizedMessage.id }),
@@ -5132,6 +5142,7 @@ extension CodexService {
         isStreaming: Bool,
         promoteTurnFallback: Bool
     ) -> String {
+        let effectiveIsStreaming = isStreaming && !isApplyingReplayedBridgeEvent
         let turnStreamingKey = streamingMessageKey(threadId: threadId, turnId: turnId)
         let itemStreamingKey = itemId.map {
             assistantStreamingMessageKey(threadId: threadId, turnId: turnId, itemId: $0)
@@ -5144,7 +5155,7 @@ extension CodexService {
             text: "",
             turnId: turnId,
             itemId: itemId,
-            isStreaming: isStreaming
+            isStreaming: effectiveIsStreaming
         )
 
         threadIdByTurnID[turnId] = threadId
