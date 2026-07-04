@@ -404,7 +404,7 @@ function createBridgeSecureTransport({
     });
     activeSession.isResumed = true;
     for (const entry of missingEntries) {
-      if (!sendBufferedEntry(entry, activeSession.sendWireMessage)) {
+      if (!sendBufferedEntry(replayTaggedEntryIfHistorical(entry), activeSession.sendWireMessage)) {
         break;
       }
     }
@@ -542,10 +542,46 @@ function createBridgeSecureTransport({
     }
 
     for (const entry of replayableOutboundEntries(lastRelayedBridgeOutboundSeq)) {
-      if (!sendBufferedEntry(entry, activeSession.sendWireMessage)) {
+      if (!sendBufferedEntry(replayTaggedEntryIfHistorical(entry), activeSession.sendWireMessage)) {
         break;
       }
     }
+  }
+
+  // Only prior secure-session backlog is catch-up history; same-session retries
+  // may be the phone's first delivery of a still-live turn.
+  function replayTaggedEntryIfHistorical(entry) {
+    if (
+      !activeSession
+      || entry.bridgeOutboundSeq >= activeSession.firstOutboundSeq
+    ) {
+      return entry;
+    }
+
+    return replayTaggedEntry(entry);
+  }
+
+  // Marks replayed notifications so clients hydrate them as catch-up content
+  // instead of live activity. RPC responses and non-object params pass through.
+  function replayTaggedEntry(entry) {
+    const parsed = safeParseJSON(entry.payloadText);
+    if (
+      !parsed
+      || typeof parsed.method !== "string"
+      || parsed.id !== undefined
+      || !parsed.params
+      || typeof parsed.params !== "object"
+      || Array.isArray(parsed.params)
+    ) {
+      return entry;
+    }
+
+    parsed.params.agntReplayedEvent = true;
+    return {
+      bridgeOutboundSeq: entry.bridgeOutboundSeq,
+      payloadText: JSON.stringify(parsed),
+      sizeBytes: entry.sizeBytes,
+    };
   }
 
   return {
