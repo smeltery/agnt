@@ -581,7 +581,9 @@ function startBridge({
       try {
         const response = await fetchAdaptiveThreadTurnsListForRelay(request, {
           fetchPage: (params) => bridgeManagedCodex.sendRequest("thread/turns/list", params),
-          sanitizeForRelay: sanitizeThreadHistoryImagesForRelay,
+          sanitizeForRelay: (raw, method) => sanitizeThreadHistoryImagesForRelay(raw, method, {
+            activeProviderId: activeProvider.id,
+          }),
         });
         const fallbackResponse = maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, response);
         forwardedRequestTracker.markSanitizedResponse(request.id, "thread/turns/list");
@@ -655,7 +657,9 @@ function startBridge({
     if (!trackedRequest) {
       return normalizedMessage;
     }
-    return sanitizeThreadHistoryImagesForRelay(normalizedMessage, trackedRequest.method);
+    return sanitizeThreadHistoryImagesForRelay(normalizedMessage, trackedRequest.method, {
+      activeProviderId: activeProvider.id,
+    });
   }
 
   function safeParseJSON(value) {

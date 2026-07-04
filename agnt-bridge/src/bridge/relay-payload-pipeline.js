@@ -11,17 +11,21 @@
 //            3. For any other message → pass through unchanged.
 //          Keeps bridge.js focused on orchestration by hiding the cross-
 //          module wiring here.
-// Layer: Bridge support (pure)
+// Layer: Bridge support
 // Exports:
 //   - sanitizeThreadHistoryImagesForRelay (entry)
+//   - augmentRelayThreadWithJsonlMetadata (helper — re-exported for tests)
 //   - sanitizeThreadTurnsListForRelay (entry — re-exported for tests)
 //   - sanitizeRelayHistoryTurns (helper — re-exported for tests)
 //   - sanitizeRelayHistoryTurn (helper — re-exported for tests)
 // Depends on:
+//   - fs
 //   - ./relay-image-sanitizer (annotateImageGenerationHistoryItem,
 //     sanitizeInlineHistoryImageContentItem, sanitizeCompactionHistoryItem)
 //   - ./relay-payload-trimmer (trimThreadPayloadForRelay,
 //     trimTurnsListPayloadForRelay)
+
+const fs = require("fs");
 
 const {
   annotateImageGenerationHistoryItem,
@@ -36,6 +40,18 @@ const {
 const {
   RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES,
 } = require("./turns-list-pager");
+const {
+  findRecentRolloutFileForContextRead,
+  resolveSessionsRoot,
+} = require("../desktop/rollout-watch");
+const {
+  parseSessionJsonlMetadata,
+} = require("../providers/codex/session-jsonl-history");
+
+const JSONL_THREAD_CWD_CACHE_MAX_ENTRIES = 200;
+const JSONL_THREAD_CWD_CACHE_TTL_MS = 5 * 60_000;
+const JSONL_THREAD_EMPTY_CWD_CACHE_TTL_MS = 30_000;
+const jsonlThreadCwdCacheByThread = new Map();
 
 function parseJSON(value) {
   try {
@@ -54,7 +70,7 @@ function normalizeNonEmptyString(value) {
   return str.length > 0 ? str : "";
 }
 
-function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
+function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod, requestContext = {}) {
   if (requestMethod === "thread/turns/list") {
     return sanitizeThreadTurnsListForRelay(rawMessage);
   }
@@ -72,6 +88,7 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
   const threadId = normalizeNonEmptyString(thread.id)
     || normalizeNonEmptyString(thread.threadId)
     || normalizeNonEmptyString(thread.thread_id);
+  const shouldAugmentJsonlMetadata = requestContext.activeProviderId === "codex";
   const didPreTrimTurnWindow = Buffer.byteLength(rawMessage, "utf8") > RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES
     && thread.turns.length > RELAY_HISTORY_RECENT_TURN_TARGET;
   const workingTurns = didPreTrimTurnWindow
@@ -86,9 +103,12 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
       compactionIdSource: thread.turns[0],
     }
     : {};
+  const { thread: threadWithJsonlMetadata, didAugment: didAugmentThreadMetadata } = shouldAugmentJsonlMetadata
+    ? augmentRelayThreadWithJsonlMetadata(workingThread, threadId, requestContext)
+    : { thread: workingThread, didAugment: false };
   const { turns: sanitizedTurns, didSanitize } = sanitizeRelayHistoryTurns(workingTurns, threadId);
 
-  if (!didSanitize && !didPreTrimTurnWindow) {
+  if (!didSanitize && !didPreTrimTurnWindow && !didAugmentThreadMetadata) {
     const trimmedPayload = trimThreadPayloadForRelay(parsed, thread);
     return trimmedPayload == null ? rawMessage : trimmedPayload;
   }
@@ -98,13 +118,126 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
     result: {
       ...parsed.result,
       thread: {
-        ...workingThread,
+        ...threadWithJsonlMetadata,
         turns: sanitizedTurns,
       },
     },
   });
 
   return trimThreadPayloadForRelay(parseJSON(sanitizedPayload), null, trimOptions) ?? sanitizedPayload;
+}
+
+function augmentRelayThreadWithJsonlMetadata(thread, threadId = "", {
+  resolveSessionsRootImpl = resolveSessionsRoot,
+  findRecentRolloutFileForContextReadImpl = findRecentRolloutFileForContextRead,
+  parseSessionJsonlMetadataImpl = parseSessionJsonlMetadata,
+  fsModule = fs,
+  now = () => Date.now(),
+  logger = console,
+} = {}) {
+  const cwd = readJsonlThreadCwd(threadId, {
+    resolveSessionsRootImpl,
+    findRecentRolloutFileForContextReadImpl,
+    parseSessionJsonlMetadataImpl,
+    fsModule,
+    now,
+    logger,
+  });
+  if (!cwd || !thread || typeof thread !== "object") {
+    return { thread, didAugment: false };
+  }
+
+  if (normalizeNonEmptyString(thread.cwd) === cwd
+    && normalizeNonEmptyString(thread.current_working_directory) === cwd) {
+    return { thread, didAugment: false };
+  }
+
+  return {
+    thread: {
+      ...thread,
+      cwd,
+      current_working_directory: cwd,
+    },
+    didAugment: true,
+  };
+}
+
+function readJsonlThreadCwd(threadId, {
+  resolveSessionsRootImpl,
+  findRecentRolloutFileForContextReadImpl,
+  parseSessionJsonlMetadataImpl,
+  fsModule,
+  now,
+  logger,
+}) {
+  const normalizedThreadId = normalizeNonEmptyString(threadId);
+  if (!normalizedThreadId) {
+    return "";
+  }
+
+  const sessionsRoot = resolveSessionsRootImpl();
+  const cacheKey = `${sessionsRoot}\0${normalizedThreadId}`;
+
+  try {
+    const rolloutPath = findRecentRolloutFileForContextReadImpl(sessionsRoot, { threadId: normalizedThreadId, fsModule });
+    if (!rolloutPath) {
+      const cachedMiss = jsonlThreadCwdCacheByThread.get(cacheKey);
+      if (cachedMiss && !cachedMiss.rolloutPath) {
+        const ttlMs = JSONL_THREAD_EMPTY_CWD_CACHE_TTL_MS;
+        if (now() - cachedMiss.checkedAt <= ttlMs) {
+          return cachedMiss.cwd;
+        }
+      }
+      rememberJsonlThreadCwdCache(cacheKey, {
+        rolloutPath: "",
+        mtimeMs: 0,
+        size: 0,
+        checkedAt: now(),
+        cwd: "",
+      });
+      return "";
+    }
+
+    const stat = fsModule.statSync(rolloutPath);
+    const cached = jsonlThreadCwdCacheByThread.get(cacheKey);
+    if (
+      cached
+      && cached.rolloutPath === rolloutPath
+      && cached.mtimeMs === stat.mtimeMs
+      && cached.size === stat.size
+    ) {
+      const ttlMs = cached.cwd ? JSONL_THREAD_CWD_CACHE_TTL_MS : JSONL_THREAD_EMPTY_CWD_CACHE_TTL_MS;
+      if (now() - cached.checkedAt <= ttlMs) {
+        return cached.cwd;
+      }
+    }
+
+    const metadata = parseSessionJsonlMetadataImpl(fsModule.readFileSync(rolloutPath, "utf8"));
+    const cwd = normalizeNonEmptyString(metadata?.cwd);
+    rememberJsonlThreadCwdCache(cacheKey, {
+      rolloutPath,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      checkedAt: now(),
+      cwd,
+    });
+    return cwd;
+  } catch (error) {
+    jsonlThreadCwdCacheByThread.delete(cacheKey);
+    logger.warn?.(`[agnt] thread jsonl metadata augmentation failed for ${normalizedThreadId}: ${error.message}`);
+    return "";
+  }
+}
+
+function rememberJsonlThreadCwdCache(cacheKey, entry) {
+  jsonlThreadCwdCacheByThread.set(cacheKey, entry);
+  while (jsonlThreadCwdCacheByThread.size > JSONL_THREAD_CWD_CACHE_MAX_ENTRIES) {
+    const oldestKey = jsonlThreadCwdCacheByThread.keys().next().value;
+    if (oldestKey == null) {
+      break;
+    }
+    jsonlThreadCwdCacheByThread.delete(oldestKey);
+  }
 }
 
 function sanitizeThreadTurnsListForRelay(rawMessage) {
@@ -210,6 +343,7 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
 }
 
 module.exports = {
+  augmentRelayThreadWithJsonlMetadata,
   sanitizeThreadHistoryImagesForRelay,
   sanitizeThreadTurnsListForRelay,
   sanitizeRelayHistoryTurns,
