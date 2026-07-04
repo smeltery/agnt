@@ -22,6 +22,67 @@ final class CodexServiceIncomingRunIndicatorTests: XCTestCase {
         XCTAssertEqual(service.threadRunBadgeState(for: threadID), .running)
     }
 
+    func testReplayedTurnStartedDoesNotReviveRunningState() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "turn/started",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "agntReplayedEvent": .bool(true),
+            ])
+        )
+
+        XCTAssertNil(service.activeTurnID(for: threadID))
+        XCTAssertNil(service.threadRunBadgeState(for: threadID))
+        XCTAssertEqual(service.threadIdByTurnID[turnID], threadID)
+    }
+
+    func testReplayedAssistantDeltaAppendsNonStreamingHistory() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let itemID = "item-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "item/agentMessage/delta",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "itemId": .string(itemID),
+                "delta": .string("Historical reply"),
+                "agntReplayedEvent": .bool(true),
+            ])
+        )
+        service.flushAllPendingStreamingDeltas()
+
+        let messages = service.messages(for: threadID)
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages.first?.text, "Historical reply")
+        XCTAssertFalse(messages.first?.isStreaming ?? true)
+        XCTAssertNil(service.threadRunBadgeState(for: threadID))
+        XCTAssertNil(service.activeTurnID(for: threadID))
+    }
+
+    func testReplayedActiveThreadStatusDoesNotMarkRunning() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "thread/status/changed",
+            params: .object([
+                "threadId": .string(threadID),
+                "status": .object(["type": .string("active")]),
+                "agntReplayedEvent": .bool(true),
+            ])
+        )
+
+        XCTAssertNil(service.threadRunBadgeState(for: threadID))
+    }
+
     func testAssistantDeltaCoalescingAppliesOrderedDeltasOnFlush() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"

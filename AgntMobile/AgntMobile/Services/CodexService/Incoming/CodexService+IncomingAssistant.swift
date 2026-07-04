@@ -28,7 +28,9 @@ extension CodexService {
             eventObject: eventObject
         ) else { return }
 
-        if let directThreadId = extractThreadID(from: paramsObject), !directThreadId.isEmpty {
+        if let directThreadId = extractThreadID(from: paramsObject),
+           !directThreadId.isEmpty,
+           !isApplyingReplayedBridgeEvent {
             markThreadAsRunning(directThreadId)
         }
 
@@ -41,8 +43,10 @@ extension CodexService {
             return
         }
 
-        markThreadAsRunning(context.threadId)
-        clearMirroredRunningCatchupNeeded(for: context.threadId)
+        if !isApplyingReplayedBridgeEvent {
+            markThreadAsRunning(context.threadId)
+            clearMirroredRunningCatchupNeeded(for: context.threadId)
+        }
         appendAssistantDelta(
             threadId: context.threadId,
             turnId: turnId,

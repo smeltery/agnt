@@ -547,7 +547,7 @@ final class CodexService {
     @ObservationIgnored var messagePersistenceDebounceTask: Task<Void, Never>?
     // Coalesces high-frequency assistant deltas before they mutate observed timeline state.
     @ObservationIgnored var pendingAssistantDeltaByStreamID: [String: String] = [:]
-    @ObservationIgnored var pendingAssistantDeltaContextByStreamID: [String: (threadId: String, turnId: String, itemId: String?, assistantPhase: String?)] = [:]
+    @ObservationIgnored var pendingAssistantDeltaContextByStreamID: [String: (threadId: String, turnId: String, itemId: String?, assistantPhase: String?, isReplayed: Bool)] = [:]
     @ObservationIgnored var pendingAssistantDeltaStreamOrder: [String] = []
     @ObservationIgnored var pendingAssistantDeltaFlushTask: Task<Void, Never>?
     // Coalesces multiple invalidateAssistantRevertStates() calls within the same run loop tick into one refresh.
@@ -577,6 +577,8 @@ final class CodexService {
     var resumedThreadIDs: Set<String> = []
     // Coalesces per-thread thread/read history fetches so reconcile work can await the same RPC.
     @ObservationIgnored var threadHistoryLoadTaskByThreadID: [String: Task<ThreadHistoryLoadOutcome, Error>] = [:]
+    // Secure-transport replay is history catch-up, not live runtime activity.
+    @ObservationIgnored var isApplyingReplayedBridgeEvent = false
     // Lets a late force caller upgrade an in-flight history load without spawning another thread/read.
     @ObservationIgnored var forcedHistoryLoadThreadIDs: Set<String> = []
     // Preserves callers that need "not materialized" reads to keep retrying instead of marking hydrated.
