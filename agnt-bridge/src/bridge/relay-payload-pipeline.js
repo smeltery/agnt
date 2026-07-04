@@ -29,9 +29,13 @@ const {
   sanitizeCompactionHistoryItem,
 } = require("./relay-image-sanitizer");
 const {
+  RELAY_HISTORY_RECENT_TURN_TARGET,
   trimThreadPayloadForRelay,
   trimTurnsListPayloadForRelay,
 } = require("./relay-payload-trimmer");
+const {
+  RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES,
+} = require("./turns-list-pager");
 
 function parseJSON(value) {
   try {
@@ -68,9 +72,23 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
   const threadId = normalizeNonEmptyString(thread.id)
     || normalizeNonEmptyString(thread.threadId)
     || normalizeNonEmptyString(thread.thread_id);
-  const { turns: sanitizedTurns, didSanitize } = sanitizeRelayHistoryTurns(thread.turns, threadId);
+  const didPreTrimTurnWindow = Buffer.byteLength(rawMessage, "utf8") > RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES
+    && thread.turns.length > RELAY_HISTORY_RECENT_TURN_TARGET;
+  const workingTurns = didPreTrimTurnWindow
+    ? thread.turns.slice(-RELAY_HISTORY_RECENT_TURN_TARGET)
+    : thread.turns;
+  const workingThread = didPreTrimTurnWindow
+    ? { ...thread, turns: workingTurns }
+    : thread;
+  const trimOptions = didPreTrimTurnWindow
+    ? {
+      preOmittedTurnCount: thread.turns.length - workingTurns.length,
+      compactionIdSource: thread.turns[0],
+    }
+    : {};
+  const { turns: sanitizedTurns, didSanitize } = sanitizeRelayHistoryTurns(workingTurns, threadId);
 
-  if (!didSanitize) {
+  if (!didSanitize && !didPreTrimTurnWindow) {
     const trimmedPayload = trimThreadPayloadForRelay(parsed, thread);
     return trimmedPayload == null ? rawMessage : trimmedPayload;
   }
@@ -80,13 +98,13 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod) {
     result: {
       ...parsed.result,
       thread: {
-        ...thread,
+        ...workingThread,
         turns: sanitizedTurns,
       },
     },
   });
 
-  return trimThreadPayloadForRelay(parseJSON(sanitizedPayload), null) ?? sanitizedPayload;
+  return trimThreadPayloadForRelay(parseJSON(sanitizedPayload), null, trimOptions) ?? sanitizedPayload;
 }
 
 function sanitizeThreadTurnsListForRelay(rawMessage) {

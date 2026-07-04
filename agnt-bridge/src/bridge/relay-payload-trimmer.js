@@ -43,11 +43,14 @@ function normalizeNonEmptyString(value) {
   return str.length > 0 ? str : "";
 }
 
-function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
+function trimThreadPayloadForRelay(parsed, explicitThread = undefined, options = {}) {
   const thread = explicitThread ?? parsed?.result?.thread;
   if (!parsed || !thread || typeof thread !== "object" || !Array.isArray(thread.turns)) {
     return null;
   }
+
+  const preOmittedTurnCount = Math.max(0, options.preOmittedTurnCount ?? 0);
+  const compactionIdSource = options.compactionIdSource ?? null;
 
   let workingThread = thread;
   let encoded = encodeRelayThreadPayload(parsed, workingThread);
@@ -56,7 +59,16 @@ function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
   }
 
   if (Buffer.byteLength(encoded, "utf8") <= RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES) {
-    return explicitThread === undefined ? null : encoded;
+    if (preOmittedTurnCount <= 0) {
+      return explicitThread === undefined ? null : encoded;
+    }
+    const compactedThread = buildRelayHistoryCompactedThread(
+      thread,
+      buildRelayCompactedHistoryTurns(thread.turns, thread.turns, preOmittedTurnCount, compactionIdSource),
+      preOmittedTurnCount,
+      thread.turns.length
+    );
+    return encodeRelayThreadPayload(parsed, compactedThread) ?? encoded;
   }
 
   const turns = thread.turns;
@@ -69,8 +81,8 @@ function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
     }
     const candidateThread = buildRelayHistoryCompactedThread(
       thread,
-      buildRelayCompactedHistoryTurns(turns, trimmedTurns),
-      Math.max(0, turns.length - trimmedTurns.length),
+      buildRelayCompactedHistoryTurns(turns, trimmedTurns, preOmittedTurnCount, compactionIdSource),
+      preOmittedTurnCount + Math.max(0, turns.length - trimmedTurns.length),
       trimmedTurns.length
     );
     encoded = encodeRelayThreadPayload(parsed, candidateThread);
@@ -90,9 +102,9 @@ function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
   while (trimmedItems.length > 1) {
     trimmedItems = trimmedItems.slice(1);
     const compactedTurnPrefix = buildRelayHistoryCompactionTurn(
-      Math.max(0, turns.length - 1),
+      preOmittedTurnCount + Math.max(0, turns.length - 1),
       1,
-      thread
+      compactionIdSource ?? thread
     );
     const candidateThread = buildRelayHistoryCompactedThread(
       thread,
@@ -103,7 +115,7 @@ function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
         ...newestTurn,
         items: trimmedItems,
       }],
-      Math.max(0, turns.length - 1),
+      preOmittedTurnCount + Math.max(0, turns.length - 1),
       1
     );
     encoded = encodeRelayThreadPayload(parsed, candidateThread);
@@ -125,13 +137,13 @@ function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
   let candidateThread = buildRelayHistoryCompactedThread(
     thread,
     [
-      ...buildRelayCompactedHistoryTurns(turns, [newestTurn]).slice(0, -1),
+      ...buildRelayCompactedHistoryTurns(turns, [newestTurn], preOmittedTurnCount, compactionIdSource).slice(0, -1),
       {
         ...newestTurn,
         items: [truncatedItem],
       },
     ],
-    Math.max(0, turns.length - 1),
+    preOmittedTurnCount + Math.max(0, turns.length - 1),
     1
   );
   encoded = encodeRelayThreadPayload(parsed, candidateThread);
@@ -142,13 +154,13 @@ function trimThreadPayloadForRelay(parsed, explicitThread = undefined) {
   candidateThread = buildRelayHistoryCompactedThread(
     thread,
     [
-      ...buildRelayCompactedHistoryTurns(turns, [newestTurn]).slice(0, -1),
+      ...buildRelayCompactedHistoryTurns(turns, [newestTurn], preOmittedTurnCount, compactionIdSource).slice(0, -1),
       {
         ...newestTurn,
         items: [compactHistoryItemForRelay(mostRecentItem, RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS)],
       },
     ],
-    Math.max(0, turns.length - 1),
+    preOmittedTurnCount + Math.max(0, turns.length - 1),
     1
   );
   return encodeRelayThreadPayload(parsed, candidateThread);
@@ -214,12 +226,12 @@ function buildRelayHistoryCompactedThread(thread, turns, omittedTurnCount, keptT
   };
 }
 
-function buildRelayCompactedHistoryTurns(allTurns, keptTurns) {
-  const omittedTurnCount = Math.max(0, allTurns.length - keptTurns.length);
+function buildRelayCompactedHistoryTurns(allTurns, keptTurns, preOmittedTurnCount = 0, idSourceOverride = null) {
+  const omittedTurnCount = preOmittedTurnCount + Math.max(0, allTurns.length - keptTurns.length);
   const compactionTurn = buildRelayHistoryCompactionTurn(
     omittedTurnCount,
     keptTurns.length,
-    allTurns[0]
+    idSourceOverride ?? allTurns[0]
   );
   return compactionTurn ? [compactionTurn, ...keptTurns] : keptTurns;
 }

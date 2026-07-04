@@ -84,6 +84,53 @@ test("sanitizeThreadHistoryImagesForRelay elides inline data: image URLs in hist
   assert.equal(out.includes("agnt://history-image-elided"), true, "placeholder must be present");
 });
 
+test("sanitizeThreadHistoryImagesForRelay pre-trims oversized old image turns before sanitation", () => {
+  const oldImage = `data:image/png;base64,${"A".repeat(900_000)}`;
+  const turns = [
+    ...Array.from({ length: 5 }, (_, index) => ({
+      id: `old-turn-${index + 1}`,
+      items: [{
+        id: `old-item-${index + 1}`,
+        type: "user_message",
+        content: [{ type: "input_image", url: oldImage }],
+      }],
+    })),
+    ...Array.from({ length: 40 }, (_, index) => ({
+      id: `new-turn-${index + 1}`,
+      items: [{ id: `new-item-${index + 1}`, type: "message", text: `reply ${index + 1}` }],
+    })),
+  ];
+  const raw = JSON.stringify({
+    id: "r-pretrim-images",
+    result: {
+      thread: {
+        id: "thread-pretrim-images",
+        turns,
+      },
+    },
+  });
+
+  const out = sanitizeThreadHistoryImagesForRelay(raw, "thread/read");
+  const rewritten = JSON.parse(out);
+
+  assert.equal(out.includes("data:image/png"), false, "oversized image data must not remain");
+  assert.equal(
+    out.includes("agnt://history-image-elided"),
+    false,
+    "old oversized image turns should be omitted instead of sanitized and kept"
+  );
+  assert.equal(rewritten.result.thread.agntHistoryCompacted, true);
+  assert.equal(rewritten.result.thread.agntOmittedTurnCount, 5);
+  assert.equal(rewritten.result.thread.agntKeptTurnCount, 40);
+  assert.deepEqual(
+    rewritten.result.thread.turns.map((turn) => turn.id),
+    [
+      "agnt-history-compacted-old-turn-1",
+      ...turns.slice(5).map((turn) => turn.id),
+    ]
+  );
+});
+
 test("sanitizeThreadTurnsListForRelay returns rawMessage when no turns key is present", () => {
   const raw = JSON.stringify({ id: "r1", result: { somethingElse: 1 } });
   assert.equal(sanitizeThreadTurnsListForRelay(raw), raw);
