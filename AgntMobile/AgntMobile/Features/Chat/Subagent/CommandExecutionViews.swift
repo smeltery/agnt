@@ -623,9 +623,12 @@ struct CommandExecutionCardBody: View {
 
             Spacer(minLength: 6)
 
-            Text(statusLabel)
-                .font(AppFont.caption())
-                .foregroundStyle(accent == .failed ? Color.red : Color.secondary.opacity(0.5))
+            // Running/completed state is already conveyed by the verb tense.
+            if accent == .failed {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(AppFont.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.red)
+            }
 
             Image(systemName: "chevron.right")
                 .font(AppFont.system(size: 8, weight: .semibold))
