@@ -13,7 +13,7 @@ data class CodexVoiceTranscriptionPreflight(
         get() =
             when {
                 durationSeconds > MAX_DURATION_SECONDS ->
-                    "Voice clips must be 120 seconds or less."
+                    "Voice clips must be ${MAX_DURATION_SECONDS.toInt()} seconds or less."
                 byteCount > MAX_BYTE_COUNT ->
                     "Voice clips must be smaller than 10 MB."
                 else -> null
@@ -25,7 +25,7 @@ data class CodexVoiceTranscriptionPreflight(
     }
 
     companion object {
-        const val MAX_DURATION_SECONDS: Double = 120.0
+        const val MAX_DURATION_SECONDS: Double = 150.0
         const val MAX_BYTE_COUNT: Int = 10 * 1024 * 1024
     }
 }
