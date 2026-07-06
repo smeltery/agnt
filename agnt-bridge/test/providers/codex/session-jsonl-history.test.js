@@ -68,6 +68,61 @@ test("parseSessionJsonlTurns captures user_message events as user-role items", (
   assert.equal(turns[0].items[0].text, "hello there");
 });
 
+test("parseSessionJsonlTurns skips injected context user_message events", () => {
+  const content = jsonl(
+    { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },
+    {
+      type: "event_msg",
+      payload: {
+        type: "user_message",
+        message: "# AGENTS.md instructions for /Users/me/project\n\n<INSTRUCTIONS>\nrules\n</INSTRUCTIONS>",
+        turn_id: "t-1",
+        id: "ctx-agents",
+      },
+    },
+    {
+      type: "event_msg",
+      payload: {
+        type: "user_message",
+        message: "Continue the task",
+        turn_id: "t-1",
+        id: "real-user",
+      },
+    }
+  );
+
+  const turns = parseSessionJsonlTurns(content);
+  assert.equal(turns.length, 1);
+  assert.deepEqual(turns[0].items.map((item) => item.id), ["real-user"]);
+});
+
+test("parseSessionJsonlTurns extracts visible text from wrapped user_message events", () => {
+  const content = jsonl(
+    { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },
+    {
+      type: "event_msg",
+      payload: {
+        type: "user_message",
+        message: [
+          "<environment_context>",
+          "  <cwd>/Users/me/project</cwd>",
+          "</environment_context>",
+          "",
+          "## My request for Codex:",
+          "Fix the failing parser test",
+        ].join("\n"),
+        turn_id: "t-1",
+        id: "wrapped-user",
+      },
+    }
+  );
+
+  const turns = parseSessionJsonlTurns(content);
+  assert.equal(turns.length, 1);
+  assert.equal(turns[0].items[0].id, "wrapped-user");
+  assert.equal(turns[0].items[0].text, "Fix the failing parser test");
+});
+
 test("parseSessionJsonlTurns falls back to the active turn id when an event omits turn_id", () => {
   // The parser remembers the most recent task_started turn id and applies it to
   // subsequent events that don't have one. response_items without an explicit

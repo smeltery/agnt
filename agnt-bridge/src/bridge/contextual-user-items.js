@@ -2,7 +2,10 @@
 // Purpose: Identifies injected local context that Codex stores as user items
 //          but clients should not render as chat bubbles.
 // Layer: Bridge support
-// Exports: isContextualUserText, isUserRoleHistoryItem, historyItemUserText
+// Exports: isContextualUserText, isUserRoleHistoryItem, historyItemUserText,
+//          visibleUserPromptText
+
+const PROMPT_REQUEST_BEGIN = "## My request for Codex:";
 
 function isContextualUserText(value) {
   const text = normalizeNonEmptyString(value);
@@ -11,6 +14,7 @@ function isContextualUserText(value) {
   }
 
   return text.startsWith("# AGENTS.md instructions for ")
+    || text.startsWith("<user_instructions>")
     || text.startsWith("<environment_context>")
     || text.startsWith("<codex_internal_context ");
 }
@@ -49,6 +53,17 @@ function historyItemUserText(item) {
     .join("\n");
 }
 
+function visibleUserPromptText(value) {
+  if (typeof value !== "string" || !value) {
+    return "";
+  }
+  const requestIndex = value.lastIndexOf(PROMPT_REQUEST_BEGIN);
+  if (requestIndex >= 0) {
+    return value.slice(requestIndex + PROMPT_REQUEST_BEGIN.length).trim();
+  }
+  return isContextualUserText(value) ? "" : value;
+}
+
 function normalizeHistoryItemToken(value) {
   return normalizeNonEmptyString(value).toLowerCase().replace(/[\s_-]+/g, "");
 }
@@ -61,4 +76,5 @@ module.exports = {
   historyItemUserText,
   isContextualUserText,
   isUserRoleHistoryItem,
+  visibleUserPromptText,
 };
