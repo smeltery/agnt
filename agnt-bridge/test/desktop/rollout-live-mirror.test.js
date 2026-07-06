@@ -970,7 +970,7 @@ test("desktop-origin user messages without a turn flush with timestamps on task 
 
   await wait(20);
   appendRolloutLines(rolloutPath, [
-    userMessageWithTimestamp("Start from Mac", "2026-03-15T19:47:36.500Z"),
+    userMessageWithTimestamp("Start from Mac", "2026-03-15T19:47:36.500Z", "desktop-user-1"),
     taskStarted("turn-flush"),
   ]);
   await wait(30);
@@ -985,8 +985,58 @@ test("desktop-origin user messages without a turn flush with timestamps on task 
   );
   assert.equal(outbound[1].params.message, "Start from Mac");
   assert.equal(outbound[1].params.turnId, "turn-flush");
+  assert.equal(outbound[1].params.id, "desktop-user-1");
   assert.equal(outbound[1].params.createdAt, "2026-03-15T19:47:36.500Z");
   assert.equal(outbound[1].params.timestamp, "2026-03-15T19:47:36.500Z");
+});
+
+test("desktop-origin user messages drop contextual wrappers before mirroring", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-user-context",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: {
+      threadId: "thread-user-context",
+    },
+  }));
+
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    userMessage(`# AGENTS.md instructions for /tmp/project
+
+<INSTRUCTIONS>
+rules
+</INSTRUCTIONS>
+
+## My request for Codex:
+Only show this prompt`),
+    taskStarted("turn-context"),
+  ]);
+  await wait(30);
+
+  const userNotification = outbound.find((message) => message.method === "codex/event/user_message");
+  assert.equal(userNotification?.params.message, "Only show this prompt");
 });
 
 test("desktop-origin detection stays narrow", () => {
@@ -1053,13 +1103,14 @@ function agentMessage(message, phase = "final_answer") {
   });
 }
 
-function userMessageWithTimestamp(message, timestamp) {
+function userMessageWithTimestamp(message, timestamp, id = "") {
   return JSON.stringify({
     timestamp,
     type: "event_msg",
     payload: {
       type: "user_message",
       message,
+      ...(id ? { id } : {}),
     },
   });
 }

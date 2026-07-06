@@ -11,6 +11,7 @@ const {
   findRecentRolloutFileForContextRead,
   resolveSessionsRoot,
 } = require("./rollout-watch");
+const { visibleUserPromptText } = require("../bridge/contextual-user-items");
 const { resolveCodexGeneratedImagesRoot } = require("../providers/codex/home");
 const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
 
@@ -397,7 +398,9 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
     }
 
     if (eventType === "user_message") {
-      const message = readString(payload.message) || readString(payload.text);
+      const message = visibleUserPromptText(
+        readString(payload.message) || readString(payload.text)
+      );
       if (!message) {
         return [];
       }
@@ -417,6 +420,7 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
         threadId: state.threadId,
         turnId,
         message,
+        ...(readString(payload.id) ? { id: readString(payload.id) } : {}),
         ...timestampParams(readUserMessageTimestamp(entry, payload)),
       }));
       return notifications;
@@ -1057,13 +1061,14 @@ function flushPendingUserMessageNotifications(state, turnId) {
     return [];
   }
 
+  const resolvedTurnId = readString(turnId) || readString(state.activeTurnId);
   return messages.map((pending) => createNotification("codex/event/user_message", {
     threadId: state.threadId,
-    turnId: turnId || state.activeTurnId || "",
-    message: pending.message,
+    ...(resolvedTurnId ? { turnId: resolvedTurnId } : {}),
+    message: visibleUserPromptText(pending.message),
     ...(pending.id ? { id: pending.id } : {}),
     ...timestampParams(pending.timestamp),
-  }));
+  })).filter((notification) => notification.params.message);
 }
 
 function readUserMessageTimestamp(entry, payload = {}) {
