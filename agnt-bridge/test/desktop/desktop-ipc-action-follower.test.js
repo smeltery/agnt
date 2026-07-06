@@ -680,6 +680,48 @@ test("projects desktop IPC bare function calls as live tool rows", () => {
   }]);
 });
 
+test("projects desktop IPC command output from structured content items", () => {
+  const mirroredKeys = new Set();
+  const stateWithCall = {
+    turns: [{
+      id: "turn-tool",
+      items: [{
+        id: "call-structured-output",
+        type: "function_call",
+        call_id: "call-structured-output",
+        name: "exec_command",
+        arguments: JSON.stringify({ cmd: "cat notes.txt", workdir: "/repo" }),
+      }],
+    }],
+  };
+
+  assert.equal(projectDesktopActivityNotifications("thread-1", stateWithCall, mirroredKeys).length, 1);
+
+  const notifications = projectDesktopActivityNotifications("thread-1", {
+    turns: [{
+      id: "turn-tool",
+      items: [
+        ...stateWithCall.turns[0].items,
+        {
+          type: "function_call_output",
+          call_id: "call-structured-output",
+          contentItems: [
+            { text: "first line\n" },
+            { file: { content: "file-backed line\n" } },
+          ],
+        },
+      ],
+    }],
+  }, mirroredKeys);
+
+  assert.deepEqual(notifications.map((notification) => notification.method), [
+    "codex/event/exec_command_output_delta",
+    "codex/event/exec_command_end",
+  ]);
+  assert.equal(notifications[0].params.chunk, "first line\nfile-backed line\n");
+  assert.equal(notifications[1].params.output, "first line\nfile-backed line\n");
+});
+
 test("projects completed-fast desktop custom tool calls as finished file changes", () => {
   const notifications = projectDesktopActivityNotifications("thread-1", {
     turns: [{

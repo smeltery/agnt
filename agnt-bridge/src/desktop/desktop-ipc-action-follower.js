@@ -946,7 +946,7 @@ function projectDesktopActivityOutputNotifications(threadId, turnId, item, callI
   const argumentsObject = parseToolArguments(callItem?.arguments);
   const command = resolveToolCommand(toolName, argumentsObject);
   const cwd = resolveToolWorkingDirectory(argumentsObject, callItem);
-  const output = readString(item?.output) || readString(item?.text) || readString(item?.content);
+  const output = desktopActivityOutputText(item);
   const notifications = [];
   if (output) {
     notifications.push(createDesktopIpcNotification("codex/event/exec_command_output_delta", {
@@ -968,6 +968,41 @@ function projectDesktopActivityOutputNotifications(threadId, turnId, item, callI
     output: output || "",
   }));
   return notifications;
+}
+
+function desktopActivityOutputText(item) {
+  return readString(item?.output)
+    || readString(item?.text)
+    || readString(item?.content)
+    || renderContentText(item?.result?.content)
+    || renderContentText(item?.contentItems)
+    || renderContentText(item?.content_items)
+    || renderContentText(item?.content)
+    || "";
+}
+
+function renderContentText(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  return value
+    .map((entry) => {
+      if (typeof entry === "string") {
+        return entry;
+      }
+      if (!entry || typeof entry !== "object") {
+        return "";
+      }
+      return readText(entry.text)
+        || readText(entry.content)
+        || readText(entry?.data?.text)
+        || readText(entry?.file?.content);
+    })
+    .filter((entry) => entry !== "")
+    .join("");
 }
 
 function projectDesktopTurnCompletedNotifications(
@@ -1613,6 +1648,10 @@ function createDesktopIpcNotification(method, params = {}) {
 
 function readString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function readText(value) {
+  return typeof value === "string" ? value : "";
 }
 
 function normalizeToken(value) {
