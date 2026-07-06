@@ -29,6 +29,7 @@ const TERMINAL_TASK_EVENT_TYPES = new Set(["task_complete", "turn_aborted", "err
 // bridge notifications so the phone can render live thinking/tool activity.
 function createRolloutLiveMirrorController({
   sendApplicationResponse,
+  shouldSuppressThread = () => false,
   logPrefix = "[agnt]",
   fsModule = fs,
   now = () => Date.now(),
@@ -63,7 +64,12 @@ function createRolloutLiveMirrorController({
     let mirror;
     mirror = createThreadRolloutLiveMirror({
       threadId,
-      sendApplicationResponse,
+      sendApplicationResponse: (rawNotification) => {
+        if (!shouldSuppressThread(threadId)) {
+          sendApplicationResponse(rawNotification);
+        }
+      },
+      isSuppressed: () => Boolean(shouldSuppressThread(threadId)),
       logPrefix,
       fsModule,
       now,
@@ -101,6 +107,7 @@ function createRolloutLiveMirrorController({
 function createThreadRolloutLiveMirror({
   threadId,
   sendApplicationResponse,
+  isSuppressed = () => false,
   logPrefix,
   fsModule,
   now,
@@ -123,6 +130,7 @@ function createThreadRolloutLiveMirror({
   let lastActivityAt = startedAt;
   let lastHeartbeatAt = startedAt;
   let didBootstrap = false;
+  let wasSuppressed = false;
 
   const intervalId = setIntervalFn(tick, pollIntervalMs);
   tick();
@@ -134,6 +142,14 @@ function createThreadRolloutLiveMirror({
 
     try {
       const currentTime = now();
+      const suppressed = isSuppressed();
+      if (wasSuppressed && !suppressed && didBootstrap) {
+        lastSize = 0;
+        partialLine = "";
+        didBootstrap = false;
+        resetRunState(state);
+      }
+      wasSuppressed = suppressed;
 
       if (!rolloutPath) {
         if (currentTime - startedAt >= lookupTimeoutMs) {

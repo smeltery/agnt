@@ -367,6 +367,97 @@ test("phone-origin rollouts do not emit mirrored updates", async (t) => {
   assert.deepEqual(outbound, []);
 });
 
+test("rollout mirror suppression silences threads owned by another live source", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-suppressed",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      userMessage("keep going"),
+      taskStarted("turn-suppressed"),
+      agentMessage("still streaming", "final_answer"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+    shouldSuppressThread: () => true,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: {
+      threadId: "thread-suppressed",
+    },
+  }));
+
+  await wait(30);
+  assert.deepEqual(outbound, []);
+});
+
+test("suppression lift re-bootstraps the muted tail so a running thread recovers", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-unmute",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      userMessage("keep going"),
+      taskStarted("turn-unmute"),
+      agentMessage("still streaming", "final_answer"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  let suppressed = true;
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 200,
+    shouldSuppressThread: () => suppressed,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: {
+      threadId: "thread-unmute",
+    },
+  }));
+
+  await wait(30);
+  assert.deepEqual(outbound, []);
+
+  suppressed = false;
+  await wait(30);
+
+  const methods = outbound.map((message) => message.method);
+  assert.equal(methods.includes("turn/started"), true);
+  assert.equal(methods.includes("codex/event/user_message"), true);
+  const userNotification = outbound.find((message) => message.method === "codex/event/user_message");
+  assert.equal(userNotification?.params.turnId, "turn-unmute");
+  assert.equal(userNotification?.params.message, "keep going");
+});
+
 test("desktop-origin idle watchers stream new rollout growth after the phone reopens the thread", async (t) => {
   const { homeDir, rolloutPath } = createTemporaryRolloutHome({
     threadId: "thread-grow",

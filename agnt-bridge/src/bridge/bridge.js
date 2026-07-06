@@ -264,6 +264,7 @@ function startBridge({
   const rolloutLiveMirror = !config.codexEndpoint
     ? createRolloutLiveMirrorController({
       sendApplicationResponse,
+      shouldSuppressThread: (threadId) => Boolean(desktopIpcActionFollower?.hasFreshLiveThreadState(threadId)),
     })
     : null;
   const desktopIpcActionFollower = !config.codexEndpoint

@@ -14,6 +14,7 @@ const FRAME_HEADER_BYTES = 4;
 const MAX_FRAME_BYTES = 256 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
 const TURN_COMPLETION_IDLE_MS = 3_500;
+const STALE_ACTIVE_READ_MAX_AGE_MS = 20_000;
 const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
 const ACTION_METHODS = new Set([
   "item/commandExecution/requestApproval",
@@ -60,6 +61,7 @@ function createDesktopIpcActionFollower({
     onDisconnect,
   });
   const rawStatesByThreadId = new Map();
+  const rawStateUpdatedAtByThreadId = new Map();
   const assistantMessageTextsByThreadId = new Map();
   const mirroredActivityKeysByThreadId = new Map();
   const mirroredUserMessageKeysByThreadId = new Map();
@@ -94,6 +96,7 @@ function createDesktopIpcActionFollower({
 
   function stopAll() {
     rawStatesByThreadId.clear();
+    rawStateUpdatedAtByThreadId.clear();
     assistantMessageTextsByThreadId.clear();
     mirroredActivityKeysByThreadId.clear();
     mirroredUserMessageKeysByThreadId.clear();
@@ -131,6 +134,7 @@ function createDesktopIpcActionFollower({
         const speculativeActions = projectPendingDesktopActions(threadId, speculativeState);
         if (speculativeActions.length > 0) {
           rawStatesByThreadId.set(threadId, speculativeState);
+          rawStateUpdatedAtByThreadId.set(threadId, now());
           syncProjectedActions(threadId, speculativeActions);
           return;
         }
@@ -146,12 +150,14 @@ function createDesktopIpcActionFollower({
     }
 
     rawStatesByThreadId.set(threadId, nextState);
+    rawStateUpdatedAtByThreadId.set(threadId, now());
     syncProjectedLiveState(threadId, previousState, nextState);
     syncProjectedActions(threadId, projectPendingDesktopActions(threadId, nextState));
   }
 
   function onDisconnect() {
     rawStatesByThreadId.clear();
+    rawStateUpdatedAtByThreadId.clear();
     assistantMessageTextsByThreadId.clear();
     mirroredActivityKeysByThreadId.clear();
     mirroredUserMessageKeysByThreadId.clear();
@@ -292,6 +298,7 @@ function createDesktopIpcActionFollower({
     }
 
     rawStatesByThreadId.set(threadId, nextState);
+    rawStateUpdatedAtByThreadId.set(threadId, now());
     syncProjectedLiveState(threadId, baselineState, nextState);
     syncProjectedActions(threadId, projectPendingDesktopActions(threadId, nextState));
   }
@@ -496,6 +503,16 @@ function createDesktopIpcActionFollower({
   return {
     observeInbound,
     stopAll,
+    hasLiveThreadState(threadId) {
+      return rawStatesByThreadId.has(readString(threadId));
+    },
+    hasFreshLiveThreadState(threadId) {
+      const id = readString(threadId);
+      if (!rawStatesByThreadId.has(id)) {
+        return false;
+      }
+      return now() - (rawStateUpdatedAtByThreadId.get(id) || 0) <= STALE_ACTIVE_READ_MAX_AGE_MS;
+    },
   };
 }
 
