@@ -145,7 +145,7 @@ test("sanitizeThreadTurnsListForRelay drops injected context user items from pag
 
 test("sanitizeLiveContextualUserItemForRelay drops injected live user item notifications", () => {
   const raw = JSON.stringify({
-    method: "item/started",
+    method: "item/updated",
     params: {
       item: {
         id: "ctx-live",

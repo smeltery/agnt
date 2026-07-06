@@ -56,6 +56,11 @@ const {
 const JSONL_THREAD_CWD_CACHE_MAX_ENTRIES = 200;
 const JSONL_THREAD_CWD_CACHE_TTL_MS = 5 * 60_000;
 const JSONL_THREAD_EMPTY_CWD_CACHE_TTL_MS = 30_000;
+const LIVE_ITEM_LIFECYCLE_METHODS = new Set([
+  "item/started",
+  "item/updated",
+  "item/completed",
+]);
 const jsonlThreadCwdCacheByThread = new Map();
 
 function parseJSON(value) {
@@ -135,7 +140,7 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod, requestC
 function sanitizeLiveContextualUserItemForRelay(rawMessage) {
   const parsed = parseJSON(rawMessage);
   const method = readString(parsed?.method);
-  if (method !== "item/started" && method !== "item/completed") {
+  if (!LIVE_ITEM_LIFECYCLE_METHODS.has(method)) {
     return rawMessage;
   }
 
