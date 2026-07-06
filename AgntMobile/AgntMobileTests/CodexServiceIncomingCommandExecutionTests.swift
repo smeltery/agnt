@@ -2011,6 +2011,47 @@ final class CodexServiceIncomingCommandExecutionTests: XCTestCase {
         )
     }
 
+    func testRolloutMirrorReasoningRebindsToIpcThinkingRowInsteadOfDuplicating() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let realItemID = "reasoning-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "turn/started",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+            ])
+        )
+        service.handleNotification(
+            method: "item/reasoning/textDelta",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "itemId": .string(realItemID),
+                "delta": .string("Weighing options"),
+            ])
+        )
+        service.handleNotification(
+            method: "item/reasoning/textDelta",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "itemId": .string("rollout-thinking:\(threadID):\(turnID)"),
+                "delta": .string(" and deciding"),
+                "agntDesktopMirror": .bool(true),
+                "agntRolloutLiveMirror": .bool(true),
+            ])
+        )
+
+        let thinkingRows = service.messages(for: threadID).filter {
+            $0.role == .system && $0.kind == .thinking
+        }
+        XCTAssertEqual(thinkingRows.count, 1)
+        XCTAssertEqual(thinkingRows[0].itemId, realItemID)
+    }
+
     func testDuplicateLateGeneratedImageDoesNotAdoptImageItemIdentity() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"
