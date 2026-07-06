@@ -47,6 +47,11 @@ const {
 const {
   parseSessionJsonlMetadata,
 } = require("../providers/codex/session-jsonl-history");
+const {
+  historyItemUserText,
+  isContextualUserText,
+  isUserRoleHistoryItem,
+} = require("./contextual-user-items");
 
 const JSONL_THREAD_CWD_CACHE_MAX_ENTRIES = 200;
 const JSONL_THREAD_CWD_CACHE_TTL_MS = 5 * 60_000;
@@ -125,6 +130,21 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod, requestC
   });
 
   return trimThreadPayloadForRelay(parseJSON(sanitizedPayload), null, trimOptions) ?? sanitizedPayload;
+}
+
+function sanitizeLiveContextualUserItemForRelay(rawMessage) {
+  const parsed = parseJSON(rawMessage);
+  const method = readString(parsed?.method);
+  if (method !== "item/started" && method !== "item/completed") {
+    return rawMessage;
+  }
+
+  const item = parsed?.params?.item;
+  if (!isUserRoleHistoryItem(item)) {
+    return rawMessage;
+  }
+
+  return isContextualUserText(historyItemUserText(item)) ? null : rawMessage;
 }
 
 function augmentRelayThreadWithJsonlMetadata(thread, threadId = "", {
@@ -293,7 +313,16 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
   const turnThreadId = normalizeNonEmptyString(threadId)
     || normalizeNonEmptyString(turn.threadId)
     || normalizeNonEmptyString(turn.thread_id);
-  const sanitizedItems = turn.items.map((item) => {
+  const sanitizedItems = turn.items.filter((item) => {
+    if (!isUserRoleHistoryItem(item)) {
+      return true;
+    }
+    const shouldKeep = !isContextualUserText(historyItemUserText(item));
+    if (!shouldKeep) {
+      turnDidChange = true;
+    }
+    return shouldKeep;
+  }).map((item) => {
     if (!item || typeof item !== "object") {
       return item;
     }
@@ -344,6 +373,7 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
 
 module.exports = {
   augmentRelayThreadWithJsonlMetadata,
+  sanitizeLiveContextualUserItemForRelay,
   sanitizeThreadHistoryImagesForRelay,
   sanitizeThreadTurnsListForRelay,
   sanitizeRelayHistoryTurns,

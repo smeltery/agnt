@@ -102,6 +102,48 @@ test("parseSessionJsonlTurns defaults message role to assistant when one is miss
   assert.equal(turns[0].items[0].role, "assistant");
 });
 
+test("parseSessionJsonlTurns skips injected context user response items", () => {
+  const content = jsonl(
+    { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },
+    {
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        id: "ctx-agents",
+        content: [{
+          type: "input_text",
+          text: "# AGENTS.md instructions for /Users/me/project\n\n<INSTRUCTIONS>\nrules\n</INSTRUCTIONS>",
+        }],
+        turn_id: "t-1",
+      },
+    },
+    {
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        id: "real-user",
+        content: [{ type: "input_text", text: "Continue the task" }],
+        turn_id: "t-1",
+      },
+    },
+    {
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "assistant",
+        id: "assistant",
+        content: [{ type: "output_text", text: "Continuing" }],
+        turn_id: "t-1",
+      },
+    }
+  );
+
+  const turns = parseSessionJsonlTurns(content);
+  assert.deepEqual(turns[0].items.map((item) => item.id), ["real-user", "assistant"]);
+});
+
 test("parseSessionJsonlTurns skips invalid JSON lines and empty lines without crashing", () => {
   const content = [
     '',
