@@ -194,6 +194,7 @@ function startBridge({
   const desktopRefresher = activeProvider.capabilities?.desktopRefresher && typeof activeProvider.createDesktopRefresher === "function"
     ? activeProvider.createDesktopRefresher({
       enabled: config.refreshEnabled,
+      navigationOnly: !config.codexEndpoint,
       debounceMs: config.refreshDebounceMs,
       refreshCommand: config.refreshCommand,
       bundleId: desktopBundle.id,

@@ -49,11 +49,15 @@ function readBridgeConfig({
   );
   const explicitRefreshEnabled = readOptionalBooleanEnv(["AGNT_REFRESH_ENABLED"], env);
   const explicitKeepMacAwakeEnabled = readOptionalBooleanEnv(["AGNT_KEEP_MAC_AWAKE"], env);
+  const persistedRefreshEnabled = typeof daemonConfig.refreshEnabled === "boolean"
+    ? daemonConfig.refreshEnabled
+    : null;
   const persistedKeepMacAwakeEnabled = typeof daemonConfig.keepMacAwakeEnabled === "boolean"
     ? daemonConfig.keepMacAwakeEnabled
     : null;
-  // Desktop refresh is opt-in for now because Codex.app still lacks true live updates.
-  const defaultRefreshEnabled = false;
+  // Desktop refresh is opt-in, but once enabled in preferences the persisted
+  // choice must survive daemon restarts unless the env explicitly overrides it.
+  const defaultRefreshEnabled = persistedRefreshEnabled == null ? false : persistedRefreshEnabled;
   return {
     relayUrl,
     pushServiceUrl: readFirstDefinedEnv(

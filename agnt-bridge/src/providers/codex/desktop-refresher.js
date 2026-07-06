@@ -22,6 +22,7 @@ const NEW_THREAD_DEEP_LINK = "codex://threads/new";
 class CodexDesktopRefresher {
   constructor({
     enabled = true,
+    navigationOnly = false,
     debounceMs = DEFAULT_DEBOUNCE_MS,
     refreshCommand = "",
     bundleId = DEFAULT_BUNDLE_ID,
@@ -38,6 +39,7 @@ class CodexDesktopRefresher {
     customRefreshFailureThreshold = DEFAULT_CUSTOM_REFRESH_FAILURE_THRESHOLD,
   } = {}) {
     this.enabled = enabled;
+    this.navigationOnly = navigationOnly;
     this.debounceMs = debounceMs;
     this.refreshCommand = refreshCommand;
     this.bundleId = bundleId;
@@ -124,6 +126,9 @@ class CodexDesktopRefresher {
     const method = parsed.method;
     if (method === "turn/completed") {
       this.clearFallbackTimer();
+      if (this.navigationOnly) {
+        return;
+      }
       const turnId = extractTurnId(parsed);
       if (turnId && turnId === this.lastTurnIdRefreshed) {
         this.log(`refresh skipped (debounced): completion already refreshed for ${turnId}`);
@@ -370,7 +375,7 @@ class CodexDesktopRefresher {
 
   // Keeps one lightweight rollout watcher alive for the current agnt-controlled thread.
   ensureWatcher(threadId) {
-    if (!this.canRefresh() || !threadId) {
+    if (this.navigationOnly || !this.canRefresh() || !threadId) {
       return;
     }
 
