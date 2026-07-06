@@ -1385,6 +1385,16 @@ extension CodexService {
         return !itemId.hasPrefix("turn:") && !itemId.hasPrefix("rollout-")
     }
 
+    // Rollout mirrors tag reasoning rows with synthetic "rollout-*" item ids
+    // and live streams may use turn-scoped placeholders; both are provisional
+    // and must merge with the real reasoning identity of the same turn.
+    nonisolated static func isProvisionalThinkingIdentifier(_ itemId: String?) -> Bool {
+        guard let itemId = normalizedHistoryIdentifier(itemId) else {
+            return true
+        }
+        return itemId.hasPrefix("rollout-") || itemId.hasPrefix("turn:")
+    }
+
     // Running assistant rows may absorb history only when the provider item identity agrees.
     nonisolated static func assistantHistoryIdentityAllowsRunningReconcile(
         localMessage: CodexMessage,
