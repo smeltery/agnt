@@ -60,6 +60,24 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
       },
     },
   });
+  const persistedRefreshConfig = readBridgeConfig({
+    env: {
+      AGNT_DEVICE_STATE_DIR: "/tmp/agnt-state",
+    },
+    platform: "darwin",
+    runtimeRoot: "/tmp/agnt-package",
+    fsImpl: {
+      existsSync(targetPath) {
+        return targetPath === "/tmp/agnt-state/daemon-config.json";
+      },
+      readFileSync(targetPath) {
+        if (targetPath === "/tmp/agnt-state/daemon-config.json") {
+          return JSON.stringify({ refreshEnabled: true });
+        }
+        throw new Error("unexpected read");
+      },
+    },
+  });
   const macEndpointConfig = readBridgeConfig({
     env: { AGNT_CODEX_ENDPOINT: "ws://localhost:8080" },
     platform: "darwin",
@@ -128,6 +146,7 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   assert.equal(macConfig.relayUrl, "");
   assert.equal(macConfig.pushServiceUrl, "");
   assert.equal(persistedKeepAwakeConfig.keepMacAwakeEnabled, false);
+  assert.equal(persistedRefreshConfig.refreshEnabled, true);
   assert.equal(macEndpointConfig.refreshEnabled, false);
   assert.equal(linuxConfig.refreshEnabled, false);
   assert.equal(linuxCommandConfig.refreshEnabled, false);
@@ -300,6 +319,47 @@ test("thread/started cancels the fallback and refreshes the concrete thread rout
 
   refresher.handleTransportReset();
   assert.equal(stopCount, 1);
+});
+
+test("navigation-only mode refreshes phone turn starts but skips watchers and completion refreshes", async () => {
+  const refreshCalls = [];
+  const watchedThreads = [];
+  const refresher = new CodexDesktopRefresher({
+    enabled: true,
+    navigationOnly: true,
+    debounceMs: 0,
+    refreshExecutor: async (targetUrl) => {
+      refreshCalls.push(targetUrl);
+    },
+    watchThreadRolloutFactory: ({ threadId }) => {
+      watchedThreads.push(threadId);
+      return { stop() {} };
+    },
+  });
+
+  refresher.handleInbound(JSON.stringify({
+    method: "turn/start",
+    params: {
+      threadId: "thread-nav-only",
+      input: [{ type: "text", text: "hello" }],
+    },
+  }));
+  await waitFor(() => refreshCalls.length === 1);
+
+  refresher.handleOutbound(JSON.stringify({
+    method: "turn/completed",
+    params: {
+      turn: {
+        id: "turn-nav-1",
+        threadId: "thread-nav-only",
+      },
+    },
+  }));
+  await wait(25);
+
+  assert.deepEqual(refreshCalls, ["codex://threads/thread-nav-only"]);
+  assert.deepEqual(watchedThreads, []);
+  refresher.handleTransportReset();
 });
 
 test("rollout growth refreshes are throttled during long runs", async () => {
