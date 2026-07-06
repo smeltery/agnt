@@ -12,6 +12,7 @@ const {
   historyItemUserText,
   isContextualUserText,
   isUserRoleHistoryItem,
+  visibleUserPromptText,
 } = require("../../bridge/contextual-user-items");
 
 function readThreadTurnsListPageFromSessionJsonl(filePath, {
@@ -133,6 +134,12 @@ function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
       }
 
       if (eventType === "user_message") {
+        const text = visibleUserPromptText(
+          normalizeString(payload?.message) || normalizeString(payload?.text)
+        );
+        if (!text) {
+          continue;
+        }
         const turn = ensureTurn(
           turns,
           turnsById,
@@ -144,7 +151,7 @@ function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
           id: normalizeString(payload?.id) || `user-message-line-${index + 1}`,
           type: "user_message",
           role: "user",
-          text: normalizeString(payload?.message) || normalizeString(payload?.text),
+          text,
         });
         continue;
       }
