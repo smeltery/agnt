@@ -602,12 +602,29 @@ enum MarkdownTextFormatter {
             in: raw,
             style: .displayName
         )
-        let headingNormalized = replaceMatches(
-            in: normalizedSkills,
-            regex: TurnMessageRegexCache.heading,
-            template: "**$1**"
-        )
+        let headingNormalized = normalizeHeadingsOutsideFences(in: normalizedSkills)
         return linkifyFileReferenceLines(in: headingNormalized, profile: profile)
+    }
+
+    private static func normalizeHeadingsOutsideFences(in text: String) -> String {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var isInsideFence = false
+
+        return lines.map { line in
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if isMarkdownFenceLine(trimmed) {
+                isInsideFence.toggle()
+                return line
+            }
+            guard !isInsideFence else {
+                return line
+            }
+            return replaceMatches(
+                in: line,
+                regex: TurnMessageRegexCache.heading,
+                template: "**$1**"
+            )
+        }.joined(separator: "\n")
     }
 
     private static func linkifyFileReferenceLines(in text: String, profile: MarkdownRenderProfile) -> String {
@@ -616,7 +633,7 @@ enum MarkdownTextFormatter {
 
         let transformed = lines.map { line -> String in
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.hasPrefix("`@agnt``") {
+            if isMarkdownFenceLine(trimmed) {
                 isInsideFence.toggle()
                 return line
             }
@@ -631,10 +648,18 @@ enum MarkdownTextFormatter {
         return transformed.joined(separator: "\n")
     }
 
+    private static func isMarkdownFenceLine(_ trimmedLine: String) -> Bool {
+        trimmedLine.hasPrefix("`@agnt``")
+            || trimmedLine.hasPrefix("```")
+            || trimmedLine.hasPrefix("~~~")
+    }
+
     private static func linkifyInlineFileReferences(in line: String, profile: MarkdownRenderProfile) -> String {
         switch profile {
         case .assistantProse, .fileChangeSystem:
             break
+        case .userProse:
+            return line
         }
 
         var transformedLine = line
@@ -1110,7 +1135,8 @@ private struct UserBubbleTextBlock<Content: View>: View {
     let contentIdentity: String
     let rawText: String
     var contentResetKey: String? = nil
-    @ViewBuilder let content: () -> Content
+    var collapsesWithLineLimit: Bool = true
+    @ViewBuilder let content: (_ isCollapsed: Bool) -> Content
 
     @State private var isExpanded = false
 
@@ -1136,10 +1162,13 @@ private struct UserBubbleTextBlock<Content: View>: View {
         "\(contentIdentity)|\(contentResetKey ?? TurnTextCacheKey.stableFingerprint(for: rawText))"
     }
 
+    private static var collapsedContentMaxHeight: CGFloat {
+        UIFont.preferredFont(forTextStyle: .body).lineHeight * CGFloat(collapseLineLimit)
+    }
+
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            content()
-                .lineLimit(canCollapse ? (isExpanded ? nil : Self.collapseLineLimit) : nil)
+            collapsibleContent
 
             if canCollapse {
                 Button(isExpanded ? "Show less" : "Show more") {
@@ -1154,6 +1183,20 @@ private struct UserBubbleTextBlock<Content: View>: View {
         }
         .onChange(of: collapseResetKey) { _, _ in
             isExpanded = false
+        }
+    }
+
+    @ViewBuilder
+    private var collapsibleContent: some View {
+        let isCollapsed = canCollapse && !isExpanded
+        if collapsesWithLineLimit {
+            content(isCollapsed)
+                .lineLimit(isCollapsed ? Self.collapseLineLimit : nil)
+        } else {
+            content(isCollapsed)
+                .frame(maxHeight: isCollapsed ? Self.collapsedContentMaxHeight : nil, alignment: .top)
+                .clipped()
+                .allowsHitTesting(!isCollapsed)
         }
     }
 }
@@ -1298,9 +1341,10 @@ struct MessageRow: View, Equatable {
                     UserBubbleTextBlock(
                         contentIdentity: message.id,
                         rawText: renderModel.text,
-                        contentResetKey: renderModel.textFingerprint
-                    ) {
-                        userBubbleText(renderModel.text)
+                        contentResetKey: renderModel.textFingerprint,
+                        collapsesWithLineLimit: !renderModel.usesBlockMarkdown
+                    ) { isCollapsed in
+                        userBubbleText(renderModel, isCollapsed: isCollapsed)
                             .font(AppFont.body())
                     }
                         .padding(.vertical, 12)
@@ -1345,16 +1389,21 @@ struct MessageRow: View, Equatable {
     }
 
     @ViewBuilder
-    private func userBubbleText(_ rawText: String) -> some View {
-        let normalizedRawText = SkillReferenceFormatter.replacingSkillReferences(
-            in: rawText,
-            style: .mentionToken
-        )
-
-        if normalizedRawText.contains("@") || normalizedRawText.contains("$") {
-            userBubbleMentionText(normalizedRawText)
+    private func userBubbleText(_ renderModel: UserBubbleRenderModel, isCollapsed: Bool) -> some View {
+        if renderModel.usesBlockMarkdown {
+            MarkdownTextView(
+                text: isCollapsed
+                    ? UserBubbleCollapsedMarkdownPreview.previewText(for: renderModel.text)
+                    : renderModel.text,
+                profile: .userProse,
+                constrainsToAvailableWidth: true
+            )
+            .foregroundStyle(.primary)
+            .tint(.primary)
+        } else if renderModel.text.contains("@") || renderModel.text.contains("$") {
+            userBubbleMentionText(renderModel.text)
         } else {
-            UserBubbleInlineMarkdownText(normalizedRawText, foreground: .primary)
+            UserBubbleInlineMarkdownText(renderModel.text, foreground: .primary)
         }
     }
 

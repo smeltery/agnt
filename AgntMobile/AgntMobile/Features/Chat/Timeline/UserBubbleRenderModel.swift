@@ -10,6 +10,7 @@ struct UserBubbleRenderModel: Equatable {
     let text: String
     let textFingerprint: String
     let chips: [TurnMentionChipRef]
+    let usesBlockMarkdown: Bool
 }
 
 enum UserBubbleRenderModelCache {
@@ -150,7 +151,8 @@ enum UserBubbleMentionExtractor {
         return UserBubbleRenderModel(
             text: displayText,
             textFingerprint: TurnTextCacheKey.stableFingerprint(for: displayText),
-            chips: chips
+            chips: chips,
+            usesBlockMarkdown: UserBubbleBlockMarkdownDetector.containsBlockMarkdown(displayText)
         )
     }
 

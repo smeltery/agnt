@@ -36,6 +36,58 @@ final class TurnMessageCachesTests: XCTestCase {
         XCTAssertEqual(buildCount, 2)
     }
 
+    func testMarkdownFormatterKeepsFencedCodeVerbatim() {
+        let raw = """
+        # Steps
+
+        ```bash
+        # install deps
+        npm install
+        ```
+        """
+
+        let rendered = MarkdownTextFormatter.renderableText(
+            from: raw,
+            profile: .assistantProse,
+            usesCache: false
+        )
+
+        XCTAssertTrue(rendered.hasPrefix("**Steps**"))
+        XCTAssertTrue(rendered.contains("# install deps"))
+        XCTAssertFalse(rendered.contains("**install deps**"))
+    }
+
+    func testMarkdownFormatterKeepsTildeFencedCodeVerbatim() {
+        let raw = """
+        # Steps
+
+        ~~~bash
+        # install deps
+        npm install
+        ~~~
+        """
+
+        let rendered = MarkdownTextFormatter.renderableText(
+            from: raw,
+            profile: .userProse,
+            usesCache: false
+        )
+
+        XCTAssertTrue(rendered.hasPrefix("**Steps**"))
+        XCTAssertTrue(rendered.contains("# install deps"))
+        XCTAssertFalse(rendered.contains("**install deps**"))
+    }
+
+    func testMarkdownFormatterUserProseSkipsFilePathLinkification() {
+        let rendered = MarkdownTextFormatter.renderableText(
+            from: "please check `agnt-bridge/test/secure-transport.test.js` again",
+            profile: .userProse,
+            usesCache: false
+        )
+
+        XCTAssertEqual(rendered, "please check `agnt-bridge/test/secure-transport.test.js` again")
+    }
+
     func testStableTextFingerprintChangesForUnsampledTextEdits() {
         let prefix = String(repeating: "a", count: 48)
         let suffix = String(repeating: "z", count: 48)

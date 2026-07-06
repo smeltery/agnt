@@ -34,6 +34,146 @@ enum UserBubbleInlineMarkdownRenderResult {
     case rich(AttributedString)
 }
 
+enum UserBubbleBlockMarkdownDetector {
+    static func containsBlockMarkdown(_ rawText: String) -> Bool {
+        if rawText.contains("```") || rawText.contains("~~~") {
+            return true
+        }
+
+        return rawText
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .contains { isBlockSyntaxLine($0.drop(while: { $0 == " " || $0 == "\t" })) }
+    }
+
+    private static func isBlockSyntaxLine(_ line: Substring) -> Bool {
+        guard let first = line.first else {
+            return false
+        }
+
+        switch first {
+        case "#":
+            let hashes = line.prefix(while: { $0 == "#" })
+            return hashes.count <= 6 && line.dropFirst(hashes.count).first == " "
+        case "-", "*", "+":
+            return line.dropFirst().first == " " || isThematicBreak(line)
+        case ">":
+            return true
+        case "|":
+            return line.dropFirst().contains("|")
+        default:
+            return isOrderedListItem(line)
+        }
+    }
+
+    private static func isOrderedListItem(_ line: Substring) -> Bool {
+        let digits = line.prefix(while: { $0.isASCII && $0.isNumber })
+        guard !digits.isEmpty, digits.count <= 3 else {
+            return false
+        }
+
+        let rest = line.dropFirst(digits.count)
+        return rest.hasPrefix(". ") || rest.hasPrefix(") ")
+    }
+
+    private static func isThematicBreak(_ line: Substring) -> Bool {
+        guard let marker = line.first, line.count >= 3 else {
+            return false
+        }
+        return line.allSatisfy { $0 == marker }
+    }
+}
+
+enum UserBubbleCollapsedMarkdownPreview {
+    private static let cache = BoundedCache<String, String>(maxEntries: 256)
+    private static let maxLines = 10
+    private static let maxCharacters = 1_200
+
+    static func previewText(for rawText: String) -> String {
+        guard needsTruncation(rawText) else {
+            return rawText
+        }
+
+        let key = TurnTextCacheKey.stableKey(namespace: "user-bubble-collapsed-preview", text: rawText)
+        return cache.getOrSet(key) {
+            truncatedPreview(from: rawText)
+        }
+    }
+
+    static func reset() {
+        cache.removeAll()
+    }
+
+    private static func needsTruncation(_ rawText: String) -> Bool {
+        var characterCount = 0
+        var newlineCount = 0
+        for character in rawText {
+            characterCount += 1
+            if characterCount > maxCharacters {
+                return true
+            }
+            if character == "\n" {
+                newlineCount += 1
+                if newlineCount >= maxLines {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private static func truncatedPreview(from rawText: String) -> String {
+        var openFenceCloser: String?
+        var includedLines = 0
+        var remainingCharacters = maxCharacters
+        var cutIndex = rawText.endIndex
+        var lineStart = rawText.startIndex
+
+        while lineStart < rawText.endIndex {
+            let lineEnd = rawText[lineStart...].firstIndex(of: "\n") ?? rawText.endIndex
+            let line = rawText[lineStart..<lineEnd]
+
+            if let budgetIndex = line.index(line.startIndex, offsetBy: remainingCharacters, limitedBy: line.endIndex),
+               budgetIndex < line.endIndex {
+                cutIndex = budgetIndex
+                break
+            }
+
+            let content = line.drop(while: { $0 == " " || $0 == "\t" })
+            if let fenceCloser = openFenceCloser {
+                if content.hasPrefix(fenceCloser) {
+                    openFenceCloser = nil
+                }
+            } else if content.hasPrefix("```") {
+                openFenceCloser = "```"
+            } else if content.hasPrefix("~~~") {
+                openFenceCloser = "~~~"
+            }
+
+            includedLines += 1
+            remainingCharacters -= line.count + 1
+            if includedLines >= maxLines || remainingCharacters <= 0 {
+                cutIndex = lineEnd
+                break
+            }
+            lineStart = lineEnd < rawText.endIndex ? rawText.index(after: lineEnd) : rawText.endIndex
+        }
+
+        let preview = String(rawText[..<cutIndex])
+        if let openFenceCloser {
+            return preview + "\n" + openFenceCloser
+        }
+        return autoClosedInlineMarkup(preview)
+    }
+
+    private static func autoClosedInlineMarkup(_ preview: String) -> String {
+        var closed = preview
+        if preview.components(separatedBy: "**").count.isMultiple(of: 2) {
+            closed += "**"
+        }
+        return closed
+    }
+}
+
 enum UserBubbleInlineMarkdownRenderer {
     private static let cache = BoundedCache<String, UserBubbleInlineMarkdownRenderResult>(maxEntries: 512)
     private static let bareURLRegex = try? NSRegularExpression(
