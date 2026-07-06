@@ -120,6 +120,14 @@ extension CodexService {
         }
 
         let itemType = normalizedItemType(itemObject["type"]?.stringValue ?? "")
+        if handleMirroredUserMessageItem(
+            itemObject: itemObject,
+            paramsObject: paramsObject,
+            itemType: itemType
+        ) {
+            return
+        }
+
         if isCompletedGeneratedImageItemType(itemType) {
             appendCompletedGeneratedImageItem(
                 itemObject: itemObject,
@@ -249,6 +257,14 @@ extension CodexService {
         }
 
         let itemType = normalizedItemType(itemObject["type"]?.stringValue ?? "")
+        if handleMirroredUserMessageItem(
+            itemObject: itemObject,
+            paramsObject: paramsObject,
+            itemType: itemType
+        ) {
+            return
+        }
+
         if handleStructuredItemLifecycle(
             itemObject: itemObject,
             paramsObject: paramsObject,
@@ -299,6 +315,61 @@ extension CodexService {
             itemId: context.identity.itemId,
             assistantPhase: context.identity.phase
         )
+    }
+}
+
+private extension CodexService {
+    // Desktop mirrors can deliver user prompts as item lifecycle events instead
+    // of the explicit codex/event/user_message path. Upsert them immediately so
+    // the prompt row is visible before the next history reconciliation.
+    func handleMirroredUserMessageItem(
+        itemObject: IncomingParamsObject,
+        paramsObject: IncomingParamsObject,
+        itemType: String
+    ) -> Bool {
+        guard isDesktopMirroredBridgeEvent(paramsObject) else {
+            return false
+        }
+
+        let role = itemObject["role"]?.stringValue?.lowercased() ?? ""
+        let isUserMessage = itemType == "usermessage"
+            || (itemType == "message" && role.contains("user"))
+        guard isUserMessage else {
+            return false
+        }
+
+        let turnId = extractTurnID(from: paramsObject)
+        guard let threadId = resolveThreadID(from: paramsObject, turnIdHint: turnId) else {
+            return true
+        }
+        if let turnId {
+            threadIdByTurnID[turnId] = threadId
+        }
+
+        let text = extractIncomingMessageText(from: itemObject)
+        guard !text.isEmpty else {
+            return true
+        }
+
+        markMirroredRunningCatchupNeeded(for: threadId)
+        appendConfirmedMirroredUserMessage(
+            threadId: threadId,
+            turnId: turnId,
+            text: text,
+            createdAt: decodeHistoryTimestamp(from: paramsObject)
+        )
+        return true
+    }
+
+    func isDesktopMirroredBridgeEvent(_ paramsObject: IncomingParamsObject) -> Bool {
+        paramsObject["agntDesktopMirror"]?.boolValue == true
+            || paramsObject["agntDesktopIpcMirror"]?.boolValue == true
+            || paramsObject["agntActionSource"]?.stringValue == "desktop-ipc-action-follower"
+            || paramsObject["agntActionSource"]?.stringValue == "desktop-ipc-live-owner"
+            || paramsObject["remodexDesktopMirror"]?.boolValue == true
+            || paramsObject["remodexDesktopIpcMirror"]?.boolValue == true
+            || paramsObject["remodexActionSource"]?.stringValue == "desktop-ipc-action-follower"
+            || paramsObject["remodexActionSource"]?.stringValue == "desktop-ipc-live-owner"
     }
 }
 

@@ -83,6 +83,122 @@ final class CodexServiceIncomingRunIndicatorTests: XCTestCase {
         XCTAssertNil(service.threadRunBadgeState(for: threadID))
     }
 
+    func testDesktopMirroredUserMessageItemStartedAppendsImmediately() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "item/started",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "agntDesktopMirror": .bool(true),
+                "item": .object([
+                    "id": .string("\(turnID):input"),
+                    "type": .string("userMessage"),
+                    "content": .array([
+                        .object([
+                            "type": .string("text"),
+                            "text": .string("Show the failing test"),
+                        ]),
+                    ]),
+                ]),
+            ])
+        )
+
+        let messages = service.messages(for: threadID)
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages.first?.role, .user)
+        XCTAssertEqual(messages.first?.text, "Show the failing test")
+        XCTAssertEqual(messages.first?.turnId, turnID)
+        XCTAssertEqual(messages.first?.deliveryState, .confirmed)
+    }
+
+    func testDesktopMirroredUserMessageItemCompletedDedupsStartedRow() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let params: JSONValue = .object([
+            "threadId": .string(threadID),
+            "turnId": .string(turnID),
+            "agntDesktopMirror": .bool(true),
+            "item": .object([
+                "id": .string("\(turnID):input"),
+                "type": .string("userMessage"),
+                "content": .array([
+                    .object([
+                        "type": .string("text"),
+                        "text": .string("Fix the login bug"),
+                    ]),
+                ]),
+            ]),
+        ])
+
+        service.handleNotification(method: "item/started", params: params)
+        service.handleNotification(method: "item/completed", params: params)
+
+        let userRows = service.messages(for: threadID).filter { $0.role == .user }
+        XCTAssertEqual(userRows.count, 1)
+        XCTAssertEqual(userRows.first?.text, "Fix the login bug")
+        XCTAssertEqual(userRows.first?.deliveryState, .confirmed)
+    }
+
+    func testDesktopMirroredUserMessageItemCompletedAppendsWithoutStartedEvent() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "item/completed",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "agntDesktopMirror": .bool(true),
+                "item": .object([
+                    "id": .string("\(turnID):input"),
+                    "type": .string("userMessage"),
+                    "content": .array([
+                        .object([
+                            "type": .string("text"),
+                            "text": .string("Summarize the thread"),
+                        ]),
+                    ]),
+                ]),
+            ])
+        )
+
+        let userRows = service.messages(for: threadID).filter { $0.role == .user }
+        XCTAssertEqual(userRows.count, 1)
+        XCTAssertEqual(userRows.first?.text, "Summarize the thread")
+        XCTAssertEqual(userRows.first?.turnId, turnID)
+        XCTAssertEqual(userRows.first?.deliveryState, .confirmed)
+    }
+
+    func testTodoListItemLifecycleRendersAsPlanRow() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let itemID = "todo-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "item/started",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "item": .object([
+                    "id": .string(itemID),
+                    "type": .string("todoList"),
+                    "text": .string("1. Audit flow\n2. Ship fix"),
+                ]),
+            ])
+        )
+
+        let planRows = service.messages(for: threadID).filter { $0.kind == .plan }
+        XCTAssertEqual(planRows.count, 1)
+        XCTAssertEqual(planRows.first?.text, "1. Audit flow\n2. Ship fix")
+    }
+
     func testAssistantDeltaCoalescingAppliesOrderedDeltasOnFlush() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"

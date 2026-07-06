@@ -294,7 +294,7 @@ extension CodexService {
                         timeZoneIdentifier: timeZoneIdentifier
                     )
 
-                case "plan":
+                case "plan", "todolist":
                     let decodedPlanState = decodeHistoryPlanState(from: itemObject)
                     appendHistoryMessage(
                         to: &result,
