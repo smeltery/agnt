@@ -1188,6 +1188,11 @@ final class GhosttyTerminalView: UIView, UITextFieldDelegate, UIGestureRecognize
         )
     }
 
+    func visibleTextForSelection() -> String? {
+        guard let rawText = readVisibleTerminalText() else { return nil }
+        return TerminalSelectableTextNormalizer.normalizedText(from: rawText)
+    }
+
     private func readText(for selectionRange: TerminalSelectionRange) -> String? {
         guard let surface else { return nil }
         let normalizedRange = selectionRange.normalized

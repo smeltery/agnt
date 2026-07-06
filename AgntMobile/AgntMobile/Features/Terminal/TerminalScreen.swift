@@ -23,6 +23,8 @@ struct TerminalScreen: View {
     @State private var actionErrorMessage: String?
     @State private var didApplyPreferredWorkingDirectory = false
     @State private var pendingModifier: TerminalPendingModifier?
+    @State private var terminalTextReader = GhosttyTerminalTextReader()
+    @State private var selectableTextState: TerminalSelectableTextState?
     @AppStorage("codex.terminal.fontSize") private var terminalFontSize = agntTerminalDefaultFontSize
 
     let preferredWorkingDirectory: String?
@@ -192,6 +194,10 @@ struct TerminalScreen: View {
         activeSnapshot.status == .running && UIPasteboard.general.hasStrings
     }
 
+    private var canSelectTerminalText: Bool {
+        isNativeTerminalAvailable && !activeSnapshot.bufferData.isEmpty
+    }
+
     var body: some View {
         ZStack {
             Color(hexString: theme.background)
@@ -222,6 +228,7 @@ struct TerminalScreen: View {
                     isRunning: isRunning,
                     hasConnectionConfiguration: hasConnectionConfiguration,
                     canPaste: canPasteIntoActiveTerminal,
+                    canSelectText: canSelectTerminalText,
                     canClear: !activeSnapshot.bufferData.isEmpty,
                     canResetKnownHost: !profileResolvedFromConnection.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                     onSelectSession: selectTerminalSession,
@@ -229,6 +236,7 @@ struct TerminalScreen: View {
                     onToggleConnection: toggleTerminalConnection,
                     onOpenConnectionEditor: showConnectionEditor,
                     onPaste: pasteIntoActiveTerminal,
+                    onSelectText: presentSelectableTerminalText,
                     onClear: clearTerminal,
                     onResetKnownHost: resetKnownHost,
                     onAdjustFontSize: adjustFontSize
@@ -245,6 +253,13 @@ struct TerminalScreen: View {
                     onAction: handleToolbarActionPress
                 )
             }
+        }
+        .sheet(item: $selectableTextState) { state in
+            TerminalSelectableTextSheet(
+                state: state,
+                fontSize: CGFloat(terminalFontSize),
+                theme: theme
+            )
         }
         .sheet(isPresented: $isShowingConnectionEditor) {
             TerminalConnectionEditorSheet(
@@ -293,7 +308,8 @@ struct TerminalScreen: View {
                     onResize: resizeTerminal,
                     onNativeAvailabilityChanged: { isAvailable in
                         isNativeTerminalAvailable = isAvailable
-                    }
+                    },
+                    textReader: terminalTextReader
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(8)
@@ -370,6 +386,16 @@ struct TerminalScreen: View {
 
     private func showConnectionEditor() {
         isShowingConnectionEditor = true
+    }
+
+    private func presentSelectableTerminalText() {
+        guard let text = terminalTextReader.visibleText() ?? fallbackSelectableTerminalText else { return }
+        selectableTextState = TerminalSelectableTextState(text: text)
+    }
+
+    private var fallbackSelectableTerminalText: String? {
+        let rawText = String(decoding: activeSnapshot.bufferData, as: UTF8.self)
+        return TerminalSelectableTextNormalizer.normalizedText(from: rawText)
     }
 
     private func saveConnectionAndOpen() async {

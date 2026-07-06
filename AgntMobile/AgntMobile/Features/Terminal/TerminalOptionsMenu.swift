@@ -16,6 +16,7 @@ struct TerminalOptionsMenu: View {
     let isRunning: Bool
     let hasConnectionConfiguration: Bool
     let canPaste: Bool
+    let canSelectText: Bool
     let canClear: Bool
     let canResetKnownHost: Bool
     let onSelectSession: (String) -> Void
@@ -23,6 +24,7 @@ struct TerminalOptionsMenu: View {
     let onToggleConnection: () -> Void
     let onOpenConnectionEditor: () -> Void
     let onPaste: () -> Void
+    let onSelectText: () -> Void
     let onClear: () -> Void
     let onResetKnownHost: () -> Void
     let onAdjustFontSize: (Double) -> Void
@@ -93,6 +95,9 @@ struct TerminalOptionsMenu: View {
         Section {
             Button("Paste", systemImage: "doc.on.clipboard", action: onPaste)
                 .disabled(!canPaste)
+
+            Button("Select text", systemImage: "text.cursor", action: onSelectText)
+                .disabled(!canSelectText)
         }
     }
 
