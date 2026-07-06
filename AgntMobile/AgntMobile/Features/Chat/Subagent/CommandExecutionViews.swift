@@ -607,8 +607,21 @@ struct CommandExecutionCardBody: View {
         return info
     }
 
+    private var leadingAssetName: String? {
+        CommandHumanizer.leadingAssetName(for: command)
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: leadingAssetName == nil ? 0 : 6) {
+            if let leadingAssetName {
+                Image(leadingAssetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(.secondary)
+            }
+
             (
                 Text(display.verb)
                     .font(AppFont.subheadline(weight: .medium))
@@ -700,6 +713,18 @@ enum CommandHumanizer {
                 verb: isRunning ? "Running" : "Ran",
                 target: command
             )
+        }
+    }
+
+    static func leadingAssetName(for raw: String) -> String? {
+        let command = unwrapShell(raw)
+        let (tool, _) = splitToolAndArgs(command)
+
+        switch tool {
+        case "gh", "github":
+            return "GitHub_Invertocat_Black"
+        default:
+            return nil
         }
     }
 
