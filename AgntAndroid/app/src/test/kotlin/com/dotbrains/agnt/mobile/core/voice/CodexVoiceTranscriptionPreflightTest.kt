@@ -19,14 +19,14 @@ class CodexVoiceTranscriptionPreflightTest {
     }
 
     @Test
-    fun rejectsClipLongerThanTwoMinutes() {
+    fun rejectsClipLongerThan150Seconds() {
         val preflight =
             CodexVoiceTranscriptionPreflight(
                 byteCount = 2048,
-                durationSeconds = 120.5,
+                durationSeconds = 150.5,
             )
         val err = assertFailsWith<AgentServiceError.InvalidInput> { preflight.validate() }
-        assertEquals("Voice clips must be 120 seconds or less.", err.message)
+        assertEquals("Voice clips must be 150 seconds or less.", err.message)
     }
 
     @Test
@@ -34,7 +34,7 @@ class CodexVoiceTranscriptionPreflightTest {
         val p =
             CodexVoiceTranscriptionPreflight(
                 byteCount = CodexVoiceTranscriptionPreflight.MAX_BYTE_COUNT,
-                durationSeconds = 120.0,
+                durationSeconds = CodexVoiceTranscriptionPreflight.MAX_DURATION_SECONDS,
             )
         assertNull(p.failureMessage)
         p.validate()
