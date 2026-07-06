@@ -16,6 +16,7 @@ const assert = require("node:assert/strict");
 
 const {
   augmentRelayThreadWithJsonlMetadata,
+  sanitizeLiveContextualUserItemForRelay,
   sanitizeThreadHistoryImagesForRelay,
   sanitizeThreadTurnsListForRelay,
   sanitizeRelayHistoryTurns,
@@ -61,6 +62,120 @@ test("sanitizeThreadHistoryImagesForRelay routes thread/turns/list to the page v
   const out = sanitizeThreadHistoryImagesForRelay(raw, "thread/turns/list");
   // No images / oversized payloads → output equals raw (no work needed)
   assert.equal(out, raw);
+});
+
+test("sanitizeThreadHistoryImagesForRelay drops injected context user items from thread history", () => {
+  const raw = JSON.stringify({
+    id: "r-context",
+    result: { thread: {
+      id: "thread-context",
+      turns: [{
+        id: "turn-1",
+        items: [
+          {
+            id: "ctx-agents",
+            type: "message",
+            role: "user",
+            content: [{
+              type: "input_text",
+              text: "# AGENTS.md instructions for /Users/me/project\n\n<INSTRUCTIONS>\nrules\n</INSTRUCTIONS>",
+            }],
+          },
+          {
+            id: "ctx-env",
+            type: "message",
+            role: "user",
+            content: [{
+              type: "input_text",
+              text: "<environment_context>\n  <cwd>/Users/me/project</cwd>\n</environment_context>",
+            }],
+          },
+          {
+            id: "real-user",
+            type: "user_message",
+            content: [{ type: "input_text", text: "Summarize the diff" }],
+          },
+          {
+            id: "assistant",
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: "Done" }],
+          },
+        ],
+      }],
+    } },
+  });
+
+  const out = JSON.parse(sanitizeThreadHistoryImagesForRelay(raw, "thread/read"));
+  assert.deepEqual(
+    out.result.thread.turns[0].items.map((item) => item.id),
+    ["real-user", "assistant"]
+  );
+});
+
+test("sanitizeThreadTurnsListForRelay drops injected context user items from pages", () => {
+  const raw = JSON.stringify({
+    id: "r-context-page",
+    result: {
+      data: [{
+        id: "turn-1",
+        items: [
+          {
+            id: "ctx-internal",
+            type: "message",
+            role: "user",
+            content: [{
+              type: "input_text",
+              text: "<codex_internal_context source=\"goal\">\nContinue working.\n</codex_internal_context>",
+            }],
+          },
+          {
+            id: "real-user",
+            type: "user_message",
+            text: "Continue",
+          },
+        ],
+      }],
+    },
+  });
+
+  const out = JSON.parse(sanitizeThreadTurnsListForRelay(raw));
+  assert.deepEqual(out.result.data[0].items.map((item) => item.id), ["real-user"]);
+});
+
+test("sanitizeLiveContextualUserItemForRelay drops injected live user item notifications", () => {
+  const raw = JSON.stringify({
+    method: "item/started",
+    params: {
+      item: {
+        id: "ctx-live",
+        type: "message",
+        role: "user",
+        content: [{
+          type: "input_text",
+          text: "# AGENTS.md instructions for /Users/me/project\n<INSTRUCTIONS>rules</INSTRUCTIONS>",
+        }],
+      },
+    },
+  });
+
+  assert.equal(sanitizeLiveContextualUserItemForRelay(raw), null);
+});
+
+test("sanitizeLiveContextualUserItemForRelay preserves real live user item notifications", () => {
+  const raw = JSON.stringify({
+    method: "item/completed",
+    params: {
+      item: {
+        id: "real-live",
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "Add tests" }],
+      },
+    },
+  });
+
+  assert.equal(sanitizeLiveContextualUserItemForRelay(raw), raw);
 });
 
 test("sanitizeThreadHistoryImagesForRelay elides inline data: image URLs in history content", () => {

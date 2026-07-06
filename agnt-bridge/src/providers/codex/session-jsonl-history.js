@@ -8,6 +8,11 @@
 // Depends on: fs
 
 const fs = require("fs");
+const {
+  historyItemUserText,
+  isContextualUserText,
+  isUserRoleHistoryItem,
+} = require("../../bridge/contextual-user-items");
 
 function readThreadTurnsListPageFromSessionJsonl(filePath, {
   threadId = "",
@@ -208,6 +213,10 @@ function normalizeResponseItemForHistory(payload, lineNumber) {
 
   if (type === "message" && !normalizeString(item.role)) {
     item.role = "assistant";
+  }
+
+  if (isUserRoleHistoryItem(item) && isContextualUserText(historyItemUserText(item))) {
+    return null;
   }
 
   return item;

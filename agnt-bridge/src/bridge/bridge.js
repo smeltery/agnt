@@ -75,6 +75,7 @@ const {
   createBridgeRelayHeartbeat,
 } = require("./relay-heartbeat");
 const {
+  sanitizeLiveContextualUserItemForRelay,
   sanitizeThreadHistoryImagesForRelay,
   sanitizeThreadTurnsListForRelay,
   sanitizeRelayHistoryTurns,
@@ -651,7 +652,11 @@ function startBridge({
     const parsed = safeParseJSON(normalizedMessage);
     const responseId = parsed?.id;
     if (responseId == null) {
-      return sanitizeLiveGeneratedImageMessageForRelay(normalizedMessage);
+      const liveContextSanitized = sanitizeLiveContextualUserItemForRelay(normalizedMessage);
+      if (liveContextSanitized == null) {
+        return null;
+      }
+      return sanitizeLiveGeneratedImageMessageForRelay(liveContextSanitized);
     }
     const trackedRequest = forwardedRequestTracker.consumeSanitizedResponse(responseId);
     if (!trackedRequest) {
