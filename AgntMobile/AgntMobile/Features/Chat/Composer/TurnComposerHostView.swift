@@ -97,6 +97,7 @@ struct TurnComposerHostView: View {
             composerMentionedPlugins: viewModel.composerMentionedPlugins,
             composerReviewSelection: viewModel.composerReviewSelection,
             isSubagentsSelectionArmed: viewModel.isSubagentsSelectionArmed,
+            isPlanModeArmed: viewModel.isPlanModeArmed,
             isVoiceRecording: isVoiceRecording,
             voiceAudioLevels: voiceAudioLevels,
             voiceRecordingDuration: voiceRecordingDuration

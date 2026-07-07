@@ -777,14 +777,30 @@ extension CodexService {
             // has a synthetic itemId that differs from the server's real one.
             if message.role == .system,
                message.kind == .fileChange,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .system
-                       && candidate.kind == .fileChange
-                       && (candidate.turnId == nil || candidate.turnId == turnId)
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
+               let turnId = message.turnId, !turnId.isEmpty {
+                let turnBlockRange = Self.contiguousTurnBlockRange(in: merged, turnId: turnId)
+                if let index = merged.indices.last(where: { candidateIndex in
+                    let candidate = merged[candidateIndex]
+                    guard candidate.role == .system,
+                          candidate.kind == .fileChange else {
+                        return false
+                    }
+                    if candidate.turnId == turnId {
+                        return true
+                    }
+                    guard candidate.turnId == nil else {
+                        return false
+                    }
+                    return Self.turnlessFileChangeRowIsClaimable(
+                        in: merged,
+                        candidateIndex: candidateIndex,
+                        turnId: turnId,
+                        turnBlockRange: turnBlockRange
+                    )
+                }) {
+                    merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+                    continue
+                }
             }
 
             // Rebind generic tool rows when a live synthetic row gets a real history item id later.
@@ -1377,12 +1393,72 @@ extension CodexService {
         return "assistant:\(threadId):item:\(itemId)"
     }
 
+    // Finds the contiguous timeline block owned by one turn; turnless artifact
+    // rows inside that range may be rebound without stealing adjacent turns.
+    nonisolated static func contiguousTurnBlockRange(
+        in messages: [CodexMessage],
+        turnId: String
+    ) -> Range<Int>? {
+        guard let startIndex = messages.firstIndex(where: { $0.turnId == turnId }) else {
+            return nil
+        }
+        let endIndex = messages.indices.first { index in
+            guard index > startIndex else {
+                return false
+            }
+            let message = messages[index]
+            if let candidateTurnId = message.turnId, !candidateTurnId.isEmpty {
+                return candidateTurnId != turnId
+            }
+            // A user prompt without a turn id still marks a boundary: the next
+            // turn's opener lands before turn/started tags it, and this turn's
+            // artifacts must not reach past it.
+            return message.role == .user
+        } ?? messages.endIndex
+        return startIndex..<endIndex
+    }
+
+    // Single rule for claiming a turnless file-change row into a turn, shared
+    // by live reconciliation and history merge. A transient duplicate is safer
+    // than stealing an adjacent turn's file-change table.
+    nonisolated static func turnlessFileChangeRowIsClaimable(
+        in messages: [CodexMessage],
+        candidateIndex: Int,
+        turnId: String,
+        turnBlockRange: Range<Int>?
+    ) -> Bool {
+        guard messages.indices.contains(candidateIndex) else {
+            return false
+        }
+        if let turnBlockRange {
+            return turnBlockRange.contains(candidateIndex)
+        }
+
+        guard !messages.contains(where: {
+            Self.normalizedHistoryIdentifier($0.turnId) != nil
+        }) else {
+            return false
+        }
+
+        guard !messages[(candidateIndex + 1)...].contains(where: { $0.role == .user }) else {
+            return false
+        }
+
+        let candidate = messages[candidateIndex]
+        let bootstrapRows = messages.filter {
+            $0.role == .system
+                && $0.kind == .fileChange
+                && Self.normalizedHistoryIdentifier($0.turnId) == nil
+        }
+        return bootstrapRows.count == 1 && bootstrapRows[0].id == candidate.id
+    }
+
     // Real provider item ids must not be rebound to a different history item mid-stream.
     nonisolated static func hasStableAssistantIdentity(_ itemId: String?) -> Bool {
         guard let itemId = normalizedHistoryIdentifier(itemId) else {
             return false
         }
-        return !itemId.hasPrefix("turn:") && !itemId.hasPrefix("rollout-")
+        return !CodexSyntheticIdentifiers.isMirrorMintedItemID(itemId)
     }
 
     // Rollout mirrors tag reasoning rows with synthetic "rollout-*" item ids
@@ -1392,7 +1468,7 @@ extension CodexService {
         guard let itemId = normalizedHistoryIdentifier(itemId) else {
             return true
         }
-        return itemId.hasPrefix("rollout-") || itemId.hasPrefix("turn:")
+        return CodexSyntheticIdentifiers.isMirrorMintedItemID(itemId)
     }
 
     // Running assistant rows may absorb history only when the provider item identity agrees.
@@ -1489,7 +1565,7 @@ extension CodexService {
         guard let value else {
             return false
         }
-        return !(value.hasPrefix("turn:") && value.contains("|kind:\(CodexMessageKind.toolActivity.rawValue)"))
+        return !CodexSyntheticIdentifiers.isPlaceholderItemID(value, kind: .toolActivity)
     }
 
     // Treats only streaming/skeleton tool rows as safe to rebind by text alone.

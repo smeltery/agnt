@@ -401,6 +401,7 @@ final class TurnViewModel {
     @ObservationIgnored private var dismissedStructuredPlanPromptRequestKeys: Set<String> = []
     @ObservationIgnored private var dismissingStructuredPlanPromptRequestKeys: Set<String> = []
     @ObservationIgnored private var attachmentLoadTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var detachedAttachmentLoadIDs: Set<String> = []
 
     let maxComposerImages = 4
     let maxFileAutocompleteItems = 6
@@ -444,9 +445,12 @@ final class TurnViewModel {
         localDraftPersistenceDebounceTask = nil
         gitStatusRefreshTask?.cancel()
         gitStatusRefreshTask = nil
-        for task in attachmentLoadTasks.values {
-            task.cancel()
+        let loadingAttachmentIDs = composerAttachments.compactMap { attachment -> String? in
+            guard attachment.state == .loading else { return nil }
+            return attachment.id
         }
+        detachedAttachmentLoadIDs.formUnion(attachmentLoadTasks.keys)
+        detachedAttachmentLoadIDs.formUnion(loadingAttachmentIDs)
         attachmentLoadTasks.removeAll()
     }
 
@@ -614,6 +618,7 @@ final class TurnViewModel {
         isSubagentsSelectionArmed = false
         input = ""
         cancelAttachmentLoadTasks()
+        detachedAttachmentLoadIDs.removeAll()
         composerAttachments.removeAll()
         composerMentionedFiles.removeAll()
         composerMentionedSkills.removeAll()
@@ -633,7 +638,22 @@ final class TurnViewModel {
         )
     }
 
-    func saveLocalDraft(codex: CodexService, threadID: String, persistToDisk: Bool = false) {
+    private var hasLoadingComposerAttachments: Bool {
+        composerAttachments.contains { $0.state == .loading }
+    }
+
+    private var loadingComposerAttachmentIDs: Set<String> {
+        Set(composerAttachments.compactMap { attachment -> String? in
+            attachment.state == .loading ? attachment.id : nil
+        })
+    }
+
+    func saveLocalDraft(
+        codex: CodexService,
+        threadID: String,
+        persistToDisk: Bool = false,
+        advancesAttachmentMergeRevision: Bool = true
+    ) {
         let draft = localDraftSnapshot()
         if isSending, draft.isEmpty {
             if persistToDisk {
@@ -642,12 +662,27 @@ final class TurnViewModel {
             return
         }
 
-        codex.setComposerDraft(draft.isEmpty ? nil : draft, for: threadID)
+        let shouldAdvanceMergeRevision = advancesAttachmentMergeRevision && !hasLoadingComposerAttachments
+        codex.setComposerDraft(
+            draft.isEmpty ? nil : draft,
+            for: threadID,
+            advancesAttachmentMergeRevision: shouldAdvanceMergeRevision
+        )
+        codex.setComposerDraftPendingAttachmentIDs(loadingComposerAttachmentIDs, for: threadID)
         if persistToDisk {
             flushLocalDraftPersistence(codex: codex)
         } else {
             scheduleLocalDraftPersistence(codex: codex)
         }
+    }
+
+    func saveLifecycleLocalDraft(codex: CodexService, threadID: String) {
+        saveLocalDraft(
+            codex: codex,
+            threadID: threadID,
+            persistToDisk: true,
+            advancesAttachmentMergeRevision: false
+        )
     }
 
     func clearLocalDraft(codex: CodexService, threadID: String, persistToDisk: Bool = false) {
@@ -660,13 +695,97 @@ final class TurnViewModel {
     }
 
     func restoreSavedLocalDraftIfNeeded(codex: CodexService, threadID: String) {
-        guard !hasComposerDraftContent,
-              let draft = codex.composerDraft(for: threadID),
+        reattachVisibleAttachmentLoads()
+        guard let draft = codex.composerDraft(for: threadID),
+              canRestoreSavedLocalDraft(draft),
               !draft.isEmpty else {
             return
         }
 
-        restoreComposerState(from: draft)
+        if hasComposerDraftContent {
+            restoreVisibleComposerState(from: draft)
+        } else {
+            restoreComposerState(from: draft)
+        }
+    }
+
+    private func restoreVisibleComposerState(from draft: TurnComposerLocalDraft) {
+        input = draft.input
+        composerMentionedFiles = draft.mentionedFiles
+        composerMentionedSkills = draft.mentionedSkills
+        composerMentionedPlugins = draft.mentionedPlugins
+
+        let draftAttachmentsByID = Dictionary(uniqueKeysWithValues: draft.attachments.map { ($0.id, $0) })
+        let liveAttachmentIDs = Set(composerAttachments.map(\.id))
+        var restoredAttachments = composerAttachments.map { attachment in
+            draftAttachmentsByID[attachment.id] ?? attachment
+        }
+        restoredAttachments.append(contentsOf: draft.attachments.filter { !liveAttachmentIDs.contains($0.id) })
+        composerAttachments = restoredAttachments
+
+        composerReviewSelection = draft.reviewSelection
+        isSubagentsSelectionArmed = draft.isSubagentsSelectionArmed
+        isPlanModeArmed = draft.isPlanModeArmed
+        clearComposerAutocomplete()
+    }
+
+    private func reattachVisibleAttachmentLoads() {
+        let visibleLoadingAttachmentIDs = Set(composerAttachments.compactMap { attachment -> String? in
+            attachment.state == .loading ? attachment.id : nil
+        })
+        detachedAttachmentLoadIDs.subtract(visibleLoadingAttachmentIDs)
+    }
+
+    private func canRestoreSavedLocalDraft(_ draft: TurnComposerLocalDraft) -> Bool {
+        if !hasComposerDraftContent {
+            return true
+        }
+
+        guard input == draft.input,
+              composerMentionedFiles == draft.mentionedFiles,
+              composerMentionedSkills == draft.mentionedSkills,
+              composerMentionedPlugins == draft.mentionedPlugins,
+              composerReviewSelection == draft.reviewSelection,
+              isPlanModeArmed == draft.isPlanModeArmed,
+              isSubagentsSelectionArmed == draft.isSubagentsSelectionArmed else {
+            return false
+        }
+
+        let readyAttachments = composerAttachments.compactMap { attachment -> TurnComposerImageAttachment? in
+            if case .ready = attachment.state {
+                return attachment
+            }
+            return nil
+        }
+        let loadingAttachmentIDs = Set(composerAttachments.compactMap { attachment -> String? in
+            attachment.state == .loading ? attachment.id : nil
+        })
+        let hasOnlyRestorableAttachmentStates = composerAttachments.allSatisfy { attachment in
+            switch attachment.state {
+            case .loading, .ready:
+                return true
+            case .failed:
+                return false
+            }
+        }
+        var draftAttachmentsByID: [String: TurnComposerImageAttachment] = [:]
+        for attachment in draft.attachments {
+            draftAttachmentsByID[attachment.id] = attachment
+        }
+        let liveAttachmentIDs = Set(composerAttachments.map(\.id))
+        let draftAttachmentIDs = Set(draftAttachmentsByID.keys)
+
+        guard hasOnlyRestorableAttachmentStates,
+              !loadingAttachmentIDs.isEmpty,
+              draftAttachmentIDs.isSubset(of: liveAttachmentIDs),
+              !draftAttachmentIDs.isDisjoint(with: loadingAttachmentIDs),
+              readyAttachments.allSatisfy({ readyAttachment in
+                  draftAttachmentsByID[readyAttachment.id].map { $0 == readyAttachment } ?? true
+              }) else {
+            return false
+        }
+
+        return true
     }
 
     func scheduleLocalDraftPersistence(codex: CodexService) {
@@ -759,6 +878,7 @@ final class TurnViewModel {
     func removeComposerAttachment(id: String) {
         attachmentLoadTasks[id]?.cancel()
         attachmentLoadTasks[id] = nil
+        detachedAttachmentLoadIDs.remove(id)
         composerAttachments.removeAll(where: { $0.id == id })
     }
 
@@ -1314,23 +1434,33 @@ final class TurnViewModel {
 
         clearComposerReviewSelectionIfNeededForNonReviewContent()
 
-        for item in acceptedItems {
-            let attachmentID = UUID().uuidString
-            composerAttachments.append(TurnComposerImageAttachment(id: attachmentID, state: .loading))
+        let attachmentJobs = acceptedItems.map { item in
+            (id: UUID().uuidString, item: item)
+        }
+        for job in attachmentJobs {
+            composerAttachments.append(TurnComposerImageAttachment(id: job.id, state: .loading))
+        }
+        saveLocalDraft(codex: codex, threadID: threadID)
+        let expectedDraftMergeRevision = codex.composerDraftMergeRevision(for: threadID)
+        let expectedDraftMergeEpoch = codex.composerDraftMergeEpoch
+        let attachmentOrder = composerAttachments.map(\.id)
 
-            attachmentLoadTasks[attachmentID] = Task { @MainActor [weak self] in
-                let state = await Self.loadComposerAttachmentState(from: item)
+        for job in attachmentJobs {
+            attachmentLoadTasks[job.id] = Task { @MainActor [weak self] in
+                let state = await Self.loadComposerAttachmentState(from: job.item)
+                guard !Task.isCancelled else { return }
                 Self.completeAttachmentLoad(
                     state,
-                    id: attachmentID,
+                    id: job.id,
                     viewModel: self,
-                    isCancelled: Task.isCancelled,
+                    expectedDraftMergeRevision: expectedDraftMergeRevision,
+                    expectedDraftMergeEpoch: expectedDraftMergeEpoch,
+                    attachmentOrder: attachmentOrder,
                     codex: codex,
                     threadID: threadID
                 )
             }
         }
-        saveLocalDraft(codex: codex, threadID: threadID)
     }
 
     // Reuses the picker intake pipeline so pasted images obey the same limits and processing.
@@ -1356,37 +1486,53 @@ final class TurnViewModel {
 
         clearComposerReviewSelectionIfNeededForNonReviewContent()
 
-        for imageData in acceptedItems {
-            let attachmentID = UUID().uuidString
-            composerAttachments.append(TurnComposerImageAttachment(id: attachmentID, state: .loading))
+        let attachmentJobs = acceptedItems.map { imageData in
+            (id: UUID().uuidString, imageData: imageData)
+        }
+        for job in attachmentJobs {
+            composerAttachments.append(TurnComposerImageAttachment(id: job.id, state: .loading))
+        }
+        saveLocalDraft(codex: codex, threadID: threadID)
+        let expectedDraftMergeRevision = codex.composerDraftMergeRevision(for: threadID)
+        let expectedDraftMergeEpoch = codex.composerDraftMergeEpoch
+        let attachmentOrder = composerAttachments.map(\.id)
 
-            attachmentLoadTasks[attachmentID] = Task { @MainActor [weak self] in
-                let state = await Self.loadComposerAttachmentState(fromData: imageData)
+        for job in attachmentJobs {
+            attachmentLoadTasks[job.id] = Task { @MainActor [weak self] in
+                let state = await Self.loadComposerAttachmentState(fromData: job.imageData)
+                guard !Task.isCancelled else { return }
                 Self.completeAttachmentLoad(
                     state,
-                    id: attachmentID,
+                    id: job.id,
                     viewModel: self,
-                    isCancelled: Task.isCancelled,
+                    expectedDraftMergeRevision: expectedDraftMergeRevision,
+                    expectedDraftMergeEpoch: expectedDraftMergeEpoch,
+                    attachmentOrder: attachmentOrder,
                     codex: codex,
                     threadID: threadID
                 )
             }
         }
-        saveLocalDraft(codex: codex, threadID: threadID)
     }
 
     private func updateComposerAttachment(
         id: String,
         state: TurnComposerImageAttachmentState,
         codex: CodexService,
-        threadID: String
+        threadID: String,
+        advancesAttachmentMergeRevision: Bool = true
     ) {
         guard let index = composerAttachments.firstIndex(where: { $0.id == id }) else {
             return
         }
 
         composerAttachments[index].state = state
-        saveLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
+        saveLocalDraft(
+            codex: codex,
+            threadID: threadID,
+            persistToDisk: true,
+            advancesAttachmentMergeRevision: advancesAttachmentMergeRevision
+        )
     }
 
     private func cancelAttachmentLoadTasks() {
@@ -1396,38 +1542,94 @@ final class TurnViewModel {
         attachmentLoadTasks.removeAll()
     }
 
-    private static func completeAttachmentLoad(
+    static func completeAttachmentLoad(
         _ state: TurnComposerImageAttachmentState,
         id attachmentID: String,
         viewModel: TurnViewModel?,
-        isCancelled: Bool,
+        expectedDraftMergeRevision: Int,
+        expectedDraftMergeEpoch: Int? = nil,
+        attachmentOrder: [String]? = nil,
         codex: CodexService,
         threadID: String
     ) {
-        if let viewModel, !isCancelled {
-            viewModel.updateComposerAttachment(id: attachmentID, state: state, codex: codex, threadID: threadID)
-            viewModel.attachmentLoadTasks[attachmentID] = nil
+        let resolvedExpectedDraftMergeEpoch = expectedDraftMergeEpoch ?? codex.composerDraftMergeEpoch
+        let resolvedAttachmentOrder = attachmentOrder ?? [attachmentID]
+
+        guard codex.composerDraftMergeEpoch == resolvedExpectedDraftMergeEpoch else {
+            viewModel?.attachmentLoadTasks[attachmentID] = nil
             return
         }
 
-        if let viewModel, !viewModel.composerAttachments.contains(where: { $0.id == attachmentID }) {
+        if let viewModel {
+            if viewModel.detachedAttachmentLoadIDs.remove(attachmentID) != nil {
+                if state == .failed,
+                   viewModel.composerAttachments.contains(where: { $0.id == attachmentID }) {
+                    viewModel.updateComposerAttachment(
+                        id: attachmentID,
+                        state: state,
+                        codex: codex,
+                        threadID: threadID,
+                        advancesAttachmentMergeRevision: false
+                    )
+                    return
+                }
+                mergeDecodedAttachmentIntoSavedDraft(
+                    state,
+                    id: attachmentID,
+                    expectedDraftMergeRevision: expectedDraftMergeRevision,
+                    expectedDraftMergeEpoch: resolvedExpectedDraftMergeEpoch,
+                    attachmentOrder: resolvedAttachmentOrder,
+                    codex: codex,
+                    threadID: threadID
+                )
+                return
+            }
+            defer { viewModel.attachmentLoadTasks[attachmentID] = nil }
+            guard viewModel.composerAttachments.contains(where: { $0.id == attachmentID }) else {
+                return
+            }
+            viewModel.updateComposerAttachment(
+                id: attachmentID,
+                state: state,
+                codex: codex,
+                threadID: threadID,
+                advancesAttachmentMergeRevision: false
+            )
             return
         }
 
-        mergeDecodedAttachmentIntoSavedDraft(state, id: attachmentID, codex: codex, threadID: threadID)
+        mergeDecodedAttachmentIntoSavedDraft(
+            state,
+            id: attachmentID,
+            expectedDraftMergeRevision: expectedDraftMergeRevision,
+            expectedDraftMergeEpoch: resolvedExpectedDraftMergeEpoch,
+            attachmentOrder: resolvedAttachmentOrder,
+            codex: codex,
+            threadID: threadID
+        )
     }
 
     private static func mergeDecodedAttachmentIntoSavedDraft(
         _ state: TurnComposerImageAttachmentState,
         id attachmentID: String,
+        expectedDraftMergeRevision: Int,
+        expectedDraftMergeEpoch: Int,
+        attachmentOrder: [String],
         codex: CodexService,
         threadID: String
     ) {
         guard case .ready = state else { return }
+        guard codex.composerDraftMergeEpoch == expectedDraftMergeEpoch else { return }
+        guard codex.composerDraftMergeRevision(for: threadID) == expectedDraftMergeRevision else { return }
+        guard codex.canMergePendingComposerAttachment(id: attachmentID, for: threadID) else { return }
         let existing = codex.composerDraft(for: threadID)
         var attachments = existing?.attachments ?? []
-        guard !attachments.contains(where: { $0.id == attachmentID }) else { return }
+        guard !attachments.contains(where: { $0.id == attachmentID }) else {
+            codex.markPendingComposerAttachmentMerged(id: attachmentID, for: threadID)
+            return
+        }
         attachments.append(TurnComposerImageAttachment(id: attachmentID, state: state))
+        attachments = orderedDraftAttachments(attachments, attachmentOrder: attachmentOrder)
 
         let merged = TurnComposerLocalDraft(
             input: existing?.input ?? "",
@@ -1440,7 +1642,38 @@ final class TurnViewModel {
             isSubagentsSelectionArmed: existing?.isSubagentsSelectionArmed ?? false,
             updatedAt: Date()
         )
-        codex.setComposerDraft(merged, for: threadID, persistToDisk: true)
+        codex.setComposerDraft(
+            merged,
+            for: threadID,
+            persistToDisk: true,
+            advancesAttachmentMergeRevision: false
+        )
+        codex.markPendingComposerAttachmentMerged(id: attachmentID, for: threadID)
+    }
+
+    private static func orderedDraftAttachments(
+        _ attachments: [TurnComposerImageAttachment],
+        attachmentOrder: [String]
+    ) -> [TurnComposerImageAttachment] {
+        guard !attachmentOrder.isEmpty else {
+            return attachments
+        }
+
+        var orderByID: [String: Int] = [:]
+        for (index, id) in attachmentOrder.enumerated() where orderByID[id] == nil {
+            orderByID[id] = index
+        }
+
+        return attachments.enumerated()
+            .sorted { lhs, rhs in
+                let lhsOrder = orderByID[lhs.element.id] ?? Int.max
+                let rhsOrder = orderByID[rhs.element.id] ?? Int.max
+                if lhsOrder != rhsOrder {
+                    return lhsOrder < rhsOrder
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
     }
 
     // Sends a composer payload, queueing follow-ups while the current run is still active.

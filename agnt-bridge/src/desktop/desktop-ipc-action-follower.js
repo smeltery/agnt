@@ -76,13 +76,31 @@ function createDesktopIpcActionFollower({
     activeThreadIds.delete(threadId);
     activeThreadIds.add(threadId);
     while (activeThreadIds.size > MAX_ACTIVE_THREAD_IDS) {
-      const oldestThreadId = activeThreadIds.values().next().value;
+      const oldestThreadId = oldestEvictableActiveThreadId();
       if (oldestThreadId === undefined) {
         break;
       }
       activeThreadIds.delete(oldestThreadId);
       forgetEvictedThreadState(oldestThreadId);
     }
+  }
+
+  function oldestEvictableActiveThreadId() {
+    for (const threadId of activeThreadIds) {
+      if (!hasPendingProjectedActions(threadId)) {
+        return threadId;
+      }
+    }
+    return undefined;
+  }
+
+  function hasPendingProjectedActions(threadId) {
+    for (const route of pendingRoutesByRequestId.values()) {
+      if (route.threadId === threadId) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function forgetEvictedThreadState(threadId) {
@@ -195,7 +213,9 @@ function createDesktopIpcActionFollower({
     mirroredActivityKeysByThreadId.clear();
     mirroredUserMessageKeysByThreadId.clear();
     clearAllDesktopTurnCompletionTimers();
-    pendingRoutesByRequestId.clear();
+    // Keep activeThreadIds and pending approval routes across transient Desktop
+    // IPC disconnects. The phone is still viewing those threads, and reconnect
+    // snapshots/actions reconcile the state.
     recoveringThreadIds.clear();
     queuedChangesByThreadId.clear();
   }

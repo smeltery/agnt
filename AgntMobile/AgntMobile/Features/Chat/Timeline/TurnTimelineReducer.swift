@@ -11,12 +11,16 @@ struct TurnTimelineProjection {
 }
 
 enum TurnTimelineReducer {
+    private static let largeTextDedupeByteLimit = 64_000
+    private static let smallWhitespaceScanByteLimit = 512
+
     // ─── ENTRY POINT ─────────────────────────────────────────────
 
     // Applies all render-only timeline transforms in one pass.
     static func project(messages: [CodexMessage]) -> TurnTimelineProjection {
         let visibleMessages = removeHiddenSystemMarkers(in: messages)
-        let reordered = enforceIntraTurnOrder(in: visibleMessages)
+        let anchored = anchorLateFileChangesToOwningTurn(in: visibleMessages)
+        let reordered = enforceIntraTurnOrder(in: anchored)
         let collapsedThinking = collapseThinkingMessages(in: reordered)
         let withoutCommandThinkingEchoes = removeRedundantThinkingCommandActivityMessages(in: collapsedThinking)
         let dedupedUsers = removeDuplicateUserMessages(in: withoutCommandThinkingEchoes)
@@ -68,7 +72,9 @@ enum TurnTimelineReducer {
                 // Steer can append a later user row into the still-active turn before the
                 // assistant emits another distinct item. Preserve chronology so that user
                 // prompt stays visible near the tail instead of jumping to the turn start.
-                sorted = turnMessages.sorted { $0.orderIndex < $1.orderIndex }
+                sorted = movingFileChangesToTurnTail(
+                    in: turnMessages.sorted { $0.orderIndex < $1.orderIndex }
+                )
             } else if hasInterleavedAssistantActivityFlow(turnMessages) {
                 // Multi-item turn: keep the streamed interleaving intact. If the turn has
                 // only one user prompt, we can still float that original opener forward.
@@ -86,12 +92,13 @@ enum TurnTimelineReducer {
                         .id
                     : nil
 
-                sorted = turnMessages.sorted { a, b in
+                let chronological = turnMessages.sorted { a, b in
                     let aIsOpeningUser = openingUserID != nil && a.id == openingUserID
                     let bIsOpeningUser = openingUserID != nil && b.id == openingUserID
                     if aIsOpeningUser != bIsOpeningUser { return aIsOpeningUser }
                     return a.orderIndex < b.orderIndex
                 }
+                sorted = movingFileChangesToTurnTail(in: chronological)
             } else {
                 // Single-item turn: apply normal role-based ordering.
                 sorted = turnMessages.sorted { a, b in
@@ -149,10 +156,12 @@ enum TurnTimelineReducer {
         // file-change cards still need semantic trailing placement after the final answer.
         var distinctAssistantTexts: Set<String> = []
         var distinctAssistantItemIDs: Set<String> = []
+        var hasLargeAssistantText = false
         for message in turnMessages where message.role == .assistant {
-            let text = normalizedMessageText(message.text)
-            if !text.isEmpty {
+            if let text = normalizedSmallMessageText(message.text) {
                 distinctAssistantTexts.insert(text)
+            } else if hasMeaningfulMessageText(message.text) {
+                hasLargeAssistantText = true
             }
             if let itemID = normalizedIdentifier(message.itemId) {
                 distinctAssistantItemIDs.insert(itemID)
@@ -160,19 +169,27 @@ enum TurnTimelineReducer {
         }
         let hasFileChangeCard = turnMessages.contains { $0.role == .system && $0.kind == .fileChange }
         if !hasFileChangeCard,
-           distinctAssistantTexts.count > 1,
+           (distinctAssistantTexts.count > 1 || (hasLargeAssistantText && distinctAssistantItemIDs.count > 1)),
            distinctAssistantItemIDs.count > 1 {
             return true
         }
 
-        // Check pattern: activity → assistant → activity (system activity on both sides).
+        // Check for activity after an already-visible assistant row. Preserving command/tool
+        // chronology avoids a second jump when the assistant flips from streaming to complete.
         let ordered = turnMessages.sorted { $0.orderIndex < $1.orderIndex }
         var hasActivityBeforeAssistant = false
         var seenAssistant = false
+        var seenStreamingAssistant = false
         for message in ordered {
             if message.role == .assistant {
                 seenAssistant = true
+                if message.isStreaming {
+                    seenStreamingAssistant = true
+                }
             } else if isInterleavableSystemActivity(message) {
+                if seenStreamingAssistant || (seenAssistant && isPostAssistantStatusActivity(message)) {
+                    return true
+                }
                 if !seenAssistant {
                     hasActivityBeforeAssistant = true
                 } else if hasActivityBeforeAssistant {
@@ -181,6 +198,92 @@ enum TurnTimelineReducer {
             }
         }
         return false
+    }
+
+    private static func isPostAssistantStatusActivity(_ message: CodexMessage) -> Bool {
+        guard message.role == .system else {
+            return false
+        }
+
+        switch message.kind {
+        case .toolActivity, .commandExecution:
+            return true
+        case .thinking, .chat, .plan, .userInputPrompt, .fileChange, .subagentAction:
+            return false
+        }
+    }
+
+    // Turn-end file-change snapshots can land after the user already sent the next
+    // message. Relocate them back to the end of their owning turn when a later turn
+    // has clearly started in between.
+    static func anchorLateFileChangesToOwningTurn(in messages: [CodexMessage]) -> [CodexMessage] {
+        var lastContentIndexByTurn: [String: Int] = [:]
+        for (index, message) in messages.enumerated() {
+            guard let turnId = message.turnId, !turnId.isEmpty,
+                  !(message.role == .system && message.kind == .fileChange) else {
+                continue
+            }
+            lastContentIndexByTurn[turnId] = index
+        }
+        guard !lastContentIndexByTurn.isEmpty else {
+            return messages
+        }
+
+        var relocatedIndicesByAnchor: [Int: [Int]] = [:]
+        var relocatedIndices = Set<Int>()
+        for (index, message) in messages.enumerated() {
+            guard message.role == .system,
+                  message.kind == .fileChange,
+                  let turnId = message.turnId, !turnId.isEmpty,
+                  let anchorIndex = lastContentIndexByTurn[turnId],
+                  anchorIndex < index else {
+                continue
+            }
+
+            let crossesIntoLaterTurn = messages[(anchorIndex + 1)..<index].contains { between in
+                guard let betweenTurnId = between.turnId, !betweenTurnId.isEmpty else {
+                    return false
+                }
+                return betweenTurnId != turnId
+            }
+            guard crossesIntoLaterTurn else {
+                continue
+            }
+
+            relocatedIndicesByAnchor[anchorIndex, default: []].append(index)
+            relocatedIndices.insert(index)
+        }
+        guard !relocatedIndices.isEmpty else {
+            return messages
+        }
+
+        var result: [CodexMessage] = []
+        result.reserveCapacity(messages.count)
+        for (index, message) in messages.enumerated() {
+            if relocatedIndices.contains(index) {
+                continue
+            }
+
+            result.append(message)
+            if let relocated = relocatedIndicesByAnchor[index] {
+                for relocatedIndex in relocated {
+                    result.append(messages[relocatedIndex])
+                }
+            }
+        }
+        return result
+    }
+
+    // Mac-started rollout mirrors can interleave many assistant/tool rows before the
+    // final answer; edited-file cards are still turn-end artifacts and must trail it.
+    private static func movingFileChangesToTurnTail(in messages: [CodexMessage]) -> [CodexMessage] {
+        guard messages.contains(where: { $0.role == .system && $0.kind == .fileChange }) else {
+            return messages
+        }
+
+        let nonFileChanges = messages.filter { !($0.role == .system && $0.kind == .fileChange) }
+        let fileChanges = messages.filter { $0.role == .system && $0.kind == .fileChange }
+        return nonFileChanges + fileChanges
     }
 
     private static func isInterleavableSystemActivity(_ message: CodexMessage) -> Bool {
@@ -358,12 +461,18 @@ enum TurnTimelineReducer {
         return previousTurnId == incomingTurnId
     }
 
-    // Treats synthetic turn-scoped thinking ids as unstable so a later real item can reuse the row.
+    // Treats synthetic turn-scoped and rollout-mirror thinking ids as unstable
+    // so a later real item can reuse the row instead of stacking a duplicate.
+    // Deliberately narrower than isMirrorMintedItemID: only this kind's own
+    // placeholder is unstable, other kinds' placeholders stay distinct.
     private static func hasStableThinkingIdentity(_ message: CodexMessage) -> Bool {
         guard let itemId = normalizedIdentifier(message.itemId) else {
             return false
         }
-        return !(itemId.hasPrefix("turn:") && itemId.contains("|kind:\(CodexMessageKind.thinking.rawValue)"))
+        if CodexSyntheticIdentifiers.isRolloutMintedItemID(itemId) {
+            return false
+        }
+        return !CodexSyntheticIdentifiers.isPlaceholderItemID(itemId, kind: .thinking)
     }
 
     // Identifies placeholder-only rows that should be reused instead of stacked.
@@ -601,10 +710,9 @@ enum TurnTimelineReducer {
         }
 
         let semanticUserMatch = CodexService.userMessagesMatchForHistory(merged, incoming)
-        let incomingText = incoming.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if shouldPreferIncomingPresentation {
             merged.text = incoming.text
-        } else if !incomingText.isEmpty,
+        } else if hasMeaningfulMessageText(incoming.text),
                   (!semanticUserMatch || (merged.skillMentions.isEmpty && merged.pluginMentions.isEmpty)) {
             merged.text = incoming.text
         }
@@ -632,7 +740,8 @@ enum TurnTimelineReducer {
     }
 
     private static func containsInlineMentionToken(_ text: String) -> Bool {
-        guard let regex = try? NSRegularExpression(
+        guard text.utf8.count <= largeTextDedupeByteLimit,
+              let regex = try? NSRegularExpression(
                 pattern: #"(?<!\S)([$/@])([A-Za-z0-9][A-Za-z0-9._-]*)(?=[\s,.;:!?)\]}>]|$)"#
               ) else {
             return false
@@ -646,8 +755,38 @@ enum TurnTimelineReducer {
         !CodexTimestampParser.isTrustworthyServerDate(date)
     }
 
-    private static func normalizedMessageText(_ text: String) -> String {
-        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func normalizedSmallMessageText(_ text: String) -> String? {
+        guard text.utf8.count <= largeTextDedupeByteLimit else {
+            return nil
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func messageTextsMatchForDedupe(_ lhs: String, _ rhs: String) -> Bool {
+        guard lhs.utf8.count <= largeTextDedupeByteLimit,
+              rhs.utf8.count <= largeTextDedupeByteLimit else {
+            return lhs == rhs
+        }
+
+        return lhs.trimmingCharacters(in: .whitespacesAndNewlines)
+            == rhs.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func hasMeaningfulMessageText(_ text: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        guard text.utf8.count <= smallWhitespaceScanByteLimit else { return true }
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private static func assistantReplayTextAlreadyRepresented(previous: String, incoming: String) -> Bool {
+        guard previous.utf8.count <= largeTextDedupeByteLimit,
+              incoming.utf8.count <= largeTextDedupeByteLimit else {
+            return previous == incoming
+        }
+        let previousText = previous.trimmingCharacters(in: .whitespacesAndNewlines)
+        let incomingText = incoming.trimmingCharacters(in: .whitespacesAndNewlines)
+        return previousText.count >= incomingText.count || previousText.contains(incomingText)
     }
 
     private static func attachmentSignature(for message: CodexMessage) -> String {
@@ -700,8 +839,7 @@ enum TurnTimelineReducer {
                 continue
             }
 
-            let normalizedText = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !normalizedText.isEmpty else {
+            guard hasMeaningfulMessageText(message.text) else {
                 result.append(message)
                 continue
             }
@@ -724,8 +862,10 @@ enum TurnTimelineReducer {
                 if let replayIndex = result.indices.reversed().first(where: {
                     shouldMergeAssistantReplay(previous: result[$0], incoming: message)
                 }) {
-                    let previousText = result[replayIndex].text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if previousText.count >= normalizedText.count || previousText.contains(normalizedText) {
+                    if assistantReplayTextAlreadyRepresented(
+                        previous: result[replayIndex].text,
+                        incoming: message.text
+                    ) {
                         continue
                     }
 
@@ -739,34 +879,38 @@ enum TurnTimelineReducer {
                     continue
                 }
 
-                let dedupeScope = normalizedIdentifier(message.itemId)
-                let key = "\(turnId)|\(dedupeScope ?? "no-item")|\(normalizedText)"
-                if seenKeys.contains(key) {
-                    continue
-                }
+                if let normalizedText = normalizedSmallMessageText(message.text) {
+                    let dedupeScope = normalizedIdentifier(message.itemId)
+                    let key = "\(turnId)|\(dedupeScope ?? "no-item")|\(normalizedText)"
+                    if seenKeys.contains(key) {
+                        continue
+                    }
 
-                let hasStableIdentity = dedupeScope != nil
-                let turnTextKey = "\(turnId)|\(normalizedText)"
-                if let previous = seenTurnText[turnTextKey],
-                   abs(message.createdAt.timeIntervalSince(previous.createdAt)) <= 12,
-                   !previous.hasStableIdentity || !hasStableIdentity {
-                    continue
+                    let hasStableIdentity = dedupeScope != nil
+                    let turnTextKey = "\(turnId)|\(normalizedText)"
+                    if let previous = seenTurnText[turnTextKey],
+                       abs(message.createdAt.timeIntervalSince(previous.createdAt)) <= 12,
+                       !previous.hasStableIdentity || !hasStableIdentity {
+                        continue
+                    }
+                    seenKeys.insert(key)
+                    seenTurnText[turnTextKey] = AssistantTurnTextObservation(
+                        createdAt: message.createdAt,
+                        hasStableIdentity: hasStableIdentity
+                    )
                 }
-                seenKeys.insert(key)
-                seenTurnText[turnTextKey] = AssistantTurnTextObservation(
-                    createdAt: message.createdAt,
-                    hasStableIdentity: hasStableIdentity
-                )
                 result.append(message)
                 continue
             }
 
-            if let previous = seenNoTurnByText[normalizedText],
-               abs(message.createdAt.timeIntervalSince(previous)) <= 12 {
-                continue
-            }
+            if let normalizedText = normalizedSmallMessageText(message.text) {
+                if let previous = seenNoTurnByText[normalizedText],
+                   abs(message.createdAt.timeIntervalSince(previous)) <= 12 {
+                    continue
+                }
 
-            seenNoTurnByText[normalizedText] = message.createdAt
+                seenNoTurnByText[normalizedText] = message.createdAt
+            }
             result.append(message)
         }
 
@@ -787,10 +931,8 @@ enum TurnTimelineReducer {
             return false
         }
 
-        let previousText = normalizedMessageText(previous.text)
-        let incomingText = normalizedMessageText(incoming.text)
-        guard previousText.count >= 24,
-              previousText == incomingText else {
+        guard messageTextsMatchForDedupe(previous.text, incoming.text),
+              previous.text.count >= 24 else {
             return false
         }
 
@@ -830,6 +972,10 @@ enum TurnTimelineReducer {
             return false
         }
 
+        guard previous.text.utf8.count <= largeTextDedupeByteLimit,
+              incoming.text.utf8.count <= largeTextDedupeByteLimit else {
+            return false
+        }
         let previousText = previous.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let incomingText = incoming.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard min(previousText.count, incomingText.count) >= 24 else {
@@ -854,26 +1000,34 @@ enum TurnTimelineReducer {
         guard let itemId else {
             return true
         }
-        return itemId.hasPrefix("turn:") || itemId.hasPrefix("rollout-")
+        return CodexSyntheticIdentifiers.isMirrorMintedItemID(itemId)
     }
 
     // Keeps only the newest matching file-change card when multiple event channels emit the same diff.
     static func removeDuplicateFileChangeMessages(in messages: [CodexMessage]) -> [CodexMessage] {
         let signatures = messages.map { fileChangeDedupSignature(for: $0) }
+        let fileChangeIndices = signatures.indices.filter { signatures[$0] != nil }
         var supersededIndices: Set<Int> = []
 
-        for olderIndex in messages.indices {
-            guard let olderSignature = signatures[olderIndex] else {
-                continue
-            }
+        for olderSlot in fileChangeIndices.indices {
+            let olderIndex = fileChangeIndices[olderSlot]
+            guard let olderSignature = signatures[olderIndex],
+                  !supersededIndices.contains(olderIndex) else { continue }
 
-            for newerIndex in messages.indices where newerIndex > olderIndex {
+            for newerSlot in (olderSlot + 1)..<fileChangeIndices.count {
+                let newerIndex = fileChangeIndices[newerSlot]
                 guard let newerSignature = signatures[newerIndex],
-                      fileChangeMessage(newerSignature, supersedes: olderSignature) else {
+                      !supersededIndices.contains(newerIndex) else {
                     continue
                 }
-                supersededIndices.insert(olderIndex)
-                break
+                if fileChangeMessage(newerSignature, supersedes: olderSignature)
+                    || fileChangeAggregateAbsorbs(newerSignature, card: olderSignature) {
+                    supersededIndices.insert(olderIndex)
+                    break
+                }
+                if fileChangeAggregateAbsorbs(olderSignature, card: newerSignature) {
+                    supersededIndices.insert(newerIndex)
+                }
             }
         }
 
@@ -974,12 +1128,12 @@ enum TurnTimelineReducer {
     private static func duplicateFileChangeKey(for message: CodexMessage) -> String? {
         let turnLabel = normalizedIdentifier(message.turnId) ?? "turnless"
 
-        if let summaryKey = TurnFileChangeSummaryParser.dedupeKey(from: message.text) {
+        if message.text.utf8.count <= largeTextDedupeByteLimit,
+           let summaryKey = TurnFileChangeSummaryParser.dedupeKey(from: message.text) {
             return "\(turnLabel)|\(summaryKey)"
         }
 
-        let normalizedText = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedText.isEmpty else {
+        guard let normalizedText = normalizedSmallMessageText(message.text) else {
             return nil
         }
         return "\(turnLabel)|\(normalizedText)"
@@ -996,7 +1150,9 @@ enum TurnTimelineReducer {
 
         let turnId = normalizedIdentifier(message.turnId)
         let key = duplicateFileChangeKey(for: message)
-        let entries = TurnFileChangeSummaryParser.parse(from: message.text)?.entries ?? []
+        let entries = message.text.utf8.count <= largeTextDedupeByteLimit
+            ? (TurnFileChangeSummaryParser.parse(from: message.text)?.entries ?? [])
+            : []
 
         let paths = Set(
             entries.map(\.path)
@@ -1021,8 +1177,29 @@ enum TurnTimelineReducer {
             key: key,
             paths: paths,
             singleEntryDescriptor: singleEntryDescriptor,
-            isStreaming: message.isStreaming
+            isStreaming: message.isStreaming,
+            isKnownAggregate: normalizedIdentifier(message.itemId)
+                .map(CodexSyntheticIdentifiers.isCumulativeFileChangeAggregateItemID) ?? false
         )
+    }
+
+    private static func fileChangeAggregateAbsorbs(
+        _ aggregate: FileChangeDedupSignature,
+        card: FileChangeDedupSignature
+    ) -> Bool {
+        guard !card.isStreaming,
+              !card.isKnownAggregate,
+              let aggregateTurn = aggregate.turnId,
+              let cardTurn = card.turnId,
+              aggregateTurn == cardTurn,
+              !card.paths.isEmpty,
+              !aggregate.paths.isEmpty else {
+            return false
+        }
+        if aggregate.isStreaming || aggregate.isKnownAggregate {
+            return card.paths.isSubset(of: aggregate.paths)
+        }
+        return card.paths.isStrictSubset(of: aggregate.paths)
     }
 
     // Treats newer file-change snapshots as authoritative only when they describe the
@@ -1113,6 +1290,9 @@ private struct FileChangeDedupSignature: Equatable {
     let paths: Set<String>
     let singleEntryDescriptor: FileChangeSingleEntryDescriptor?
     let isStreaming: Bool
+    // Positive-only: true when the item id can only belong to the cumulative
+    // aggregate row; false means identity unknown, not per-patch card.
+    let isKnownAggregate: Bool
 }
 
 private struct FileChangeSingleEntryDescriptor: Equatable {

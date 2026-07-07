@@ -1460,7 +1460,9 @@ extension CodexService {
                     let candidate = threadMessages[index]
                     guard candidate.role == .system,
                           candidate.kind == .fileChange,
-                          (candidate.turnId == resolvedTurnId || candidate.turnId == nil) else {
+                          (candidate.turnId == resolvedTurnId
+                              || (candidate.turnId == nil
+                                  && turnlessFileChangeRowBelongsToTurn(candidate, threadId: threadId, turnId: resolvedTurnId))) else {
                         return false
                     }
                     let candidatePathKeys = normalizedFileChangePathKeys(from: candidate.text)
@@ -2144,7 +2146,9 @@ extension CodexService {
                   let existingMessageID = messagesByThread[threadId]?.reversed().first(where: { candidate in
                       guard candidate.role == .system,
                             candidate.kind == .fileChange,
-                            (candidate.turnId == resolvedTurnId || candidate.turnId == nil) else {
+                            (candidate.turnId == resolvedTurnId
+                                || (candidate.turnId == nil
+                                    && turnlessFileChangeRowBelongsToTurn(candidate, threadId: threadId, turnId: resolvedTurnId))) else {
                           return false
                       }
                       let candidateKeys = normalizedFileChangePathKeys(from: candidate.text)
@@ -2602,13 +2606,32 @@ extension CodexService {
                 && candidate.kind == .fileChange
                 && (
                     candidate.turnId == turnId
-                        || (allowsTurnlessFallback && candidate.turnId == nil)
+                        || (allowsTurnlessFallback
+                            && candidate.turnId == nil
+                            && turnlessFileChangeRowBelongsToTurn(candidate, threadId: threadId, turnId: turnId))
                 )
         }
         guard candidates.count == 1 else {
             return nil
         }
         return candidates[0].id
+    }
+
+    private func turnlessFileChangeRowBelongsToTurn(
+        _ candidate: CodexMessage,
+        threadId: String,
+        turnId: String
+    ) -> Bool {
+        guard let messages = messagesByThread[threadId],
+              let candidateIndex = messages.firstIndex(where: { $0.id == candidate.id }) else {
+            return false
+        }
+        return Self.turnlessFileChangeRowIsClaimable(
+            in: messages,
+            candidateIndex: candidateIndex,
+            turnId: turnId,
+            turnBlockRange: Self.contiguousTurnBlockRange(in: messages, turnId: turnId)
+        )
     }
 
     private func pruneDuplicateSystemRows(
@@ -2624,6 +2647,15 @@ extension CodexService {
         guard threadMessages.indices.contains(keepIndex) else { return }
         let keepID = threadMessages[keepIndex].id
         let keepText = threadMessages[keepIndex].text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let turnBlockRange = Self.contiguousTurnBlockRange(in: threadMessages, turnId: turnId)
+        let prunableTurnlessIDs = Set(threadMessages.indices.compactMap { index -> String? in
+            guard let turnBlockRange,
+                  turnBlockRange.contains(index),
+                  threadMessages[index].turnId == nil else {
+                return nil
+            }
+            return threadMessages[index].id
+        })
 
         threadMessages.removeAll { candidate in
             guard candidate.id != keepID,
@@ -2636,6 +2668,7 @@ extension CodexService {
                 let sameTurn = candidate.turnId == turnId
                 let canPruneTurnlessFallback = isAuthoritativeFileChangeSnapshot
                     && candidate.turnId == nil
+                    && prunableTurnlessIDs.contains(candidate.id)
                 guard sameTurn || canPruneTurnlessFallback else {
                     return false
                 }
@@ -4326,11 +4359,11 @@ extension CodexService {
 // ─── Private helpers ──────────────────────────────────────────
 
 extension CodexService {
-    private func enqueueAssistantDelta(
+    func enqueueAssistantDelta(
         threadId: String,
         turnId: String,
         itemId: String?,
-        assistantPhase: String?,
+        assistantPhase: String? = nil,
         delta: String
     ) {
         let normalizedItemId = normalizedStreamingItemID(itemId)
@@ -5320,11 +5353,11 @@ extension CodexService {
     }
 
     func syntheticStreamingItemId(turnId: String, kind: CodexMessageKind) -> String {
-        "turn:\(turnId)|kind:\(kind.rawValue)"
+        CodexSyntheticIdentifiers.placeholderItemID(turnId: turnId, kind: kind)
     }
 
     func syntheticSubagentActionItemIdPrefix(turnId: String) -> String {
-        "turn:\(turnId)|kind:\(CodexMessageKind.subagentAction.rawValue)|action:"
+        CodexSyntheticIdentifiers.placeholderItemID(turnId: turnId, kind: .subagentAction) + "|action:"
     }
 
     func streamingPlaceholderText(for kind: CodexMessageKind) -> String {

@@ -563,6 +563,7 @@ function startBridge({
       // Observation-only — never claim the message.
       (msg) => { desktopRefresher.handleInbound(msg); return false; },
       (msg) => { rolloutLiveMirror?.observeInbound(msg); return false; },
+      (msg) => { forwardedRequestTracker.rememberRequest(msg); return false; },
       (msg) => desktopIpcActionFollower?.observeInbound(msg),
       (msg) => handleBridgeManagedThreadTurnsListRequest(msg),
     ],
@@ -572,7 +573,6 @@ function startBridge({
       const forwarded = activeProvider.id === "codex"
         ? disableUnsupportedReasoningSummaryForTurnStart(msg)
         : msg;
-      forwardedRequestTracker.rememberRequest(forwarded);
       rememberThreadFromMessage("phone", forwarded);
       codex.send(forwarded);
     },

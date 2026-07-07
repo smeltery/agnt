@@ -41,6 +41,9 @@ security_best_practices_report.md
 
 # Minified JS bundles (not part of this project)
 /main.js
+/main-*.js
+/deeplinks-*.js
+/preload.js
 /links-*.js
 /scheme-*.js
 /initial-route-atom-*.js

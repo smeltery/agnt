@@ -32,7 +32,10 @@ const {
   truncateRelayTextTail,
 } = require("./turns-list-pager");
 
-const RELAY_HISTORY_RECENT_TURN_TARGET = 40;
+// Used only after a thread/read payload exceeds the relay soft budget. Normal
+// threads are not trimmed; heavy threads first paint recent turns and page older
+// history through thread/turns/list.
+const RELAY_HISTORY_RECENT_TURN_TARGET = 16;
 
 function readString(value) {
   return typeof value === "string" ? value : "";
@@ -255,6 +258,7 @@ function buildRelayHistoryCompactionTurn(omittedTurnCount, keptTurnCount, idSour
 
   return {
     id: `agnt-history-compacted-${baseId}`,
+    status: "completed",
     agntSynthetic: true,
     agntHistoryCompacted: true,
     agntOmittedTurnCount: omittedTurnCount,

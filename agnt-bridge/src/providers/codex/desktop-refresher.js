@@ -320,6 +320,7 @@ class CodexDesktopRefresher {
       this.bundleId,
       this.appPath,
       targetUrl || "",
+      this.navigationOnly ? "0" : "1",
     ]);
   }
 

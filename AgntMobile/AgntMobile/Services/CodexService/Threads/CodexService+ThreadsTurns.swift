@@ -208,15 +208,46 @@ extension CodexService {
         composerDraftsByThreadID[threadId]
     }
 
+    func composerDraftMergeRevision(for threadId: String) -> Int {
+        composerDraftMergeRevisionByThreadID[threadId] ?? 0
+    }
+
+    func setComposerDraftPendingAttachmentIDs(_ ids: Set<String>, for threadId: String) {
+        composerDraftPendingAttachmentIDsByThreadID[threadId] = ids
+    }
+
+    func canMergePendingComposerAttachment(id attachmentID: String, for threadId: String) -> Bool {
+        guard let pendingAttachmentIDs = composerDraftPendingAttachmentIDsByThreadID[threadId] else {
+            return true
+        }
+
+        return pendingAttachmentIDs.contains(attachmentID)
+    }
+
+    func markPendingComposerAttachmentMerged(id attachmentID: String, for threadId: String) {
+        guard var pendingAttachmentIDs = composerDraftPendingAttachmentIDsByThreadID[threadId] else {
+            return
+        }
+
+        pendingAttachmentIDs.remove(attachmentID)
+        setComposerDraftPendingAttachmentIDs(pendingAttachmentIDs, for: threadId)
+    }
+
     func setComposerDraft(
         _ draft: TurnComposerLocalDraft?,
         for threadId: String,
-        persistToDisk: Bool = false
+        persistToDisk: Bool = false,
+        advancesAttachmentMergeRevision: Bool = true
     ) {
         if let draft, !draft.isEmpty {
             composerDraftsByThreadID[threadId] = draft
         } else {
             composerDraftsByThreadID.removeValue(forKey: threadId)
+            composerDraftPendingAttachmentIDsByThreadID.removeValue(forKey: threadId)
+        }
+
+        if advancesAttachmentMergeRevision {
+            composerDraftMergeRevisionByThreadID[threadId, default: 0] += 1
         }
 
         if persistToDisk {
@@ -2982,17 +3013,27 @@ extension CodexService {
         }
 
         let newestTurnObjects = newestFirst ? turnObjects : Array(turnObjects.reversed())
-        let latestTurnID = newestTurnObjects.compactMap { turnObject in
-            normalizedInterruptIdentifier(
+        let latestTurnID = newestTurnObjects.compactMap { turnObject -> String? in
+            guard let turnID = normalizedInterruptIdentifier(
                 turnObject["id"]?.stringValue
                     ?? turnObject["turnId"]?.stringValue
                     ?? turnObject["turn_id"]?.stringValue
-            )
+            ), !CodexSyntheticIdentifiers.isHistoryCompactionMarkerTurnID(turnID) else {
+                return nil
+            }
+            return turnID
         }.first
 
         // Newest-first scanning avoids interrupting an older completed turn when recovery is stale.
         var hasInterruptibleTurnWithoutID = false
         for turnObject in newestTurnObjects {
+            if let turnID = normalizedInterruptIdentifier(
+                turnObject["id"]?.stringValue
+                    ?? turnObject["turnId"]?.stringValue
+                    ?? turnObject["turn_id"]?.stringValue
+            ), CodexSyntheticIdentifiers.isHistoryCompactionMarkerTurnID(turnID) {
+                continue
+            }
             let turnStatus = normalizedInterruptTurnStatus(from: turnObject)
             guard isInterruptibleTurnStatus(turnStatus) else {
                 continue

@@ -37,6 +37,7 @@ test("buildRelayHistoryCompactionTurn returns null for negative omitted counts",
 test("buildRelayHistoryCompactionTurn synthesises a turn with the agnt-history-compacted marker", () => {
   const turn = buildRelayHistoryCompactionTurn(12, 3, { id: "thread-abc" });
   assert.match(turn.id, /^agnt-history-compacted-thread-abc/);
+  assert.equal(turn.status, "completed");
   assert.equal(turn.agntSynthetic, true);
   assert.equal(turn.agntHistoryCompacted, true);
   assert.equal(turn.agntOmittedTurnCount, 12);
@@ -142,7 +143,7 @@ test("trimThreadPayloadForRelay drops older turns and prepends the agnt-history-
 });
 
 test("trimThreadPayloadForRelay keeps no more than RELAY_HISTORY_RECENT_TURN_TARGET turns on the first compaction pass", () => {
-  assert.equal(RELAY_HISTORY_RECENT_TURN_TARGET, 40);
+  assert.equal(RELAY_HISTORY_RECENT_TURN_TARGET, 16);
   // Verify that a long, easily-shrinkable thread doesn't keep more than the
   // target. We use small per-turn payloads so the pass converges at the
   // 40-turn step rather than the per-item drop step.

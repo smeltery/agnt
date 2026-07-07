@@ -677,6 +677,7 @@ private struct ComposerPreviewContent: View {
                 composerMentionedPlugins: [],
                 composerReviewSelection: nil,
                 isSubagentsSelectionArmed: isSubagentsSelectionArmed,
+                isPlanModeArmed: isPlanModeArmed,
                 isVoiceRecording: false,
                 voiceAudioLevels: [],
                 voiceRecordingDuration: 0

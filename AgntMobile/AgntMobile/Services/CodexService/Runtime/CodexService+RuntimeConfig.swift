@@ -444,7 +444,7 @@ extension CodexService {
     }
 }
 
-private extension CodexService {
+extension CodexService {
     // Centralizes thread-override mutation so empty records never linger in storage.
     func mutateThreadRuntimeOverride(
         for threadId: String,

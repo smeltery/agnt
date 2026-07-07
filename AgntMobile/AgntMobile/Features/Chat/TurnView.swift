@@ -408,7 +408,7 @@ struct TurnView: View {
                 // Defer the observable-model mutation out of the .onChange action
                 // to avoid AttributeGraph cycles when the parent re-renders.
                 DispatchQueue.main.async { [viewModel] in
-                    viewModel.saveLocalDraft(codex: codex, threadID: thread.id, persistToDisk: true)
+                    viewModel.saveLifecycleLocalDraft(codex: codex, threadID: thread.id)
                 }
                 cancelVoiceRecordingIfNeeded()
                 invalidatePendingVoicePreflight()
@@ -421,7 +421,7 @@ struct TurnView: View {
             cancelVoiceRecordingIfNeeded()
             invalidatePendingVoicePreflight()
             clearVoiceRecovery()
-            viewModel.saveLocalDraft(codex: codex, threadID: thread.id, persistToDisk: true)
+            viewModel.saveLifecycleLocalDraft(codex: codex, threadID: thread.id)
             viewModel.cancelTransientTasks()
             viewModel.clearComposerAutocomplete()
         }

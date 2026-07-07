@@ -63,7 +63,7 @@ enum TurnAttachmentPipeline {
     private static let thumbnailCache = NSCache<NSString, UIImage>()
 
     // Builds both payload and preview formats from raw picker data.
-    static func makeAttachment(from sourceData: Data) -> CodexImageAttachment? {
+    nonisolated static func makeAttachment(from sourceData: Data) -> CodexImageAttachment? {
         guard let normalizedJPEGData = normalizePayloadJPEG(from: sourceData),
               let thumbnailBase64 = makeThumbnailBase64JPEG(from: normalizedJPEGData) else {
             return nil
@@ -98,7 +98,7 @@ enum TurnAttachmentPipeline {
     }
 
     // Converts any image source into a normalized JPEG payload to keep network and memory predictable.
-    private static func normalizePayloadJPEG(from sourceData: Data) -> Data? {
+    private nonisolated static func normalizePayloadJPEG(from sourceData: Data) -> Data? {
         guard let image = UIImage(data: sourceData) else {
             return nil
         }
@@ -123,7 +123,7 @@ enum TurnAttachmentPipeline {
     }
 
     // Produces the exact 70x70 cover thumbnail shown in composer and user bubble.
-    private static func makeThumbnailBase64JPEG(from imageData: Data) -> String? {
+    private nonisolated static func makeThumbnailBase64JPEG(from imageData: Data) -> String? {
         guard let image = UIImage(data: imageData) else {
             return nil
         }

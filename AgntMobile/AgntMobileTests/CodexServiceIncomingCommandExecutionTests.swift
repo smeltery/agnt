@@ -706,6 +706,118 @@ final class CodexServiceIncomingCommandExecutionTests: XCTestCase {
         XCTAssertNil(assistantMessage.flatMap { service.readyChangeSet(forAssistantMessage: $0) })
     }
 
+    func testLiveFileChangeBootstrapFallbackDoesNotCrossUserBoundary() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let previousTurnID = "turn-\(UUID().uuidString)"
+        let newTurnID = "turn-\(UUID().uuidString)"
+        let fileChangeText = """
+        Status: completed
+
+        Path: Sources/App.swift
+        Kind: update
+        Totals: +2 -1
+        """
+
+        service.appendUserMessage(threadId: threadID, text: "first prompt", turnId: previousTurnID)
+        service.appendSystemMessage(
+            threadId: threadID,
+            text: fileChangeText,
+            kind: .fileChange,
+            isStreaming: false
+        )
+
+        service.appendUserMessage(threadId: threadID, text: "nice")
+        service.handleNotification(
+            method: "turn/started",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(newTurnID),
+            ])
+        )
+        service.upsertStreamingSystemItemMessage(
+            threadId: threadID,
+            turnId: newTurnID,
+            itemId: "file-new-turn",
+            kind: .fileChange,
+            text: fileChangeText,
+            isStreaming: false
+        )
+
+        let fileRows = service.messages(for: threadID).filter {
+            $0.role == .system && $0.kind == .fileChange
+        }
+        XCTAssertEqual(fileRows.count, 2)
+        XCTAssertNil(fileRows[0].turnId)
+        XCTAssertEqual(fileRows[1].turnId, newTurnID)
+        XCTAssertEqual(fileRows[1].itemId, "file-new-turn")
+    }
+
+    func testLiveFileChangeAppendDoesNotStealNextTurnsTurnlessTable() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let oldTurnID = "turn-\(UUID().uuidString)"
+        let newTurnID = "turn-\(UUID().uuidString)"
+        let now = Date(timeIntervalSince1970: 1_779_654_720)
+        let fileChangeText = """
+        Status: completed
+
+        Path: package.json
+        Kind: update
+        Totals: +1 -1
+        """
+
+        service.messagesByThread[threadID] = [
+            CodexMessage(
+                id: "user-old-turn",
+                threadId: threadID,
+                role: .user,
+                text: "first change",
+                createdAt: now,
+                turnId: oldTurnID,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+            CodexMessage(
+                id: "user-new-turn",
+                threadId: threadID,
+                role: .user,
+                text: "second change",
+                createdAt: now.addingTimeInterval(10),
+                turnId: newTurnID,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+            CodexMessage(
+                id: "new-turn-table",
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: fileChangeText,
+                createdAt: now.addingTimeInterval(12),
+                turnId: nil,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+        ]
+
+        service.appendSystemMessage(
+            threadId: threadID,
+            text: fileChangeText,
+            turnId: oldTurnID,
+            itemId: "file-old",
+            kind: .fileChange,
+            isStreaming: false
+        )
+
+        let fileRows = service.messages(for: threadID).filter {
+            $0.role == .system && $0.kind == .fileChange
+        }
+        XCTAssertEqual(fileRows.count, 2)
+        XCTAssertNil(service.messages(for: threadID).first(where: { $0.id == "new-turn-table" })?.turnId)
+        XCTAssertTrue(fileRows.contains { $0.turnId == oldTurnID && $0.itemId == "file-old" })
+    }
+
     func testLegacyToolActivityAfterAssistantCreatesNewLaterRow() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"
@@ -2231,6 +2343,169 @@ final class CodexServiceIncomingCommandExecutionTests: XCTestCase {
             if case .previousMessages = $0 { return true }
             return false
         })
+    }
+
+    func testHistoryFileChangeDoesNotStealPreviousTurnsTurnlessTable() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let newTurnID = "turn-\(UUID().uuidString)"
+        let now = Date(timeIntervalSince1970: 1_779_654_720)
+        let existing = [
+            CodexMessage(
+                id: "old-table",
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: "package.json +1 -1",
+                createdAt: now,
+                turnId: nil,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+            CodexMessage(
+                id: "user-new-turn",
+                threadId: threadID,
+                role: .user,
+                text: "nice",
+                createdAt: now.addingTimeInterval(10),
+                turnId: newTurnID,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+        ]
+        let history = [
+            CodexMessage(
+                id: "new-turn-snapshot",
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: "package.json +1 -1",
+                createdAt: now.addingTimeInterval(12),
+                turnId: newTurnID,
+                itemId: "fc-new",
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+        ]
+
+        let merged = service.mergeHistoryMessages(existing, history)
+        let fileChangeRows = merged.filter { $0.kind == .fileChange }
+
+        XCTAssertEqual(fileChangeRows.count, 2)
+        XCTAssertNil(merged.first(where: { $0.id == "old-table" })?.turnId)
+    }
+
+    func testHistoryFileChangeDoesNotStealNextTurnsTurnlessTable() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let oldTurnID = "turn-\(UUID().uuidString)"
+        let newTurnID = "turn-\(UUID().uuidString)"
+        let now = Date(timeIntervalSince1970: 1_779_654_720)
+        let existing = [
+            CodexMessage(
+                id: "user-old-turn",
+                threadId: threadID,
+                role: .user,
+                text: "first change",
+                createdAt: now,
+                turnId: oldTurnID,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+            CodexMessage(
+                id: "user-new-turn",
+                threadId: threadID,
+                role: .user,
+                text: "second change",
+                createdAt: now.addingTimeInterval(10),
+                turnId: newTurnID,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+            CodexMessage(
+                id: "new-turn-table",
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: "package.json +1 -1",
+                createdAt: now.addingTimeInterval(12),
+                turnId: nil,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+        ]
+        let history = [
+            CodexMessage(
+                id: "old-turn-snapshot",
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: "package.json +1 -1",
+                createdAt: now.addingTimeInterval(2),
+                turnId: oldTurnID,
+                itemId: "fc-old",
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+        ]
+
+        let merged = service.mergeHistoryMessages(existing, history)
+        let fileChangeRows = merged.filter { $0.kind == .fileChange }
+
+        XCTAssertEqual(fileChangeRows.count, 2)
+        XCTAssertNil(merged.first(where: { $0.id == "new-turn-table" })?.turnId)
+        XCTAssertNotNil(merged.first(where: { $0.id == "old-turn-snapshot" }))
+    }
+
+    func testHistoryFileChangeStillBindsSameTurnTurnlessSnapshot() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let now = Date(timeIntervalSince1970: 1_779_654_720)
+        let existing = [
+            CodexMessage(
+                id: "user-turn",
+                threadId: threadID,
+                role: .user,
+                text: "bump the version",
+                createdAt: now,
+                turnId: turnID,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+            CodexMessage(
+                id: "turnless-snapshot",
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: "package.json +1 -1",
+                createdAt: now.addingTimeInterval(5),
+                turnId: nil,
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+        ]
+        let history = [
+            CodexMessage(
+                id: "turn-snapshot",
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: "package.json +1 -1",
+                createdAt: now.addingTimeInterval(6),
+                turnId: turnID,
+                itemId: "fc-turn",
+                isStreaming: false,
+                deliveryState: .confirmed
+            ),
+        ]
+
+        let merged = service.mergeHistoryMessages(existing, history)
+        let fileChangeRows = merged.filter { $0.kind == .fileChange }
+
+        XCTAssertEqual(fileChangeRows.count, 1)
+        XCTAssertEqual(fileChangeRows[0].id, "turnless-snapshot")
+        XCTAssertEqual(fileChangeRows[0].turnId, turnID)
     }
 
     private func makeService() -> CodexService {

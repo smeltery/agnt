@@ -29,9 +29,9 @@ final class MyDevicesPresentationTests: XCTestCase {
         let rows = MyDevicesPresentation.rowModels(from: service, switchingDeviceId: nil)
         let currentRow = try? XCTUnwrap(rows.first { $0.deviceId == currentID })
 
-        XCTAssertEqual(currentRow??.status, "Selected")
-        XCTAssertTrue(currentRow??.isCurrent == true)
-        XCTAssertEqual(currentRow??.primaryName, "Studio")
+        XCTAssertEqual(currentRow?.status, "Selected")
+        XCTAssertTrue(currentRow?.isCurrent == true)
+        XCTAssertEqual(currentRow?.primaryName, "Studio")
     }
 
     func testRowModelReportsSwitchingState() {
@@ -41,9 +41,9 @@ final class MyDevicesPresentationTests: XCTestCase {
         let rows = MyDevicesPresentation.rowModels(from: service, switchingDeviceId: deviceID)
         let row = try? XCTUnwrap(rows.first { $0.deviceId == deviceID })
 
-        XCTAssertEqual(row??.status, "Switching")
-        XCTAssertEqual(row??.detail, "Reloading chats…")
-        XCTAssertTrue(row??.isSwitching == true)
+        XCTAssertEqual(row?.status, "Switching")
+        XCTAssertEqual(row?.detail, "Reloading chats…")
+        XCTAssertTrue(row?.isSwitching == true)
     }
 
     func testSortPlacesCurrentDeviceFirst() {
