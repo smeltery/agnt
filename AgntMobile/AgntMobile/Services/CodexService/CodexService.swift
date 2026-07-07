@@ -647,6 +647,9 @@ final class CodexService {
     var supportsKeepAwakeWhileBridgeRuns: Bool {
         bridgeHostCapabilities.keepAwake
     }
+    var supportsBridgeSelfUpdate: Bool {
+        bridgeHostCapabilities.bridgeSelfUpdate
+    }
     var hostComputerLabel: String {
         bridgeHostPlatform.displayName
     }

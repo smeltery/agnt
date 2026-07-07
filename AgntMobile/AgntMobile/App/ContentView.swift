@@ -61,6 +61,7 @@ struct ContentView: View {
     @State private var isResolvingManualPairingCode = false
     @State private var isSearchActive = false
     @State private var isRetryingBridgeUpdate = false
+    @State private var isUpdatingBridgePackage = false
     @State private var isPreparingManualScanner = false
     @State private var macSwitchTask: Task<Void, Never>?
     @State private var suppressAutomaticThreadSelection = false
@@ -1330,6 +1331,7 @@ struct ContentView: View {
     private func dismissBridgeUpdatePrompt() {
         codex.bridgeUpdatePrompt = nil
         isRetryingBridgeUpdate = false
+        isUpdatingBridgePackage = false
     }
 
     private func dismissWhatsNewSheet(version: String) {
@@ -1341,6 +1343,10 @@ struct ContentView: View {
         BridgeUpdateSheet(
             prompt: prompt,
             isRetrying: isRetryingBridgeUpdate,
+            isUpdatingBridge: isUpdatingBridgePackage,
+            onUpdateBridge: codex.isConnected && codex.supportsBridgeSelfUpdate ? {
+                updateBridgePackageAndRestart()
+            } : nil,
             onRetry: {
                 retryBridgeConnectionAfterUpdate()
             },
@@ -1366,9 +1372,38 @@ struct ContentView: View {
         .presentationDragIndicator(.visible)
     }
 
+    private func updateBridgePackageAndRestart() {
+        guard !isUpdatingBridgePackage else {
+            return
+        }
+
+        isUpdatingBridgePackage = true
+
+        Task {
+            do {
+                let handoffService = DesktopHandoffService(codex: codex)
+                try await handoffService.updateBridgePackageAndRestart()
+                await MainActor.run {
+                    isUpdatingBridgePackage = false
+                    isRetryingBridgeUpdate = true
+                }
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                await viewModel.toggleConnection(codex: codex)
+                await MainActor.run {
+                    isRetryingBridgeUpdate = false
+                }
+            } catch {
+                await MainActor.run {
+                    isUpdatingBridgePackage = false
+                    codex.lastErrorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
     // Re-tries the saved relay session after the user updates the Mac package.
     private func retryBridgeConnectionAfterUpdate() {
-        guard !isRetryingBridgeUpdate else {
+        guard !isRetryingBridgeUpdate, !isUpdatingBridgePackage else {
             return
         }
 

@@ -169,6 +169,7 @@ function deriveHostCapabilities(platform, { webTerminalEnabled = false } = {}) {
     displayWake: isMacOS,
     keepAwake: isMacOS,
     hostBrowserLogin: isMacOS,
+    bridgeSelfUpdate: isMacOS,
     // On-device SSH terminal runs on the phone via Citadel; available regardless of host.
     terminal: true,
     // Bridge-spawned local PTY shell exposed to the web client. Off by default —

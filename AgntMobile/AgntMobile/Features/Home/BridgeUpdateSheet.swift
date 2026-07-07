@@ -10,6 +10,8 @@ import UIKit
 struct BridgeUpdateSheet: View {
     let prompt: CodexBridgeUpdatePrompt
     let isRetrying: Bool
+    let isUpdatingBridge: Bool
+    let onUpdateBridge: (() -> Void)?
     let onRetry: () -> Void
     let onScanNewQR: () -> Void
     let onDismiss: () -> Void
@@ -88,22 +90,44 @@ struct BridgeUpdateSheet: View {
                 Spacer(minLength: 0)
 
                 VStack(spacing: 12) {
+                    if let onUpdateBridge, prompt.command != nil {
+                        Button(action: onUpdateBridge) {
+                            HStack(spacing: 8) {
+                                if isUpdatingBridge {
+                                    ProgressView()
+                                        .tint(.white)
+                                }
+                                Text(isUpdatingBridge ? "Updating..." : "Update on This Mac")
+                                    .font(AppFont.body(weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .foregroundStyle(.white)
+                            .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isUpdatingBridge || isRetrying)
+                    }
+
                     Button(action: onRetry) {
                         HStack(spacing: 8) {
                             if isRetrying {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(onUpdateBridge == nil ? Color.white : Color.primary)
                             }
                             Text(isRetrying ? "Reconnecting..." : "I Updated It")
                                 .font(AppFont.body(weight: .semibold))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .foregroundStyle(.white)
-                        .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .foregroundStyle(onUpdateBridge == nil ? Color.white : Color.primary)
+                        .background(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(onUpdateBridge == nil ? Color.black : Color(.secondarySystemFill))
+                        )
                     }
                     .buttonStyle(.plain)
-                    .disabled(isRetrying)
+                    .disabled(isRetrying || isUpdatingBridge)
 
                     Button("Scan New QR Code", action: onScanNewQR)
                         .font(AppFont.body(weight: .semibold))
