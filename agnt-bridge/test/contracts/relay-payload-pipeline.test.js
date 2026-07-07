@@ -22,6 +22,9 @@ const {
   sanitizeRelayHistoryTurns,
   sanitizeRelayHistoryTurn,
 } = require("../../src/bridge/relay-payload-pipeline");
+const {
+  RELAY_HISTORY_RECENT_TURN_TARGET,
+} = require("../../src/bridge/relay-payload-trimmer");
 
 // ─── dispatcher behaviour ───────────────────────────────────────────────────
 
@@ -236,13 +239,16 @@ test("sanitizeThreadHistoryImagesForRelay pre-trims oversized old image turns be
     "old oversized image turns should be omitted instead of sanitized and kept"
   );
   assert.equal(rewritten.result.thread.agntHistoryCompacted, true);
-  assert.equal(rewritten.result.thread.agntOmittedTurnCount, 5);
-  assert.equal(rewritten.result.thread.agntKeptTurnCount, 40);
+  assert.equal(
+    rewritten.result.thread.agntOmittedTurnCount,
+    turns.length - RELAY_HISTORY_RECENT_TURN_TARGET
+  );
+  assert.equal(rewritten.result.thread.agntKeptTurnCount, RELAY_HISTORY_RECENT_TURN_TARGET);
   assert.deepEqual(
     rewritten.result.thread.turns.map((turn) => turn.id),
     [
       "agnt-history-compacted-old-turn-1",
-      ...turns.slice(5).map((turn) => turn.id),
+      ...turns.slice(-RELAY_HISTORY_RECENT_TURN_TARGET).map((turn) => turn.id),
     ]
   );
 });

@@ -17,6 +17,9 @@ const {
   sanitizeLiveGeneratedImageMessageForRelay,
   sanitizeThreadHistoryImagesForRelay,
 } = require("../../src/bridge/bridge");
+const {
+  RELAY_HISTORY_RECENT_TURN_TARGET,
+} = require("../../src/bridge/relay-payload-trimmer");
 const { createMacOSBridgeWakeAssertion } = require("../../src/platform/wake-assertion");
 
 test("disableUnsupportedReasoningSummaryForTurnStart disables summaries for Codex Spark", () => {
@@ -791,7 +794,7 @@ test("sanitizeThreadHistoryImagesForRelay compacts oversized history before the 
   );
 });
 
-test("sanitizeThreadHistoryImagesForRelay keeps the newest forty turns when compacting", () => {
+test("sanitizeThreadHistoryImagesForRelay keeps the configured recent turn window when compacting", () => {
   const largeText = "A".repeat(900 * 1024);
   const turns = Array.from({ length: 45 }, (_, index) => ({
     id: `turn-${index + 1}`,
@@ -818,13 +821,16 @@ test("sanitizeThreadHistoryImagesForRelay keeps the newest forty turns when comp
   );
 
   assert.equal(sanitized.result.thread.agntHistoryCompacted, true);
-  assert.equal(sanitized.result.thread.agntOmittedTurnCount, 5);
-  assert.equal(sanitized.result.thread.agntKeptTurnCount, 40);
+  assert.equal(
+    sanitized.result.thread.agntOmittedTurnCount,
+    turns.length - RELAY_HISTORY_RECENT_TURN_TARGET
+  );
+  assert.equal(sanitized.result.thread.agntKeptTurnCount, RELAY_HISTORY_RECENT_TURN_TARGET);
   assert.deepEqual(
     sanitized.result.thread.turns.map((turn) => turn.id),
     [
       "agnt-history-compacted-turn-1",
-      ...turns.slice(5).map((turn) => turn.id),
+      ...turns.slice(-RELAY_HISTORY_RECENT_TURN_TARGET).map((turn) => turn.id),
     ]
   );
 });
