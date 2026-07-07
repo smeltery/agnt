@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -34,7 +37,11 @@ fun BridgeUpdateSheet(
     title: String,
     message: String,
     installCommand: String? = null,
+    canUpdateBridge: Boolean = false,
+    isUpdatingBridge: Boolean = false,
+    updateBridgeError: String? = null,
     onDismiss: () -> Unit,
+    onUpdateBridge: () -> Unit = {},
     onRetry: () -> Unit,
     onScanNewQr: () -> Unit,
     modifier: Modifier = Modifier,
@@ -85,9 +92,42 @@ fun BridgeUpdateSheet(
                     Text(stringResource(R.string.bridge_update_copy_install_command))
                 }
             }
-            TextButton(onClick = onRetry) { Text("Retry") }
-            TextButton(onClick = onScanNewQr) { Text("Scan new QR") }
-            TextButton(onClick = onDismiss) { Text("Dismiss") }
+            updateBridgeError?.takeIf { it.isNotBlank() }?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (canUpdateBridge && !installCommand.isNullOrBlank()) {
+                Button(
+                    onClick = onUpdateBridge,
+                    enabled = !isUpdatingBridge,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (isUpdatingBridge) {
+                        CircularProgressIndicator(
+                            modifier =
+                                Modifier
+                                    .padding(end = 8.dp)
+                                    .size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                    Text(
+                        stringResource(
+                            if (isUpdatingBridge) {
+                                R.string.bridge_update_updating
+                            } else {
+                                R.string.bridge_update_on_this_computer
+                            },
+                        ),
+                    )
+                }
+            }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.bridge_update_retry)) }
+            TextButton(onClick = onScanNewQr) { Text(stringResource(R.string.bridge_update_scan_new_qr)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.bridge_update_dismiss)) }
         }
     }
 }

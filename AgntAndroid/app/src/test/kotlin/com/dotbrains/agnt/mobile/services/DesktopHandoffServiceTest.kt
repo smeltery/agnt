@@ -160,6 +160,59 @@ class DesktopHandoffServiceTest {
 
             assertEquals("saved_pair_required", error.errorCode)
         }
+
+    @Test
+    fun updateBridgePackageAndRestartRequiresRestartScheduledSuccess() =
+        runTest {
+            val methods = mutableListOf<String>()
+            val repository =
+                HandoffFakeRepository { method, params ->
+                    methods += method
+                    assertEquals(emptyMap(), params?.objectValue)
+                    RPCMessage.success(
+                        id = null,
+                        result =
+                            JSONValue.Obj(
+                                mapOf(
+                                    "success" to JSONValue.Bool(true),
+                                    "restartScheduled" to JSONValue.Bool(true),
+                                ),
+                            ),
+                    )
+                }
+
+            DesktopHandoffService(repository).updateBridgePackageAndRestart()
+
+            assertEquals(listOf("desktop/bridge/updateAndRestart"), methods)
+        }
+
+    @Test
+    fun updateBridgePackageAndRestartMapsUnsupportedSelfUpdate() =
+        runTest {
+            val repository =
+                HandoffFakeRepository { _, _ ->
+                    throw AgentServiceError.RpcFailure(
+                        RPCError(
+                            code = -32000,
+                            message = "Bridge self-update is unavailable on this host.",
+                            data =
+                                JSONValue.Obj(
+                                    mapOf(
+                                        "errorCode" to JSONValue.Str("unsupported_bridge_self_update"),
+                                    ),
+                                ),
+                        ),
+                    )
+                }
+
+            val error =
+                assertFailsWith<DesktopHandoffError.BridgeFailure> {
+                    DesktopHandoffService(repository).updateBridgePackageAndRestart()
+                }
+
+            assertEquals("unsupported_bridge_self_update", error.errorCode)
+            assertEquals("Bridge self-update is unavailable on this host.", error.message)
+        }
 }
 
 private class HandoffFakeRepository(

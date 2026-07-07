@@ -135,8 +135,11 @@ fun MainShell(
     val handoffFallbackMessage = stringResource(R.string.turn_open_desktop_failed_fallback)
     val appName = stringResource(R.string.app_name)
     val gitStatusLoadingToast = stringResource(R.string.git_status_loading_toast)
+    val bridgeUpdateFailedFallback = stringResource(R.string.bridge_update_failed_fallback)
     val context = LocalContext.current
     var desktopHandoffError by remember { mutableStateOf<String?>(null) }
+    var bridgeUpdateError by remember { mutableStateOf<String?>(null) }
+    var isUpdatingBridge by remember { mutableStateOf(false) }
     var handingOffToDesktop by remember { mutableStateOf(false) }
     var handingOffWorktree by remember { mutableStateOf(false) }
     var worktreeHandoffError by remember { mutableStateOf<String?>(null) }
@@ -1419,9 +1422,37 @@ fun MainShell(
         title = bridgeUpdatePrompt?.title.orEmpty(),
         message = bridgeUpdatePrompt?.message.orEmpty(),
         installCommand = bridgeUpdatePrompt?.command,
-        onDismiss = { repository.dismissBridgeUpdatePrompt() },
-        onRetry = { viewModel.retryBridgeConnectionAfterUpdate() },
+        canUpdateBridge = ready,
+        isUpdatingBridge = isUpdatingBridge,
+        updateBridgeError = bridgeUpdateError,
+        onDismiss = {
+            bridgeUpdateError = null
+            repository.dismissBridgeUpdatePrompt()
+        },
+        onUpdateBridge = {
+            if (isUpdatingBridge) return@BridgeUpdateSheet
+            bridgeUpdateError = null
+            isUpdatingBridge = true
+            scope.launch {
+                try {
+                    repository.updateBridgePackageAndRestart()
+                    repository.dismissBridgeUpdatePrompt()
+                    viewModel.retryBridgeConnectionAfterUpdate()
+                } catch (error: Exception) {
+                    bridgeUpdateError =
+                        error.message?.takeIf { it.isNotBlank() }
+                            ?: bridgeUpdateFailedFallback
+                } finally {
+                    isUpdatingBridge = false
+                }
+            }
+        },
+        onRetry = {
+            bridgeUpdateError = null
+            viewModel.retryBridgeConnectionAfterUpdate()
+        },
         onScanNewQr = {
+            bridgeUpdateError = null
             repository.dismissBridgeUpdatePrompt()
             onOpenPairingScanner()
         },
