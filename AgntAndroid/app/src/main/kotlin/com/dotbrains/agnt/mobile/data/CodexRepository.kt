@@ -235,6 +235,9 @@ interface CodexRepository {
     /** Clears [bridgeUpdatePrompt] after the user dismisses the sheet. */
     fun dismissBridgeUpdatePrompt()
 
+    /** Requests the connected desktop bridge to update the npm package and restart itself. */
+    suspend fun updateBridgePackageAndRestart(): Unit = throw UnsupportedOperationException("bridge self-update is not implemented by this repository")
+
     /** Best-effort `thread/list` refresh (active + archived); no-op when disconnected. */
     suspend fun refreshThreads()
 

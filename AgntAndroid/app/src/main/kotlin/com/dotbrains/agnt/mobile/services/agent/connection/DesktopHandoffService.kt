@@ -88,6 +88,25 @@ class DesktopHandoffService(
         }
     }
 
+    suspend fun updateBridgePackageAndRestart() {
+        try {
+            val response =
+                repository.sendRequest(
+                    method = "desktop/bridge/updateAndRestart",
+                    params = JSONValue.Obj(emptyMap()),
+                )
+            val resultObject = response.result?.objectValue
+            if (
+                resultObject?.get("success")?.boolValue != true ||
+                resultObject["restartScheduled"]?.boolValue != true
+            ) {
+                throw DesktopHandoffError.InvalidResponse
+            }
+        } catch (error: AgentServiceError) {
+            throw mapServiceError(error)
+        }
+    }
+
     private fun requireSuccess(response: com.dotbrains.agnt.mobile.core.model.RPCMessage) {
         val resultObject = response.result?.objectValue
         if (resultObject?.get("success")?.boolValue != true) {
@@ -132,6 +151,14 @@ class DesktopHandoffService(
                         "Update the agnt bridge on your computer to sync this setting."
                     }
                 "invalid_bridge_preferences" -> error.rpcError.message.ifBlank { "The computer bridge rejected this setting update." }
+                "unsupported_bridge_self_update" ->
+                    error.rpcError.message.ifBlank {
+                        "Update the agnt bridge manually on your computer, then reconnect."
+                    }
+                "bridge_update_failed" ->
+                    error.rpcError.message.ifBlank {
+                        "The bridge could not update itself. Run the install command manually, then reconnect."
+                    }
                 else -> error.rpcError.message.ifBlank { "Could not continue this chat on your desktop." }
             }
         return DesktopHandoffError.BridgeFailure(errorCode = errorCode, message = message)

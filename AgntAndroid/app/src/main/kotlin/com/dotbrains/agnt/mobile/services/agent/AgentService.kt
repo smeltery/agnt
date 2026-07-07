@@ -41,6 +41,7 @@ import com.dotbrains.agnt.mobile.data.QueuedTurnDraft
 import com.dotbrains.agnt.mobile.data.QueuedTurnDraftPreview
 import com.dotbrains.agnt.mobile.data.TurnDraftQueueStore
 import com.dotbrains.agnt.mobile.services.agent.connection.AgntTrustedSessionResolveClient
+import com.dotbrains.agnt.mobile.services.agent.connection.DesktopHandoffService
 import com.dotbrains.agnt.mobile.services.agent.connection.connectImpl
 import com.dotbrains.agnt.mobile.services.agent.connection.disconnectImpl
 import com.dotbrains.agnt.mobile.services.agent.connection.setActiveThreadIdImpl
@@ -575,6 +576,10 @@ class AgentService(
 
     override fun dismissBridgeUpdatePrompt() {
         _bridgeUpdatePrompt.value = null
+    }
+
+    override suspend fun updateBridgePackageAndRestart() {
+        DesktopHandoffService(this).updateBridgePackageAndRestart()
     }
 
     override suspend fun loadComposerDraft(threadId: String): String =

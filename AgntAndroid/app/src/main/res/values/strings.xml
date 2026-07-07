@@ -525,6 +525,12 @@
     <string name="bridge_update_service_tier_message">This computer bridge does not support the selected speed setting yet. Update the agnt npm package to use Fast Mode and other speed controls.</string>
     <string name="bridge_update_run_on_computer_hint">Run this on your computer</string>
     <string name="bridge_update_copy_install_command">Copy install command</string>
+    <string name="bridge_update_on_this_computer">Update on this computer</string>
+    <string name="bridge_update_updating">Updating…</string>
+    <string name="bridge_update_failed_fallback">The bridge could not update itself. Run the install command manually, then reconnect.</string>
+    <string name="bridge_update_retry">I updated it</string>
+    <string name="bridge_update_scan_new_qr">Scan new QR</string>
+    <string name="bridge_update_dismiss">Not now</string>
     <string name="git_repo_diff_sheet_title">Repository diff</string>
     <string name="git_repo_diff_tab_summary">Summary</string>
     <string name="git_repo_diff_tab_review">Review</string>
