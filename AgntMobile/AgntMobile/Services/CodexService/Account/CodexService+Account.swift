@@ -125,6 +125,7 @@ struct CodexBridgeHostCapabilities: Codable, Equatable, Sendable {
         case displayWake
         case keepAwake
         case hostBrowserLogin
+        case bridgeSelfUpdate
         case terminal
     }
 
@@ -132,6 +133,7 @@ struct CodexBridgeHostCapabilities: Codable, Equatable, Sendable {
     var displayWake: Bool = false
     var keepAwake: Bool = false
     var hostBrowserLogin: Bool = false
+    var bridgeSelfUpdate: Bool = false
     var terminal: Bool = false
 
     init(
@@ -139,12 +141,14 @@ struct CodexBridgeHostCapabilities: Codable, Equatable, Sendable {
         displayWake: Bool = false,
         keepAwake: Bool = false,
         hostBrowserLogin: Bool = false,
+        bridgeSelfUpdate: Bool = false,
         terminal: Bool = false
     ) {
         self.desktopHandoff = desktopHandoff
         self.displayWake = displayWake
         self.keepAwake = keepAwake
         self.hostBrowserLogin = hostBrowserLogin
+        self.bridgeSelfUpdate = bridgeSelfUpdate
         self.terminal = terminal
     }
 
@@ -154,6 +158,7 @@ struct CodexBridgeHostCapabilities: Codable, Equatable, Sendable {
         displayWake = try container.decodeIfPresent(Bool.self, forKey: .displayWake) ?? false
         keepAwake = try container.decodeIfPresent(Bool.self, forKey: .keepAwake) ?? false
         hostBrowserLogin = try container.decodeIfPresent(Bool.self, forKey: .hostBrowserLogin) ?? false
+        bridgeSelfUpdate = try container.decodeIfPresent(Bool.self, forKey: .bridgeSelfUpdate) ?? false
         terminal = try container.decodeIfPresent(Bool.self, forKey: .terminal) ?? false
     }
 
@@ -162,6 +167,7 @@ struct CodexBridgeHostCapabilities: Codable, Equatable, Sendable {
         displayWake: true,
         keepAwake: true,
         hostBrowserLogin: true,
+        bridgeSelfUpdate: false,
         terminal: false
     )
 }
@@ -1216,6 +1222,7 @@ extension CodexService {
             displayWake: firstBoolValue(in: capabilitiesObject, keys: ["displayWake", "display_wake"]) ?? false,
             keepAwake: firstBoolValue(in: capabilitiesObject, keys: ["keepAwake", "keep_awake"]) ?? false,
             hostBrowserLogin: firstBoolValue(in: capabilitiesObject, keys: ["hostBrowserLogin", "host_browser_login"]) ?? false,
+            bridgeSelfUpdate: firstBoolValue(in: capabilitiesObject, keys: ["bridgeSelfUpdate", "bridge_self_update"]) ?? false,
             terminal: firstBoolValue(in: capabilitiesObject, keys: ["terminal", "sshTerminal", "ssh_terminal"]) ?? false
         )
     }

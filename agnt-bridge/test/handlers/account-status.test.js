@@ -22,6 +22,7 @@ const macHostMetadata = {
     displayWake: true,
     keepAwake: true,
     hostBrowserLogin: true,
+    bridgeSelfUpdate: true,
     terminal: true,
     terminalLocal: false,
   },

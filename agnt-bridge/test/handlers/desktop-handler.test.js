@@ -379,3 +379,59 @@ test("desktop/preferences/update rejects invalid bridge preference payloads", as
 
   assert.equal(responses[0].error?.data?.errorCode, "invalid_bridge_preferences");
 });
+
+test("desktop/bridge/updateAndRestart forwards bridge package update requests", async () => {
+  const responses = [];
+  let updateCallCount = 0;
+
+  const handled = handleDesktopRequest(JSON.stringify({
+    id: "request-7",
+    method: "desktop/bridge/updateAndRestart",
+    params: {},
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  }, {
+    platform: "darwin",
+    updateBridgePackageAndRestart() {
+      updateCallCount += 1;
+      return {
+        success: true,
+        command: "npm install -g @dotbrains/agnt@latest",
+        restartScheduled: true,
+        restartDelayMs: 750,
+      };
+    },
+  });
+
+  assert.equal(handled, true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(updateCallCount, 1);
+  assert.deepEqual(responses, [{
+    id: "request-7",
+    result: {
+      success: true,
+      command: "npm install -g @dotbrains/agnt@latest",
+      restartScheduled: true,
+      restartDelayMs: 750,
+    },
+  }]);
+});
+
+test("desktop/bridge/updateAndRestart rejects when update support is unavailable", async () => {
+  const responses = [];
+
+  handleDesktopRequest(JSON.stringify({
+    id: "request-8",
+    method: "desktop/bridge/updateAndRestart",
+    params: {},
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  }, {
+    platform: "darwin",
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(responses[0].error?.data?.errorCode, "unsupported_bridge_update");
+});

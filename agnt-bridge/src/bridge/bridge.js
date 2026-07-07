@@ -37,6 +37,7 @@ const { createBridgePreferences, persistBridgePreferences } = require("./bridge-
 const { createContextUsageWatcher } = require("./context-usage-watcher");
 const { createHandshakeHandler } = require("./handshake-handler");
 const { createBridgePackageVersionStatusReader } = require("./package-version-status");
+const { createBridgePackageUpdateAndRestart } = require("./bridge-package-updater");
 const { createPushNotificationServiceClient } = require("../transport/push-notification-service-client");
 const { createPushNotificationTracker } = require("../transport/push-notification-tracker");
 const {
@@ -301,6 +302,9 @@ function startBridge({
     resolveVoiceAuth,
     isWebTerminalEnabled: () => config.enableWebTerminal === true,
   });
+  const updateBridgePackageAndRestart = createBridgePackageUpdateAndRestart({
+    logger: console,
+  });
   const terminalHandler = createTerminalHandler({
     isEnabled: () => config.enableWebTerminal === true,
     sendApplicationResponse: (raw) => sendApplicationResponse(raw),
@@ -547,6 +551,7 @@ function startBridge({
         appPath: desktopBundle.appPath,
         readBridgePreferences: bridgePreferences.read,
         updateBridgePreferences: bridgePreferences.update,
+        updateBridgePackageAndRestart,
       }),
       (msg) => handleGitRequest(msg, sendApplicationResponse, {
         codexAppPath: desktopBundle.appPath,

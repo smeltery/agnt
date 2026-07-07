@@ -114,6 +114,30 @@ final class DesktopHandoffService {
         try await sendBridgePreferenceUpdate(params: ["enableWebTerminal": .bool(enabled)])
     }
 
+    func updateBridgePackageAndRestart() async throws {
+        do {
+            let response = try await codex.sendRequest(
+                method: "desktop/bridge/updateAndRestart",
+                params: .object([:])
+            )
+            guard let resultObject = response.result?.objectValue,
+                  resultObject["success"]?.boolValue == true,
+                  resultObject["restartScheduled"]?.boolValue == true else {
+                throw DesktopHandoffError.invalidResponse
+            }
+        } catch let error as CodexServiceError {
+            switch error {
+            case .disconnected:
+                throw DesktopHandoffError.disconnected
+            case .rpcError(let rpcError):
+                let errorCode = rpcError.data?.objectValue?["errorCode"]?.stringValue
+                throw DesktopHandoffError.bridgeError(code: errorCode, message: rpcError.message)
+            default:
+                throw DesktopHandoffError.bridgeError(code: nil, message: error.errorDescription)
+            }
+        }
+    }
+
     private func sendBridgePreferenceUpdate(params: [String: JSONValue]) async throws {
         do {
             let response = try await codex.sendRequest(
@@ -214,6 +238,10 @@ private extension DesktopHandoffError {
             return fallback ?? "The computer bridge rejected this setting update."
         case "bridge_preferences_persist_failed":
             return fallback ?? "The computer bridge could not save this setting."
+        case "unsupported_bridge_update":
+            return fallback ?? "Update this computer's agnt bridge manually, then reconnect."
+        case "bridge_update_failed":
+            return fallback ?? "The computer bridge could not update the agnt package."
         default:
             return fallback ?? "Could not continue this chat on the desktop app."
         }
