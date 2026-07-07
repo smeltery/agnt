@@ -1111,6 +1111,53 @@ test("desktop IPC follower mirrors live assistant text growth from desktop state
   });
 });
 
+test("desktop IPC follower bounds active thread interest and evicts cached state", async (t) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-ipc-lru-"));
+  const socketPath = path.join(tempDir, "ipc.sock");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse() {},
+    requestTimeoutMs: 500,
+    turnCompletionIdleMs: 10,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({
+    method: "thread/read",
+    params: { threadId: "thread-0" },
+  }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopSnapshotChange("thread-0"));
+  await waitFor(() => follower.hasLiveThreadState("thread-0"));
+
+  for (let index = 1; index <= 512; index += 1) {
+    follower.observeInbound(JSON.stringify({
+      method: "thread/read",
+      params: { threadId: `thread-${index}` },
+    }));
+  }
+
+  assert.equal(follower.hasLiveThreadState("thread-0"), false);
+  writeFrame(serverSocket, desktopSnapshotChange("thread-0"));
+  await wait(25);
+  assert.equal(follower.hasLiveThreadState("thread-0"), false);
+
+  writeFrame(serverSocket, desktopSnapshotChange("thread-512"));
+  await waitFor(() => follower.hasLiveThreadState("thread-512"));
+});
+
 function attachFrameReader(socket, onFrame) {
   let buffer = Buffer.alloc(0);
   socket.on("data", (chunk) => {
@@ -1133,6 +1180,25 @@ function writeFrame(socket, payload) {
   const header = Buffer.alloc(4);
   header.writeUInt32LE(body.length, 0);
   socket.write(Buffer.concat([header, body]));
+}
+
+function desktopSnapshotChange(threadId) {
+  return {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 5,
+    params: {
+      conversationId: threadId,
+      change: {
+        type: "snapshot",
+        conversationState: {
+          turns: [],
+          requests: [],
+        },
+      },
+    },
+  };
 }
 
 async function waitFor(predicate, timeoutMs = 500) {

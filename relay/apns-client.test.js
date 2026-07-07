@@ -56,6 +56,48 @@ test("APNs authorization tokens use a 64-byte JOSE ES256 signature", async () =>
   assert.equal(signature.length, 64);
 });
 
+test("APNs session errors reject the notification request", async () => {
+  const { privateKey } = crypto.generateKeyPairSync("ec", {
+    namedCurve: "prime256v1",
+  });
+
+  const client = createAPNsClient({
+    teamId: "TEAM123456",
+    keyId: "KEY1234567",
+    bundleId: "com.example.agnt",
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }),
+    http2Connect() {
+      const session = new EventEmitter();
+      session.request = () => {
+        const request = new EventEmitter();
+        request.setEncoding = () => {};
+        request.end = () => {
+          process.nextTick(() => {
+            session.emit("error", new Error("connection reset"));
+          });
+        };
+        return request;
+      };
+      session.close = () => {};
+      return session;
+    },
+  });
+
+  await assert.rejects(
+    client.sendNotification({
+      deviceToken: "aa bb cc",
+      apnsEnvironment: "development",
+      title: "Ready",
+      body: "Response ready",
+    }),
+    {
+      code: "apns_session_error",
+      status: 502,
+      message: /connection reset/,
+    }
+  );
+});
+
 function decodeBase64URL(value) {
   const normalized = String(value || "")
     .replace(/-/g, "+")
