@@ -159,7 +159,7 @@ function createDesktopIpcActionFollower({
     ipc.close();
   }
 
-  // Desktop broadcasts carry the live conversation state Litter projects from.
+  // Desktop broadcasts carry the live conversation state agnt projects from.
   function onEnvelope(envelope) {
     if (envelope?.type !== "broadcast" || envelope.method !== "thread-stream-state-changed") {
       return;
@@ -569,7 +569,7 @@ function createDesktopIpcActionFollower({
   };
 }
 
-// Minimal IPC client for Litter's length-prefixed Codex desktop bus.
+// Minimal IPC client for agnt's length-prefixed Codex desktop bus.
 function createDesktopIpcClient({
   socketPath,
   netModule,

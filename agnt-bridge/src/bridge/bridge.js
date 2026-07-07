@@ -126,6 +126,9 @@ const {
   createDesktopIpcActionFollower,
   seedConversationStateFromThreadRead,
 } = require("../desktop/desktop-ipc-action-follower");
+const {
+  createDesktopIpcLiveOwner,
+} = require("../desktop/desktop-ipc-live-owner");
 const { version: bridgePackageVersion = "" } = require("../../package.json");
 const { buildCachedIOSAppCompatibilityWarning } = require("./ios-app-compatibility");
 const { createShortPairingCode, SHORT_PAIRING_CODE_LENGTH } = require("../transport/qr");
@@ -260,12 +263,17 @@ function startBridge({
     live.send(wireMessage);
     return true;
   }
-  // Only the spawned local runtime needs rollout mirroring; a real endpoint
-  // already provides the authoritative live stream for resumed threads.
-  const rolloutLiveMirror = !config.codexEndpoint
-    ? createRolloutLiveMirrorController({
+  const desktopIpcLiveOwner = !config.codexEndpoint && activeProvider.id === "codex"
+    ? createDesktopIpcLiveOwner({
       sendApplicationResponse,
-      shouldSuppressThread: (threadId) => Boolean(desktopIpcActionFollower?.hasFreshLiveThreadState(threadId)),
+      sendCodexRequest: bridgeManagedCodex.sendRequest,
+      sendRawCodexMessage: (payload) => codex.send(payload),
+      normalizeTurnStartParams: (params) => {
+        const raw = JSON.stringify({ method: "turn/start", params });
+        const normalized = disableUnsupportedReasoningSummaryForTurnStart(raw);
+        return safeParseJSON(normalized)?.params || params;
+      },
+      socketPath: config.desktopIpcSocketPath || undefined,
     })
     : null;
   const desktopIpcActionFollower = !config.codexEndpoint
@@ -273,6 +281,17 @@ function startBridge({
       sendApplicationResponse,
       readConversationState: readDesktopConversationState,
       socketPath: config.desktopIpcSocketPath || undefined,
+    })
+    : null;
+  // Only the spawned local runtime needs rollout mirroring; a real endpoint
+  // already provides the authoritative live stream for resumed threads.
+  const rolloutLiveMirror = !config.codexEndpoint
+    ? createRolloutLiveMirrorController({
+      sendApplicationResponse,
+      shouldSuppressThread: (threadId) => Boolean(
+        desktopIpcLiveOwner?.isThreadOwned(threadId)
+          || desktopIpcActionFollower?.hasFreshLiveThreadState(threadId)
+      ),
     })
     : null;
   const contextUsageWatcher = createContextUsageWatcher({
@@ -363,6 +382,7 @@ function startBridge({
     clearBridgeStatusHeartbeat();
     contextUsageWatcher.stop();
     rolloutLiveMirror?.stopAll();
+    desktopIpcLiveOwner?.stopAll();
     desktopIpcActionFollower?.stopAll();
     terminalHandler.shutdown();
   }
@@ -468,6 +488,7 @@ function startBridge({
     onTeardown: () => {
       contextUsageWatcher.stop();
       rolloutLiveMirror?.stopAll();
+      desktopIpcLiveOwner?.stopAll();
       desktopIpcActionFollower?.stopAll();
       desktopRefresher.handleTransportReset();
     },
@@ -495,6 +516,7 @@ function startBridge({
       (msg) => accountHandler.updatePendingAuthLoginFromCodexMessage(msg),
       (msg) => handshakeHandler.observeCodexResponse(msg),
       (msg) => desktopRefresher.handleOutbound(msg),
+      (msg) => { desktopIpcLiveOwner?.observeOutbound(msg); return false; },
       (msg) => pushNotificationTracker.handleOutbound(msg),
       (msg) => rememberThreadFromMessage("codex", msg),
     ],
@@ -562,6 +584,7 @@ function startBridge({
       }),
       // Observation-only — never claim the message.
       (msg) => { desktopRefresher.handleInbound(msg); return false; },
+      (msg) => { desktopIpcLiveOwner?.observeInbound(msg); return false; },
       (msg) => { rolloutLiveMirror?.observeInbound(msg); return false; },
       (msg) => { forwardedRequestTracker.rememberRequest(msg); return false; },
       (msg) => desktopIpcActionFollower?.observeInbound(msg),
