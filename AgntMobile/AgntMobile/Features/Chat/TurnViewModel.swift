@@ -400,6 +400,7 @@ final class TurnViewModel {
     @ObservationIgnored var unsupportedPluginsAutocompleteRoots: Set<String> = []
     @ObservationIgnored private var dismissedStructuredPlanPromptRequestKeys: Set<String> = []
     @ObservationIgnored private var dismissingStructuredPlanPromptRequestKeys: Set<String> = []
+    @ObservationIgnored private var attachmentLoadTasks: [String: Task<Void, Never>] = [:]
 
     let maxComposerImages = 4
     let maxFileAutocompleteItems = 6
@@ -443,6 +444,10 @@ final class TurnViewModel {
         localDraftPersistenceDebounceTask = nil
         gitStatusRefreshTask?.cancel()
         gitStatusRefreshTask = nil
+        for task in attachmentLoadTasks.values {
+            task.cancel()
+        }
+        attachmentLoadTasks.removeAll()
     }
 
     func activateThread(threadID: String, codex: CodexService, onComplete: @escaping () -> Void) {
@@ -608,6 +613,7 @@ final class TurnViewModel {
         resetSlashCommandState(clearPendingSelection: true, clearConfirmedSelection: true)
         isSubagentsSelectionArmed = false
         input = ""
+        cancelAttachmentLoadTasks()
         composerAttachments.removeAll()
         composerMentionedFiles.removeAll()
         composerMentionedSkills.removeAll()
@@ -751,6 +757,8 @@ final class TurnViewModel {
     }
 
     func removeComposerAttachment(id: String) {
+        attachmentLoadTasks[id]?.cancel()
+        attachmentLoadTasks[id] = nil
         composerAttachments.removeAll(where: { $0.id == id })
     }
 
@@ -1310,11 +1318,16 @@ final class TurnViewModel {
             let attachmentID = UUID().uuidString
             composerAttachments.append(TurnComposerImageAttachment(id: attachmentID, state: .loading))
 
-            Task {
+            attachmentLoadTasks[attachmentID] = Task { @MainActor [weak self] in
                 let state = await Self.loadComposerAttachmentState(from: item)
-                await MainActor.run {
-                    self.updateComposerAttachment(id: attachmentID, state: state, codex: codex, threadID: threadID)
-                }
+                Self.completeAttachmentLoad(
+                    state,
+                    id: attachmentID,
+                    viewModel: self,
+                    isCancelled: Task.isCancelled,
+                    codex: codex,
+                    threadID: threadID
+                )
             }
         }
         saveLocalDraft(codex: codex, threadID: threadID)
@@ -1347,11 +1360,16 @@ final class TurnViewModel {
             let attachmentID = UUID().uuidString
             composerAttachments.append(TurnComposerImageAttachment(id: attachmentID, state: .loading))
 
-            Task {
-                let state = Self.loadComposerAttachmentState(fromData: imageData)
-                await MainActor.run {
-                    self.updateComposerAttachment(id: attachmentID, state: state, codex: codex, threadID: threadID)
-                }
+            attachmentLoadTasks[attachmentID] = Task { @MainActor [weak self] in
+                let state = await Self.loadComposerAttachmentState(fromData: imageData)
+                Self.completeAttachmentLoad(
+                    state,
+                    id: attachmentID,
+                    viewModel: self,
+                    isCancelled: Task.isCancelled,
+                    codex: codex,
+                    threadID: threadID
+                )
             }
         }
         saveLocalDraft(codex: codex, threadID: threadID)
@@ -1369,6 +1387,60 @@ final class TurnViewModel {
 
         composerAttachments[index].state = state
         saveLocalDraft(codex: codex, threadID: threadID, persistToDisk: true)
+    }
+
+    private func cancelAttachmentLoadTasks() {
+        for task in attachmentLoadTasks.values {
+            task.cancel()
+        }
+        attachmentLoadTasks.removeAll()
+    }
+
+    private static func completeAttachmentLoad(
+        _ state: TurnComposerImageAttachmentState,
+        id attachmentID: String,
+        viewModel: TurnViewModel?,
+        isCancelled: Bool,
+        codex: CodexService,
+        threadID: String
+    ) {
+        if let viewModel, !isCancelled {
+            viewModel.updateComposerAttachment(id: attachmentID, state: state, codex: codex, threadID: threadID)
+            viewModel.attachmentLoadTasks[attachmentID] = nil
+            return
+        }
+
+        if let viewModel, !viewModel.composerAttachments.contains(where: { $0.id == attachmentID }) {
+            return
+        }
+
+        mergeDecodedAttachmentIntoSavedDraft(state, id: attachmentID, codex: codex, threadID: threadID)
+    }
+
+    private static func mergeDecodedAttachmentIntoSavedDraft(
+        _ state: TurnComposerImageAttachmentState,
+        id attachmentID: String,
+        codex: CodexService,
+        threadID: String
+    ) {
+        guard case .ready = state else { return }
+        let existing = codex.composerDraft(for: threadID)
+        var attachments = existing?.attachments ?? []
+        guard !attachments.contains(where: { $0.id == attachmentID }) else { return }
+        attachments.append(TurnComposerImageAttachment(id: attachmentID, state: state))
+
+        let merged = TurnComposerLocalDraft(
+            input: existing?.input ?? "",
+            mentionedFiles: existing?.mentionedFiles ?? [],
+            mentionedSkills: existing?.mentionedSkills ?? [],
+            mentionedPlugins: existing?.mentionedPlugins ?? [],
+            attachments: attachments,
+            reviewSelection: existing?.reviewSelection,
+            isPlanModeArmed: existing?.isPlanModeArmed ?? false,
+            isSubagentsSelectionArmed: existing?.isSubagentsSelectionArmed ?? false,
+            updatedAt: Date()
+        )
+        codex.setComposerDraft(merged, for: threadID, persistToDisk: true)
     }
 
     // Sends a composer payload, queueing follow-ups while the current run is still active.
@@ -1900,19 +1972,19 @@ final class TurnViewModel {
         }
     }
 
-    private static func loadComposerAttachmentState(from item: PhotosPickerItem) async -> TurnComposerImageAttachmentState {
+    private nonisolated static func loadComposerAttachmentState(from item: PhotosPickerItem) async -> TurnComposerImageAttachmentState {
         do {
             guard let data = try await item.loadTransferable(type: Data.self),
                   !data.isEmpty else {
                 return .failed
             }
-            return loadComposerAttachmentState(fromData: data)
+            return await loadComposerAttachmentState(fromData: data)
         } catch {
             return .failed
         }
     }
 
-    private static func loadComposerAttachmentState(fromData data: Data) -> TurnComposerImageAttachmentState {
+    private nonisolated static func loadComposerAttachmentState(fromData data: Data) async -> TurnComposerImageAttachmentState {
         guard let attachment = TurnAttachmentPipeline.makeAttachment(from: data) else {
             return .failed
         }

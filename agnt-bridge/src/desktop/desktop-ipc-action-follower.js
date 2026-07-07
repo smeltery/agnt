@@ -15,6 +15,7 @@ const MAX_FRAME_BYTES = 256 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
 const TURN_COMPLETION_IDLE_MS = 3_500;
 const STALE_ACTIVE_READ_MAX_AGE_MS = 20_000;
+const MAX_ACTIVE_THREAD_IDS = 512;
 const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
 const ACTION_METHODS = new Set([
   "item/commandExecution/requestApproval",
@@ -71,6 +72,38 @@ function createDesktopIpcActionFollower({
   const recoveringThreadIds = new Set();
   const queuedChangesByThreadId = new Map();
 
+  function rememberActiveThread(threadId) {
+    activeThreadIds.delete(threadId);
+    activeThreadIds.add(threadId);
+    while (activeThreadIds.size > MAX_ACTIVE_THREAD_IDS) {
+      const oldestThreadId = activeThreadIds.values().next().value;
+      if (oldestThreadId === undefined) {
+        break;
+      }
+      activeThreadIds.delete(oldestThreadId);
+      forgetEvictedThreadState(oldestThreadId);
+    }
+  }
+
+  function forgetEvictedThreadState(threadId) {
+    rawStatesByThreadId.delete(threadId);
+    rawStateUpdatedAtByThreadId.delete(threadId);
+    assistantMessageTextsByThreadId.delete(threadId);
+    mirroredActivityKeysByThreadId.delete(threadId);
+    mirroredUserMessageKeysByThreadId.delete(threadId);
+    queuedChangesByThreadId.delete(threadId);
+    recoveringThreadIds.delete(threadId);
+    const turns = activeDesktopTurnsByThreadId.get(threadId);
+    if (turns) {
+      for (const entry of turns.values()) {
+        if (entry.timer) {
+          clearTimeoutFn(entry.timer);
+        }
+      }
+      activeDesktopTurnsByThreadId.delete(threadId);
+    }
+  }
+
   function observeInbound(rawMessage) {
     const message = safeParseJSON(rawMessage);
     const responseRoute = desktopRouteForResponse(message);
@@ -89,7 +122,7 @@ function createDesktopIpcActionFollower({
       return false;
     }
 
-    activeThreadIds.add(threadId);
+    rememberActiveThread(threadId);
     ipc.ensureConnected();
     return false;
   }
