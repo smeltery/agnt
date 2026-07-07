@@ -16,6 +16,7 @@ function isContextualUserText(value) {
   return text.startsWith("# AGENTS.md instructions for ")
     || text.startsWith("<user_instructions>")
     || text.startsWith("<environment_context>")
+    || text.startsWith("<skill>")
     || text.startsWith("<codex_internal_context ");
 }
 

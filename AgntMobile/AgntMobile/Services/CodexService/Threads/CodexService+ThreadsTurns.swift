@@ -3024,7 +3024,8 @@ extension CodexService {
             return turnID
         }.first
 
-        // Newest-first scanning avoids interrupting an older completed turn when recovery is stale.
+        // Newest-first scanning trusts the latest real turn as the active-state boundary.
+        // If it is terminal, older stale in-progress rows cannot still be interruptible.
         var hasInterruptibleTurnWithoutID = false
         for turnObject in newestTurnObjects {
             if let turnID = normalizedInterruptIdentifier(
@@ -3035,8 +3036,8 @@ extension CodexService {
                 continue
             }
             let turnStatus = normalizedInterruptTurnStatus(from: turnObject)
-            guard isInterruptibleTurnStatus(turnStatus) else {
-                continue
+            if !isInterruptibleTurnStatus(turnStatus) {
+                break
             }
 
             if let interruptibleTurnID = normalizedInterruptIdentifier(
@@ -3048,6 +3049,7 @@ extension CodexService {
             }
 
             hasInterruptibleTurnWithoutID = true
+            break
         }
 
         return (nil, hasInterruptibleTurnWithoutID, latestTurnID)

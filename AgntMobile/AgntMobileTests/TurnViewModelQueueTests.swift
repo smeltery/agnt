@@ -761,7 +761,7 @@ final class TurnViewModelQueueTests: XCTestCase {
 
         XCTAssertEqual(recordedMethods, ["thread/read"])
         XCTAssertFalse(service.runningThreadIDs.contains("thread-queue"))
-        XCTAssertTrue(service.protectedRunningFallbackThreadIDs.contains("thread-queue"))
+        XCTAssertFalse(service.protectedRunningFallbackThreadIDs.contains("thread-queue"))
     }
 
     func testSteerQueuedDraftIsNoOpWhenThreadIsNotRunning() async {

@@ -15,10 +15,10 @@ struct TurnComposerInputTextView: UIViewRepresentable {
     @Binding var dynamicHeight: CGFloat
     let runtimeState: TurnComposerRuntimeState?
     let runtimeActions: TurnComposerRuntimeActions
+    let maxVisibleLines: CGFloat
     let onPasteImageData: ([Data]) -> Void
 
     private let minVisibleLines: CGFloat = 1
-    private let maxVisibleLines: CGFloat = 8
     func makeUIView(context: Context) -> TurnComposerPasteInterceptingTextView {
         let textView = TurnComposerPasteInterceptingTextView(frame: .zero, textContainer: nil)
         textView.delegate = context.coordinator
@@ -63,6 +63,7 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             isFocused: $isFocused,
             dynamicHeight: $dynamicHeight
         )
+        let maxVisibleLinesChanged = context.coordinator.updateMaxVisibleLines(maxVisibleLines)
         let shouldApplyBindingText = context.coordinator.shouldApplyBindingText(text, to: uiView)
         let textChanged = shouldApplyBindingText && uiView.text != text
         if textChanged {
@@ -98,7 +99,13 @@ struct TurnComposerInputTextView: UIViewRepresentable {
                 uiView?.isEditable = false
             }
         }
-        context.coordinator.updateHeightIfNeeded(for: uiView, force: textChanged || fontChanged)
+        context.coordinator.updateHeightIfNeeded(
+            for: uiView,
+            force: textChanged || fontChanged || maxVisibleLinesChanged
+        )
+        if maxVisibleLinesChanged {
+            context.coordinator.scheduleDeferredHeightUpdate(for: uiView)
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -124,7 +131,7 @@ struct TurnComposerInputTextView: UIViewRepresentable {
         private var isFocused: Binding<Bool>
         private var dynamicHeight: Binding<CGFloat>
         private let minVisibleLines: CGFloat
-        private let maxVisibleLines: CGFloat
+        private var maxVisibleLines: CGFloat
         private var lastFocusBindingValue: Bool
         private var pendingHeightValue: CGFloat?
         private var isHeightCommitScheduled = false
@@ -157,6 +164,15 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             self.text = text
             self.isFocused = isFocused
             self.dynamicHeight = dynamicHeight
+        }
+
+        fileprivate func updateMaxVisibleLines(_ value: CGFloat) -> Bool {
+            guard abs(maxVisibleLines - value) > 0.1 else {
+                return false
+            }
+            maxVisibleLines = value
+            lastHeightMeasurementSignature = nil
+            return true
         }
 
         func textViewDidChange(_ textView: UITextView) {
@@ -257,6 +273,13 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             }
             lastHeightMeasurementSignature = signature
             updateHeight(for: textView)
+        }
+
+        fileprivate func scheduleDeferredHeightUpdate(for textView: UITextView) {
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self, let textView else { return }
+                self.updateHeightIfNeeded(for: textView, force: true)
+            }
         }
 
         private func updateHeight(for textView: UITextView) {

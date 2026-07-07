@@ -97,6 +97,9 @@ struct TurnComposerView: View {
     // surfaces, but project-backed new-chat drafts keep it visible.
     var showsSecondaryBar: Bool = true
 
+    private let expandedPlainTextMaxVisibleLines: CGFloat = 6
+    private let expandedAccessoryTextMaxVisibleLines: CGFloat = 4
+
     @State private var composerInputHeight: CGFloat = 32
     @State private var inputChangeTask: Task<Void, Never>?
 
@@ -174,6 +177,7 @@ struct TurnComposerView: View {
                         dynamicHeight: $composerInputHeight,
                         runtimeState: runtimeState,
                         runtimeActions: runtimeActions,
+                        maxVisibleLines: expandedInputMaxVisibleLines,
                         onPasteImageData: { imageDataItems in
                             HapticFeedback.shared.triggerImpactFeedback(style: .light)
                             onPasteImageData(imageDataItems)
@@ -270,6 +274,15 @@ struct TurnComposerView: View {
         .padding(.top, 4)
         .padding(.bottom, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // Attachments and mention chips already consume vertical keyboard space, so
+    // switch the text field to internal scrolling sooner to keep the whole
+    // composer card above the keyboard in compact draft screens.
+    private var expandedInputMaxVisibleLines: CGFloat {
+        accessoryState.hasTopAccessoryContent
+            ? expandedAccessoryTextMaxVisibleLines
+            : expandedPlainTextMaxVisibleLines
     }
 
 }

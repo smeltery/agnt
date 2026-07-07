@@ -239,6 +239,64 @@ test("parseSessionJsonlTurns ignores agent_message events to avoid double-counti
   assert.equal(turns[0].items[0].content[0].text, "final");
 });
 
+test("parseSessionJsonlTurns drops expanded skill context user items", () => {
+  const expandedSkillContext = [
+    "<skill>",
+    "<name>check-code</name>",
+    "<path>$check-code</path>",
+    "---",
+    "name: check-code",
+    "description: Review recent code changes across a repository.",
+    "</skill>",
+  ].join("\n");
+  const content = jsonl(
+    {
+      timestamp: "2026-05-24T21:53:47.000Z",
+      type: "session_meta",
+      payload: { id: "thread-jsonl-expanded-skill" },
+    },
+    {
+      timestamp: "2026-05-24T21:53:51.100Z",
+      type: "event_msg",
+      payload: { type: "task_started", turn_id: "turn-jsonl-expanded-skill" },
+    },
+    {
+      timestamp: "2026-05-24T21:53:51.133Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: expandedSkillContext }],
+      },
+    },
+    {
+      timestamp: "2026-05-24T21:53:52.000Z",
+      type: "event_msg",
+      payload: {
+        type: "user_message",
+        turn_id: "turn-jsonl-expanded-skill",
+        message: expandedSkillContext,
+      },
+    },
+    {
+      timestamp: "2026-05-24T21:53:53.000Z",
+      type: "response_item",
+      payload: {
+        id: "assistant-final",
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "done" }],
+      },
+    }
+  );
+
+  const turns = parseSessionJsonlTurns(content, { threadId: "thread-jsonl-expanded-skill" });
+  const userItems = turns.flatMap((turn) => turn.items.filter((item) => item.role === "user"));
+
+  assert.equal(userItems.length, 0);
+  assert.equal(turns[0].items.some((item) => item.role === "assistant"), true);
+});
+
 // ─── readThreadTurnsListPageFromSessionJsonl ───────────────────────────────
 
 test("readThreadTurnsListPageFromSessionJsonl returns null when filePath is missing", () => {
