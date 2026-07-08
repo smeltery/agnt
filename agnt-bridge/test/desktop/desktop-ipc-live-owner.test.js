@@ -62,6 +62,16 @@ test("live owner broadcasts phone-owned turn snapshots over Desktop IPC", async 
     },
   }));
   owner.observeOutbound(JSON.stringify({
+    method: "thread/started",
+    params: {
+      thread: {
+        id: "thread-live-owner",
+        cwd: "/tmp/project",
+        turns: [],
+      },
+    },
+  }));
+  owner.observeOutbound(JSON.stringify({
     method: "turn/started",
     params: {
       threadId: "thread-live-owner",

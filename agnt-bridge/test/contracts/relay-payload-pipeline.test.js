@@ -17,6 +17,7 @@ const assert = require("node:assert/strict");
 const {
   augmentRelayThreadWithJsonlMetadata,
   sanitizeLiveContextualUserItemForRelay,
+  sanitizeLiveUserNotification,
   sanitizeThreadHistoryImagesForRelay,
   sanitizeThreadTurnsListForRelay,
   sanitizeRelayHistoryTurns,
@@ -94,6 +95,15 @@ test("sanitizeThreadHistoryImagesForRelay drops injected context user items from
             }],
           },
           {
+            id: "ctx-internal-goal",
+            type: "message",
+            role: "user",
+            content: [{
+              type: "input_text",
+              text: "<codex_internal_context source=\"goal\">\nhidden goal state\n</codex_internal_context>",
+            }],
+          },
+          {
             id: "real-user",
             type: "user_message",
             content: [{ type: "input_text", text: "Summarize the diff" }],
@@ -114,6 +124,38 @@ test("sanitizeThreadHistoryImagesForRelay drops injected context user items from
     out.result.thread.turns[0].items.map((item) => item.id),
     ["real-user", "assistant"]
   );
+});
+
+test("sanitizeThreadHistoryImagesForRelay sanitizes mixed user content entry-by-entry", () => {
+  const raw = JSON.stringify({
+    id: "r-mixed-context",
+    result: { thread: {
+      id: "thread-mixed-context",
+      turns: [{
+        id: "turn-1",
+        items: [{
+          id: "item-mixed",
+          type: "user_message",
+          content: [
+            { type: "input_text", text: "<environment_context>secret</environment_context>" },
+            {
+              type: "input_text",
+              text: "## Code review guidelines:\ninternal review text\n## My request for Codex:\nReview this file",
+            },
+            { type: "input_text", text: "<image name=[Image #1] path=\"/tmp/private.png\">" },
+            { type: "input_image", image_url: "data:image/png;base64,AAAA" },
+            { type: "input_text", text: "</image>" },
+          ],
+        }],
+      }],
+    } },
+  });
+
+  const out = JSON.parse(sanitizeThreadHistoryImagesForRelay(raw, "thread/read"));
+  assert.deepEqual(out.result.thread.turns[0].items[0].content, [
+    { type: "input_text", text: "Review this file" },
+    { type: "input_image", url: "agnt://history-image-elided" },
+  ]);
 });
 
 test("sanitizeThreadTurnsListForRelay drops injected context user items from pages", () => {
@@ -179,6 +221,45 @@ test("sanitizeLiveContextualUserItemForRelay preserves real live user item notif
   });
 
   assert.equal(sanitizeLiveContextualUserItemForRelay(raw), raw);
+});
+
+test("sanitizeLiveUserNotification filters fallback context and rewrites visible envelopes", () => {
+  assert.equal(sanitizeLiveUserNotification({
+    method: "codex/event/user_message",
+    params: {
+      threadId: "t",
+      message: "<codex_internal_context source=\"goal\">secret</codex_internal_context>",
+    },
+  }), null);
+
+  const heartbeat = sanitizeLiveUserNotification({
+    method: "codex/event/user_message",
+    params: {
+      threadId: "t",
+      message: "<heartbeat><automation_id>private</automation_id><instructions>Check CI.</instructions></heartbeat>",
+    },
+  });
+  assert.equal(heartbeat.params.message, "Check CI.");
+
+  const mixedItem = sanitizeLiveUserNotification({
+    method: "item/completed",
+    params: {
+      threadId: "t",
+      item: {
+        id: "mixed",
+        type: "userMessage",
+        content: [
+          { type: "input_text", text: "<environment_context>secret</environment_context>" },
+          { type: "input_text", text: "keep me" },
+          { type: "input_image", image_url: "data:image/png;base64,AAAA" },
+        ],
+      },
+    },
+  });
+  assert.deepEqual(mixedItem.params.item.content, [
+    { type: "input_text", text: "keep me" },
+    { type: "input_image", image_url: "data:image/png;base64,AAAA" },
+  ]);
 });
 
 test("sanitizeThreadHistoryImagesForRelay elides inline data: image URLs in history content", () => {

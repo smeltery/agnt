@@ -48,9 +48,9 @@ const {
   parseSessionJsonlMetadata,
 } = require("../providers/codex/session-jsonl-history");
 const {
-  historyItemUserText,
-  isContextualUserText,
   isUserRoleHistoryItem,
+  sanitizeUserRoleItem,
+  visibleUserPromptText,
 } = require("./contextual-user-items");
 
 const JSONL_THREAD_CWD_CACHE_MAX_ENTRIES = 200;
@@ -140,16 +140,53 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod, requestC
 function sanitizeLiveContextualUserItemForRelay(rawMessage) {
   const parsed = parseJSON(rawMessage);
   const method = readString(parsed?.method);
-  if (!LIVE_ITEM_LIFECYCLE_METHODS.has(method)) {
+  if (!LIVE_ITEM_LIFECYCLE_METHODS.has(method) && method !== "codex/event/user_message") {
     return rawMessage;
   }
 
+  const sanitized = sanitizeLiveUserNotification(parsed);
+  if (!sanitized) {
+    return null;
+  }
+  return sanitized === parsed ? rawMessage : JSON.stringify(sanitized);
+}
+
+function sanitizeLiveUserNotification(parsed) {
+  if (!parsed || typeof parsed !== "object") {
+    return parsed;
+  }
+  const method = readString(parsed?.method);
+  if (method === "codex/event/user_message") {
+    const key = typeof parsed?.params?.message === "string"
+      ? "message"
+      : (typeof parsed?.params?.text === "string" ? "text" : "");
+    if (!key) {
+      return parsed;
+    }
+    const visible = visibleUserPromptText(parsed.params[key]);
+    if (!visible) {
+      return null;
+    }
+    return visible === parsed.params[key] ? parsed : {
+      ...parsed,
+      params: { ...parsed.params, [key]: visible },
+    };
+  }
+  if (!LIVE_ITEM_LIFECYCLE_METHODS.has(method)) {
+    return parsed;
+  }
   const item = parsed?.params?.item;
   if (!isUserRoleHistoryItem(item)) {
-    return rawMessage;
+    return parsed;
   }
-
-  return isContextualUserText(historyItemUserText(item)) ? null : rawMessage;
+  const sanitizedItem = sanitizeUserRoleItem(item);
+  if (!sanitizedItem) {
+    return null;
+  }
+  return sanitizedItem === item ? parsed : {
+    ...parsed,
+    params: { ...parsed.params, item: sanitizedItem },
+  };
 }
 
 function augmentRelayThreadWithJsonlMetadata(thread, threadId = "", {
@@ -318,22 +355,22 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
   const turnThreadId = normalizeNonEmptyString(threadId)
     || normalizeNonEmptyString(turn.threadId)
     || normalizeNonEmptyString(turn.thread_id);
-  const sanitizedItems = turn.items.filter((item) => {
-    if (!isUserRoleHistoryItem(item)) {
-      return true;
-    }
-    const shouldKeep = !isContextualUserText(historyItemUserText(item));
-    if (!shouldKeep) {
-      turnDidChange = true;
-    }
-    return shouldKeep;
-  }).map((item) => {
+  const sanitizedItems = turn.items.map((item) => {
     if (!item || typeof item !== "object") {
       return item;
     }
 
     let itemDidChange = false;
-    let sanitizedItem = annotateImageGenerationHistoryItem(item, turnThreadId);
+    let sanitizedItem = sanitizeUserRoleItem(item);
+    if (!sanitizedItem) {
+      turnDidChange = true;
+      return null;
+    }
+    if (sanitizedItem !== item) {
+      itemDidChange = true;
+    }
+
+    sanitizedItem = annotateImageGenerationHistoryItem(sanitizedItem, turnThreadId);
     if (sanitizedItem !== item) {
       itemDidChange = true;
     }
@@ -366,7 +403,7 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
     }
 
     return itemDidChange ? sanitizedItem : item;
-  });
+  }).filter(Boolean);
 
   return turnDidChange
     ? {
@@ -379,6 +416,7 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
 module.exports = {
   augmentRelayThreadWithJsonlMetadata,
   sanitizeLiveContextualUserItemForRelay,
+  sanitizeLiveUserNotification,
   sanitizeThreadHistoryImagesForRelay,
   sanitizeThreadTurnsListForRelay,
   sanitizeRelayHistoryTurns,
