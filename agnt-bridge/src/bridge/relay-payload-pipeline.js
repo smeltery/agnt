@@ -27,6 +27,7 @@
 
 const fs = require("fs");
 
+const { buildApplyPatchFileChangeItem } = require("../desktop/apply-patch-changes");
 const {
   annotateImageGenerationHistoryItem,
   sanitizeInlineHistoryImageContentItem,
@@ -370,6 +371,11 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
       itemDidChange = true;
     }
 
+    sanitizedItem = convertApplyPatchHistoryItem(sanitizedItem) || sanitizedItem;
+    if (sanitizedItem !== item) {
+      itemDidChange = true;
+    }
+
     sanitizedItem = annotateImageGenerationHistoryItem(sanitizedItem, turnThreadId);
     if (sanitizedItem !== item) {
       itemDidChange = true;
@@ -411,6 +417,28 @@ function sanitizeRelayHistoryTurn(turn, threadId = "") {
       items: sanitizedItems,
     }
     : turn;
+}
+
+function convertApplyPatchHistoryItem(item) {
+  const itemType = normalizeHistoryItemToken(item?.type);
+  const toolName = normalizeNonEmptyString(item?.name);
+  if (toolName !== "apply_patch" || itemType !== "customtoolcall") {
+    return null;
+  }
+
+  const fileChangeItem = buildApplyPatchFileChangeItem({
+    callId: normalizeNonEmptyString(item.call_id)
+      || normalizeNonEmptyString(item.callId)
+      || normalizeNonEmptyString(item.id),
+    patch: normalizeNonEmptyString(item.input),
+    status: normalizeNonEmptyString(item.status) || "completed",
+    idFallback: normalizeNonEmptyString(item.id) || "history-apply-patch-file-change",
+  });
+  return fileChangeItem ? { ...item, ...fileChangeItem } : null;
+}
+
+function normalizeHistoryItemToken(value) {
+  return normalizeNonEmptyString(value).toLowerCase().replace(/[\s_-]+/g, "");
 }
 
 module.exports = {

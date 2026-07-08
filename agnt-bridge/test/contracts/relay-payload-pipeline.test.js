@@ -188,6 +188,52 @@ test("sanitizeThreadTurnsListForRelay drops injected context user items from pag
   assert.deepEqual(out.result.data[0].items.map((item) => item.id), ["real-user"]);
 });
 
+test("sanitizeThreadHistoryImagesForRelay converts historical apply_patch calls to fileChange items", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: src/app.js",
+    "@@",
+    "-old",
+    "+new",
+    "*** End Patch",
+  ].join("\n");
+  const raw = JSON.stringify({
+    id: "r-apply-patch-history",
+    result: { thread: {
+      id: "thread-apply-patch-history",
+      turns: [{
+        id: "turn-1",
+        items: [{
+          id: "call-apply-patch",
+          type: "custom_tool_call",
+          name: "apply_patch",
+          call_id: "call-1",
+          input: patch,
+          status: "completed",
+        }],
+      }],
+    } },
+  });
+
+  const out = JSON.parse(sanitizeThreadHistoryImagesForRelay(raw, "thread/read"));
+  const item = out.result.thread.turns[0].items[0];
+  assert.equal(item.id, "call-1");
+  assert.equal(item.type, "fileChange");
+  assert.equal(item.status, "completed");
+  assert.deepEqual(item.changes.map((change) => ({
+    path: change.path,
+    kind: change.kind,
+    additions: change.additions,
+    deletions: change.deletions,
+  })), [{
+    path: "src/app.js",
+    kind: "update",
+    additions: 1,
+    deletions: 1,
+  }]);
+  assert.match(item.changes[0].diff, /diff --git a\/src\/app\.js b\/src\/app\.js/);
+});
+
 test("sanitizeLiveContextualUserItemForRelay drops injected live user item notifications", () => {
   const raw = JSON.stringify({
     method: "item/updated",
