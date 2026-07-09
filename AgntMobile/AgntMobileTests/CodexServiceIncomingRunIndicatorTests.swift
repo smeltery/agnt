@@ -12,6 +12,33 @@ import Network
 final class CodexServiceIncomingRunIndicatorTests: XCTestCase {
     private static var retainedServices: [CodexService] = []
 
+    func testRuntimeItemCompletionDebugLogCoalescesBursts() {
+        let service = makeService()
+
+        service.recordCompactRuntimeItemCompletion(itemType: "agent_message")
+        service.recordCompactRuntimeItemCompletion(itemType: "tool_call")
+        service.recordCompactRuntimeItemCompletion(itemType: "agent_message")
+
+        XCTAssertTrue(service.runtimeDebugLogEntries.isEmpty)
+
+        service.flushCompactRuntimeItemCompletions()
+
+        XCTAssertEqual(service.runtimeDebugLogEntries.count, 1)
+        XCTAssertTrue(service.runtimeDebugLogEntries[0].contains("rpc item/completed x3"))
+        XCTAssertTrue(service.runtimeDebugLogEntries[0].contains("agent_message:2"))
+        XCTAssertTrue(service.runtimeDebugLogEntries[0].contains("tool_call:1"))
+    }
+
+    func testRuntimeDebugLogClearDropsPendingItemCompletionBatch() {
+        let service = makeService()
+
+        service.recordCompactRuntimeItemCompletion(itemType: "agent_message")
+        service.clearRuntimeDebugLog()
+        service.flushCompactRuntimeItemCompletions()
+
+        XCTAssertTrue(service.runtimeDebugLogEntries.isEmpty)
+    }
+
     func testTurnStartedMarksThreadAsRunning() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"

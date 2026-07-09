@@ -525,6 +525,9 @@ final class CodexService {
     var webSocketSessionDelegate: CodexURLSessionWebSocketDelegate?
     var webSocketTask: URLSessionWebSocketTask?
     var webSocketKeepAliveTask: Task<Void, Never>?
+    @ObservationIgnored var compactRuntimeItemCompletedFlushTask: Task<Void, Never>?
+    @ObservationIgnored var compactRuntimeItemCompletedCount = 0
+    @ObservationIgnored var compactRuntimeItemCompletedTypes: [String: Int] = [:]
     // Raw frame buffer used when the relay runs over manual TCP websocket framing.
     var manualWebSocketReadBuffer = Data()
     var usesManualWebSocketTransport = false

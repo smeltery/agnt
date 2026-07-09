@@ -180,7 +180,9 @@ extension CodexService {
         defer { isApplyingReplayedBridgeEvent = previousReplayScope }
 
         switch method {
-        case "turn/plan/updated", "item/plan/delta", "item/completed", "serverRequest/resolved":
+        case "item/completed":
+            recordCompactRuntimeItemCompletion(itemType: debugNotificationItemType(paramsObject: paramsObject))
+        case "turn/plan/updated", "item/plan/delta", "serverRequest/resolved":
             debugRuntimeLog(
                 debugNotificationSummary(method: method, paramsObject: paramsObject)
             )
@@ -2210,7 +2212,7 @@ extension CodexService {
     private func debugNotificationSummary(method: String, paramsObject: IncomingParamsObject?) -> String {
         let eventObject = paramsObject.flatMap { envelopeEventObject(from: $0) }
         let itemObject = paramsObject.flatMap { extractIncomingItemObject(from: $0, eventObject: eventObject) }
-        let itemType = normalizedItemType(itemObject?["type"]?.stringValue ?? "")
+        let itemType = debugNotificationItemType(paramsObject: paramsObject)
         let itemId = extractItemID(from: paramsObject, eventObject: eventObject, itemObject: itemObject) ?? ""
         let nestedItemId = paramsObject?["item"]?.objectValue?["id"]?.stringValue ?? ""
         let eventType = eventObject?["type"]?.stringValue ?? ""
@@ -2228,6 +2230,12 @@ extension CodexService {
         .compactMap { $0 }
         .first ?? 0
         return "rpc notification \(method) thread=\(paramsObject?["threadId"]?.stringValue ?? "") turn=\(paramsObject?["turnId"]?.stringValue ?? "") item=\(itemId) nestedItem=\(nestedItemId) type=\(itemType) event=\(eventType) path=\(pathName) resultLen=\(resultLength)"
+    }
+
+    private func debugNotificationItemType(paramsObject: IncomingParamsObject?) -> String {
+        let eventObject = paramsObject.flatMap { envelopeEventObject(from: $0) }
+        let itemObject = paramsObject.flatMap { extractIncomingItemObject(from: $0, eventObject: eventObject) }
+        return normalizedItemType(itemObject?["type"]?.stringValue ?? "")
     }
 
     private func extractItemID(
