@@ -459,8 +459,20 @@ built on QR pairing + the phone/Mac identity keys, not any ChatGPT token.
       has a composer-draft column; agnt has no per-thread composer-draft store yet,
       so that surface is omitted.
 
-`:app:ktlintCheck` + `:app:testDebugUnitTest` green (614 tests, 0 failures).
+`:app:ktlintCheck` + `:app:testDebugUnitTest` green (619 tests, 0 failures).
 Banned-identifier sweep clean over added/changed files.
+
+### P3.1 — workspace artifact previews
+
+- [x] **SVG workspace preview.** `WorkspaceTextFilePreviewDialog` now detects
+      `.svg` workspace files and renders them through `WorkspaceSvgPreview`, an
+      offline WebView with JavaScript disabled, network/file access blocked, a
+      strict CSP, and external `href`/`src` stripping. This keeps using
+      `workspace/readFile`, so no bridge or image-RPC change is required.
+      Coverage: `WorkspaceSvgPreviewSecurityTest`.
+- [ ] **Syntax-highlighted code preview.** Android still renders non-SVG text
+      previews as plain monospace; the iOS Runestone/TreeSitter preview remains a
+      separate larger slice.
 
 ## Finishing the upstream parity audit
 

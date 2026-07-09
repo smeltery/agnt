@@ -1,6 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,17 +112,25 @@ fun WorkspaceTextFilePreviewDialog(
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
                     ) {
-                        SelectionContainer {
-                            Text(
-                                text = data.content,
-                                modifier =
-                                    Modifier
-                                        .padding(12.dp)
-                                        .verticalScroll(rememberScrollState())
-                                        .horizontalScroll(rememberScrollState()),
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = MaterialTheme.colorScheme.onSurface,
+                        if (data.isSvgPreview(request.path)) {
+                            WorkspaceSvgPreview(
+                                source = data.content,
+                                isDark = isSystemInDarkTheme(),
+                                modifier = Modifier.fillMaxWidth(),
                             )
+                        } else {
+                            SelectionContainer {
+                                Text(
+                                    text = data.content,
+                                    modifier =
+                                        Modifier
+                                            .padding(12.dp)
+                                            .verticalScroll(rememberScrollState())
+                                            .horizontalScroll(rememberScrollState()),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                         }
                     }
                 }
@@ -129,6 +138,8 @@ fun WorkspaceTextFilePreviewDialog(
         }
     }
 }
+
+private fun WorkspaceTextFileService.TextPreview.isSvgPreview(requestPath: String): Boolean = WorkspaceSvgPreviewSecurity.isSvgPath(metadata.path.ifBlank { requestPath })
 
 private fun previewMetadataLabel(data: WorkspaceTextFileService.TextPreview): String {
     val parts = mutableListOf(formatByteCount(data.metadata.byteLength))
