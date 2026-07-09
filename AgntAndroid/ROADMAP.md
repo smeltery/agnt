@@ -438,6 +438,12 @@ built on QR pairing + the phone/Mac identity keys, not any ChatGPT token.
       as nav route `AppRoutes.MyDevices` in `AppNavHost`, opened from a sidebar
       icon button (`lucide_ic_monitor_smartphone`) in `SidebarDrawerContent`. Scan
       QR / Pair with Code both route through the existing single QR scanner screen.
+- [x] **Sidebar quick-switch dropdown** — `SidebarDrawerContent` now surfaces the
+      active device row whenever `MyDevicesPresentation.shouldShowDeviceSwitcher`
+      says at least two menu-eligible devices exist. It reuses
+      `switcherRows` / `activeSwitcherRow`, confirms before switching, calls the
+      existing `switchToTrustedDevice`, and keeps the full My Devices screen for
+      visibility and forget-device management.
 - [x] **`CodexRepository` device-switch surface** — flows + actions added with
       defaulted bodies so existing test fakes keep compiling.
 - [x] **Tests** — `ui/mydevices/MyDevicesPresentationTest`,
@@ -452,11 +458,8 @@ built on QR pairing + the phone/Mac identity keys, not any ChatGPT token.
 - [ ] **Composer-draft scoping (deferred).** Upstream's `MacScopedSessionStore`
       has a composer-draft column; agnt has no per-thread composer-draft store yet,
       so that surface is omitted.
-- [ ] **`SidebarDevicesMenuButton` quick-switch dropdown (deferred).** The iOS
-      inline sidebar device-switch dropdown (`shouldShowDeviceSwitcher`) is not yet
-      surfaced; the helper exists in `MyDevicesPresentation` for a follow-up.
 
-`:app:ktlintCheck` + `:app:testDebugUnitTest` green (607 tests, 0 failures).
+`:app:ktlintCheck` + `:app:testDebugUnitTest` green (614 tests, 0 failures).
 Banned-identifier sweep clean over added/changed files.
 
 ## Finishing the upstream parity audit

@@ -55,6 +55,18 @@ object MyDevicesPresentation {
 
     fun rowModels(context: TrustedDevicePresentationContext): List<MyDeviceRowModel> = sortedRecords(context).map { record -> rowModel(record, context) }
 
+    fun switcherRows(context: TrustedDevicePresentationContext): List<MyDeviceRowModel> =
+        rowModels(context).filter { row ->
+            row.isVisibleInMenu || row.isCurrent || row.isSwitching
+        }
+
+    fun activeSwitcherRow(context: TrustedDevicePresentationContext): MyDeviceRowModel? {
+        val rows = rowModels(context)
+        return rows.firstOrNull { it.isCurrent }
+            ?: rows.firstOrNull { it.isConnected }
+            ?: rows.firstOrNull { it.isSwitching }
+    }
+
     fun rowModel(
         trustedMac: CodexTrustedMacRecord,
         context: TrustedDevicePresentationContext,
@@ -73,13 +85,7 @@ object MyDevicesPresentation {
         )
     }
 
-    fun shouldShowDeviceSwitcher(context: TrustedDevicePresentationContext): Boolean {
-        val pickerDevices =
-            rowModels(context).filter { row ->
-                row.isVisibleInMenu || row.isCurrent || row.isSwitching
-            }
-        return pickerDevices.size > 1
-    }
+    fun shouldShowDeviceSwitcher(context: TrustedDevicePresentationContext): Boolean = switcherRows(context).size > 1
 
     private fun displayIdentity(trustedMac: CodexTrustedMacRecord): Pair<String, String?> {
         val nickname = SidebarComputerNicknameStore.nickname(trustedMac.macDeviceId).trim()

@@ -607,4 +607,5 @@
     <string name="my_devices_show_in_menu">Show in sidebar menu</string>
     <string name="my_devices_hide_from_menu">Hide from sidebar menu</string>
     <string name="my_devices_open_cd">Open My Devices</string>
+    <string name="my_devices_sidebar_switcher_cd">Switch active device</string>
 </resources>
