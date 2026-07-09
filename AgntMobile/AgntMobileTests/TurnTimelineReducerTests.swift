@@ -3006,27 +3006,27 @@ final class TurnTimelineReducerTests: XCTestCase {
             stoppedTurnIDs: []
         )
 
-        XCTAssertEqual(blockInfo[0]?.copyText, "Completed response")
+        XCTAssertEqual(blockInfo[0]?.allowsCopy, true)
+        XCTAssertNil(blockInfo[0]?.copyText)
     }
 
-    func testAssistantBlockInfoCopyTextSkipsSystemRows() {
+    func testAssistantBlockInfoKeepsCopyAtEndOfTrailingToolCallBlock() {
         let now = Date()
         let messages = [
             makeMessage(
-                id: "assistant-1",
+                id: "assistant",
                 threadID: "thread",
                 role: .assistant,
-                kind: .chat,
                 text: "Completed response",
                 createdAt: now,
                 turnID: "turn-1"
             ),
             makeMessage(
-                id: "tool-1",
+                id: "tool",
                 threadID: "thread",
                 role: .system,
-                kind: .toolActivity,
-                text: "Ran git status",
+                kind: .commandExecution,
+                text: "Run wait",
                 createdAt: now.addingTimeInterval(1),
                 turnID: "turn-1"
             ),
@@ -3040,7 +3040,53 @@ final class TurnTimelineReducerTests: XCTestCase {
             stoppedTurnIDs: []
         )
 
+        XCTAssertNil(blockInfo[0])
+        XCTAssertEqual(blockInfo[1]?.allowsCopy, true)
         XCTAssertEqual(blockInfo[1]?.copyText, "Completed response")
+    }
+
+    func testToolBurstAccessoryResolverMovesCopyAndRunningStateToGroupFooter() {
+        let messages = (1...5).map { index in
+            makeMessage(
+                id: "tool-\(index)",
+                threadID: "thread",
+                role: .system,
+                kind: .commandExecution,
+                text: "Tool \(index)",
+                turnID: "turn-1"
+            )
+        }
+        let group = TurnTimelineToolBurstGroup(messages: messages)
+        guard let hostID = group.latestMessage?.id else {
+            return XCTFail("Expected the tool burst to expose its latest message as footer host")
+        }
+        let state = AssistantBlockAccessoryState(
+            copyText: "Completed response",
+            showsRunningIndicator: true,
+            allowsCopy: true,
+            blockDiffText: "diff payload"
+        )
+
+        let footerState = TurnTimelineToolBurstAccessoryResolver.copyFooterState(
+            for: group,
+            statesByMessageID: [hostID: state],
+            suppressesRunningIndicator: false
+        )
+        let globallySuppressedState = TurnTimelineToolBurstAccessoryResolver.copyFooterState(
+            for: group,
+            statesByMessageID: [hostID: state],
+            suppressesRunningIndicator: true
+        )
+        let rowState = state.suppressingCopyAndRunningAccessory()
+
+        XCTAssertEqual(footerState?.copyText, "Completed response")
+        XCTAssertEqual(footerState?.showsRunningIndicator, true)
+        XCTAssertEqual(globallySuppressedState?.copyText, "Completed response")
+        XCTAssertEqual(globallySuppressedState?.showsRunningIndicator, false)
+        XCTAssertNil(rowState.copyText)
+        XCTAssertEqual(rowState.allowsCopy, false)
+        XCTAssertEqual(rowState.showsRunningIndicator, false)
+        XCTAssertEqual(rowState.blockDiffText, "diff payload")
     }
 
     func testAssistantBlockInfoSeparatesAdjacentBlocksByStableTurnID() {
@@ -3074,8 +3120,65 @@ final class TurnTimelineReducerTests: XCTestCase {
             stoppedTurnIDs: []
         )
 
-        XCTAssertEqual(blockInfo[0]?.copyText, "First response")
-        XCTAssertEqual(blockInfo[1]?.copyText, "Second response")
+        XCTAssertEqual(blockInfo[0]?.allowsCopy, true)
+        XCTAssertNil(blockInfo[0]?.copyText)
+        XCTAssertEqual(blockInfo[1]?.allowsCopy, true)
+        XCTAssertNil(blockInfo[1]?.copyText)
+    }
+
+    func testAssistantBlockInfoDoesNotMoveCopyAcrossTurnBoundary() {
+        let now = Date()
+        let messages = [
+            makeMessage(
+                id: "assistant-old-turn",
+                threadID: "thread",
+                role: .assistant,
+                text: "Completed response",
+                createdAt: now,
+                turnID: "turn-1"
+            ),
+            makeMessage(
+                id: "tool-new-turn",
+                threadID: "thread",
+                role: .system,
+                kind: .commandExecution,
+                text: "Run wait",
+                createdAt: now.addingTimeInterval(1),
+                turnID: "turn-2"
+            ),
+        ]
+
+        let blockInfo = TurnTimelineView<EmptyView, EmptyView>.assistantBlockInfo(
+            for: messages,
+            activeTurnID: nil,
+            isThreadRunning: false,
+            latestTurnTerminalState: .completed,
+            stoppedTurnIDs: []
+        )
+
+        XCTAssertEqual(blockInfo[0]?.allowsCopy, true)
+        XCTAssertNil(blockInfo[1])
+    }
+
+    func testAssistantBlockInfoDoesNotShowCopyForToolOnlyBlock() {
+        let message = makeMessage(
+            id: "tool-only",
+            threadID: "thread",
+            role: .system,
+            kind: .toolActivity,
+            text: "Search files",
+            turnID: "turn-1"
+        )
+
+        let blockInfo = TurnTimelineView<EmptyView, EmptyView>.assistantBlockInfo(
+            for: [message],
+            activeTurnID: nil,
+            isThreadRunning: false,
+            latestTurnTerminalState: .completed,
+            stoppedTurnIDs: []
+        )
+
+        XCTAssertNil(blockInfo[0])
     }
 
     func testAssistantBlockInfoHidesCopyWhenLatestRunStopped() {

@@ -1265,7 +1265,7 @@ struct MessageRow: View, Equatable {
                     }
                     if let assistantBlockAccessoryState {
                         CopyBlockButton(
-                            text: assistantBlockAccessoryState.copyText,
+                            text: assistantBlockAccessoryState.allowsCopy ? assistantBlockAccessoryState.copyText : nil,
                             isRunning: assistantBlockAccessoryState.showsRunningIndicator
                         )
                     }
@@ -1715,7 +1715,7 @@ struct MessageRow: View, Equatable {
 
             if !suppressNativeProposedPlanShell, let assistantBlockAccessoryState {
                 CopyBlockButton(
-                    text: assistantCopyText,
+                    text: assistantBlockAccessoryState.allowsCopy ? assistantCopyText : nil,
                     isRunning: assistantBlockAccessoryState.showsRunningIndicator
                 )
             }
