@@ -61,6 +61,7 @@ const PERSIST_DEBOUNCE_MS = 250;
 
 export type ReasoningEffort = "low" | "medium" | "high";
 export type PermissionMode = "default" | "acceptEdits" | "plan" | "bypassPermissions";
+export type ServiceTier = "fast";
 
 export interface TurnFlags {
   /** Selected provider model id (subset of state.models). Undefined = bridge default. */
@@ -70,6 +71,8 @@ export interface TurnFlags {
   permissionMode?: PermissionMode;
   /** Codex-only: requests plan-mode for this turn. */
   planMode?: boolean;
+  /** Codex-only: low-latency turn variant for models that advertise support. */
+  serviceTier?: ServiceTier;
 }
 
 export interface ThreadsState {
@@ -192,6 +195,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
         reasoningEffort: persistedFlags.reasoningEffort as TurnFlags["reasoningEffort"],
         permissionMode: persistedFlags.permissionMode as TurnFlags["permissionMode"],
         planMode: persistedFlags.planMode,
+        serviceTier: persistedFlags.serviceTier as TurnFlags["serviceTier"],
       },
       pinnedThreadIds: new Set(pinnedIds),
       lastVisitedByThread: lastVisited,
@@ -373,6 +377,8 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     const reasoningEffort = override.reasoningEffort ?? flags.reasoningEffort;
     if (model) params.model = model;
     if (reasoningEffort) params.reasoningEffort = reasoningEffort;
+    const serviceTier = effectiveServiceTier(flags, get().models);
+    if (serviceTier) params.serviceTier = serviceTier;
     if (flags.permissionMode) params.permissionMode = flags.permissionMode;
     if (flags.planMode) params.planMode = true;
     try {
@@ -411,6 +417,8 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     const reasoningEffort = override.reasoningEffort ?? flags.reasoningEffort;
     if (model) params.model = model;
     if (reasoningEffort) params.reasoningEffort = reasoningEffort;
+    const serviceTier = effectiveServiceTier(flags, get().models);
+    if (serviceTier) params.serviceTier = serviceTier;
     if (flags.permissionMode) params.permissionMode = flags.permissionMode;
     if (flags.planMode) params.planMode = true;
     try {
@@ -432,6 +440,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       reasoningEffort: next.reasoningEffort,
       permissionMode: next.permissionMode,
       planMode: next.planMode,
+      serviceTier: next.serviceTier,
     });
   },
 
@@ -445,6 +454,8 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     if (cwd) params.cwd = cwd;
     if (flags.model) params.model = flags.model;
     if (flags.reasoningEffort) params.reasoningEffort = flags.reasoningEffort;
+    const serviceTier = effectiveServiceTier(flags, get().models);
+    if (serviceTier) params.serviceTier = serviceTier;
     if (flags.permissionMode) params.permissionMode = flags.permissionMode;
     if (flags.planMode) params.planMode = true;
     try {
@@ -1162,6 +1173,14 @@ export function isThreadUnread(thread: CodexThread, lastVisited: Record<string, 
   const visited = lastVisited[thread.id];
   if (typeof visited !== "number") return updated > 0;
   return updated > visited;
+}
+
+export function effectiveServiceTier(flags: TurnFlags, models: ModelOption[]): ServiceTier | undefined {
+  if (flags.serviceTier !== "fast") return undefined;
+  const selectedModel = flags.model
+    ? models.find((model) => model.id === flags.model || model.model === flags.model)
+    : models.find((model) => model.isDefault);
+  return selectedModel?.supportsFastMode ? "fast" : undefined;
 }
 
 // When a turn completes (or fails) on the *currently selected* thread, the

@@ -4,6 +4,16 @@ The web client is being built across a series of focused sessions. Each session
 delivers an end-to-end-usable slice; the foundation never gets restructured by a
 later session because the protocol and storage layers are already complete.
 
+## Session 43 — Fast Mode service tier ✅ DONE
+
+- ✅ **Fast Mode runtime flag.** Web `model/list` decoding now preserves fast
+  capability metadata across known field spellings and static fallback model
+  ids. The turn flag bar exposes Fast Mode only when the selected/default model
+  supports it, persists `serviceTier: "fast"`, and includes it in `thread/start`
+  / `turn/start` params through the same guarded path used for retries.
+- New `service-tier.test.ts` covers model metadata decoding, persistence, and
+  supported-model gating.
+
 ## Session 42 — Workspace text-file previews ✅ DONE
 
 - ✅ **Syntax-highlighted workspace text previews.** Assistant markdown links to

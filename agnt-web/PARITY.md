@@ -88,7 +88,7 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | `CodexReasoningEffortOption` | ✅ | 3 (per-turn flag) |
 | `CodexFuzzyFileMatch` | ⛔ bridge-blocked | bridge translators don't expose `fuzzyFileSearch` |
 | `CodexRateLimitStatus` | ⛔ bridge-blocked | bridge translators don't expose `account/rateLimits` |
-| `CodexServiceTier` | ⛔ | future |
+| `CodexServiceTier` | ✅ | Fast Mode toggle decodes model speed metadata, persists `serviceTier: "fast"`, and sends it only when the selected/default model supports it. |
 | `GitActionModels` | 🟡 | sync/diff/commit/push/branches/checkout/createBranch/createWorktree (Sessions 4 + 8 + 11); managed-worktree handoff + stacked actions still deferred |
 | `AIChangeSetModels` | ⛔ | future |
 | `PetCompanionModels` | ⛔ | future |

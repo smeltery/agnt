@@ -13,6 +13,7 @@ export interface PersistedTurnFlags {
   reasoningEffort?: string;
   permissionMode?: string;
   planMode?: boolean;
+  serviceTier?: string;
 }
 
 export type ThemePreference = "auto" | "light" | "dark";

@@ -25,9 +25,12 @@ export interface BootstrapSnapshot {
 
 export interface ModelOption {
   id: string;
+  model?: string;
   name?: string;
   displayName?: string;
   description?: string;
+  isDefault?: boolean;
+  supportsFastMode?: boolean;
 }
 
 export interface BootstrapInputs {
@@ -94,15 +97,67 @@ async function runModelList(rpc: JsonRpcClient): Promise<ModelOption[]> {
   }
 }
 
-function normalizeModel(raw: Record<string, unknown>): ModelOption | null {
-  const id = typeof raw.id === "string" ? raw.id : null;
+export function normalizeModel(raw: Record<string, unknown>): ModelOption | null {
+  const id = readFirstString(raw, ["id", "slug", "model"]);
   if (!id) return null;
+  const model = readFirstString(raw, ["model", "slug", "id"]);
   return {
     id,
-    name: typeof raw.name === "string" ? raw.name : undefined,
-    displayName: typeof raw.displayName === "string" ? raw.displayName : undefined,
-    description: typeof raw.description === "string" ? raw.description : undefined,
+    model,
+    name: readFirstString(raw, ["name"]),
+    displayName: readFirstString(raw, ["displayName", "display_name"]),
+    description: readFirstString(raw, ["description"]),
+    isDefault: readFirstBoolean(raw, ["isDefault", "is_default"]),
+    supportsFastMode: modelSupportsFastMode(raw, id, model),
   };
+}
+
+export function modelSupportsFastMode(raw: Record<string, unknown>, id = "", model = ""): boolean {
+  const explicit = readFirstBoolean(raw, [
+    "supportsFastMode",
+    "supports_fast_mode",
+    "fastMode",
+    "fast_mode",
+    "fastServiceTier",
+    "fast_service_tier",
+  ]);
+  if (explicit !== undefined) return explicit;
+  if (readSpeedTiers(raw).some((tier) => tier.trim().toLowerCase() === "fast")) return true;
+  return [id, model].some((value) => STATIC_FAST_MODE_MODELS.has(value.trim().toLowerCase()));
+}
+
+const STATIC_FAST_MODE_MODELS = new Set([
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.2-codex",
+  "gpt-5.2",
+]);
+
+function readFirstString(raw: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function readFirstBoolean(raw: Record<string, unknown>, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "boolean") return value;
+  }
+  return undefined;
+}
+
+function readSpeedTiers(raw: Record<string, unknown>): string[] {
+  const tiers: string[] = [];
+  for (const key of ["additionalSpeedTiers", "additional_speed_tiers"]) {
+    const value = raw[key];
+    if (!Array.isArray(value)) continue;
+    tiers.push(...value.filter((entry): entry is string => typeof entry === "string"));
+  }
+  return tiers;
 }
 
 function isMethodNotFound(error: unknown): boolean {
