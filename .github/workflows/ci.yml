@@ -74,64 +74,71 @@ jobs:
           if matches "$common|$secure|^AgntAndroid/"; then set_output android true; else set_output android false; fi
           if matches "$common|^agnt-host/"; then set_output host true; else set_output host false; fi
 
-  bridge:
+  bun-packages:
     needs: changes
-    if: needs.changes.outputs.bridge == 'true'
+    if: >-
+      needs.changes.outputs.bridge == 'true' ||
+      needs.changes.outputs.relay == 'true' ||
+      needs.changes.outputs.web == 'true' ||
+      needs.changes.outputs.host == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: agnt-bridge
+            surface: bridge
+            working-directory: agnt-bridge
+            frozen-lockfile: "true"
+            audit: "true"
+          - name: relay
+            surface: relay
+            working-directory: relay
+            frozen-lockfile: "true"
+            audit: "true"
+          - name: agnt-web
+            surface: web
+            working-directory: agnt-web
+            frozen-lockfile: "true"
+            audit: "true"
+          - name: agnt-host
+            surface: host
+            working-directory: agnt-host
+            # agnt-host does not commit a Bun lockfile yet.
+            frozen-lockfile: "false"
+            audit: "false"
     env:
       AGNT_FLOX_QUIET: "1"
     steps:
       - name: Checkout repository
+        if: >-
+          (matrix.surface == 'bridge' && needs.changes.outputs.bridge == 'true') ||
+          (matrix.surface == 'relay' && needs.changes.outputs.relay == 'true') ||
+          (matrix.surface == 'web' && needs.changes.outputs.web == 'true') ||
+          (matrix.surface == 'host' && needs.changes.outputs.host == 'true')
         uses: actions/checkout@v7
 
       - name: Setup Bun package
+        if: >-
+          (matrix.surface == 'bridge' && needs.changes.outputs.bridge == 'true') ||
+          (matrix.surface == 'relay' && needs.changes.outputs.relay == 'true') ||
+          (matrix.surface == 'web' && needs.changes.outputs.web == 'true') ||
+          (matrix.surface == 'host' && needs.changes.outputs.host == 'true')
         uses: ./.github/actions/setup-bun-package
         with:
-          working-directory: agnt-bridge
+          working-directory: ${{ matrix.working-directory }}
+          frozen-lockfile: ${{ matrix.frozen-lockfile }}
+          audit: ${{ matrix.audit }}
 
       - name: Run package CI
-        working-directory: agnt-bridge
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
-
-  relay:
-    needs: changes
-    if: needs.changes.outputs.relay == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    env:
-      AGNT_FLOX_QUIET: "1"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Bun package
-        uses: ./.github/actions/setup-bun-package
-        with:
-          working-directory: relay
-
-      - name: Run package CI
-        working-directory: relay
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
-
-  web:
-    needs: changes
-    if: needs.changes.outputs.web == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    env:
-      AGNT_FLOX_QUIET: "1"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Bun package
-        uses: ./.github/actions/setup-bun-package
-        with:
-          working-directory: agnt-web
-
-      - name: Run package CI
-        working-directory: agnt-web
+        if: >-
+          (matrix.surface == 'bridge' && needs.changes.outputs.bridge == 'true') ||
+          (matrix.surface == 'relay' && needs.changes.outputs.relay == 'true') ||
+          (matrix.surface == 'web' && needs.changes.outputs.web == 'true') ||
+          (matrix.surface == 'host' && needs.changes.outputs.host == 'true')
+        working-directory: ${{ matrix.working-directory }}
         run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
   android:
@@ -172,37 +179,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  host:
-    needs: changes
-    if: needs.changes.outputs.host == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    env:
-      AGNT_FLOX_QUIET: "1"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Bun package
-        uses: ./.github/actions/setup-bun-package
-        with:
-          working-directory: agnt-host
-          # agnt-host does not commit a Bun lockfile yet.
-          frozen-lockfile: "false"
-          audit: "false"
-
-      - name: Run package CI
-        working-directory: agnt-host
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
-
   ci-summary:
     needs:
       - changes
-      - bridge
-      - relay
-      - web
+      - bun-packages
       - android
-      - host
     if: always()
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
@@ -212,11 +193,8 @@ jobs:
 
           for result in \
             "${{ needs.changes.result }}" \
-            "${{ needs.bridge.result }}" \
-            "${{ needs.relay.result }}" \
-            "${{ needs.web.result }}" \
-            "${{ needs.android.result }}" \
-            "${{ needs.host.result }}"
+            "${{ needs.bun-packages.result }}" \
+            "${{ needs.android.result }}"
           do
             case "$result" in
               success|skipped) ;;
