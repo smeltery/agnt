@@ -133,6 +133,7 @@ function createThreadRolloutLiveMirror({
   let lastSize = 0;
   let partialLine = "";
   let lastActivityAt = startedAt;
+  let lastGrowthAt = startedAt;
   let lastHeartbeatAt = startedAt;
   let didBootstrap = false;
   let wasSuppressed = false;
@@ -185,6 +186,8 @@ function createThreadRolloutLiveMirror({
         });
         lastSize = fileSize;
         lastActivityAt = currentTime;
+        lastGrowthAt = currentTime;
+        lastHeartbeatAt = currentTime;
         if (state.isDesktopOrigin === false) {
           stop();
         }
@@ -195,6 +198,7 @@ function createThreadRolloutLiveMirror({
         const chunk = readFileSlice(rolloutPath, lastSize, fileSize, fsModule);
         lastSize = fileSize;
         lastActivityAt = currentTime;
+        lastGrowthAt = currentTime;
         lastHeartbeatAt = currentTime;
         state.suppressLiveActivityUntilGrowth = false;
         if (!chunk) {
@@ -208,6 +212,11 @@ function createThreadRolloutLiveMirror({
         return;
       }
 
+      if (state.activeTurnId && currentTime - lastGrowthAt >= staleActiveRunMaxAgeMs) {
+        stop();
+        return;
+      }
+
       if (
         state.isDesktopOrigin !== false
         && state.activeTurnId
@@ -215,10 +224,11 @@ function createThreadRolloutLiveMirror({
         && currentTime - lastHeartbeatAt >= activityHeartbeatMs
       ) {
         lastHeartbeatAt = currentTime;
-        sendApplicationResponse(JSON.stringify(createNotification("codex/event/background_event", {
+        lastActivityAt = currentTime;
+        sendApplicationResponse(JSON.stringify(createNotification("turn/activity", {
           threadId: state.threadId,
           turnId: state.activeTurnId,
-          message: "Still running on desktop",
+          id: state.activeTurnId,
         })));
       }
 

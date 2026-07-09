@@ -392,6 +392,89 @@ test("desktop-origin mirror emits response_item assistant messages when event_ms
   assert.equal(message.params.itemId, "msg-response-only");
 });
 
+test("desktop-origin mirror dedupes the same assistant text across event and response_item shapes", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-dedupe-shapes",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-dedupe-shapes"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 200,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-dedupe-shapes" },
+  }));
+
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    agentMessage("Final answer text", "final_answer"),
+    responseMessage("Final answer text", "final_answer", "msg-dedupe-response"),
+  ]);
+  await wait(30);
+
+  const messages = outbound.filter((message) => (
+    message.method === "codex/event/agent_message"
+    && message.params.message === "Final answer text"
+  ));
+  assert.equal(messages.length, 1);
+});
+
+test("desktop-origin mirror stays alive on heartbeat-only active runs", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-heartbeat-idle",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-heartbeat-idle"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 30,
+    activityHeartbeatMs: 10,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-heartbeat-idle" },
+  }));
+
+  await wait(75);
+
+  const heartbeats = outbound.filter((message) => message.method === "turn/activity");
+  assert.ok(heartbeats.length >= 4, `expected heartbeat mirror to stay alive, got ${heartbeats.length}`);
+});
+
 test("desktop-origin active runs mirror generated image previews", async (t) => {
   const { homeDir } = createTemporaryRolloutHome({
     threadId: "thread-image",
@@ -1185,6 +1268,138 @@ test("desktop-origin live tail closes mirrored turns on turn_aborted", async (t)
   assert.ok(completed);
   assert.equal(completed.params.turnId, "turn-live-abort");
   assert.equal(completed.params.status, "aborted");
+});
+
+test("desktop-origin live tail closes mirrored turns on fatal error", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-live-error",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-live-error"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 100,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-live-error" },
+  }));
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    errorEvent("turn-live-error", "Model stream disconnected"),
+  ]);
+  await wait(30);
+
+  const completed = outbound.find((message) => message.method === "turn/completed");
+  assert.ok(completed);
+  assert.equal(completed.params.turnId, "turn-live-error");
+  assert.equal(completed.params.status, "failed");
+  assert.equal(completed.params.error.message, "Model stream disconnected");
+});
+
+test("desktop-origin live tail preserves abort status when finalizing a synthetic active turn", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-live-synthetic-abort",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted(),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 100,
+    syntheticTerminalGraceMs: 5,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-live-synthetic-abort" },
+  }));
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    turnAborted("turn-real-abort"),
+  ]);
+  await wait(40);
+
+  const syntheticCompleted = outbound
+    .filter((message) => message.method === "turn/completed")
+    .find((message) => message.params.turnId.startsWith("rollout-turn:"));
+  assert.ok(syntheticCompleted);
+  assert.equal(syntheticCompleted.params.status, "aborted");
+});
+
+test("desktop-origin live tail preserves failed status when finalizing a synthetic active turn", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-live-synthetic-error",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted(),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 100,
+    syntheticTerminalGraceMs: 5,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-live-synthetic-error" },
+  }));
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    errorEvent("turn-real-error", "Model stream disconnected"),
+  ]);
+  await wait(40);
+
+  const syntheticCompleted = outbound
+    .filter((message) => message.method === "turn/completed")
+    .find((message) => message.params.turnId.startsWith("rollout-turn:"));
+  assert.ok(syntheticCompleted);
+  assert.equal(syntheticCompleted.params.status, "failed");
+  assert.equal(syntheticCompleted.params.error.message, "Model stream disconnected");
 });
 
 test("desktop-origin rollouts emit a turn-end file-change snapshot after final text", async (t) => {
