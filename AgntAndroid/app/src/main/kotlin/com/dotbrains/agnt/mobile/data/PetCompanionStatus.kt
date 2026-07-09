@@ -11,15 +11,17 @@ import com.dotbrains.agnt.mobile.core.model.PetCompanionStatusSnapshot
  * Captures only the pet-relevant slice of repository state so the overlay does not
  * subscribe to whole chat timelines (parity iOS `PetCompanionStatusSignature`).
  *
- * Android exposes a subset of iOS's per-thread status state: there is no
- * `failedThreadIDs` / `readyThreadIDs` / completion-banner stream yet, so the
- * derived snapshot supports idle / running / waiting phases and degrades the
- * failed/review phases until that state lands.
+ * Android exposes the same phase resolver as iOS. Some callers may not yet have
+ * failed / ready / completion-banner state available, so those inputs default to
+ * empty values and gracefully fall back to idle.
  */
 data class PetCompanionStatusInputs(
     val isConnected: Boolean,
     val activeThreadId: String?,
     val runningThreadIds: Set<String>,
+    val failedThreadIds: Set<String> = emptySet(),
+    val readyThreadIds: Set<String> = emptySet(),
+    val completionBannerTitle: String? = null,
     val hasPendingApproval: Boolean,
     val pendingApprovalThreadId: String?,
     val threads: List<CodexThread>,
@@ -54,6 +56,30 @@ fun derivePetStatusSnapshot(inputs: PetCompanionStatusInputs): PetCompanionStatu
             phase = PetCompanionPhase.Running,
             title = if (count > 1) "Working $count chats" else "Working",
             detail = petProgressPrompt(threadId, inputs, fallback = petThreadTitle(threadId, inputs), prefersActivity = true),
+        )
+    }
+
+    preferredThreadId(inputs.failedThreadIds, inputs)?.let { threadId ->
+        return PetCompanionStatusSnapshot(
+            phase = PetCompanionPhase.Failed,
+            title = "Needs a look",
+            detail = petProgressPrompt(threadId, inputs, fallback = petThreadTitle(threadId, inputs), prefersActivity = false),
+        )
+    }
+
+    inputs.completionBannerTitle?.trim()?.takeIf { it.isNotEmpty() }?.let { title ->
+        return PetCompanionStatusSnapshot(
+            phase = PetCompanionPhase.Review,
+            title = "Done",
+            detail = title,
+        )
+    }
+
+    preferredThreadId(inputs.readyThreadIds, inputs)?.let { threadId ->
+        return PetCompanionStatusSnapshot(
+            phase = PetCompanionPhase.Review,
+            title = "Done",
+            detail = petProgressPrompt(threadId, inputs, fallback = petThreadTitle(threadId, inputs), prefersActivity = false),
         )
     }
 

@@ -338,8 +338,8 @@ Open follow-ups:
           a dedicated `agnt_pet` SharedPreferences file, exposes
           `availablePets` / `renderedPet` / `isLoading` / `errorMessage` flows,
           and resets in-memory state on disconnect. `PetCompanionStatus.kt` holds
-          a pure `derivePetStatusSnapshot` (idle / running / waiting) over the
-          pet-relevant repo state slice.
+          a pure `derivePetStatusSnapshot` (idle / running / waiting / failed /
+          review) over the pet-relevant repo state slice.
         - `ui/pet/PetCompanionOverlay.kt` — decodes the base64 atlas to a
           `Bitmap`, crops 192×208 cells into cached `ImageBitmap` frames, runs the
           play-3×-then-idle animation loop, supports drag-to-reposition + tap-to-jump,
@@ -348,8 +348,9 @@ Open follow-ups:
           `MainShell` (interaction limited to Home).
         - Settings gains a `Companion pet` card (enable switch + pet picker +
           refresh).
-      Status: iOS's `failed` / `review` / completion-banner phases degrade to
-      idle until Android exposes per-thread failed/ready/completion state.
+      Status: the pure status resolver now supports iOS's `failed` / `review` /
+      completion-banner phases; live repository wiring for failed / ready /
+      completion state is still pending.
       Coverage: `PetCompanionTest` (atlas math + layout), `PetCompanionStatusTest`
       (snapshot derivation + prompt sanitizing), `AgentServicePetsTest` (parsing).
       `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:lintDebug` green.

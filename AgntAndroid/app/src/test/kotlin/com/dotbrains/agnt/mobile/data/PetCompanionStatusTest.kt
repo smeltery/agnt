@@ -29,6 +29,9 @@ class PetCompanionStatusTest {
         connected: Boolean = true,
         active: String? = null,
         running: Set<String> = emptySet(),
+        failed: Set<String> = emptySet(),
+        ready: Set<String> = emptySet(),
+        completionBanner: String? = null,
         approval: Boolean = false,
         approvalThread: String? = null,
         threads: List<CodexThread> = emptyList(),
@@ -37,6 +40,9 @@ class PetCompanionStatusTest {
         isConnected = connected,
         activeThreadId = active,
         runningThreadIds = running,
+        failedThreadIds = failed,
+        readyThreadIds = ready,
+        completionBannerTitle = completionBanner,
         hasPendingApproval = approval,
         pendingApprovalThreadId = approvalThread,
         threads = threads,
@@ -90,6 +96,61 @@ class PetCompanionStatusTest {
         val snapshot = derivePetStatusSnapshot(inputs(running = setOf("a", "b", "c")))
         assertEquals(PetCompanionPhase.Running, snapshot.phase)
         assertEquals("Working 3 chats", snapshot.title)
+    }
+
+    @Test
+    fun failedUsesLatestAssistantDetailAfterRunning() {
+        val snapshot =
+            derivePetStatusSnapshot(
+                inputs(
+                    active = "t1",
+                    failed = setOf("t1"),
+                    messages =
+                        mapOf(
+                            "t1" to
+                                listOf(
+                                    message("t1", CodexMessageRole.assistant, CodexMessageKind.chat, "Build failed"),
+                                ),
+                        ),
+                ),
+            )
+        assertEquals(PetCompanionPhase.Failed, snapshot.phase)
+        assertEquals("Needs a look", snapshot.title)
+        assertEquals("Build failed", snapshot.detail)
+    }
+
+    @Test
+    fun runningTakesPriorityOverFailed() {
+        val snapshot = derivePetStatusSnapshot(inputs(running = setOf("t1"), failed = setOf("t1")))
+        assertEquals(PetCompanionPhase.Running, snapshot.phase)
+    }
+
+    @Test
+    fun completionBannerUsesReviewPhaseBeforeReadyThreads() {
+        val snapshot =
+            derivePetStatusSnapshot(
+                inputs(
+                    ready = setOf("t1"),
+                    completionBanner = "Implemented sync",
+                ),
+            )
+        assertEquals(PetCompanionPhase.Review, snapshot.phase)
+        assertEquals("Done", snapshot.title)
+        assertEquals("Implemented sync", snapshot.detail)
+    }
+
+    @Test
+    fun readyThreadUsesReviewPhaseAndThreadTitleFallback() {
+        val snapshot =
+            derivePetStatusSnapshot(
+                inputs(
+                    ready = setOf("t1"),
+                    threads = listOf(CodexThread(id = "t1", title = "Review patch")),
+                ),
+            )
+        assertEquals(PetCompanionPhase.Review, snapshot.phase)
+        assertEquals("Done", snapshot.title)
+        assertEquals("Review patch", snapshot.detail)
     }
 
     @Test
