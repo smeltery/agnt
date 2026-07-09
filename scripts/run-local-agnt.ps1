@@ -5,6 +5,7 @@
 [CmdletBinding()]
 param(
     [string]$Hostname = "",
+    [string]$RelayUrl = "",
     [string]$BindHost = "0.0.0.0",
     [int]$Port = 9000,
     [string]$Provider = "",
@@ -70,6 +71,36 @@ function Resolve-AdvertisedHostname {
     return [System.Net.Dns]::GetHostName()
 }
 
+function Normalize-RelayUrl {
+    param([string]$RawUrl)
+
+    try {
+        $uri = [System.UriBuilder]::new($RawUrl)
+        if ($uri.UserName -or $uri.Password) {
+            Fail "Credentials are not supported in relay URLs."
+        }
+        if ($uri.Query -or $uri.Fragment) {
+            Fail "Query strings and fragments are not supported in relay URLs."
+        }
+
+        switch ($uri.Scheme.ToLowerInvariant()) {
+            "ws" { }
+            "wss" { }
+            "http" { $uri.Scheme = "ws" }
+            "https" { $uri.Scheme = "wss" }
+            default { Fail "Relay URL must start with ws://, wss://, http://, or https://" }
+        }
+
+        if (-not $uri.Path -or $uri.Path -eq "/") {
+            $uri.Path = "/relay"
+        }
+
+        return $uri.Uri.AbsoluteUri
+    } catch {
+        Fail "Invalid -RelayUrl '$RawUrl'. Pass ws(s)://.../relay, or paste an http(s) tunnel URL."
+    }
+}
+
 function Wait-ForRelay {
     param([string]$ProbeHost, [int]$ProbePort, [System.Diagnostics.Process]$RelayProcess)
 
@@ -124,7 +155,11 @@ New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
 
 $advertisedHost = Resolve-AdvertisedHostname
 $probeHost = if ($BindHost -eq "0.0.0.0" -or -not $BindHost.Trim()) { "127.0.0.1" } else { $BindHost }
-$relayUrl = "ws://${advertisedHost}:${Port}/relay"
+$resolvedRelayUrl = if ($RelayUrl.Trim()) {
+    Normalize-RelayUrl $RelayUrl.Trim()
+} else {
+    "ws://${advertisedHost}:${Port}/relay"
+}
 
 $existingListener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
     Select-Object -First 1
@@ -136,7 +171,7 @@ Write-RunLog "Configuration"
 Write-Host "  Relay bind host : $BindHost"
 Write-Host "  Relay port      : $Port"
 Write-Host "  Relay hostname  : $advertisedHost"
-Write-Host "  Relay URL       : $relayUrl"
+Write-Host "  Relay URL       : $resolvedRelayUrl"
 Write-Host "  Relay log       : $RelayLog"
 if ($Provider.Trim()) {
     Write-Host "  Provider        : $Provider"
@@ -144,15 +179,15 @@ if ($Provider.Trim()) {
     Write-Host "  Provider        : (auto-detect)"
 }
 
-$previousPort = $env:PORT
-$previousRelayBindHost = $env:RELAY_BIND_HOST
+$previousAgntRelayPort = $env:AGNT_RELAY_PORT
+$previousAgntRelayBindHost = $env:AGNT_RELAY_BIND_HOST
 $previousAgntRelay = $env:AGNT_RELAY
 $previousAgntProvider = $env:AGNT_PROVIDER
 $relayProcess = $null
 
 try {
-    $env:PORT = [string]$Port
-    $env:RELAY_BIND_HOST = $BindHost
+    $env:AGNT_RELAY_PORT = [string]$Port
+    $env:AGNT_RELAY_BIND_HOST = $BindHost
     $relayProcess = Start-Process -FilePath "node" `
         -ArgumentList @("server.js") `
         -WorkingDirectory $RelayDir `
@@ -166,7 +201,7 @@ try {
 
     Write-RunLog "Relay is healthy. Starting foreground bridge."
     Write-RunLog "Keep this terminal open. Press Ctrl+C to stop the bridge and relay."
-    $env:AGNT_RELAY = $relayUrl
+    $env:AGNT_RELAY = $resolvedRelayUrl
 
     $bridgeArgs = @(".\bin\agnt.js", "run")
     if ($Provider.Trim()) {
@@ -180,8 +215,8 @@ try {
         Pop-Location
     }
 } finally {
-    $env:PORT = $previousPort
-    $env:RELAY_BIND_HOST = $previousRelayBindHost
+    $env:AGNT_RELAY_PORT = $previousAgntRelayPort
+    $env:AGNT_RELAY_BIND_HOST = $previousAgntRelayBindHost
     $env:AGNT_RELAY = $previousAgntRelay
     $env:AGNT_PROVIDER = $previousAgntProvider
 

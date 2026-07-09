@@ -60,6 +60,12 @@ If the advertised host in the QR is not reachable from your phone, pass the LAN 
 .\scripts\run-local-agnt.ps1 -Hostname 192.168.1.254
 ```
 
+For tunnel or reverse-proxy testing, pass the public relay URL directly:
+
+```sh
+./scripts/run-local-agnt.sh --relay-url https://example-tunnel.trycloudflare.com
+```
+
 Pair from any client:
 
 - **iOS app** — install [agnt](https://github.com/dotbrains/agnt), scan the QR. The phone reconnects automatically afterward.

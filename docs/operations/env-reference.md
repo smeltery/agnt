@@ -95,6 +95,7 @@ For repeatable configurations, put env into `~/.agnt/env` (or wherever you'd lik
 
 | Var | Used by | Purpose |
 |---|---|---|
-| `RELAY_BIND_HOST` | `scripts/run-local-agnt.sh` | Interface the local relay binds to. Default `0.0.0.0`. |
-| `RELAY_PORT` | `scripts/run-local-agnt.sh` | Local relay port. Default `9000`. |
-| `RELAY_HOSTNAME` | `scripts/run-local-agnt.sh` | Hostname iPhone uses to reach the relay. Default `LocalHostName.local` then `hostname` then `localhost`. |
+| `AGNT_RELAY_BIND_HOST` | `scripts/run-local-agnt.sh`, `relay/server.js` | Interface the local relay binds to. Default `0.0.0.0`. |
+| `AGNT_RELAY_PORT` | `scripts/run-local-agnt.sh`, `relay/server.js` | Local relay port. Default `9000`. |
+| `AGNT_RELAY_HOSTNAME` | `scripts/run-local-agnt.sh` | Hostname clients use to reach the relay. Default `LocalHostName.local` then `hostname` then `localhost`. |
+| `AGNT_RELAY_URL` | `scripts/run-local-agnt.sh` | Full relay URL to advertise for tunnel/reverse-proxy testing. Equivalent to `--relay-url`; `http(s)` is normalized to `ws(s)` and `/relay` is appended when needed. |

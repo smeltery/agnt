@@ -5,6 +5,7 @@
 // Depends on: http, ws, ./relay, ./push-service
 
 const http = require("http");
+const { monitorEventLoopDelay } = require("perf_hooks");
 const { WebSocketServer } = require("ws");
 const {
   setupRelay,
@@ -25,6 +26,7 @@ function createRelayServer({
   relayOptions = {},
   trustProxy = false,
 } = {}) {
+  const runtimeMetrics = createRuntimeMetrics();
   const pushEnabled = Boolean(enablePushService || pushSessionService);
   const resolvedPushSessionService = pushEnabled
     ? (pushSessionService || createPushSessionService({
@@ -46,6 +48,7 @@ function createRelayServer({
       pushEnabled,
       pushRateLimiter,
       pushSessionService: resolvedPushSessionService,
+      runtimeMetrics,
       trustProxy,
     });
   });
@@ -97,6 +100,7 @@ async function handleHTTPRequest(req, res, {
   pushEnabled,
   pushRateLimiter,
   pushSessionService,
+  runtimeMetrics,
   trustProxy,
 }) {
   const pathname = safePathname(req.url);
@@ -119,6 +123,7 @@ async function handleHTTPRequest(req, res, {
             ok: true,
             relay: getRelayStats(),
             push: pushSessionService.getStats(),
+            runtime: runtimeMetrics.snapshot(),
           }
         : { ok: true }
     );
@@ -264,6 +269,37 @@ function createDisabledPushSessionService() {
   };
 }
 
+// Captures process-level pressure that can make WebSocket heartbeats miss deadlines.
+function createRuntimeMetrics() {
+  const eventLoopDelay = monitorEventLoopDelay({ resolution: 20 });
+  eventLoopDelay.enable();
+  const startedAt = Date.now();
+
+  return {
+    snapshot() {
+      const memory = process.memoryUsage();
+      return {
+        uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+        eventLoopDelayMs: {
+          mean: nanosecondsToMilliseconds(eventLoopDelay.mean),
+          max: nanosecondsToMilliseconds(eventLoopDelay.max),
+          p99: nanosecondsToMilliseconds(eventLoopDelay.percentile(99)),
+        },
+        memory: {
+          rss: memory.rss,
+          heapUsed: memory.heapUsed,
+          heapTotal: memory.heapTotal,
+          external: memory.external,
+        },
+      };
+    },
+  };
+}
+
+function nanosecondsToMilliseconds(value) {
+  return Number.isFinite(value) ? Math.round(value / 1_000_000) : 0;
+}
+
 function safePathname(rawUrl) {
   try {
     return new URL(rawUrl || "/", "http://localhost").pathname;
@@ -381,14 +417,15 @@ function createFixedWindowRateLimiter({ windowMs, maxRequests, now = () => Date.
 }
 
 if (require.main === module) {
-  const port = Number(process.env.PORT || 9000);
+  const port = Number(process.env.AGNT_RELAY_PORT || 9000);
   const trustProxy = readOptionalBooleanEnv(["AGNT_TRUST_PROXY"]) ?? false;
   const enablePushService = readOptionalBooleanEnv(
     ["AGNT_ENABLE_PUSH_SERVICE"]
   ) ?? false;
+  const bindHost = process.env.AGNT_RELAY_BIND_HOST || "0.0.0.0";
   const { server } = createRelayServer({ enablePushService, trustProxy });
-  server.listen(port, () => {
-    console.log(`[relay] listening on :${port}`);
+  server.listen(port, bindHost, () => {
+    console.log(`[relay] listening on ${bindHost}:${port}`);
   });
 }
 

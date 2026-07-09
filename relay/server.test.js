@@ -29,7 +29,29 @@ test("health is minimal by default and detailed only when enabled", async () => 
   assert.equal(detailed.ok, true);
   assert.ok(detailed.relay);
   assert.ok(detailed.push);
+  assert.ok(detailed.runtime);
+  assert.equal(typeof detailed.runtime.eventLoopDelayMs.max, "number");
   assert.equal(detailed.push.enabled, false);
+});
+
+test("detailed health exposes relay pressure counters", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-health`, {
+      headers: { "x-role": "mac" },
+    });
+    await onceOpen(mac);
+
+    const response = await fetch(`http://127.0.0.1:${port}/health`);
+    const body = await response.json();
+    assert.equal(body.relay.sessionsWithOpenMac, 1);
+    assert.equal(body.relay.sessionsWithStaleMac, 0);
+    assert.equal(body.relay.sessionsWithClients, 0);
+    assert.equal(typeof body.relay.heartbeatTerminations, "number");
+
+    const macClosed = onceClosed(mac);
+    mac.close();
+    await macClosed;
+  }, { exposeDetailedHealth: true });
 });
 
 test("push routes stay disabled until explicitly enabled", async () => {
@@ -233,6 +255,67 @@ test("trusted session resolve also works when the relay HTTP API is mounted unde
     const macClosed = onceClosed(mac);
     mac.close();
     await macClosed;
+  });
+});
+
+test("trusted session resolve routes each trusted mobile device to its own live mac channel", async () => {
+  const phone = makePhoneIdentity();
+  const android = makePhoneIdentity();
+
+  await withServer(async ({ port }) => {
+    const firstMacChannel = new WebSocket(`ws://127.0.0.1:${port}/relay/live-session-phone`, {
+      headers: {
+        "x-role": "mac",
+        "x-mac-device-id": "mac-multi",
+        "x-mac-identity-public-key": "mac-public-key-multi",
+        "x-machine-name": "Test-Mac",
+        "x-trusted-phone-device-id": phone.phoneDeviceId,
+        "x-trusted-phone-public-key": phone.phoneIdentityPublicKey,
+      },
+    });
+    const secondMacChannel = new WebSocket(`ws://127.0.0.1:${port}/relay/live-session-android`, {
+      headers: {
+        "x-role": "mac",
+        "x-mac-device-id": "mac-multi",
+        "x-mac-identity-public-key": "mac-public-key-multi",
+        "x-machine-name": "Test-Mac",
+        "x-trusted-phone-device-id": android.phoneDeviceId,
+        "x-trusted-phone-public-key": android.phoneIdentityPublicKey,
+      },
+    });
+    await Promise.all([onceOpen(firstMacChannel), onceOpen(secondMacChannel)]);
+
+    const phoneResponse = await fetch(`http://127.0.0.1:${port}/v1/trusted/session/resolve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(makeTrustedResolveBody({
+        macDeviceId: "mac-multi",
+        phoneIdentity: phone,
+        nonce: "nonce-phone-channel",
+        timestamp: Date.now(),
+      })),
+    });
+    const androidResponse = await fetch(`http://127.0.0.1:${port}/v1/trusted/session/resolve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(makeTrustedResolveBody({
+        macDeviceId: "mac-multi",
+        phoneIdentity: android,
+        nonce: "nonce-android-channel",
+        timestamp: Date.now(),
+      })),
+    });
+
+    assert.equal(phoneResponse.status, 200);
+    assert.equal(androidResponse.status, 200);
+    assert.equal((await phoneResponse.json()).sessionId, "live-session-phone");
+    assert.equal((await androidResponse.json()).sessionId, "live-session-android");
+
+    const firstClosed = onceClosed(firstMacChannel);
+    const secondClosed = onceClosed(secondMacChannel);
+    firstMacChannel.close();
+    secondMacChannel.close();
+    await Promise.all([firstClosed, secondClosed]);
   });
 });
 
@@ -621,6 +704,32 @@ test("websocket relay forwards between mac and iphone on the base relay path", a
     mac.close();
     iphone.close();
     await Promise.all([macClosed, iphoneClosed]);
+  });
+});
+
+test("websocket relay accepts android as a mobile role from query string", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-android`, {
+      headers: { "x-role": "mac" },
+    });
+    await onceOpen(mac);
+
+    const android = new WebSocket(`ws://127.0.0.1:${port}/relay/session-android?role=android`);
+    await onceOpen(android);
+
+    const messageFromAndroid = onceMessage(mac);
+    android.send("from-android");
+    assert.equal(await messageFromAndroid, "from-android");
+
+    const messageFromMac = onceMessage(android);
+    mac.send("from-mac");
+    assert.equal(await messageFromMac, "from-mac");
+
+    const macClosed = onceClosed(mac);
+    const androidClosed = onceClosed(android);
+    android.close();
+    mac.close();
+    await Promise.all([androidClosed, macClosed]);
   });
 });
 
