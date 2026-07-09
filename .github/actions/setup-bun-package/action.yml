@@ -1,0 +1,41 @@
+name: Setup Bun package
+description: Install, optionally audit, and run CI for a Bun package through Flox.
+
+inputs:
+  working-directory:
+    description: Package working directory.
+    required: true
+  frozen-lockfile:
+    description: Pass --frozen-lockfile to bun install.
+    default: "true"
+  audit:
+    description: Run bun audit after install.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install package dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+
+        flox activate -d "$GITHUB_WORKSPACE" -- bun --version
+        args=()
+        if [[ "${{ inputs.frozen-lockfile }}" == "true" ]]; then
+          args+=(--frozen-lockfile)
+        fi
+        timeout --kill-after=30s 240s flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"
+
+    - name: Audit package dependencies
+      if: inputs.audit == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: timeout --kill-after=30s 120s flox activate -d "$GITHUB_WORKSPACE" -- bun audit
+
+    - name: Run package CI
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci

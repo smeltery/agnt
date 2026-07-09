@@ -104,8 +104,9 @@ jobs:
 
           ci_config='^(\.github/workflows/|\.github/actions/|\.github/actionlint\.ya?ml)'
           link_check_action='^\.github/actions/run-link-check/'
+          setup_bun_action='^\.github/actions/setup-bun-package/'
           flox_config='^\.flox/'
-          bun_common="$flox_config"
+          bun_common="$flox_config|$setup_bun_action"
           secure_bridge='^agnt-bridge/src/transport/secure-transport\.js'
           secure_web='^agnt-web/src/crypto/'
           secure_ios='^(AgntMobile/AgntMobile/Core/Networking/CodexSecureTransportModels\.swift|AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService\+SecureTransport\.swift)'
@@ -119,21 +120,21 @@ jobs:
 
           if should_run bridge "$bun_common|$secure_transport|^agnt-bridge/"; then
             set_output bridge true
-            bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true","ci_command":"bun run verify:entrypoints && bun run test"}')
+            bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
           else
             set_output bridge false
           fi
 
           if should_run relay "$bun_common|^relay/"; then
             set_output relay true
-            bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true","ci_command":"bun run test"}')
+            bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
           else
             set_output relay false
           fi
 
           if should_run web "$bun_common|$secure_transport|^agnt-web/"; then
             set_output web true
-            bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true","ci_command":"bun run test && bun run typecheck && bun run build:vite && bun run size"}')
+            bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
           else
             set_output web false
           fi
@@ -143,7 +144,7 @@ jobs:
           if should_run host "$bun_common|^agnt-host/"; then
             set_output host true
             # agnt-host does not commit a Bun lockfile yet.
-            bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false","ci_command":"bun run lint && bun run build"}')
+            bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
           else
             set_output host false
           fi
@@ -183,28 +184,12 @@ jobs:
       - name: Install Flox
         uses: flox/install-flox-action@v2
 
-      - name: Install package dependencies
-        working-directory: ${{ matrix.working-directory }}
-        run: |
-          set -euo pipefail
-          flox activate -d "$GITHUB_WORKSPACE" -- bun --version
-          args=()
-          if [[ "${{ matrix.frozen-lockfile }}" == "true" ]]; then
-            args+=(--frozen-lockfile)
-          fi
-          timeout 240s flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"
-
-      - name: Audit package dependencies
-        if: matrix.audit == 'true'
-        continue-on-error: true
-        working-directory: ${{ matrix.working-directory }}
-        run: timeout 120s flox activate -d "$GITHUB_WORKSPACE" -- bun audit
-
       - name: Run package CI
-        working-directory: ${{ matrix.working-directory }}
-        run: |
-          echo "Running: ${{ matrix.ci_command }}"
-          flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
+        uses: ./.github/actions/setup-bun-package
+        with:
+          working-directory: ${{ matrix.working-directory }}
+          frozen-lockfile: ${{ matrix.frozen-lockfile }}
+          audit: ${{ matrix.audit }}
 
   android:
     needs: changes
