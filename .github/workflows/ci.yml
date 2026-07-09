@@ -23,6 +23,8 @@ jobs:
       web: ${{ steps.filter.outputs.web }}
       android: ${{ steps.filter.outputs.android }}
       host: ${{ steps.filter.outputs.host }}
+      ios: ${{ steps.filter.outputs.ios }}
+      links: ${{ steps.filter.outputs.links }}
       bun_packages: ${{ steps.filter.outputs.bun_packages }}
     steps:
       - name: Checkout repository
@@ -66,6 +68,7 @@ jobs:
             echo "$name: $value" >> "$GITHUB_STEP_SUMMARY"
           }
 
+          ci_workflow='^\.github/workflows/ci\.yml'
           common='^(\.github/workflows/ci\.yml|\.github/actions/setup-bun-package/|\.flox/)'
           secure='^(agnt-bridge/src/transport/secure-transport\.js|agnt-web/src/crypto/|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
 
@@ -101,6 +104,10 @@ jobs:
           else
             set_output host false
           fi
+
+          if matches "$ci_workflow|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
+
+          if matches "$ci_workflow|^.*\.md$|^\.lycheeignore$"; then set_output links true; else set_output links false; fi
 
           bun_packages_json="$(printf '%s\n' "${bun_packages[@]}" | jq -s -c '.')"
           set_output bun_packages "$bun_packages_json"
@@ -170,11 +177,156 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  ios:
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    name: Build unsigned release IPA
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build unsigned IPA
+        run: |
+          set -euo pipefail
+
+          output_dir="$GITHUB_WORKSPACE/build/unsigned-ipa"
+          archive_path="$output_dir/AgntMobile.xcarchive"
+          ipa_path="$output_dir/agnt-unsigned-release.ipa"
+          build_log_path="$output_dir/xcodebuild.log"
+
+          rm -rf "$output_dir"
+          mkdir -p "$output_dir"
+
+          xcodebuild \
+            -project "$GITHUB_WORKSPACE/AgntMobile/AgntMobile.xcodeproj" \
+            -scheme AgntMobile \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$archive_path" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            2>&1 | tee "$build_log_path"
+
+          app_path="$(find "$archive_path/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+          if [[ -z "$app_path" ]]; then
+            echo "Unable to locate an .app bundle in $archive_path" >&2
+            exit 1
+          fi
+
+          payload_root="$(mktemp -d "$output_dir/payload.XXXXXX")"
+          trap 'rm -rf "$payload_root"' EXIT
+
+          mkdir -p "$payload_root/Payload"
+          ditto "$app_path" "$payload_root/Payload/$(basename "$app_path")"
+          ditto -c -k --sequesterRsrc --keepParent "$payload_root/Payload" "$ipa_path"
+
+          echo "Unsigned IPA created at $ipa_path"
+
+  links:
+    needs: changes
+    if: needs.changes.outputs.links == 'true'
+    name: Link check
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run lychee + post report
+        id: lychee
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set +e
+
+          echo "::group::lychee --version"
+          docker run --rm lycheeverse/lychee:latest --version
+          echo "lychee --version exit: $?"
+          echo "::endgroup::"
+
+          echo "::group::lychee scan"
+          docker run --rm \
+            --user 0:0 \
+            -v "$PWD:/workdir" \
+            -w /workdir \
+            -e GITHUB_TOKEN \
+            lycheeverse/lychee:latest \
+            --verbose \
+            --no-progress \
+            --max-redirects 5 \
+            --timeout 20 \
+            --max-retries 2 \
+            --exclude-path agnt-bridge/README.md \
+            --format markdown \
+            --output ./lychee-report.md \
+            './**/*.md' \
+            2>&1 | tee ./lychee-stdout.txt
+          code=${PIPESTATUS[0]}
+          echo "::endgroup::"
+          echo "lychee exit code: $code"
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+          echo "::group::report file"
+          if [ -f ./lychee-report.md ]; then
+            cat ./lychee-report.md
+          else
+            echo "(lychee did not write ./lychee-report.md)"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::lychee stdout fallback"
+          if [ -f ./lychee-stdout.txt ]; then
+            cat ./lychee-stdout.txt
+          fi
+          echo "::endgroup::"
+
+          if [ "$code" -ne 0 ] && [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "::group::posting PR comment"
+            if [ -f ./lychee-report.md ] && [ -s ./lychee-report.md ]; then
+              gh pr comment "$PR_NUMBER" --body-file ./lychee-report.md
+            elif [ -f ./lychee-stdout.txt ] && [ -s ./lychee-stdout.txt ]; then
+              {
+                echo "Link check failed (exit $code). Report file wasn't written; here is the captured stdout/stderr:"
+                echo
+                echo '```'
+                head -c 50000 ./lychee-stdout.txt
+                echo
+                echo '```'
+              } > ./pr-comment.md
+              gh pr comment "$PR_NUMBER" --body-file ./pr-comment.md
+            else
+              gh pr comment "$PR_NUMBER" --body "Link check failed (exit $code) with no captured output."
+            fi
+            echo "::endgroup::"
+          fi
+
+          exit "$code"
+
   ci-summary:
     needs:
       - changes
       - bun-packages
       - android
+      - ios
+      - links
     if: always()
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
@@ -185,7 +337,9 @@ jobs:
           for result in \
             "${{ needs.changes.result }}" \
             "${{ needs.bun-packages.result }}" \
-            "${{ needs.android.result }}"
+            "${{ needs.android.result }}" \
+            "${{ needs.ios.result }}" \
+            "${{ needs.links.result }}"
           do
             case "$result" in
               success|skipped) ;;
