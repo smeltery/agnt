@@ -49,7 +49,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Terminal` (bridge-PTY) | 🟡 | 32 (different shape from iOS — browser cannot open raw SSH; instead the bridge spawns its login shell via `node-pty` and proxies bytes over `terminal/*` JSON-RPC + `terminal/output` notifications. xterm.js + addon-fit on the front-end. Off by default; opt-in via `enableWebTerminal` bridge preference. Single session, single PTY for now — multi-tab sessions UI deferred.) |
 | `Pets` | ⛔ dropped | iOS-specific UX (animations / haptics / Live Activities). Use the iOS app for pets. |
 | `LiveActivity` / Dynamic Island | ⛔ dropped | iOS-only — done on iOS (`AgntMobile/AgntWidget`; Live Activity + Dynamic Island surface an in-flight turn on the Lock Screen, driven by local ActivityKit updates). No browser equivalent (no Lock Screen / Dynamic Island host). Use the iOS app. |
-| `Review` | ⛔ | future (`review/start` UI; bridge supports the RPC, no clear web surface yet) |
+| `Review` | 🟡 | `/review` slash command starts inline `review/start` for uncommitted changes; base-branch target picker still future |
 | `AIChangeSets` | ⛔ deferred | per-turn `RevertSheet` (Session 10) covers the practical "undo what this turn did" workflow; finer-grained per-message patch revert needs reducer to track forward patches captured during streaming |
 | `WorkspaceCheckpoints` | ✅ | 10 (preview + apply per turn; checkpointDiff + Copy not yet wired in UI but bridge-ready) |
 | `WorkspaceImages` | ✅ | 18 + 30 (workspace/readImage wrapper + cache; MarkdownContent resolves non-http image refs against thread cwd; click any inline image to open in the shared Lightbox) |
@@ -106,7 +106,7 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | New chat modal | `components/chat/NewChatModal.tsx` | ✅ (prompt + project selector + flag-aware turn/start) |
 | Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
 | Markdown | `components/chat/MarkdownContent.tsx` + `markdown-blocks.ts` + `syntax-highlight.ts` | ✅ (fenced code w/ Prism, inline code, bold/italic, headings 1–6, ordered/bullet/task lists, tables w/ column alignment, links + images w/ scheme allowlist, autolinks, blockquotes, horizontal rules) |
-| Composer slash commands | `components/chat/Composer.tsx` + `state/slash-commands.ts` | ✅ (Session 17; `/compact`, `/fork`, `/archive`, `/unarchive`, `/stop`; ↑/↓ navigate, Enter runs, Tab autocompletes, Esc dismisses) |
+| Composer slash commands | `components/chat/Composer.tsx` + `state/slash-commands.ts` | ✅ (Session 17 + review slice; `/review`, `/compact`, `/fork`, `/archive`, `/unarchive`, `/stop`; ↑/↓ navigate, Enter runs, Tab autocompletes, Esc dismisses) |
 | Composer draft autosave | `storage/drafts-store.ts` + `components/chat/Composer.tsx` | ✅ (Session 19; per-thread draft persisted to IndexedDB with 400 ms debounce; hydrates on thread switch and beforeunload, clears on send) |
 | Pinned threads | `storage/prefs-store.ts:loadPinnedThreadIds` + `state/threads-store.ts:togglePinThread` + sidebar | ✅ (Session 19; pinned threads sort to top of the live tab, ★ glyph in the row, Pin/Unpin in the context menu) |
 | Power-user keyboard shortcuts | `components/workspace/Workspace.tsx` | ✅ (Session 19 + 21; `e` exports, `r` reverts last turn, `n` opens New Chat, `p` toggles pin, ⌘/Ctrl+K opens cross-thread palette) |

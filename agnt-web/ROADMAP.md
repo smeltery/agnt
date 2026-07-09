@@ -4,6 +4,17 @@ The web client is being built across a series of focused sessions. Each session
 delivers an end-to-end-usable slice; the foundation never gets restructured by a
 later session because the protocol and storage layers are already complete.
 
+## Session 44 — Inline review slash command ✅ DONE
+
+- ✅ **Inline review start.** The web slash-command catalog now exposes
+  `/review` for live threads. It inserts the same optimistic user row as a
+  normal send and calls `review/start` with `{ delivery: "inline", target:
+  { type: "uncommittedChanges" } }`, matching the provider protocol without
+  adding a parallel review thread UI.
+- New `slash-commands.test.ts` coverage verifies command routing plus the
+  review/start payload shape, including the guarded base-branch payload helper
+  for a future target picker.
+
 ## Session 43 — Fast Mode service tier ✅ DONE
 
 - ✅ **Fast Mode runtime flag.** Web `model/list` decoding now preserves fast

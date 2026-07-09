@@ -46,6 +46,16 @@ export const CUSTOM_SLASH_NAME_RE = /^[a-z][a-z0-9-]{0,31}$/;
  */
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
   {
+    name: "review",
+    aliases: ["code-review"],
+    description: "Run an inline code review on current changes",
+    canRun: ({ threadId, threads }) =>
+      Boolean(threadId) && threads.threads.some((thread) => thread.id === threadId),
+    async run({ threadId, threads }) {
+      await threads.startReview(threadId, { target: "uncommittedChanges" });
+    },
+  },
+  {
     name: "compact",
     description: "Summarize older turns to free context window space",
     canRun: ({ threadId }) => Boolean(threadId),

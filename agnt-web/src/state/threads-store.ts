@@ -62,6 +62,7 @@ const PERSIST_DEBOUNCE_MS = 250;
 export type ReasoningEffort = "low" | "medium" | "high";
 export type PermissionMode = "default" | "acceptEdits" | "plan" | "bypassPermissions";
 export type ServiceTier = "fast";
+export type ReviewTarget = "uncommittedChanges" | "baseBranch";
 
 export interface TurnFlags {
   /** Selected provider model id (subset of state.models). Undefined = bridge default. */
@@ -114,6 +115,7 @@ export interface ThreadsState {
   selectThread(threadId: string): Promise<void>;
   loadOlderTurns(threadId: string): Promise<void>;
   sendTurn(threadId: string, content: string, attachments?: ImageAttachment[]): Promise<void>;
+  startReview(threadId: string, options?: { target?: ReviewTarget; baseBranch?: string }): Promise<boolean>;
   /** Re-issues turn/start with the inputs of a failed turn. Returns whether a retry actually fired. */
   /** Re-issue a failed turn. When `options.modelOverride` is set, that
    *  model wins over both the per-thread override and the global flag —
@@ -385,6 +387,29 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
       await activeConnection.rpc.request("turn/start", params);
     } catch (error) {
       set({ error: (error as Error).message });
+    }
+  },
+
+  async startReview(threadId, options) {
+    if (!activeConnection?.rpc || !threadId) return false;
+    const params = buildReviewStartParams(threadId, options);
+    if (!params) {
+      set({ error: "Choose a base branch before starting this review." });
+      return false;
+    }
+    mutateReducer(threadId, set, get, (state) =>
+      applyLocalUserMessage(state, threadId, reviewPromptText(options))
+    );
+    schedulePersist(threadId, get);
+    try {
+      await activeConnection.rpc.request("review/start", params);
+      return true;
+    } catch (error) {
+      const message = (error as { code?: number; message?: string }).code === -32601
+        ? "This provider doesn't support inline code review."
+        : (error as Error).message;
+      set({ error: message });
+      return false;
     }
   },
 
@@ -1181,6 +1206,40 @@ export function effectiveServiceTier(flags: TurnFlags, models: ModelOption[]): S
     ? models.find((model) => model.id === flags.model || model.model === flags.model)
     : models.find((model) => model.isDefault);
   return selectedModel?.supportsFastMode ? "fast" : undefined;
+}
+
+export function buildReviewStartParams(
+  threadId: string,
+  options: { target?: ReviewTarget; baseBranch?: string } = {}
+): Record<string, unknown> | null {
+  const target = options.target ?? "uncommittedChanges";
+  if (target === "baseBranch") {
+    const branch = options.baseBranch?.trim();
+    if (!branch) return null;
+    return {
+      threadId,
+      delivery: "inline",
+      target: {
+        type: "baseBranch",
+        branch,
+      },
+    };
+  }
+  return {
+    threadId,
+    delivery: "inline",
+    target: {
+      type: "uncommittedChanges",
+    },
+  };
+}
+
+function reviewPromptText(options: { target?: ReviewTarget; baseBranch?: string } = {}): string {
+  if (options.target === "baseBranch") {
+    const branch = options.baseBranch?.trim();
+    return branch ? `Review against base branch ${branch}` : "Review against base branch";
+  }
+  return "Review current changes";
 }
 
 // When a turn completes (or fails) on the *currently selected* thread, the

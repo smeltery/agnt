@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { filterSlashCommands, SLASH_COMMANDS } from "../src/state/slash-commands";
-import type { ThreadsState } from "../src/state/threads-store";
+import { buildReviewStartParams, type ThreadsState } from "../src/state/threads-store";
 
 function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
   // The slash-command catalog only reads a small slice of the threads store
@@ -28,6 +28,7 @@ function fakeThreadsState(overrides: Partial<ThreadsState> = {}): ThreadsState {
     selectThread: async () => {},
     loadOlderTurns: async () => {},
     sendTurn: async () => {},
+    startReview: async () => false,
     retryFailedTurn: async () => false,
     startNewThread: async () => null,
     stopTurn: async () => {},
@@ -58,6 +59,7 @@ describe("filterSlashCommands", () => {
     // not in `archivedThreads`); stop is not (no active turn).
     const names = result.map((command) => command.name);
     expect(names).toContain("compact");
+    expect(names).toContain("review");
     expect(names).toContain("fork");
     expect(names).toContain("archive");
     expect(names).not.toContain("unarchive");
@@ -70,6 +72,24 @@ describe("filterSlashCommands", () => {
     });
     const result = filterSlashCommands("COM", { threadId: "t1", threads });
     expect(result.map((command) => command.name)).toEqual(["compact"]);
+  });
+
+  it("runs /review as an inline review of current changes", async () => {
+    const calls: unknown[] = [];
+    const threads = fakeThreadsState({
+      threads: [{ id: "t1", syncState: "live" }],
+      startReview: async (threadId, options) => {
+        calls.push({ threadId, options });
+        return true;
+      },
+    });
+    const [command] = filterSlashCommands("review", { threadId: "t1", threads });
+
+    await command.run({ threadId: "t1", threads });
+
+    expect(calls).toEqual([
+      { threadId: "t1", options: { target: "uncommittedChanges" } },
+    ]);
   });
 
   it("matches aliases too — `/interrupt` resolves to stop", () => {
@@ -113,5 +133,29 @@ describe("filterSlashCommands", () => {
     expect(result).toEqual([]);
     // Catalog itself is non-empty, so we're testing the gate, not vacuity.
     expect(SLASH_COMMANDS.length).toBeGreaterThan(0);
+  });
+});
+
+describe("buildReviewStartParams", () => {
+  it("builds the inline uncommitted-changes review payload", () => {
+    expect(buildReviewStartParams("thread-1")).toEqual({
+      threadId: "thread-1",
+      delivery: "inline",
+      target: {
+        type: "uncommittedChanges",
+      },
+    });
+  });
+
+  it("trims base branches and rejects empty base-branch reviews", () => {
+    expect(buildReviewStartParams("thread-1", { target: "baseBranch", baseBranch: " main " })).toEqual({
+      threadId: "thread-1",
+      delivery: "inline",
+      target: {
+        type: "baseBranch",
+        branch: "main",
+      },
+    });
+    expect(buildReviewStartParams("thread-1", { target: "baseBranch", baseBranch: " " })).toBeNull();
   });
 });
