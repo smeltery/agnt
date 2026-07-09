@@ -301,6 +301,14 @@ jobs:
 
           echo "Unsigned IPA created at $ipa_path"
 
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v7
+        with:
+          name: agnt-unsigned-ipa
+          path: build/unsigned-ipa/agnt-unsigned-release.ipa
+          if-no-files-found: error
+          retention-days: 14
+
   links:
     needs: changes
     if: needs.changes.outputs.links == 'true'
