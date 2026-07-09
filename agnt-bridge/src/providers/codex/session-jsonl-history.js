@@ -169,7 +169,7 @@ function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
       const turn = ensureTurn(
         turns,
         turnsById,
-        normalizeString(payload.turn_id) || normalizeString(payload.turnId) || activeTurnId || `turn-line-${index + 1}`,
+        responseItemTurnId(payload) || activeTurnId || `turn-line-${index + 1}`,
         sessionThreadId,
         entry.timestamp
       );
@@ -241,6 +241,17 @@ function normalizeHistoryItemType(rawType) {
     return "tool_call_output";
   }
   return rawType;
+}
+
+// Modern Codex rollouts can attach response-item ownership in metadata
+// passthrough. Prefer it before the process-wide active turn so interleaved
+// turns keep their tools, plans, and prose isolated.
+function responseItemTurnId(payload) {
+  const metadata = objectValue(payload?.internal_chat_message_metadata_passthrough);
+  return normalizeString(payload?.turn_id)
+    || normalizeString(payload?.turnId)
+    || normalizeString(metadata?.turn_id)
+    || normalizeString(metadata?.turnId);
 }
 
 function objectValue(value) {

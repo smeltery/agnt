@@ -157,6 +157,75 @@ test("parseSessionJsonlTurns defaults message role to assistant when one is miss
   assert.equal(turns[0].items[0].role, "assistant");
 });
 
+test("parseSessionJsonlTurns uses nested response-item turn ownership across interleaved turns", () => {
+  const nestedTurn = (turnId) => ({
+    internal_chat_message_metadata_passthrough: { turn_id: turnId },
+  });
+  const content = jsonl(
+    { timestamp: "2026-07-08T18:00:00.000Z", type: "event_msg", payload: { type: "task_started", turn_id: "turn-a" } },
+    { timestamp: "2026-07-08T18:00:01.000Z", type: "event_msg", payload: { type: "task_started", turn_id: "turn-b" } },
+    {
+      timestamp: "2026-07-08T18:00:02.000Z",
+      type: "response_item",
+      payload: {
+        type: "reasoning",
+        id: "reasoning-a",
+        summary: [{ type: "summary_text", text: "Reasoning for A" }],
+        ...nestedTurn("turn-a"),
+      },
+    },
+    {
+      timestamp: "2026-07-08T18:00:03.000Z",
+      type: "response_item",
+      payload: {
+        type: "function_call",
+        id: "plan-a",
+        name: "update_plan",
+        call_id: "plan-a",
+        arguments: JSON.stringify({
+          explanation: "Plan A",
+          plan: [{ step: "Keep A isolated", status: "in_progress" }],
+        }),
+        ...nestedTurn("turn-a"),
+      },
+    },
+    {
+      timestamp: "2026-07-08T18:00:04.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        id: "assistant-b",
+        role: "assistant",
+        content: [{ type: "output_text", text: "Answer B" }],
+        ...nestedTurn("turn-b"),
+      },
+    },
+    {
+      timestamp: "2026-07-08T18:00:05.000Z",
+      type: "response_item",
+      payload: {
+        type: "message",
+        id: "assistant-a",
+        role: "assistant",
+        content: [{ type: "output_text", text: "Answer A" }],
+        ...nestedTurn("turn-a"),
+      },
+    }
+  );
+
+  const turns = parseSessionJsonlTurns(content, { threadId: "thread-interleaved" });
+  const turnA = turns.find((turn) => turn.id === "turn-a");
+  const turnB = turns.find((turn) => turn.id === "turn-b");
+
+  assert.ok(turnA);
+  assert.ok(turnB);
+  assert.deepEqual(
+    turnA.items.map((item) => item.id),
+    ["reasoning-a", "plan-a", "assistant-a"]
+  );
+  assert.deepEqual(turnB.items.map((item) => item.id), ["assistant-b"]);
+});
+
 test("parseSessionJsonlTurns skips injected context user response items", () => {
   const content = jsonl(
     { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },
