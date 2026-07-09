@@ -42,6 +42,9 @@ fun PetCompanionHost(
     val threads by repository.threads.collectAsStateWithLifecycle()
     val runningTurnByThread by repository.runningTurnIdByThread.collectAsStateWithLifecycle()
     val protectedRunningFallback by repository.protectedRunningFallbackThreadIds.collectAsStateWithLifecycle()
+    val failedThreadIds by repository.failedThreadIds.collectAsStateWithLifecycle()
+    val readyThreadIds by repository.readyThreadIds.collectAsStateWithLifecycle()
+    val completionBannerTitle by repository.threadCompletionBannerTitle.collectAsStateWithLifecycle()
     val pendingApproval by repository.pendingApprovalRequest.collectAsStateWithLifecycle()
     val messagesByThread by repository.messagesByThread.collectAsStateWithLifecycle()
 
@@ -67,6 +70,9 @@ fun PetCompanionHost(
         ready,
         activeThreadId,
         runningThreadIds,
+        failedThreadIds,
+        readyThreadIds,
+        completionBannerTitle,
         pendingApproval,
         threads,
         messagesByThread,
@@ -81,6 +87,9 @@ fun PetCompanionHost(
                 isConnected = ready,
                 activeThreadId = activeThreadId,
                 runningThreadIds = runningThreadIds,
+                failedThreadIds = failedThreadIds,
+                readyThreadIds = readyThreadIds,
+                completionBannerTitle = completionBannerTitle,
                 hasPendingApproval = pendingApproval != null,
                 pendingApprovalThreadId = pendingApproval?.threadId,
                 threads = threads,

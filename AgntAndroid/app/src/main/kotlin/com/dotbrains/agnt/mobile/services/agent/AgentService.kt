@@ -220,6 +220,16 @@ class AgentService(
     override val protectedRunningFallbackThreadIds: StateFlow<Set<String>> =
         _protectedRunningFallbackThreadIds.asStateFlow()
 
+    internal val _failedThreadIds = MutableStateFlow<Set<String>>(emptySet())
+    override val failedThreadIds: StateFlow<Set<String>> = _failedThreadIds.asStateFlow()
+
+    internal val _readyThreadIds = MutableStateFlow<Set<String>>(emptySet())
+    override val readyThreadIds: StateFlow<Set<String>> = _readyThreadIds.asStateFlow()
+
+    internal val _threadCompletionBannerThreadId = MutableStateFlow<String?>(null)
+    internal val _threadCompletionBannerTitle = MutableStateFlow<String?>(null)
+    override val threadCompletionBannerTitle: StateFlow<String?> = _threadCompletionBannerTitle.asStateFlow()
+
     internal val _pendingBranchPickerThreadId = MutableStateFlow<String?>(null)
     override val pendingBranchPickerThreadId: StateFlow<String?> = _pendingBranchPickerThreadId.asStateFlow()
 
@@ -465,6 +475,8 @@ class AgentService(
                 }
             },
             onTurnFinished = { th -> noteTurnFinished(th) },
+            onTurnCompleted = { th -> noteTurnCompleted(th) },
+            onTurnFailed = { th -> noteTurnFailed(th) },
             isTurnStreamingActive = { threadId, turnId ->
                 val runMap = _runningTurnIdByThread.value
                 val fb = _protectedRunningFallbackThreadIds.value
@@ -512,6 +524,7 @@ class AgentService(
         if (th.isEmpty()) return
         _protectedRunningFallbackThreadIds.value =
             if (active) {
+                clearThreadOutcome(th)
                 _protectedRunningFallbackThreadIds.value + th
             } else {
                 _protectedRunningFallbackThreadIds.value - th
@@ -527,6 +540,7 @@ class AgentService(
         if (th.isEmpty() || t.isEmpty()) return
         _runningTurnIdByThread.value = _runningTurnIdByThread.value + (th to t)
         _protectedRunningFallbackThreadIds.value = _protectedRunningFallbackThreadIds.value - th
+        clearThreadOutcome(th)
     }
 
     internal fun noteTurnFinished(threadId: String) {
@@ -534,6 +548,43 @@ class AgentService(
         if (th.isEmpty()) return
         _runningTurnIdByThread.value = _runningTurnIdByThread.value.filterKeys { it != th }
         _protectedRunningFallbackThreadIds.value = _protectedRunningFallbackThreadIds.value - th
+    }
+
+    internal fun noteTurnCompleted(threadId: String) {
+        val th = threadId.trim()
+        if (th.isEmpty()) return
+        noteTurnFinished(th)
+        clearThreadOutcome(th)
+        if (_activeThreadId.value == th) return
+        _readyThreadIds.value = _readyThreadIds.value + th
+        val title =
+            _threads.value
+                .firstOrNull { it.id == th }
+                ?.displayTitle
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+        _threadCompletionBannerThreadId.value = th
+        _threadCompletionBannerTitle.value = title ?: "Chat"
+    }
+
+    internal fun noteTurnFailed(threadId: String) {
+        val th = threadId.trim()
+        if (th.isEmpty()) return
+        noteTurnFinished(th)
+        clearThreadOutcome(th)
+        if (_activeThreadId.value == th) return
+        _failedThreadIds.value = _failedThreadIds.value + th
+    }
+
+    internal fun clearThreadOutcome(threadId: String) {
+        val th = threadId.trim()
+        if (th.isEmpty()) return
+        _readyThreadIds.value = _readyThreadIds.value - th
+        _failedThreadIds.value = _failedThreadIds.value - th
+        if (_threadCompletionBannerThreadId.value == th) {
+            _threadCompletionBannerThreadId.value = null
+            _threadCompletionBannerTitle.value = null
+        }
     }
 
     /** Single running thread fallback for legacy token usage events without explicit thread id. */

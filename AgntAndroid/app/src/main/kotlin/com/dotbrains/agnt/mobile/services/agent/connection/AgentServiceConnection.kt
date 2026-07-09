@@ -99,6 +99,9 @@ internal suspend fun AgentService.disconnectImpl(preservePresentationState: Bool
 internal suspend fun AgentService.setActiveThreadIdImpl(threadId: String?) {
     _activeThreadId.value = threadId?.trim()?.takeIf { it.isNotEmpty() }
     val id = _activeThreadId.value
+    if (id != null) {
+        clearThreadOutcome(id)
+    }
     sessionPersistence.saveLastActiveThreadId(id)
     if (id != null && sessionReady) {
         scope.launch(Dispatchers.IO) {
@@ -125,6 +128,10 @@ internal suspend fun AgentService.resetBridgeSession(preservePresentationState: 
     }
     _runningTurnIdByThread.value = emptyMap()
     _protectedRunningFallbackThreadIds.value = emptySet()
+    _readyThreadIds.value = emptySet()
+    _failedThreadIds.value = emptySet()
+    _threadCompletionBannerThreadId.value = null
+    _threadCompletionBannerTitle.value = null
     clearPendingServerRequests()
     hydratedThreadIds.clear()
     resumedThreadIds.clear()

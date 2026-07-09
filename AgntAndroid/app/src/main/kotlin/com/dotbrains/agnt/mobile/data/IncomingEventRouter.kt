@@ -45,6 +45,8 @@ internal class IncomingEventRouter(
     /** [turnId] null ⇒ run attivo senza id ancora (protected fallback iOS). */
     private val onTurnLifecycle: (threadId: String, turnId: String?) -> Unit,
     private val onTurnFinished: (threadId: String) -> Unit,
+    private val onTurnCompleted: (threadId: String) -> Unit = { _ -> },
+    private val onTurnFailed: (threadId: String) -> Unit = { _ -> },
     /**
      * Streaming reasoning/delta attivo per quel thread+turn (parity iOS `isReasoningTurnActive`).
      */
@@ -492,15 +494,15 @@ internal class IncomingEventRouter(
     private fun handleTurnFailed(params: Map<String, JSONValue>?) {
         val p = params ?: return
         val threadId = resolveThreadId(p) ?: IncomingNotificationParsers.extractThreadId(p) ?: return
-        onTurnFinished(threadId)
-        handleErrorNotification(p)
+        onTurnFailed(threadId)
+        handleErrorNotification(p, markFailed = false)
     }
 
     private fun handleTurnCompleted(params: Map<String, JSONValue>?) {
         val p = params ?: return
         val threadId = resolveThreadId(p) ?: return
         val turnId = IncomingNotificationParsers.extractTurnIdForTurnLifecycleEvent(p)
-        onTurnFinished(threadId)
+        onTurnCompleted(threadId)
         if (turnId != null) {
             scope.launch {
                 messageTimeline.confirmLatestPendingUserMessage(threadId, turnId)
@@ -575,7 +577,7 @@ internal class IncomingEventRouter(
                             )
                         }
                         if (completesTurn && turnId.isNullOrBlank()) {
-                            onTurnFinished(threadId)
+                            onTurnCompleted(threadId)
                         }
                     }
                     CodexMessageRole.user -> {
@@ -680,7 +682,7 @@ internal class IncomingEventRouter(
             )
         }
         if (completesTurn && turnId.isNullOrBlank()) {
-            onTurnFinished(threadId)
+            onTurnCompleted(threadId)
         }
     }
 
@@ -1117,10 +1119,16 @@ internal class IncomingEventRouter(
         }
     }
 
-    private fun handleErrorNotification(params: Map<String, JSONValue>?) {
+    private fun handleErrorNotification(
+        params: Map<String, JSONValue>?,
+        markFailed: Boolean = true,
+    ) {
         val threadId = resolveThreadId(params) ?: return
         val turnId = IncomingNotificationParsers.extractTurnId(params)
         val text = IncomingNotificationParsers.extractErrorMessage(params) ?: return
+        if (markFailed) {
+            onTurnFailed(threadId)
+        }
         scope.launch {
             messageTimeline.appendSystemLine(threadId, turnId, "Error: $text")
         }

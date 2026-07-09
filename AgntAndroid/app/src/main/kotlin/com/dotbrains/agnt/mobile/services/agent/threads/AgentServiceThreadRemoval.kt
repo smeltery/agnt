@@ -17,6 +17,7 @@ internal suspend fun AgentService.deleteThreadLocallyInternal(threadId: String) 
             ?: throw AgentServiceError.InvalidInput("Missing thread id")
 
     noteTurnFinished(tid)
+    clearThreadOutcome(tid)
     resumedThreadIds.remove(tid)
     hydratedThreadIds.remove(tid)
     loadingHistory.remove(tid)

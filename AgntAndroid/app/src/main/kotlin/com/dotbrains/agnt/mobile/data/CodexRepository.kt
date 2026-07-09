@@ -77,6 +77,18 @@ interface CodexRepository {
      */
     val protectedRunningFallbackThreadIds: StateFlow<Set<String>>
 
+    /** Off-screen threads whose latest run failed; cleared when the thread is viewed or starts again. */
+    val failedThreadIds: StateFlow<Set<String>>
+        get() = MutableStateFlow(emptySet())
+
+    /** Off-screen threads whose latest run completed; cleared when the thread is viewed or starts again. */
+    val readyThreadIds: StateFlow<Set<String>>
+        get() = MutableStateFlow(emptySet())
+
+    /** Lightweight title for the latest off-screen completion banner. */
+    val threadCompletionBannerTitle: StateFlow<String?>
+        get() = MutableStateFlow(null)
+
     val availableModels: StateFlow<List<CodexModelOption>>
 
     val isLoadingModels: StateFlow<Boolean>

@@ -11,80 +11,96 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Codex desktop-mirror path: a final `codex/event/agent_message` arriving without a
- * turn id must clear the per-thread running fallback by finalizing the turn, since
- * the mirror never emits a `turn/completed`. An `agent_message` that carries a turn id
- * is finalized by the normal `turn/completed` lifecycle instead, so it must not
- * double-finalize here.
- */
-class IncomingEventRouterDesktopMirrorTest {
+class IncomingEventRouterOutcomeTest {
     @Test
-    fun desktopFinalAgentMessageWithoutTurnId_clearsRunningFallback() =
+    fun turnCompletedPublishesCompletionOutcome() =
         runBlocking {
             val completed = mutableListOf<String>()
-            val router = newRouter(onTurnCompleted = { threadId -> completed += threadId })
+            val failed = mutableListOf<String>()
+            val router =
+                newRouter(
+                    onTurnCompleted = { completed += it },
+                    onTurnFailed = { failed += it },
+                )
 
             router.dispatchNotification(
-                method = "codex/event/user_message",
+                method = "turn/completed",
                 params =
                     JSONValue.Obj(
                         mapOf(
-                            "threadId" to JSONValue.Str("thread-1"),
-                            "message" to JSONValue.Str("Prompt from PC"),
-                        ),
-                    ),
-            )
-            router.dispatchNotification(
-                method = "codex/event/agent_message",
-                params =
-                    JSONValue.Obj(
-                        mapOf(
-                            "threadId" to JSONValue.Str("thread-1"),
-                            "message" to JSONValue.Str("Final answer"),
+                            "threadId" to JSONValue.Str("thread-ready"),
+                            "turnId" to JSONValue.Str("turn-1"),
                         ),
                     ),
             )
 
-            assertEquals(listOf("thread-1"), completed)
+            assertEquals(listOf("thread-ready"), completed)
+            assertEquals(emptyList(), failed)
         }
 
     @Test
-    fun desktopAgentMessageWithTurnId_doesNotFinalizeTurn() =
+    fun turnFailedPublishesFailureOutcome() =
         runBlocking {
             val completed = mutableListOf<String>()
-            val router = newRouter(onTurnCompleted = { threadId -> completed += threadId })
+            val failed = mutableListOf<String>()
+            val router =
+                newRouter(
+                    onTurnCompleted = { completed += it },
+                    onTurnFailed = { failed += it },
+                )
 
             router.dispatchNotification(
-                method = "codex/event/agent_message",
+                method = "turn/failed",
                 params =
                     JSONValue.Obj(
                         mapOf(
-                            "threadId" to JSONValue.Str("thread-1"),
-                            "turnId" to JSONValue.Str("turn-1"),
-                            "itemId" to JSONValue.Str("assistant-1"),
-                            "message" to JSONValue.Str("Final answer"),
+                            "threadId" to JSONValue.Str("thread-failed"),
+                            "turnId" to JSONValue.Str("turn-2"),
+                            "message" to JSONValue.Str("Tool failed"),
                         ),
                     ),
             )
 
             assertEquals(emptyList(), completed)
+            assertEquals(listOf("thread-failed"), failed)
+        }
+
+    @Test
+    fun errorNotificationPublishesFailureOutcome() =
+        runBlocking {
+            val failed = mutableListOf<String>()
+            val router = newRouter(onTurnFailed = { failed += it })
+
+            router.dispatchNotification(
+                method = "error",
+                params =
+                    JSONValue.Obj(
+                        mapOf(
+                            "threadId" to JSONValue.Str("thread-error"),
+                            "turnId" to JSONValue.Str("turn-3"),
+                            "message" to JSONValue.Str("Runtime error"),
+                        ),
+                    ),
+            )
+
+            assertEquals(listOf("thread-error"), failed)
         }
 
     private fun newRouter(
-        messageTimeline: MessageTimelineStore = MessageTimelineStore(),
         onTurnCompleted: (threadId: String) -> Unit = {},
+        onTurnFailed: (threadId: String) -> Unit = {},
     ): IncomingEventRouter =
         IncomingEventRouter(
             scope = kotlinx.coroutines.CoroutineScope(Dispatchers.Unconfined),
             threads = MutableStateFlow<List<CodexThread>>(emptyList()),
             activeThreadId = MutableStateFlow(null),
-            messageTimeline = messageTimeline,
+            messageTimeline = MessageTimelineStore(),
             onRequestThreadSync = {},
             onHydrateThread = {},
             onTurnLifecycle = { _, _ -> },
             onTurnFinished = {},
             onTurnCompleted = onTurnCompleted,
+            onTurnFailed = onTurnFailed,
             isTurnStreamingActive = { _, _ -> false },
             shouldAutoApproveRequests = { false },
             onApprovalRequest = { _: PendingApprovalRequest, _: (PendingApprovalDecision) -> Unit -> },

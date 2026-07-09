@@ -348,9 +348,9 @@ Open follow-ups:
           `MainShell` (interaction limited to Home).
         - Settings gains a `Companion pet` card (enable switch + pet picker +
           refresh).
-      Status: the pure status resolver now supports iOS's `failed` / `review` /
-      completion-banner phases; live repository wiring for failed / ready /
-      completion state is still pending.
+      Status: `AgentService` feeds `failed` / `review` / completion-banner
+      phases from turn lifecycle notifications and clears stale outcomes when a
+      thread is viewed or starts another run.
       Coverage: `PetCompanionTest` (atlas math + layout), `PetCompanionStatusTest`
       (snapshot derivation + prompt sanitizing), `AgentServicePetsTest` (parsing).
       `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:lintDebug` green.
