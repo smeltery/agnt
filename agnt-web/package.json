@@ -9,7 +9,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "ci": "bun run lint && bun run test && bun run build:vite && bun run size",
+    "ci": "bun run test && bun run build && bun run size",
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "build:vite": "vite build",

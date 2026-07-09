@@ -36,11 +36,11 @@ jobs:
   changes:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
-      workflow_config: ${{ steps.filter.outputs.workflow_config }}
       android: ${{ steps.filter.outputs.android }}
       ios: ${{ steps.filter.outputs.ios }}
       links: ${{ steps.filter.outputs.links }}
       bun_packages: ${{ steps.filter.outputs.bun_packages }}
+      lint_workflows: ${{ steps.filter.outputs.lint_workflows }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -102,21 +102,20 @@ jobs:
             echo "$name: $value" >> "$GITHUB_STEP_SUMMARY"
           }
 
-          ci_workflow='^\.github/workflows/ci\.yml'
+          ci_config='^(\.github/workflows/|\.github/actions/|\.github/actionlint\.ya?ml)'
           link_check_action='^\.github/actions/run-link-check/'
           flox_config='^\.flox/'
-          github_workflows='^\.github/workflows/'
-          android_ci='^\.flox/'
           bun_common="$flox_config"
           secure_bridge='^agnt-bridge/src/transport/secure-transport\.js'
           secure_web='^agnt-web/src/crypto/'
+          secure_ios='^(AgntMobile/AgntMobile/Core/Networking/CodexSecureTransportModels\.swift|AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService\+SecureTransport\.swift)'
           secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
-          secure_transport="$secure_bridge|$secure_web|$secure_android"
+          secure_transport="$secure_bridge|$secure_web|$secure_ios|$secure_android"
           android_code='^(AgntAndroid/(app|gradle)/|AgntAndroid/(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|gradlew\.bat))'
 
           bun_packages=()
 
-          if matches "$github_workflows"; then set_output workflow_config true; else set_output workflow_config false; fi
+          if matches "$ci_config"; then set_output lint_workflows true; else set_output lint_workflows false; fi
 
           if should_run bridge "$bun_common|$secure_transport|^agnt-bridge/"; then
             set_output bridge true
@@ -139,7 +138,7 @@ jobs:
             set_output web false
           fi
 
-          if should_run android "$android_ci|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
+          if should_run android "$flox_config|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
 
           if should_run host "$bun_common|^agnt-host/"; then
             set_output host true
@@ -151,21 +150,13 @@ jobs:
 
           if should_run ios "^AgntMobile/"; then set_output ios true; else set_output ios false; fi
 
-          if [[ "${{ github.event_name }}" == "schedule" ]] || requested links || matches "$ci_workflow|$link_check_action|^.*\.md$|^\.lycheeignore$"; then set_output links true; else set_output links false; fi
+          if [[ "${{ github.event_name }}" == "schedule" ]] || requested links || matches "$ci_config|$link_check_action|^.*\.md$|^\.lycheeignore$"; then set_output links true; else set_output links false; fi
 
           bun_packages_json="$(printf '%s\n' "${bun_packages[@]}" | jq -s -c '.')"
           set_output bun_packages "$bun_packages_json"
 
-  workflow-config:
-    needs: changes
-    if: needs.changes.outputs.workflow_config == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
       - name: Lint GitHub Actions workflows
+        if: steps.filter.outputs.lint_workflows == 'true'
         run: |
           docker run --rm \
             -v "$PWD:/repo" \
@@ -333,7 +324,6 @@ jobs:
   ci-summary:
     needs:
       - changes
-      - workflow-config
       - bun-packages
       - android
       - ios
@@ -347,7 +337,6 @@ jobs:
 
           for result in \
             "${{ needs.changes.result }}" \
-            "${{ needs.workflow-config.result }}" \
             "${{ needs.bun-packages.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \
