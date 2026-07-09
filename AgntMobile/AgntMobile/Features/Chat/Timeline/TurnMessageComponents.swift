@@ -70,6 +70,24 @@ private struct FileChangeInlineActionRow: View {
 
 // MARK: - FileChangeSummaryBox
 // Renders turn-end file edits as one compact recap instead of chat-like rows.
+enum FileChangeSummaryPreview {
+    static let previewEntryLimit = 3
+
+    static func visibleEntries(
+        from entries: [TurnFileChangeSummaryEntry],
+        showsAllEntries: Bool
+    ) -> ArraySlice<TurnFileChangeSummaryEntry> {
+        showsAllEntries ? entries[...] : entries.prefix(previewEntryLimit)
+    }
+
+    static func hiddenEntryCount(
+        totalEntryCount: Int,
+        showsAllEntries: Bool
+    ) -> Int {
+        showsAllEntries ? 0 : max(0, totalEntryCount - previewEntryLimit)
+    }
+}
+
 private struct FileChangeSummaryBox: View {
     let entries: [TurnFileChangeSummaryEntry]
     let fallbackText: String
@@ -78,10 +96,29 @@ private struct FileChangeSummaryBox: View {
     // Default to expanded so the recap stays informative without an extra tap;
     // collapse remains available for long lists or visual decluttering.
     @State private var isExpanded: Bool = true
+    @State private var showsAllEntries: Bool = false
     @State private var selectedEntry: TurnFileChangeSummaryEntry?
 
     private var canCollapse: Bool {
         !entries.isEmpty || !fallbackText.isEmpty
+    }
+
+    private var visibleEntries: ArraySlice<TurnFileChangeSummaryEntry> {
+        FileChangeSummaryPreview.visibleEntries(
+            from: entries,
+            showsAllEntries: showsAllEntries
+        )
+    }
+
+    private var hiddenEntryCount: Int {
+        FileChangeSummaryPreview.hiddenEntryCount(
+            totalEntryCount: entries.count,
+            showsAllEntries: showsAllEntries
+        )
+    }
+
+    private var hasEntryOverflow: Bool {
+        entries.count > FileChangeSummaryPreview.previewEntryLimit
     }
 
     var body: some View {
@@ -92,9 +129,8 @@ private struct FileChangeSummaryBox: View {
                 if !entries.isEmpty {
                     Divider()
 
-                    ForEach(entries.indices, id: \.self) { index in
-                        let entry = entries[index]
-                        let isLastEntry = index == entries.index(before: entries.endIndex)
+                    ForEach(Array(visibleEntries.enumerated()), id: \.element.id) { index, entry in
+                        let isLastEntry = index == visibleEntries.count - 1
 
                         Button {
                             selectedEntry = entry
@@ -119,10 +155,39 @@ private struct FileChangeSummaryBox: View {
                         }
                         .buttonStyle(.plain)
 
-                        if !isLastEntry {
+                        if !isLastEntry || hiddenEntryCount > 0 {
                             Divider()
                                 .padding(.leading, 12)
                         }
+                    }
+
+                    if hiddenEntryCount > 0 || showsAllEntries && hasEntryOverflow {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                showsAllEntries.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(showsAllEntries ? "Show less" : "Show more")
+                                    .font(AppFont.subheadline(weight: .medium))
+
+                                Image(systemName: "chevron.down")
+                                    .font(AppFont.system(size: 10, weight: .semibold))
+                                    .rotationEffect(.degrees(showsAllEntries ? 180 : 0))
+                                    .accessibilityHidden(true)
+                            }
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            showsAllEntries
+                                ? "Show fewer file changes"
+                                : "Show \(hiddenEntryCount) more file changes"
+                        )
                     }
                 } else if !fallbackText.isEmpty {
                     Text(fallbackText)

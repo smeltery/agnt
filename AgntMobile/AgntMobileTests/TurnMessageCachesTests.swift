@@ -78,6 +78,46 @@ final class TurnMessageCachesTests: XCTestCase {
         XCTAssertFalse(rendered.contains("**install deps**"))
     }
 
+    func testFileChangeSummaryPreviewCapsLargeLists() {
+        let entries = makeFileChangeEntries(count: 5)
+
+        let visibleEntries = FileChangeSummaryPreview.visibleEntries(
+            from: entries,
+            showsAllEntries: false
+        )
+
+        XCTAssertEqual(visibleEntries.map(\.path), [
+            "Sources/File1.swift",
+            "Sources/File2.swift",
+            "Sources/File3.swift",
+        ])
+        XCTAssertEqual(
+            FileChangeSummaryPreview.hiddenEntryCount(
+                totalEntryCount: entries.count,
+                showsAllEntries: false
+            ),
+            2
+        )
+    }
+
+    func testFileChangeSummaryPreviewShowsAllEntriesWhenExpanded() {
+        let entries = makeFileChangeEntries(count: 5)
+
+        let visibleEntries = FileChangeSummaryPreview.visibleEntries(
+            from: entries,
+            showsAllEntries: true
+        )
+
+        XCTAssertEqual(visibleEntries.map(\.path), entries.map(\.path))
+        XCTAssertEqual(
+            FileChangeSummaryPreview.hiddenEntryCount(
+                totalEntryCount: entries.count,
+                showsAllEntries: true
+            ),
+            0
+        )
+    }
+
     func testMarkdownFormatterUserProseSkipsFilePathLinkification() {
         let rendered = MarkdownTextFormatter.renderableText(
             from: "please check `agnt-bridge/test/secure-transport.test.js` again",
@@ -555,5 +595,16 @@ final class TurnMessageCachesTests: XCTestCase {
         Kind: update
         Totals: +1 -0
         """
+    }
+
+    private func makeFileChangeEntries(count: Int) -> [TurnFileChangeSummaryEntry] {
+        (1...count).map { index in
+            TurnFileChangeSummaryEntry(
+                path: "Sources/File\(index).swift",
+                additions: index,
+                deletions: 0,
+                action: .edited
+            )
+        }
     }
 }
