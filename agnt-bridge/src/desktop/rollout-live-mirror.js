@@ -26,6 +26,10 @@ const DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS = 10 * 60_000;
 const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
 const TERMINAL_TASK_EVENT_TYPES = new Set(["task_complete", "turn_aborted", "error"]);
 
+function terminalEventClosesTrackedTurn(eventTurnId, trackedTurnId) {
+  return !eventTurnId || !trackedTurnId || eventTurnId === trackedTurnId;
+}
+
 // Observes desktop-authored rollout files and replays the currently active run as
 // bridge notifications so the phone can render live thinking/tool activity.
 function createRolloutLiveMirrorController({
@@ -265,6 +269,7 @@ function bootstrapFromExistingRollout({
   const activeRunLines = [];
   let insideActiveRun = false;
   let activeTurnId = null;
+  let latestTerminalRun = null;
   let pendingUserPreludeLine = null;
 
   for (const rawLine of lines) {
@@ -293,6 +298,7 @@ function bootstrapFromExistingRollout({
       activeTurnId = readString(parsed?.payload?.turn_id)
         || readString(parsed?.payload?.turnId)
         || "";
+      latestTerminalRun = null;
       activeRunLines.length = 0;
       if (pendingUserPreludeLine) {
         activeRunLines.push(pendingUserPreludeLine);
@@ -307,10 +313,15 @@ function bootstrapFromExistingRollout({
 
     activeRunLines.push(line);
     if (TERMINAL_TASK_EVENT_TYPES.has(taskEventType)) {
-      insideActiveRun = false;
-      activeTurnId = "";
-      activeRunLines.length = 0;
-      pendingUserPreludeLine = null;
+      const terminalTurnId = readString(parsed?.payload?.turn_id)
+        || readString(parsed?.payload?.turnId);
+      if (terminalEventClosesTrackedTurn(terminalTurnId, activeTurnId)) {
+        latestTerminalRun = terminalRunFromEvent(parsed, activeTurnId);
+        insideActiveRun = false;
+        activeTurnId = "";
+        activeRunLines.length = 0;
+        pendingUserPreludeLine = null;
+      }
     }
   }
 
@@ -320,6 +331,11 @@ function bootstrapFromExistingRollout({
   }
 
   state.isDesktopOrigin = true;
+  if (activeRunLines.length === 0 && latestTerminalRun) {
+    sendApplicationResponse(JSON.stringify(terminalCatchUpNotification(state.threadId, latestTerminalRun)));
+    return;
+  }
+
   if (activeTurnId) {
     state.activeTurnId = activeTurnId;
   }
@@ -343,6 +359,45 @@ function isRolloutFileStale(rolloutPath, fsModule, nowMs, staleActiveRunMaxAgeMs
   } catch {
     return false;
   }
+}
+
+function terminalRunFromEvent(entry, fallbackTurnId = "") {
+  const payload = entry?.payload || {};
+  const eventType = readString(payload.type);
+  if (!TERMINAL_TASK_EVENT_TYPES.has(eventType)) {
+    return null;
+  }
+
+  const turnId = readString(payload.turn_id)
+    || readString(payload.turnId)
+    || readString(fallbackTurnId);
+  if (!turnId) {
+    return null;
+  }
+
+  return {
+    eventType,
+    turnId,
+    message: readString(payload.message),
+  };
+}
+
+function terminalCatchUpNotification(threadId, terminalRun) {
+  const params = {
+    threadId,
+    turnId: terminalRun.turnId,
+    id: terminalRun.turnId,
+    agntRolloutTerminalCatchUp: true,
+  };
+  if (terminalRun.eventType === "turn_aborted") {
+    params.status = "aborted";
+  } else if (terminalRun.eventType === "error") {
+    params.status = "failed";
+    if (terminalRun.message) {
+      params.error = { message: terminalRun.message };
+    }
+  }
+  return createNotification("turn/completed", params);
 }
 
 function processRolloutLines(lines, state, sendApplicationResponse) {

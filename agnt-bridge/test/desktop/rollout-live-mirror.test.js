@@ -189,6 +189,128 @@ test("desktop-origin mirror keeps commentary prose interleaved with tool calls",
   ]);
 });
 
+test("desktop-origin bootstrap emits terminal catch-up for completed runs", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-terminal-completed",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-terminal-completed"),
+      agentMessage("Done", "final_answer"),
+      taskComplete("turn-terminal-completed"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-terminal-completed" },
+  }));
+
+  await wait(30);
+
+  assert.deepEqual(outbound.map((message) => message.method), ["turn/completed"]);
+  assert.equal(outbound[0].params.threadId, "thread-terminal-completed");
+  assert.equal(outbound[0].params.turnId, "turn-terminal-completed");
+  assert.equal(outbound[0].params.agntRolloutTerminalCatchUp, true);
+});
+
+test("desktop-origin bootstrap emits terminal catch-up for aborted runs", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-terminal-aborted",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-terminal-aborted"),
+      turnAborted("turn-terminal-aborted"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-terminal-aborted" },
+  }));
+
+  await wait(30);
+
+  assert.deepEqual(outbound.map((message) => message.method), ["turn/completed"]);
+  assert.equal(outbound[0].params.turnId, "turn-terminal-aborted");
+  assert.equal(outbound[0].params.status, "aborted");
+  assert.equal(outbound[0].params.agntRolloutTerminalCatchUp, true);
+});
+
+test("desktop-origin bootstrap emits terminal catch-up for failed runs", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-terminal-error",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-terminal-error"),
+      errorEvent("turn-terminal-error", "desktop failed"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-terminal-error" },
+  }));
+
+  await wait(30);
+
+  assert.deepEqual(outbound.map((message) => message.method), ["turn/completed"]);
+  assert.equal(outbound[0].params.turnId, "turn-terminal-error");
+  assert.equal(outbound[0].params.status, "failed");
+  assert.equal(outbound[0].params.error.message, "desktop failed");
+  assert.equal(outbound[0].params.agntRolloutTerminalCatchUp, true);
+});
+
 test("desktop-origin active runs mirror generated image previews", async (t) => {
   const { homeDir } = createTemporaryRolloutHome({
     threadId: "thread-image",
@@ -799,7 +921,7 @@ test("desktop-origin rollouts mirror custom apply_patch as file-change lifecycle
   assert.match(outbound[4].params.changes[0].diff, /diff --git a\/Sources\/App.swift b\/Sources\/App.swift/);
 });
 
-test("desktop-origin bootstrap does not replay runs ended by turn_aborted", async (t) => {
+test("desktop-origin bootstrap catches up aborted runs without replaying content", async (t) => {
   const { homeDir } = createTemporaryRolloutHome({
     threadId: "thread-aborted",
     originator: "Codex Desktop",
@@ -837,7 +959,11 @@ test("desktop-origin bootstrap does not replay runs ended by turn_aborted", asyn
 
   await wait(30);
 
-  assert.deepEqual(outbound, []);
+  assert.deepEqual(outbound.map((message) => message.method), ["turn/completed"]);
+  assert.equal(outbound[0].params.threadId, "thread-aborted");
+  assert.equal(outbound[0].params.turnId, "turn-aborted");
+  assert.equal(outbound[0].params.status, "aborted");
+  assert.equal(outbound[0].params.agntRolloutTerminalCatchUp, true);
 });
 
 test("desktop-origin bootstrap skips stale active runs whose rollout stopped growing", async (t) => {
@@ -1374,6 +1500,18 @@ function turnAborted(turnId) {
     payload: {
       type: "turn_aborted",
       turn_id: turnId,
+    },
+  });
+}
+
+function errorEvent(turnId, message) {
+  return JSON.stringify({
+    timestamp: "2026-03-15T19:47:41.000Z",
+    type: "event_msg",
+    payload: {
+      type: "error",
+      turn_id: turnId,
+      message,
     },
   });
 }
