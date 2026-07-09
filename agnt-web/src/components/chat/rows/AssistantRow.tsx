@@ -5,6 +5,7 @@ import { computeDiffStats } from "../../../lib/git-diff-stats";
 import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import { isSpeaking, isTtsSupported, speak, stop as stopSpeaking } from "../../../lib/tts";
 import { quoteAsMarkdown } from "../../../lib/quote";
+import { autoCloseStreamingInlineMarkup } from "../../../lib/streaming-inline-markup";
 import { formatCostUsd, formatTokens, totalTokens } from "../../../lib/token-usage";
 import type { CodexMessage } from "../../../models";
 import { useCheckpointsStore } from "../../../state/checkpoints-store";
@@ -128,6 +129,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
   // without cwd the bridge errors with missing_working_directory anyway, so
   // hiding the button beats showing a broken one.
   const canRevert = !message.isStreaming && Boolean(message.turnId) && Boolean(thread?.cwd);
+  const renderedText = message.isStreaming ? autoCloseStreamingInlineMarkup(message.text) : message.text;
 
   return (
     <div
@@ -135,7 +137,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       title={formatRelativeWithAbsolute(message.createdAt)}
     >
       <div className="agnt-row-bubble">
-        <MarkdownContent text={message.text} cwd={thread?.cwd} />
+        <MarkdownContent text={renderedText} cwd={thread?.cwd} />
         {message.isStreaming && <span className="agnt-cursor-blink" aria-hidden />}
       </div>
       {!message.isStreaming && message.text && (

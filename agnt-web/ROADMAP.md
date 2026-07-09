@@ -4,6 +4,16 @@ The web client is being built across a series of focused sessions. Each session
 delivers an end-to-end-usable slice; the foundation never gets restructured by a
 later session because the protocol and storage layers are already complete.
 
+## Session 46 — Streaming inline markdown polish ✅ DONE
+
+- ✅ **Streaming inline marker auto-close.** Assistant rows now render a
+  virtual close for incomplete streaming inline code / bold spans, and hold
+  back bare trailing openers for a frame, so raw markdown markers do not flash
+  while a response is still arriving. Completed messages keep the normal
+  markdown renderer path unchanged.
+- New `streaming-inline-markup.test.ts` covers open spans, bare openers,
+  fenced-code exclusions, escaped markers, and prose operators.
+
 ## Session 44 — Inline review slash command ✅ DONE
 
 - ✅ **Inline review start.** The web slash-command catalog now exposes
