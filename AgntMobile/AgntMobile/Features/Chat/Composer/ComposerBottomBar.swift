@@ -27,7 +27,16 @@ struct ComposerBottomBar: View {
     let isQueuePaused: Bool
     let activeTurnID: String?
     let isThreadRunning: Bool
+    var showsSendButton: Bool = true
     let voiceButtonPresentation: TurnComposerVoiceButtonPresentation
+    let selectedAccessMode: CodexAccessMode
+    let contextWindowUsage: ContextWindowUsage?
+    let rateLimitBuckets: [CodexRateLimitBucket]
+    let isLoadingRateLimits: Bool
+    let rateLimitsErrorMessage: String?
+    let shouldAutoRefreshUsageStatus: Bool
+    let onRefreshUsageStatus: () async -> Void
+    let onSelectAccessMode: (CodexAccessMode) -> Void
     let onTapAddImage: () -> Void
     let onTapTakePhoto: () -> Void
     let onTapVoice: () -> Void
@@ -43,6 +52,11 @@ struct ComposerBottomBar: View {
     private var metaSymbolFont: Font { AppFont.system(size: 11, weight: .regular) }
     private let metaVerticalPadding: CGFloat = 6
     private let plusTapTargetSide: CGFloat = 22
+    private let inlineAccessControlSize: CGFloat = 32
+
+    private var showsStopButton: Bool {
+        isThreadRunning && !showsSendButton
+    }
 
     private var sendButtonIconColor: Color {
         if isSendDisabled { return Color(.systemGray2) }
@@ -57,8 +71,20 @@ struct ComposerBottomBar: View {
     // MARK: - Body
 
     var body: some View {
-        HStack(spacing: 12) {
-            attachmentMenu
+        HStack(spacing: 8) {
+            ComposerAttachmentMenu(
+                isPlanModeArmed: isPlanModeArmed,
+                runtimeState: runtimeState,
+                runtimeActions: runtimeActions,
+                remainingAttachmentSlots: remainingAttachmentSlots,
+                isInteractionLocked: isComposerInteractionLocked,
+                onSetPlanModeArmed: onSetPlanModeArmed,
+                onTapAddImage: onTapAddImage,
+                onTapTakePhoto: onTapTakePhoto
+            )
+            inlineAccessMenuLabel
+            inlineStatusControl
+
             ComposerRuntimeMenuControl(
                 orderedModelOptions: orderedModelOptions,
                 selectedModelID: selectedModelID,
@@ -91,54 +117,40 @@ struct ComposerBottomBar: View {
                 .accessibilityLabel("Resume queued messages")
             }
 
-            // Voice → Stop/loading → Send. New sends can look running before the turn id is interruptible.
-            Button {
-                HapticFeedback.shared.triggerImpactFeedback()
-                onTapVoice()
-            } label: {
-                voiceButtonLabel
-            }
-            .disabled(voiceButtonPresentation.isDisabled)
-            .accessibilityLabel(voiceButtonPresentation.accessibilityLabel)
+            ComposerVoiceButton(
+                presentation: voiceButtonPresentation,
+                onTap: onTapVoice
+            )
 
-            if isThreadRunning && isSending && activeTurnID == nil {
-                ProgressView()
-                    .tint(Color(.label))
-                    .frame(width: 32, height: 32)
-                    .accessibilityLabel("Starting run")
-            } else if isThreadRunning {
+            if showsStopButton {
+                ComposerStopControl(
+                    activeTurnID: activeTurnID,
+                    isSending: isSending,
+                    onStopTurn: onStopTurn
+                )
+            }
+
+            if showsSendButton {
                 Button {
                     HapticFeedback.shared.triggerImpactFeedback()
-                    onStopTurn(activeTurnID)
+                    onSend()
                 } label: {
-                    Image(systemName: "stop.fill")
+                    Image(systemName: "arrow.up")
                         .font(AppFont.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(.systemBackground))
+                        .foregroundStyle(sendButtonIconColor)
                         .frame(width: 32, height: 32)
-                        .background(Color(.label), in: Circle())
+                        .background(sendButtonBackgroundColor, in: Circle())
                 }
-                .accessibilityLabel("Stop current run")
-            }
-
-            Button {
-                HapticFeedback.shared.triggerImpactFeedback()
-                onSend()
-            } label: {
-                Image(systemName: "arrow.up")
-                    .font(AppFont.system(size: 12, weight: .bold))
-                    .foregroundStyle(sendButtonIconColor)
-                    .frame(width: 32, height: 32)
-                    .background(sendButtonBackgroundColor, in: Circle())
-            }
-            .overlay(alignment: .topTrailing) {
-                if queuedCount > 0 {
-                    queueBadge
-                        .offset(x: 8, y: -8)
+                .overlay(alignment: .topTrailing) {
+                    if queuedCount > 0 {
+                        queueBadge
+                            .offset(x: 8, y: -8)
+                    }
                 }
+                .disabled(isSendDisabled)
             }
-            .disabled(isSendDisabled)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 8)
         .padding(.bottom, 4)
         .padding(.top, 2)
         .sheet(isPresented: $showsAllModelsSheet) {
@@ -158,75 +170,43 @@ struct ComposerBottomBar: View {
         }
     }
 
-    private var voiceButtonLabel: some View {
-        Group {
-            if voiceButtonPresentation.showsProgress {
-                ProgressView()
-                    .tint(voiceButtonPresentation.foregroundColor)
-                    .frame(width: 32, height: 32)
-                    .background(voiceButtonPresentation.backgroundColor, in: Circle())
-            } else if voiceButtonPresentation.hasCircleBackground {
-                Image(systemName: voiceButtonPresentation.systemImageName)
-                    .font(AppFont.system(size: 12, weight: .bold))
-                    .foregroundStyle(voiceButtonPresentation.foregroundColor)
-                    .frame(width: 32, height: 32)
-                    .background(voiceButtonPresentation.backgroundColor, in: Circle())
-            } else {
-                Image(systemName: voiceButtonPresentation.systemImageName)
-                    .font(metaTextFont)
-                    .foregroundStyle(metaLabelColor)
-                    .frame(width: plusTapTargetSide, height: plusTapTargetSide)
-                    .contentShape(Rectangle())
-            }
-        }
-    }
-
     // MARK: - Menus
 
-    private var attachmentMenu: some View {
+    private var inlineAccessMenuLabel: some View {
         Menu {
-            Toggle(isOn: Binding(
-                get: { isPlanModeArmed },
-                set: { newValue in
-                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                    onSetPlanModeArmed(newValue)
-                }
-            )) {
-                Label("Plan mode", systemImage: "checklist")
-            }
-
-            if runtimeState.supportsFastMode {
+            ForEach(CodexAccessMode.allCases, id: \.rawValue) { mode in
                 Button {
                     HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                    toggleFastMode()
+                    onSelectAccessMode(mode)
                 } label: {
-                    Label("Fast Mode", systemImage: fastModePlusMenuIconName)
+                    if selectedAccessMode == mode {
+                        Label(mode.menuTitle, systemImage: "checkmark")
+                    } else {
+                        Text(mode.menuTitle)
+                    }
                 }
-            }
-
-            Section {
-                Button("Photo library") {
-                    HapticFeedback.shared.triggerImpactFeedback()
-                    onTapAddImage()
-                }
-                .disabled(remainingAttachmentSlots == 0)
-
-                Button("Take a photo") {
-                    HapticFeedback.shared.triggerImpactFeedback()
-                    onTapTakePhoto()
-                }
-                .disabled(remainingAttachmentSlots == 0)
             }
         } label: {
-            Image(systemName: "plus")
-                .font(metaTextFont)
-                .fontWeight(.regular)
-                .frame(width: plusTapTargetSide, height: plusTapTargetSide)
-                .contentShape(Capsule())
+            Image(systemName: selectedAccessMode == .fullAccess ? "hand.thumbsup" : "hand.raised")
+                .font(AppFont.system(size: 14, weight: .regular))
+                .foregroundStyle(selectedAccessMode == .fullAccess ? .orange : metaLabelColor)
+                .frame(width: inlineAccessControlSize, height: inlineAccessControlSize)
+                .contentShape(Circle())
         }
+        .menuIndicator(.hidden)
         .tint(metaLabelColor)
         .disabled(isComposerInteractionLocked)
-        .accessibilityLabel("Composer options")
+    }
+
+    private var inlineStatusControl: some View {
+        ContextWindowProgressRing(
+            usage: contextWindowUsage,
+            rateLimitBuckets: rateLimitBuckets,
+            isLoadingRateLimits: isLoadingRateLimits,
+            rateLimitsErrorMessage: rateLimitsErrorMessage,
+            shouldAutoRefreshStatus: shouldAutoRefreshUsageStatus,
+            onRefreshStatus: onRefreshUsageStatus
+        )
     }
 
     private var planModeIndicator: some View {
@@ -613,4 +593,135 @@ struct TurnComposerVoiceButtonPresentation {
     let isDisabled: Bool
     let showsProgress: Bool
     let hasCircleBackground: Bool
+}
+
+struct ComposerAttachmentMenu: View {
+    let isPlanModeArmed: Bool
+    let runtimeState: TurnComposerRuntimeState
+    let runtimeActions: TurnComposerRuntimeActions
+    let remainingAttachmentSlots: Int
+    let isInteractionLocked: Bool
+    let onSetPlanModeArmed: (Bool) -> Void
+    let onTapAddImage: () -> Void
+    let onTapTakePhoto: () -> Void
+    var tapTargetSide: CGFloat = 22
+
+    private let metaLabelColor = Color(.secondaryLabel)
+
+    var body: some View {
+        Menu {
+            Toggle(isOn: Binding(
+                get: { isPlanModeArmed },
+                set: { newValue in
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    onSetPlanModeArmed(newValue)
+                }
+            )) {
+                Label("Plan mode", systemImage: "checklist")
+            }
+
+            if runtimeState.supportsFastMode {
+                Button {
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    runtimeActions.selectServiceTier(runtimeState.isSelectedServiceTier(.fast) ? nil : .fast)
+                } label: {
+                    Label("Fast Mode", systemImage: runtimeState.isSelectedServiceTier(.fast) ? "bolt.fill" : "bolt")
+                }
+            }
+
+            Section {
+                Button("Photo library") {
+                    HapticFeedback.shared.triggerImpactFeedback()
+                    onTapAddImage()
+                }
+                .disabled(remainingAttachmentSlots == 0)
+
+                Button("Take a photo") {
+                    HapticFeedback.shared.triggerImpactFeedback()
+                    onTapTakePhoto()
+                }
+                .disabled(remainingAttachmentSlots == 0)
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(AppFont.subheadline())
+                .fontWeight(.regular)
+                .foregroundStyle(metaLabelColor)
+                .frame(width: tapTargetSide, height: tapTargetSide)
+                .contentShape(Circle())
+        }
+        .tint(metaLabelColor)
+        .disabled(isInteractionLocked)
+        .accessibilityLabel("Composer options")
+    }
+}
+
+struct ComposerVoiceButton: View {
+    let presentation: TurnComposerVoiceButtonPresentation
+    let onTap: () -> Void
+    var tapTargetSide: CGFloat = 32
+
+    var body: some View {
+        Button {
+            HapticFeedback.shared.triggerImpactFeedback()
+            onTap()
+        } label: {
+            label
+        }
+        .disabled(presentation.isDisabled)
+        .accessibilityLabel(presentation.accessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if presentation.showsProgress {
+            ProgressView()
+                .tint(presentation.foregroundColor)
+                .frame(width: tapTargetSide, height: tapTargetSide)
+                .background(presentation.backgroundColor, in: Circle())
+        } else if presentation.hasCircleBackground {
+            Image(systemName: presentation.systemImageName)
+                .font(AppFont.system(size: 12, weight: .bold))
+                .foregroundStyle(presentation.foregroundColor)
+                .frame(width: tapTargetSide, height: tapTargetSide)
+                .background(presentation.backgroundColor, in: Circle())
+        } else {
+            Image(systemName: presentation.systemImageName)
+                .font(AppFont.subheadline())
+                .foregroundStyle(presentation.foregroundColor)
+                .frame(width: tapTargetSide, height: tapTargetSide)
+                .contentShape(Circle())
+        }
+    }
+}
+
+struct ComposerStopControl: View {
+    let activeTurnID: String?
+    let isSending: Bool
+    let onStopTurn: (String?) -> Void
+    var diameter: CGFloat = 32
+    var iconSize: CGFloat = 12
+
+    var body: some View {
+        Group {
+            if isSending && activeTurnID == nil {
+                ProgressView()
+                    .tint(Color(.label))
+                    .frame(width: diameter, height: diameter)
+                    .accessibilityLabel("Starting run")
+            } else {
+                Button {
+                    HapticFeedback.shared.triggerImpactFeedback()
+                    onStopTurn(activeTurnID)
+                } label: {
+                    Image(systemName: "stop.fill")
+                        .font(AppFont.system(size: iconSize, weight: .bold))
+                        .foregroundStyle(Color(.systemBackground))
+                        .frame(width: diameter, height: diameter)
+                        .background(Color(.label), in: Circle())
+                }
+                .accessibilityLabel("Stop current run")
+            }
+        }
+    }
 }

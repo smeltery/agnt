@@ -47,6 +47,10 @@ struct TurnComposerAccessoryState {
     let voiceAudioLevels: [CGFloat]
     let voiceRecordingDuration: TimeInterval
 
+    var hasQueuedDrafts: Bool {
+        !queuedDrafts.isEmpty
+    }
+
     var showsComposerAttachments: Bool {
         !composerAttachments.isEmpty
     }
@@ -92,12 +96,13 @@ struct TurnComposerAccessoryState {
 
     func hasSendableContent(input: String) -> Bool {
         !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || showsComposerAttachments
-            || showsMentionedFiles
-            || showsMentionedSkills
-            || showsMentionedPlugins
-            || showsSubagentsSelection
-            || reviewTarget != nil
+            || !composerAttachments.isEmpty
+            || !composerMentionedFiles.isEmpty
+            || !composerMentionedSkills.isEmpty
+            || !composerMentionedPlugins.isEmpty
+            || composerReviewSelection != nil
+            || isSubagentsSelectionArmed
+            || isPlanModeArmed
     }
 
     var topInputPadding: CGFloat {
