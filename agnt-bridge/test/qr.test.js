@@ -10,6 +10,7 @@ const {
   SHORT_PAIRING_CODE_ALPHABET,
   SHORT_PAIRING_CODE_LENGTH,
   createShortPairingCode,
+  formatTerminalSessionId,
 } = require("../src/transport/qr");
 
 test("createShortPairingCode emits a short human-friendly token", () => {
@@ -21,4 +22,11 @@ test("createShortPairingCode emits a short human-friendly token", () => {
 
   assert.equal(code.length, SHORT_PAIRING_CODE_LENGTH);
   assert.match(code, new RegExp(`^[${SHORT_PAIRING_CODE_ALPHABET}]+$`));
+});
+
+test("formatTerminalSessionId keeps live pairing session ids short", () => {
+  assert.equal(formatTerminalSessionId("short-id"), "short-id");
+  assert.equal(formatTerminalSessionId("session-secret-value"), "session-...");
+  assert.equal(formatTerminalSessionId(""), "(none)");
+  assert.equal(formatTerminalSessionId(null), "(none)");
 });
