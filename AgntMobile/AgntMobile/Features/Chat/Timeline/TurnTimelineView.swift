@@ -41,6 +41,22 @@ struct AssistantBlockAccessoryState: Equatable {
     let blockRevertPresentation: AssistantRevertPresentation?
     let blockRevertMessage: CodexMessage?
 
+    init(
+        copyText: String?,
+        showsRunningIndicator: Bool,
+        blockDiffText: String? = nil,
+        blockDiffEntries: [TurnFileChangeSummaryEntry]? = nil,
+        blockRevertPresentation: AssistantRevertPresentation? = nil,
+        blockRevertMessage: CodexMessage? = nil
+    ) {
+        self.copyText = copyText
+        self.showsRunningIndicator = showsRunningIndicator
+        self.blockDiffText = blockDiffText
+        self.blockDiffEntries = blockDiffEntries
+        self.blockRevertPresentation = blockRevertPresentation
+        self.blockRevertMessage = blockRevertMessage
+    }
+
     func replacingCopyText(_ copyText: String?) -> AssistantBlockAccessoryState {
         AssistantBlockAccessoryState(
             copyText: copyText,
@@ -1495,13 +1511,10 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
         var i = messages.count - 1
         while i >= 0 {
             guard messages[i].role != .user else { i -= 1; continue }
-            // Found end of an assistant block — walk backwards to collect all non-user messages.
             let blockEnd = i
-            var blockStart = i
-            while blockStart > 0 && messages[blockStart - 1].role != .user {
-                blockStart -= 1
-            }
+            let blockStart = assistantBlockStartIndex(endingAt: blockEnd, messages: messages)
             let blockText = messages[blockStart...blockEnd]
+                .filter { $0.role == .assistant }
                 .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
                 .joined(separator: "\n\n")
@@ -1637,6 +1650,33 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     private static func normalizedTurnID(_ value: String?) -> String? {
         let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed?.isEmpty == false ? trimmed : nil
+    }
+
+    // User messages and stable turn ids both delimit accessory ownership. Rows
+    // without a turn id remain grouped because live rows can receive ids late.
+    private static func assistantBlockStartIndex(
+        endingAt blockEnd: Int,
+        messages: [CodexMessage]
+    ) -> Int {
+        var blockStart = blockEnd
+        var blockTurnID = normalizedTurnID(messages[blockEnd].turnId)
+
+        while blockStart > messages.startIndex {
+            let previous = messages[blockStart - 1]
+            guard previous.role != .user else {
+                break
+            }
+
+            if let previousTurnID = normalizedTurnID(previous.turnId) {
+                if let blockTurnID, previousTurnID != blockTurnID {
+                    break
+                }
+                blockTurnID = blockTurnID ?? previousTurnID
+            }
+            blockStart -= 1
+        }
+
+        return blockStart
     }
 
     // Keeps Copy aligned with real run completion instead of per-message streaming heuristics.

@@ -3009,6 +3009,75 @@ final class TurnTimelineReducerTests: XCTestCase {
         XCTAssertEqual(blockInfo[0]?.copyText, "Completed response")
     }
 
+    func testAssistantBlockInfoCopyTextSkipsSystemRows() {
+        let now = Date()
+        let messages = [
+            makeMessage(
+                id: "assistant-1",
+                threadID: "thread",
+                role: .assistant,
+                kind: .chat,
+                text: "Completed response",
+                createdAt: now,
+                turnID: "turn-1"
+            ),
+            makeMessage(
+                id: "tool-1",
+                threadID: "thread",
+                role: .system,
+                kind: .toolActivity,
+                text: "Ran git status",
+                createdAt: now.addingTimeInterval(1),
+                turnID: "turn-1"
+            ),
+        ]
+
+        let blockInfo = TurnTimelineView<EmptyView, EmptyView>.assistantBlockInfo(
+            for: messages,
+            activeTurnID: nil,
+            isThreadRunning: false,
+            latestTurnTerminalState: .completed,
+            stoppedTurnIDs: []
+        )
+
+        XCTAssertEqual(blockInfo[1]?.copyText, "Completed response")
+    }
+
+    func testAssistantBlockInfoSeparatesAdjacentBlocksByStableTurnID() {
+        let now = Date()
+        let messages = [
+            makeMessage(
+                id: "assistant-1",
+                threadID: "thread",
+                role: .assistant,
+                kind: .chat,
+                text: "First response",
+                createdAt: now,
+                turnID: "turn-1"
+            ),
+            makeMessage(
+                id: "assistant-2",
+                threadID: "thread",
+                role: .assistant,
+                kind: .chat,
+                text: "Second response",
+                createdAt: now.addingTimeInterval(1),
+                turnID: "turn-2"
+            ),
+        ]
+
+        let blockInfo = TurnTimelineView<EmptyView, EmptyView>.assistantBlockInfo(
+            for: messages,
+            activeTurnID: nil,
+            isThreadRunning: false,
+            latestTurnTerminalState: .completed,
+            stoppedTurnIDs: []
+        )
+
+        XCTAssertEqual(blockInfo[0]?.copyText, "First response")
+        XCTAssertEqual(blockInfo[1]?.copyText, "Second response")
+    }
+
     func testAssistantBlockInfoHidesCopyWhenLatestRunStopped() {
         let now = Date()
         let messages = [
