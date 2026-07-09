@@ -126,6 +126,69 @@ test("desktop-origin bootstrap replays the pending user message and final assist
   );
 });
 
+test("desktop-origin mirror keeps commentary prose interleaved with tool calls", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-commentary",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-commentary"),
+      agentMessage("Checking touched files", "commentary"),
+      functionCall("call-1", "exec_command", { cmd: "git status" }),
+      agentMessage("Everything is green; committing", "commentary"),
+      agentMessage("Done: commit created", "final_answer"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: {
+      threadId: "thread-commentary",
+    },
+  }));
+
+  await wait(30);
+
+  const agentMessages = outbound.filter((message) => message.method === "codex/event/agent_message");
+  assert.deepEqual(
+    agentMessages.map((message) => [message.params.message, message.params.phase]),
+    [
+      ["Checking touched files", "commentary"],
+      ["Everything is green; committing", "commentary"],
+      ["Done: commit created", "final_answer"],
+    ]
+  );
+
+  const flowMethods = outbound
+    .filter((message) => (
+      message.method === "codex/event/agent_message"
+      || message.method === "codex/event/exec_command_begin"
+    ))
+    .map((message) => message.method);
+  assert.deepEqual(flowMethods, [
+    "codex/event/agent_message",
+    "codex/event/exec_command_begin",
+    "codex/event/agent_message",
+    "codex/event/agent_message",
+  ]);
+});
+
 test("desktop-origin active runs mirror generated image previews", async (t) => {
   const { homeDir } = createTemporaryRolloutHome({
     threadId: "thread-image",

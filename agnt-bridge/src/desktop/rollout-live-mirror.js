@@ -496,16 +496,18 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
 
     if (eventType === "agent_message") {
       const message = readString(payload.message) || readString(payload.text);
-      if (!message || !shouldMirrorAgentMessage(payload)) {
+      if (!message) {
         return [];
       }
       const turnId = resolveRolloutEventTurnId(state, payload);
+      const phase = readString(payload.phase);
 
       notifications.push(createNotification("codex/event/agent_message", {
         threadId: state.threadId,
         turnId,
         itemId: buildAgentMessageItemId(state.threadId, turnId, entry, message),
         message,
+        ...(phase ? { phase } : {}),
       }));
       return notifications;
     }
@@ -1040,11 +1042,6 @@ function genericToolActivityMessage(toolName) {
   default:
     return `Running ${toolName}`;
   }
-}
-
-function shouldMirrorAgentMessage(payload) {
-  const phase = readString(payload?.phase).toLowerCase();
-  return phase !== "commentary";
 }
 
 function createNotification(method, params) {
