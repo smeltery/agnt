@@ -470,9 +470,10 @@ Banned-identifier sweep clean over added/changed files.
       strict CSP, and external `href`/`src` stripping. This keeps using
       `workspace/readFile`, so no bridge or image-RPC change is required.
       Coverage: `WorkspaceSvgPreviewSecurityTest`.
-- [ ] **Syntax-highlighted code preview.** Android still renders non-SVG text
-      previews as plain monospace; the iOS Runestone/TreeSitter preview remains a
-      separate larger slice.
+- [x] **Syntax-highlighted code preview.** `WorkspaceCodePreview` now renders
+      non-SVG workspace text previews with line numbers, selectable text, common
+      language-token highlighting, and a 512 KB highlight cap that falls back to
+      plain monospace for large files. Coverage: `WorkspaceCodePreviewTest`.
 
 ## Finishing the upstream parity audit
 

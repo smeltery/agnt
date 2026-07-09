@@ -1,6 +1,5 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -119,18 +117,11 @@ fun WorkspaceTextFilePreviewDialog(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         } else {
-                            SelectionContainer {
-                                Text(
-                                    text = data.content,
-                                    modifier =
-                                        Modifier
-                                            .padding(12.dp)
-                                            .verticalScroll(rememberScrollState())
-                                            .horizontalScroll(rememberScrollState()),
-                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
+                            WorkspaceCodePreview(
+                                content = data.content,
+                                fileName = data.metadata.path.ifBlank { request.path },
+                                modifier = Modifier.verticalScroll(rememberScrollState()),
+                            )
                         }
                     }
                 }
