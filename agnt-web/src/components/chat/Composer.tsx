@@ -334,6 +334,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
     const context = {
       threadId: selectedThreadId ?? "",
       threads: useThreadsStore.getState(),
+      args,
       variables: {
         cwd: activeThread?.cwd,
         threadTitle: activeThread?.name ?? activeThread?.title,

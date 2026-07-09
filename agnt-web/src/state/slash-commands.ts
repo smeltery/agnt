@@ -15,6 +15,8 @@ export interface SlashCommandContext {
   threadId: string;
   threads: ThreadsState;
   closeNewChat?: () => void;
+  /** Positional args typed after the slash trigger. */
+  args?: readonly string[];
   /** Variables available to user-defined snippet bodies (`{cwd}`, etc.). */
   variables?: SlashVariableContext;
 }
@@ -51,7 +53,12 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     description: "Run an inline code review on current changes",
     canRun: ({ threadId, threads }) =>
       Boolean(threadId) && threads.threads.some((thread) => thread.id === threadId),
-    async run({ threadId, threads }) {
+    async run({ threadId, threads, args }) {
+      const baseBranch = args?.[0]?.trim();
+      if (baseBranch) {
+        await threads.startReview(threadId, { target: "baseBranch", baseBranch });
+        return;
+      }
       await threads.startReview(threadId, { target: "uncommittedChanges" });
     },
   },

@@ -92,6 +92,24 @@ describe("filterSlashCommands", () => {
     ]);
   });
 
+  it("runs /review with a base-branch target when given an argument", async () => {
+    const calls: unknown[] = [];
+    const threads = fakeThreadsState({
+      threads: [{ id: "t1", syncState: "live" }],
+      startReview: async (threadId, options) => {
+        calls.push({ threadId, options });
+        return true;
+      },
+    });
+    const [command] = filterSlashCommands("review", { threadId: "t1", threads });
+
+    await command.run({ threadId: "t1", threads, args: [" main "] });
+
+    expect(calls).toEqual([
+      { threadId: "t1", options: { target: "baseBranch", baseBranch: "main" } },
+    ]);
+  });
+
   it("matches aliases too — `/interrupt` resolves to stop", () => {
     const threads = fakeThreadsState({
       reducerStates: {

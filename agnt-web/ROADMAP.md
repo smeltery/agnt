@@ -8,12 +8,13 @@ later session because the protocol and storage layers are already complete.
 
 - ✅ **Inline review start.** The web slash-command catalog now exposes
   `/review` for live threads. It inserts the same optimistic user row as a
-  normal send and calls `review/start` with `{ delivery: "inline", target:
-  { type: "uncommittedChanges" } }`, matching the provider protocol without
-  adding a parallel review thread UI.
+  normal send and calls `review/start` with `{ delivery: "inline" }` for
+  uncommitted changes, while `/review <base-branch>` sends a base-branch
+  target. This matches the provider protocol without adding a parallel review
+  thread UI.
 - New `slash-commands.test.ts` coverage verifies command routing plus the
-  review/start payload shape, including the guarded base-branch payload helper
-  for a future target picker.
+  review/start payload shape for both uncommitted-change and base-branch
+  targets.
 
 ## Session 43 — Fast Mode service tier ✅ DONE
 
