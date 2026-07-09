@@ -103,7 +103,9 @@ export async function checkpointDiff(
 ): Promise<CheckpointDiff> {
   const result = await rpc.request<Record<string, unknown>>("workspace/checkpointDiff", {
     threadId: target.threadId,
+    fromCheckpointKind: "turnStart",
     fromTurnId: target.turnId,
+    toCheckpointKind: "turnEnd",
     toTurnId,
     cwd: target.cwd,
   });

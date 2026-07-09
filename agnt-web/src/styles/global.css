@@ -1393,6 +1393,13 @@ button {
 .agnt-revert-modal { max-width: 560px; max-height: 80vh; overflow: auto; }
 .agnt-revert-error { color: var(--agnt-danger); font-size: 12px; }
 .agnt-revert-section { margin-top: 8px; }
+.agnt-revert-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.agnt-revert-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .agnt-revert-warn {
   margin-top: 8px;
   padding: 8px 10px;
@@ -1406,6 +1413,7 @@ button {
   gap: 4px;
 }
 .agnt-revert-warn strong { color: var(--agnt-warn); }
+.agnt-revert-diff { margin-top: 10px; }
 .agnt-revert-files {
   list-style: none;
   padding: 0;
