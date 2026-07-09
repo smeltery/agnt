@@ -366,7 +366,7 @@ private struct StreamingAssistantMarkdownTextView: View {
     var constrainsToAvailableWidth: Bool = false
 
     @State private var displayedText = ""
-    @State private var displayedSegments: StreamingMarkdownBlockSegments
+    @State private var displayedSegments: (settled: String, active: String)
     @State private var textAdoptionTask: Task<Void, Never>?
 
     init(
@@ -416,20 +416,20 @@ private struct StreamingAssistantMarkdownTextView: View {
     }
 
     @ViewBuilder
-    private func renderedSegments(_ segments: StreamingMarkdownBlockSegments) -> some View {
+    private func renderedSegments(_ segments: (settled: String, active: String)) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(segments.stableChunks) { chunk in
+            if !segments.settled.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 MarkdownTextView(
-                    text: chunk.text,
+                    text: segments.settled,
                     profile: .assistantProse,
                     enablesSelection: enablesSelection,
                     constrainsToAvailableWidth: constrainsToAvailableWidth
                 )
             }
 
-            if !segments.activeMarkdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if !segments.active.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 MarkdownTextView(
-                    text: segments.activeMarkdown,
+                    text: segments.active,
                     profile: .assistantProse,
                     enablesSelection: enablesSelection,
                     constrainsToAvailableWidth: constrainsToAvailableWidth,
@@ -456,95 +456,6 @@ private struct StreamingAssistantMarkdownTextView: View {
             displayedText = nextText
         }
         displayedSegments = StreamingMarkdownBlockSplitter.split(displayedText)
-    }
-}
-
-private struct StreamingMarkdownBlockSegments {
-    let stableChunks: [StreamingMarkdownChunk]
-    let activeMarkdown: String
-}
-
-private struct StreamingMarkdownChunk: Identifiable {
-    let id: Int
-    let text: String
-}
-
-private enum StreamingMarkdownBlockSplitter {
-    private static let stableChunkTargetCharacterCount = 6_000
-
-    static func split(_ text: String) -> StreamingMarkdownBlockSegments {
-        var lineStart = text.startIndex
-        var chunkStart = text.startIndex
-        var isInsideFence = false
-        var stableChunks: [StreamingMarkdownChunk] = []
-
-        while lineStart < text.endIndex {
-            let lineEnd = text[lineStart...].firstIndex(of: "\n") ?? text.endIndex
-            let nextLineStart = lineEnd < text.endIndex ? text.index(after: lineEnd) : text.endIndex
-            let hasLineBreak = lineEnd < text.endIndex
-            let trimmedLine = String(text[lineStart..<lineEnd])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            var stableBoundary: String.Index?
-            if isFenceDelimiter(trimmedLine) {
-                isInsideFence.toggle()
-                if !isInsideFence {
-                    stableBoundary = nextLineStart
-                }
-            } else if !isInsideFence, hasLineBreak {
-                if trimmedLine.isEmpty || isStableSingleLineBlock(trimmedLine) {
-                    stableBoundary = nextLineStart
-                }
-            }
-
-            if let stableBoundary,
-               shouldSealChunk(in: text, from: chunkStart, to: stableBoundary) {
-                appendChunk(in: text, from: chunkStart, to: stableBoundary, into: &stableChunks)
-                chunkStart = stableBoundary
-            }
-
-            lineStart = nextLineStart
-        }
-
-        return StreamingMarkdownBlockSegments(
-            stableChunks: stableChunks,
-            activeMarkdown: String(text[chunkStart...])
-        )
-    }
-
-    // Keep the newest chunk intact so Textual can apply native paragraph/list/code spacing
-    // while old chunks stop reparsing during long streaming responses.
-    private static func shouldSealChunk(in text: String, from start: String.Index, to boundary: String.Index) -> Bool {
-        guard boundary < text.endIndex else { return false }
-        return text.distance(from: start, to: boundary) >= stableChunkTargetCharacterCount
-    }
-
-    private static func appendChunk(
-        in text: String,
-        from start: String.Index,
-        to end: String.Index,
-        into chunks: inout [StreamingMarkdownChunk]
-    ) {
-        guard start < end else { return }
-        let chunkText = String(text[start..<end])
-        guard !chunkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        chunks.append(
-            StreamingMarkdownChunk(
-                id: chunks.count,
-                text: chunkText
-            )
-        )
-    }
-
-    private static func isFenceDelimiter(_ trimmedLine: String) -> Bool {
-        trimmedLine.hasPrefix("`@agnt``") || trimmedLine.hasPrefix("~~~")
-    }
-
-    private static func isStableSingleLineBlock(_ trimmedLine: String) -> Bool {
-        let headingMarkerCount = trimmedLine.prefix(while: { $0 == "#" }).count
-        let isHeading = (1...6).contains(headingMarkerCount)
-            && trimmedLine.dropFirst(headingMarkerCount).hasPrefix(" ")
-        return isHeading || trimmedLine == "---" || trimmedLine == "***"
     }
 }
 
