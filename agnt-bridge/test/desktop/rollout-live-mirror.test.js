@@ -556,6 +556,53 @@ test("desktop-origin terminal-only real id closes the synthetic active turn", as
   assert.ok(syntheticCompleted);
 });
 
+test("desktop-origin mirror promotes synthetic turn id when a real id appears", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-promote-turn",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStartedWithoutTurnId(),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-promote-turn" },
+  }));
+
+  await wait(10);
+  appendRolloutLines(rolloutPath, [
+    responseMessage("Real turn arrived", "commentary", "msg-real-turn", "turn-real"),
+    taskComplete("turn-real"),
+  ]);
+  await wait(30);
+
+  const assistant = outbound.find((message) => message.method === "codex/event/agent_message");
+  assert.ok(assistant);
+  assert.equal(assistant.params.turnId, "turn-real");
+
+  const completed = outbound.find((message) => message.method === "turn/completed");
+  assert.ok(completed);
+  assert.equal(completed.params.turnId, "turn-real");
+});
+
 test("desktop-origin mirror stays alive on heartbeat-only active runs", async (t) => {
   const { homeDir } = createTemporaryRolloutHome({
     threadId: "thread-heartbeat-idle",

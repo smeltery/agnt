@@ -1232,12 +1232,30 @@ function buildSyntheticTurnId(state, entry) {
 function resolveRolloutEventTurnId(state, payload = {}, options = {}) {
   const explicitTurnId = readString(payload.turn_id) || readString(payload.turnId);
   if (state.activeTurnIdIsSynthetic && state.activeTurnId) {
-    if (options.allowSyntheticPromotion === false && explicitTurnId) {
+    if (explicitTurnId) {
+      if (options.allowSyntheticPromotion !== false) {
+        promoteSyntheticTurnId(state, explicitTurnId);
+      }
       return explicitTurnId;
     }
     return state.activeTurnId;
   }
   return explicitTurnId || state.activeTurnId || "";
+}
+
+function promoteSyntheticTurnId(state, explicitTurnId) {
+  const oldTurnId = state.activeTurnId;
+  if (!oldTurnId || oldTurnId === explicitTurnId) {
+    state.activeTurnId = explicitTurnId;
+    state.activeTurnIdIsSynthetic = false;
+    return;
+  }
+
+  state.activeTurnId = explicitTurnId;
+  state.activeTurnIdIsSynthetic = false;
+  if (state.reasoningItemId === buildSyntheticItemId("thinking", state.threadId, oldTurnId)) {
+    state.reasoningItemId = buildSyntheticItemId("thinking", state.threadId, explicitTurnId);
+  }
 }
 
 function markPendingSyntheticTerminal(state, terminalParams, nowMs) {
