@@ -21,11 +21,6 @@ runs:
       run: |
         set +e
 
-        echo "::group::lychee --version"
-        docker run --rm lycheeverse/lychee:latest --version
-        echo "lychee --version exit: $?"
-        echo "::endgroup::"
-
         echo "::group::lychee scan"
         docker run --rm \
           --user 0:0 \

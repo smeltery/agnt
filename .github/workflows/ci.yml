@@ -119,21 +119,21 @@ jobs:
 
           if should_run bridge "$bun_common|$secure_transport|^agnt-bridge/"; then
             set_output bridge true
-            bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
+            bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true","ci_command":"bun run verify:entrypoints && bun run test"}')
           else
             set_output bridge false
           fi
 
           if should_run relay "$bun_common|^relay/"; then
             set_output relay true
-            bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
+            bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true","ci_command":"bun run test"}')
           else
             set_output relay false
           fi
 
           if should_run web "$bun_common|$secure_transport|^agnt-web/"; then
             set_output web true
-            bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
+            bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true","ci_command":"bun run test && bun run typecheck && bun run build:vite && bun run size"}')
           else
             set_output web false
           fi
@@ -143,14 +143,14 @@ jobs:
           if should_run host "$bun_common|^agnt-host/"; then
             set_output host true
             # agnt-host does not commit a Bun lockfile yet.
-            bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
+            bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false","ci_command":"bun run lint && bun run build"}')
           else
             set_output host false
           fi
 
           if should_run ios "^AgntMobile/"; then set_output ios true; else set_output ios false; fi
 
-          if [[ "${{ github.event_name }}" == "schedule" ]] || requested links || matches "$ci_config|$link_check_action|^.*\.md$|^\.lycheeignore$"; then set_output links true; else set_output links false; fi
+          if [[ "${{ github.event_name }}" == "schedule" ]] || requested links || matches "$link_check_action|^.*\.md$|^\.lycheeignore$"; then set_output links true; else set_output links false; fi
 
           bun_packages_json="$(printf '%s\n' "${bun_packages[@]}" | jq -s -c '.')"
           set_output bun_packages "$bun_packages_json"
@@ -202,7 +202,7 @@ jobs:
 
       - name: Run package CI
         working-directory: ${{ matrix.working-directory }}
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
+        run: flox activate -d "$GITHUB_WORKSPACE" -- bash -lc '${{ matrix.ci_command }}'
 
   android:
     needs: changes
