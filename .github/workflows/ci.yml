@@ -23,6 +23,7 @@ jobs:
       web: ${{ steps.filter.outputs.web }}
       android: ${{ steps.filter.outputs.android }}
       host: ${{ steps.filter.outputs.host }}
+      bun_packages: ${{ steps.filter.outputs.bun_packages }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -68,64 +69,59 @@ jobs:
           common='^(\.github/workflows/ci\.yml|\.github/actions/setup-bun-package/|\.flox/)'
           secure='^(agnt-bridge/src/transport/secure-transport\.js|agnt-web/src/crypto/|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
 
-          if matches "$common|$secure|^agnt-bridge/"; then set_output bridge true; else set_output bridge false; fi
-          if matches "$common|^relay/"; then set_output relay true; else set_output relay false; fi
-          if matches "$common|$secure|^agnt-web/"; then set_output web true; else set_output web false; fi
+          bun_packages=()
+
+          if matches "$common|$secure|^agnt-bridge/"; then
+            set_output bridge true
+            bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
+          else
+            set_output bridge false
+          fi
+
+          if matches "$common|^relay/"; then
+            set_output relay true
+            bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
+          else
+            set_output relay false
+          fi
+
+          if matches "$common|$secure|^agnt-web/"; then
+            set_output web true
+            bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
+          else
+            set_output web false
+          fi
+
           if matches "$common|$secure|^AgntAndroid/"; then set_output android true; else set_output android false; fi
-          if matches "$common|^agnt-host/"; then set_output host true; else set_output host false; fi
+
+          if matches "$common|^agnt-host/"; then
+            set_output host true
+            # agnt-host does not commit a Bun lockfile yet.
+            bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
+          else
+            set_output host false
+          fi
+
+          bun_packages_json="$(printf '%s\n' "${bun_packages[@]}" | jq -s -c '.')"
+          set_output bun_packages "$bun_packages_json"
 
   bun-packages:
     needs: changes
-    if: >-
-      needs.changes.outputs.bridge == 'true' ||
-      needs.changes.outputs.relay == 'true' ||
-      needs.changes.outputs.web == 'true' ||
-      needs.changes.outputs.host == 'true'
+    if: needs.changes.outputs.bun_packages != '[]'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     name: ${{ matrix.name }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: agnt-bridge
-            surface: bridge
-            working-directory: agnt-bridge
-            frozen-lockfile: "true"
-            audit: "true"
-          - name: relay
-            surface: relay
-            working-directory: relay
-            frozen-lockfile: "true"
-            audit: "true"
-          - name: agnt-web
-            surface: web
-            working-directory: agnt-web
-            frozen-lockfile: "true"
-            audit: "true"
-          - name: agnt-host
-            surface: host
-            working-directory: agnt-host
-            # agnt-host does not commit a Bun lockfile yet.
-            frozen-lockfile: "false"
-            audit: "false"
+        include: ${{ fromJson(needs.changes.outputs.bun_packages) }}
     env:
       AGNT_FLOX_QUIET: "1"
     steps:
       - name: Checkout repository
-        if: >-
-          (matrix.surface == 'bridge' && needs.changes.outputs.bridge == 'true') ||
-          (matrix.surface == 'relay' && needs.changes.outputs.relay == 'true') ||
-          (matrix.surface == 'web' && needs.changes.outputs.web == 'true') ||
-          (matrix.surface == 'host' && needs.changes.outputs.host == 'true')
         uses: actions/checkout@v7
 
       - name: Setup Bun package
-        if: >-
-          (matrix.surface == 'bridge' && needs.changes.outputs.bridge == 'true') ||
-          (matrix.surface == 'relay' && needs.changes.outputs.relay == 'true') ||
-          (matrix.surface == 'web' && needs.changes.outputs.web == 'true') ||
-          (matrix.surface == 'host' && needs.changes.outputs.host == 'true')
         uses: ./.github/actions/setup-bun-package
         with:
           working-directory: ${{ matrix.working-directory }}
@@ -133,11 +129,6 @@ jobs:
           audit: ${{ matrix.audit }}
 
       - name: Run package CI
-        if: >-
-          (matrix.surface == 'bridge' && needs.changes.outputs.bridge == 'true') ||
-          (matrix.surface == 'relay' && needs.changes.outputs.relay == 'true') ||
-          (matrix.surface == 'web' && needs.changes.outputs.web == 'true') ||
-          (matrix.surface == 'host' && needs.changes.outputs.host == 'true')
         working-directory: ${{ matrix.working-directory }}
         run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
