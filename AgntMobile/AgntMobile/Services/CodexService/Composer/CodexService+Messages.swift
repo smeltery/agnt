@@ -20,6 +20,7 @@ private enum StreamingDeltaCoalescingPolicy {
     static let assistantInitialFlushDelayNanoseconds: UInt64 = 50_000_000
     static let assistantStreamingFlushDelayNanoseconds: UInt64 = 80_000_000
     static let assistantLargeStreamingFlushDelayNanoseconds: UInt64 = 100_000_000
+    static let interactionFlushDelayNanoseconds: UInt64 = 80_000_000
     static let assistantLargePendingDeltaByteCount = 12_000
     static let assistantLargeVisibleTextByteCount = 32_000
 }
@@ -4469,7 +4470,23 @@ extension CodexService {
             guard let self else { return }
             try? await Task.sleep(nanoseconds: flushDelayNanoseconds)
             guard !Task.isCancelled else { return }
+            await Self.deferFlushWhileInteractionIsActive()
+            guard !Task.isCancelled else { return }
             self.flushPendingAssistantDeltas()
+        }
+    }
+
+    // A drag or typing burst can start after the flush timer was armed; wait it out in
+    // interaction-cadence slices, bounded so a long flick chain cannot starve the stream.
+    static func deferFlushWhileInteractionIsActive() async {
+        var remainingDeferrals = 8
+        while !Task.isCancelled,
+              remainingDeferrals > 0,
+              StreamingUIInteractionMonitor.isInteractionActive() {
+            remainingDeferrals -= 1
+            try? await Task.sleep(
+                nanoseconds: StreamingDeltaCoalescingPolicy.interactionFlushDelayNanoseconds
+            )
         }
     }
 

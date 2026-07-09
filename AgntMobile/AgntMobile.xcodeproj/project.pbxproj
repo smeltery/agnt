@@ -18,6 +18,7 @@
 		FA571E0002000000000000F4 /* WorkspaceSVGPreviewSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0002000000000000F3 /* WorkspaceSVGPreviewSecurityTests.swift */; };
 		FA571E0003000000000000F6 /* TerminalPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0003000000000000F5 /* TerminalPasteTests.swift */; };
 		FA571E0004000000000000F8 /* StreamingMarkdownBlockSplitterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0004000000000000F7 /* StreamingMarkdownBlockSplitterTests.swift */; };
+		FA571E0005000000000000FA /* StreamingUIInteractionMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0005000000000000F9 /* StreamingUIInteractionMonitorTests.swift */; };
 		516497899B5C9A82CD10D93F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A37794F4B32C1952A3770E0 /* Foundation.framework */; };
 		536FE94CCA889CE20A57EC42 /* BridgeControlService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357D589B8C179934A884F8CC /* BridgeControlService.swift */; };
 		5D0DB447AAE8F5B60D164223 /* BridgeMenuBarViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C1E3E027CF4B98453962A0 /* BridgeMenuBarViews.swift */; };
@@ -143,6 +144,7 @@
 		FA571E0002000000000000F3 /* WorkspaceSVGPreviewSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceSVGPreviewSecurityTests.swift; sourceTree = "<group>"; };
 		FA571E0003000000000000F5 /* TerminalPasteTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalPasteTests.swift; sourceTree = "<group>"; };
 		FA571E0004000000000000F7 /* StreamingMarkdownBlockSplitterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingMarkdownBlockSplitterTests.swift; sourceTree = "<group>"; };
+		FA571E0005000000000000F9 /* StreamingUIInteractionMonitorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingUIInteractionMonitorTests.swift; sourceTree = "<group>"; };
 		53C1E3E027CF4B98453962A0 /* BridgeMenuBarViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeMenuBarViews.swift; sourceTree = "<group>"; };
 		6880B31C08D19C3D55FC62F0 /* AgntMenuBar-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "AgntMenuBar-Info.plist"; sourceTree = "<group>"; };
 		6F8E129A7BC34A12D45E6F71 /* CodexThreadStartProjectBindingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexThreadStartProjectBindingTests.swift; sourceTree = "<group>"; };
@@ -299,6 +301,7 @@
 				B7A1C2D3E4F5061728394052 /* SidebarThreadGroupingTests.swift */,
 				8CE11223A4B5C6D7E8F90124 /* SidebarRunBadgePerformanceTests.swift */,
 				FA571E0004000000000000F7 /* StreamingMarkdownBlockSplitterTests.swift */,
+				FA571E0005000000000000F9 /* StreamingUIInteractionMonitorTests.swift */,
 				FA571E0003000000000000F5 /* TerminalPasteTests.swift */,
 				8B4A2F5E7D1C4B9AA1234568 /* TurnComposerAttachmentIntakePlanTests.swift */,
 				74BE370810CFD7A76DC2A25F /* TurnComposerSendAvailabilityTests.swift */,
@@ -669,6 +672,7 @@
 				B7A1C2D3E4F5061728394051 /* SidebarThreadGroupingTests.swift in Sources */,
 				8CE11223A4B5C6D7E8F90123 /* SidebarRunBadgePerformanceTests.swift in Sources */,
 				FA571E0004000000000000F8 /* StreamingMarkdownBlockSplitterTests.swift in Sources */,
+				FA571E0005000000000000FA /* StreamingUIInteractionMonitorTests.swift in Sources */,
 				FA571E0003000000000000F6 /* TerminalPasteTests.swift in Sources */,
 				8B4A2F5E7D1C4B9AA1234567 /* TurnComposerAttachmentIntakePlanTests.swift in Sources */,
 				4C0F0D55A5051D8301463C69 /* TurnComposerSendAvailabilityTests.swift in Sources */,

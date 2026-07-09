@@ -176,6 +176,7 @@ struct TurnComposerInputTextView: UIViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
+            StreamingUIInteractionMonitor.noteComposerKeystroke()
             let newText = textView.text ?? ""
             if text.wrappedValue != newText {
                 pendingUIKitText = newText

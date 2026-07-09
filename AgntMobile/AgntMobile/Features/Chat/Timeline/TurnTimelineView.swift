@@ -992,6 +992,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                     }
                     .onDisappear {
                         debugTimelineLog("onDisappear threadID=\(threadID)")
+                        StreamingUIInteractionMonitor.setScrollInteractionActive(false)
                         cancelScrollTasks()
                     }
                 }
@@ -1393,6 +1394,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
 
     // Mirrors user-driven scroll phases without pausing auto-follow during programmatic animations.
     private func handleScrollPhaseChange(from oldPhase: ScrollPhase, to newPhase: ScrollPhase) {
+        updateStreamingInteractionMonitor(from: oldPhase, to: newPhase)
         switch newPhase {
         case .tracking, .interacting:
             handleUserScrollDragChanged()
@@ -1410,6 +1412,24 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
             return
         @unknown default:
             return
+        }
+    }
+
+    // Heavy streaming row flushes back off while a user drag/flick owns the main thread.
+    // Deceleration keeps the backoff; programmatic animations and idle release it.
+    private func updateStreamingInteractionMonitor(from oldPhase: ScrollPhase, to newPhase: ScrollPhase) {
+        switch newPhase {
+        case .tracking, .interacting:
+            StreamingUIInteractionMonitor.setScrollInteractionActive(true)
+        case .decelerating:
+            let wasUserTouchingScroll = oldPhase == .tracking || oldPhase == .interacting
+            if !wasUserTouchingScroll {
+                StreamingUIInteractionMonitor.setScrollInteractionActive(false)
+            }
+        case .idle, .animating:
+            StreamingUIInteractionMonitor.setScrollInteractionActive(false)
+        @unknown default:
+            StreamingUIInteractionMonitor.setScrollInteractionActive(false)
         }
     }
 
