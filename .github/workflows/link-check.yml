@@ -21,66 +21,13 @@ jobs:
 
     permissions:
       contents: read
-      pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Run lychee + post report
-        id: lychee
+      - name: Run link check
+        uses: ./.github/actions/run-link-check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set +e
-
-          # Sanity: does the image even run?
-          echo "::group::lychee --version"
-          docker run --rm lycheeverse/lychee:latest --version
-          echo "lychee --version exit: $?"
-          echo "::endgroup::"
-
-          # `--user 0:0` (root) lets the container write into the
-          # host-mounted workspace without uid/gid mismatch grief.
-          # `--verbose` makes lychee print what it's doing so failures
-          # are visible in the run log. Capture stdout to a file too so
-          # we can post it as a fallback when the markdown report is
-          # missing.
-          echo "::group::lychee scan"
-          docker run --rm \
-            --user 0:0 \
-            -v "$PWD:/workdir" \
-            -w /workdir \
-            -e GITHUB_TOKEN \
-            lycheeverse/lychee:latest \
-            --verbose \
-            --no-progress \
-            --max-redirects 5 \
-            --timeout 20 \
-            --max-retries 2 \
-            --exclude-path agnt-bridge/README.md \
-            --format markdown \
-            --output ./lychee-report.md \
-            './**/*.md' \
-            2>&1 | tee ./lychee-stdout.txt
-          code=${PIPESTATUS[0]}
-          echo "::endgroup::"
-          echo "lychee exit code: $code"
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-
-          echo "::group::report file"
-          if [ -f ./lychee-report.md ]; then
-            cat ./lychee-report.md
-          else
-            echo "(lychee did not write ./lychee-report.md)"
-          fi
-          echo "::endgroup::"
-
-          echo "::group::lychee stdout fallback"
-          if [ -f ./lychee-stdout.txt ]; then
-            cat ./lychee-stdout.txt
-          fi
-          echo "::endgroup::"
-
-          exit "$code"

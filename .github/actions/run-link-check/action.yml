@@ -1,0 +1,90 @@
+name: Run link check
+description: Run lychee over markdown and optionally post a pull request report.
+
+inputs:
+  post-pr-comment:
+    description: Whether to post a pull request comment when links fail.
+    default: "false"
+  pr-number:
+    description: Pull request number to comment on when post-pr-comment is true.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Run lychee
+      id: lychee
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ env.GH_TOKEN }}
+      run: |
+        set +e
+
+        echo "::group::lychee --version"
+        docker run --rm lycheeverse/lychee:latest --version
+        echo "lychee --version exit: $?"
+        echo "::endgroup::"
+
+        echo "::group::lychee scan"
+        docker run --rm \
+          --user 0:0 \
+          -v "$PWD:/workdir" \
+          -w /workdir \
+          -e GITHUB_TOKEN \
+          lycheeverse/lychee:latest \
+          --verbose \
+          --no-progress \
+          --max-redirects 5 \
+          --timeout 20 \
+          --max-retries 2 \
+          --exclude-path agnt-bridge/README.md \
+          --format markdown \
+          --output ./lychee-report.md \
+          './**/*.md' \
+          2>&1 | tee ./lychee-stdout.txt
+        code=${PIPESTATUS[0]}
+        echo "::endgroup::"
+        echo "lychee exit code: $code"
+        echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+        echo "::group::report file"
+        if [ -f ./lychee-report.md ]; then
+          cat ./lychee-report.md
+        else
+          echo "(lychee did not write ./lychee-report.md)"
+        fi
+        echo "::endgroup::"
+
+        echo "::group::lychee stdout fallback"
+        if [ -f ./lychee-stdout.txt ]; then
+          cat ./lychee-stdout.txt
+        fi
+        echo "::endgroup::"
+
+        if [ "$code" -ne 0 ] && [ "${{ inputs.post-pr-comment }}" = "true" ]; then
+          if [ -z "${{ inputs.pr-number }}" ]; then
+            echo "post-pr-comment is true but pr-number is empty" >&2
+            exit 1
+          fi
+
+          echo "::group::posting PR comment"
+          if [ -f ./lychee-report.md ] && [ -s ./lychee-report.md ]; then
+            gh pr comment "${{ inputs.pr-number }}" --body-file ./lychee-report.md
+          elif [ -f ./lychee-stdout.txt ] && [ -s ./lychee-stdout.txt ]; then
+            {
+              echo "Link check failed (exit $code). Report file wasn't written; here is the captured stdout/stderr:"
+              echo
+              echo '```'
+              head -c 50000 ./lychee-stdout.txt
+              echo
+              echo '```'
+            } > ./pr-comment.md
+            gh pr comment "${{ inputs.pr-number }}" --body-file ./pr-comment.md
+          else
+            gh pr comment "${{ inputs.pr-number }}" --body "Link check failed (exit $code) with no captured output."
+          fi
+          echo "::endgroup::"
+        fi
+
+        exit "$code"
