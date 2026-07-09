@@ -34,7 +34,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     outputs:
       bridge: ${{ steps.filter.outputs.bridge }}
       relay: ${{ steps.filter.outputs.relay }}
@@ -207,7 +207,7 @@ jobs:
   workflow-config:
     needs: changes
     if: needs.changes.outputs.workflow_config == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout repository
@@ -347,7 +347,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.links == 'true'
     name: Link check
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
@@ -375,7 +375,7 @@ jobs:
       - ios
       - links
     if: always()
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Check required jobs
         run: |
