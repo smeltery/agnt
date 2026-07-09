@@ -2,6 +2,8 @@ name: Relay Check
 
 on:
   push:
+    branches:
+      - main
     paths:
       - ".github/workflows/relay-check.yml"
       - ".flox/**"

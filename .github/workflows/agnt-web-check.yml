@@ -2,15 +2,23 @@ name: Web Check
 
 on:
   push:
+    branches:
+      - main
     paths:
       - ".github/workflows/agnt-web-check.yml"
       - ".flox/**"
       - "agnt-web/**"
+      - "agnt-bridge/src/transport/secure-transport.js"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/**"
   pull_request:
     paths:
       - ".github/workflows/agnt-web-check.yml"
       - ".flox/**"
       - "agnt-web/**"
+      - "agnt-bridge/src/transport/secure-transport.js"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -59,7 +67,7 @@ jobs:
 
       - name: Build production bundle
         working-directory: agnt-web
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run build
+        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run build:vite
 
       # Bundle size guard. Budgets live in `agnt-web/.size-limit.json`;
       # current main bundle is ~135 KB gzip / 12 KB gzip CSS, so the

@@ -2,15 +2,23 @@ name: Bridge Check
 
 on:
   push:
+    branches:
+      - main
     paths:
       - ".github/workflows/bridge-check.yml"
       - ".flox/**"
       - "agnt-bridge/**"
+      - "agnt-web/src/crypto/**"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/**"
   pull_request:
     paths:
       - ".github/workflows/bridge-check.yml"
       - ".flox/**"
       - "agnt-bridge/**"
+      - "agnt-web/src/crypto/**"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt"
+      - "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

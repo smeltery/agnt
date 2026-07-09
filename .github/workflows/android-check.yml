@@ -2,15 +2,21 @@ name: Android Check
 
 on:
   push:
+    branches:
+      - main
     paths:
       - ".github/workflows/android-check.yml"
       - ".flox/**"
       - "AgntAndroid/**"
+      - "agnt-bridge/src/transport/secure-transport.js"
+      - "agnt-web/src/crypto/**"
   pull_request:
     paths:
       - ".github/workflows/android-check.yml"
       - ".flox/**"
       - "AgntAndroid/**"
+      - "agnt-bridge/src/transport/secure-transport.js"
+      - "agnt-web/src/crypto/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -48,25 +54,16 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      # Style gate: ktlint with our editorconfig overrides. Runs before tests
-      # so a style-only PR fails fast rather than burning ~30s on Kotlin
-      # compile + unit-test work that won't be merged anyway. Gradle runs
-      # inside `flox activate` so JAVA_HOME resolves to the Flox JDK 17.
-      - name: ktlint
+      # One Gradle invocation shares configuration and compilation work across
+      # style, unit-test, and packaging checks while preserving the same gates.
+      - name: Check and assemble debug
         working-directory: AgntAndroid
-        run: flox activate -d "$GITHUB_WORKSPACE" -- ./gradlew :app:ktlintCheck --no-daemon
-
-      - name: Run unit tests
-        working-directory: AgntAndroid
-        run: flox activate -d "$GITHUB_WORKSPACE" -- ./gradlew :app:testDebugUnitTest --no-daemon
-
-      # `assembleDebug` is the cheapest signal that the Kotlin compile, the
-      # resources, and the build script all hang together. A separate signed-
-      # build workflow handles release artifacts once release signing is set
-      # up; the unsigned debug APK below is for PR-side smoke-testing only.
-      - name: Assemble debug
-        working-directory: AgntAndroid
-        run: flox activate -d "$GITHUB_WORKSPACE" -- ./gradlew :app:assembleDebug --no-daemon
+        run: |
+          flox activate -d "$GITHUB_WORKSPACE" -- ./gradlew \
+            :app:ktlintCheck \
+            :app:testDebugUnitTest \
+            :app:assembleDebug \
+            --no-daemon
 
       # Unsigned debug APK so reviewers can install a PR build on a device
       # without recompiling locally. Skipped on push events (the artifact
