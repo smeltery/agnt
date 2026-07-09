@@ -26,7 +26,7 @@ on:
     - cron: "0 6 * * 1"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event.inputs.scope || 'auto' }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}-${{ github.event.inputs.scope || 'auto' }}
   cancel-in-progress: true
 
 permissions:
