@@ -14,6 +14,13 @@ on:
         type: choice
         options:
           - all
+          - bun
+          - bridge
+          - relay
+          - web
+          - host
+          - android
+          - ios
           - links
   schedule:
     - cron: "0 6 * * 1"
@@ -49,12 +56,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          manual_scope="${{ github.event.inputs.scope || '' }}"
+
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             changed_files="__scheduled_link_check__"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && github.event.inputs.scope == "links" ]]; then
-            changed_files="__manual_link_check__"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "$manual_scope" == "all" ]]; then
             changed_files="__all__"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            changed_files="__manual_${manual_scope}__"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             changed_files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
           else
@@ -76,6 +85,19 @@ jobs:
             [[ "$changed_files" == "__all__" ]] || printf '%s\n' "$changed_files" | grep -Eq "$pattern"
           }
 
+          requested() {
+            local surface="$1"
+            [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || return 1
+            [[ "$manual_scope" == "all" || "$manual_scope" == "$surface" ]] && return 0
+            [[ "$manual_scope" == "bun" && "$surface" =~ ^(bridge|relay|web|host)$ ]]
+          }
+
+          should_run() {
+            local surface="$1"
+            local pattern="$2"
+            requested "$surface" || matches "$pattern"
+          }
+
           set_output() {
             local name="$1"
             local value="$2"
@@ -84,35 +106,39 @@ jobs:
           }
 
           ci_workflow='^\.github/workflows/ci\.yml'
-          common='^(\.github/workflows/ci\.yml|\.github/actions/setup-bun-package/|\.flox/)'
-          secure='^(agnt-bridge/src/transport/secure-transport\.js|agnt-web/src/crypto/|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
+          shared_ci='^(\.github/workflows/ci\.yml|\.flox/)'
+          bun_common='^(\.github/workflows/ci\.yml|\.github/actions/setup-bun-package/|\.flox/)'
+          secure_bridge='^agnt-bridge/src/transport/secure-transport\.js'
+          secure_web='^agnt-web/src/crypto/'
+          secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
+          android_code='^(AgntAndroid/(app|gradle)/|AgntAndroid/(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|gradlew\.bat))'
 
           bun_packages=()
 
-          if matches "$common|$secure|^agnt-bridge/"; then
+          if should_run bridge "$bun_common|$secure_bridge|^agnt-bridge/"; then
             set_output bridge true
             bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
           else
             set_output bridge false
           fi
 
-          if matches "$common|^relay/"; then
+          if should_run relay "$bun_common|^relay/"; then
             set_output relay true
             bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
           else
             set_output relay false
           fi
 
-          if matches "$common|$secure|^agnt-web/"; then
+          if should_run web "$bun_common|$secure_web|^agnt-web/"; then
             set_output web true
             bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
           else
             set_output web false
           fi
 
-          if matches "$common|$secure|^AgntAndroid/"; then set_output android true; else set_output android false; fi
+          if should_run android "$shared_ci|$secure_android|$android_code"; then set_output android true; else set_output android false; fi
 
-          if matches "$common|^agnt-host/"; then
+          if should_run host "$bun_common|^agnt-host/"; then
             set_output host true
             # agnt-host does not commit a Bun lockfile yet.
             bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
@@ -120,9 +146,9 @@ jobs:
             set_output host false
           fi
 
-          if matches "$ci_workflow|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
+          if should_run ios "$ci_workflow|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
 
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event.inputs.scope || '' }}" == "links" ]] || matches "$ci_workflow|^.*\.md$|^\.lycheeignore$"; then set_output links true; else set_output links false; fi
+          if [[ "${{ github.event_name }}" == "schedule" ]] || requested links || matches "$ci_workflow|^.*\.md$|^\.lycheeignore$"; then set_output links true; else set_output links false; fi
 
           bun_packages_json="$(printf '%s\n' "${bun_packages[@]}" | jq -s -c '.')"
           set_output bun_packages "$bun_packages_json"

@@ -17,7 +17,8 @@ node --test agnt-bridge/test/*-translate.test.js
 
 The main CI workflow (`.github/workflows/ci.yml`) runs package checks for bridge, relay, web, host, Android, iOS, and Markdown links when their owned surfaces change.
 
-The scheduled Link Check workflow (`.github/workflows/link-check.yml`) keeps the weekly/manual link-rot scan separate from PR/push CI.
+The main CI workflow also owns scheduled and manual link-rot checks; use the
+`links` manual dispatch scope to run only Markdown link validation.
 
 ## Conventions
 
@@ -111,4 +112,5 @@ The main CI workflow uses one change detector and only runs jobs for changed sur
 | iOS | `xcodebuild ... archive CODE_SIGNING_ALLOWED=NO` |
 | Markdown links | `lycheeverse/lychee` over `./**/*.md` |
 
-The standalone Link Check workflow is scheduled/manual only; PR and push link checks run inside main CI so each change gets one CI suite.
+Scheduled/manual link checks and PR/push link checks run inside main CI so each
+change gets one CI suite.
