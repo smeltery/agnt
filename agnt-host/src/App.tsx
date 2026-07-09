@@ -377,7 +377,10 @@ function App() {
   // Refresh provider-bridge state once Tauri is ready
   useEffect(() => {
     if (!tauriReady) return;
-    refreshProviderBridgeStatus();
+    const id = window.setTimeout(() => {
+      refreshProviderBridgeStatus();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [tauriReady, refreshProviderBridgeStatus]);
 
 
@@ -478,7 +481,7 @@ function App() {
 
     listen<string>("phone-disconnected", () => {
       setPhoneConnected(false);
-      if (appState === "connected") setAppState("running");
+      setAppState((prev) => (prev === "connected" ? "running" : prev));
     }).then((fn) => {
       unlistenFn = fn;
     });
@@ -575,9 +578,14 @@ function App() {
   useEffect(() => {
     if (!tauriReady) return;
 
-    refreshStatus();
+    const initialRefresh = window.setTimeout(() => {
+      refreshStatus();
+    }, 0);
     const interval = setInterval(refreshStatus, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      clearInterval(interval);
+    };
   }, [tauriReady, refreshStatus]);
 
   const handleStartAll = async () => {

@@ -3,10 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { PetSprite, loadPetManifest, type PetManifest } from "./Pet";
+import { PetSprite } from "./Pet";
+import { loadPetManifest, type PetManifest } from "./pet-manifest";
 
 const PET_WINDOW_SIZE = 80;
 const PET_VISIBLE_SIZE = 72;
+const hasTauriInternals = () =>
+  Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 
 export function PetApp() {
   const [manifest, setManifest] = useState<PetManifest | null>(null);
@@ -22,7 +25,7 @@ export function PetApp() {
   useEffect(() => {
     if (!isTauri()) return;
     const id = setInterval(() => {
-      if ((window as any).__TAURI_INTERNALS__) {
+      if (hasTauriInternals()) {
         getCurrentWindow().setBackgroundColor("transparent").catch(() => {});
         listen<{ state: string }>("status-changed", e => { if (e.payload) setAppState(e.payload.state); }).catch(() => {});
         invoke<{ state: string }>("get_status").then(s => setAppState(s.state)).catch(() => {});

@@ -77,5 +77,5 @@ applicable iOS commits ported, 1 partial, and 7 iOS-only. Notable areas:
 | ---                           | ---    |
 | `./gradlew :app:testDebugUnitTest` runs Kotlin tests | yes |
 | Lint / ktlint                 | ktlint wired into CI; Android Lint runs clean against a baseline (`lint-baseline.xml`) — pre-existing 20 errors / 163 warnings / 6 hints snapshotted, gates only NEW findings. Categories listed in ROADMAP. |
-| CI workflow `android-check.yml` | yes (unit tests + assemble debug) |
+| CI workflow `ci.yml` / `android` job | yes (unit tests + assemble debug) |
 | Release signing               | requires `key.properties` at repo root, not committed |

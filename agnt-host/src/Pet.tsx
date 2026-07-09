@@ -1,36 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-
-export type PetAnimation = {
-  row: number;
-  frames: number;
-  fps: number;
-  loop: boolean;
-};
-
-export type PetManifest = {
-  schema: string;
-  name: string;
-  slug: string;
-  spritesheet: {
-    file: string;
-    width: number;
-    height: number;
-    columns: number;
-    rows: number;
-    cellWidth: number;
-    cellHeight: number;
-  };
-  animations: Record<string, PetAnimation>;
-  stateMap: Record<string, string>;
-};
-
-export async function loadPetManifest(url: string): Promise<PetManifest> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to load pet manifest: ${res.status}`);
-  }
-  return res.json();
-}
+import type { PetManifest } from "./pet-manifest";
 
 type PetProps = {
   manifest: PetManifest;
@@ -52,7 +21,7 @@ export function PetSprite({ manifest, basePath, appState, scale = 1, animationOv
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
-    setFrame(0);
+    queueMicrotask(() => setFrame(0));
     if (animation.frames <= 1) return;
 
     const frameMs = 1000 / animation.fps;

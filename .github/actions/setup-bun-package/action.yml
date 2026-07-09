@@ -1,0 +1,37 @@
+name: Setup Bun package
+description: Install Flox and Bun dependencies for one package.
+
+inputs:
+  working-directory:
+    description: Package directory to install.
+    required: true
+  frozen-lockfile:
+    description: Whether to pass --frozen-lockfile to bun install.
+    default: "true"
+  audit:
+    description: Whether to run non-blocking bun audit.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Flox
+      uses: flox/install-flox-action@v2
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        args=()
+        if [[ "${{ inputs.frozen-lockfile }}" == "true" ]]; then
+          args+=(--frozen-lockfile)
+        fi
+        flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"
+
+    - name: Audit dependencies
+      if: inputs.audit == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      continue-on-error: true
+      run: flox activate -d "$GITHUB_WORKSPACE" -- bun audit
