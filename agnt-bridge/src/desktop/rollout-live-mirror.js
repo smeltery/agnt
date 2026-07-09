@@ -14,6 +14,7 @@ const {
 const { visibleUserPromptText } = require("../bridge/contextual-user-items");
 const { resolveCodexGeneratedImagesRoot } = require("../providers/codex/home");
 const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
+const { hasVisiblePlanUpdate } = require("./desktop-ipc-shared");
 
 const DEFAULT_POLL_INTERVAL_MS = 700;
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;
@@ -947,7 +948,8 @@ function parseToolArguments(rawArguments) {
 
 function planUpdateNotifications(state, argumentsObject) {
   const plan = normalizeProgressPlanSteps(argumentsObject.plan);
-  if (plan.length === 0) {
+  const explanation = readString(argumentsObject.explanation);
+  if (!hasVisiblePlanUpdate(explanation, plan)) {
     return [];
   }
 
@@ -956,7 +958,6 @@ function planUpdateNotifications(state, argumentsObject) {
     turnId: state.activeTurnId,
     plan,
   };
-  const explanation = readString(argumentsObject.explanation);
   if (explanation) {
     params.explanation = explanation;
   }

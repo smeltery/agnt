@@ -679,6 +679,81 @@ final class CodexPlanModeTests: XCTestCase {
         XCTAssertEqual(planMessages[0].planState?.steps[1].status, .inProgress)
     }
 
+    func testEmptyPlanUpdatesDoNotCreateOrClearPlanMessages() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "turn/plan/updated",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "plan": .array([]),
+            ])
+        )
+
+        XCTAssertTrue(service.messages(for: threadID).filter { $0.kind == .plan }.isEmpty)
+
+        service.handleNotification(
+            method: "turn/plan/updated",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "explanation": .string("Keep the meaningful plan visible."),
+                "plan": .array([]),
+            ])
+        )
+
+        service.handleNotification(
+            method: "turn/plan/updated",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "plan": .array([]),
+            ])
+        )
+
+        let planMessages = service.messages(for: threadID).filter { $0.kind == .plan }
+        XCTAssertEqual(planMessages.count, 1)
+        XCTAssertEqual(planMessages[0].planState?.explanation, "Keep the meaningful plan visible.")
+    }
+
+    func testEmptyCompletedPlanItemFinalizesExistingStreamWithoutPlaceholder() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let itemID = "item-\(UUID().uuidString)"
+
+        service.handleNotification(
+            method: "item/plan/delta",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "itemId": .string(itemID),
+                "delta": .string("1. Keep the streamed plan text"),
+            ])
+        )
+
+        service.handleNotification(
+            method: "item/completed",
+            params: .object([
+                "threadId": .string(threadID),
+                "turnId": .string(turnID),
+                "item": .object([
+                    "id": .string(itemID),
+                    "type": .string("plan"),
+                    "content": .array([]),
+                ]),
+            ])
+        )
+
+        let planMessages = service.messages(for: threadID).filter { $0.kind == .plan }
+        XCTAssertEqual(planMessages.count, 1)
+        XCTAssertEqual(planMessages[0].text, "1. Keep the streamed plan text")
+        XCTAssertFalse(planMessages[0].isStreaming)
+    }
+
     func testTurnPlanUpdatedWithoutThreadIDUsesTurnMapping() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"

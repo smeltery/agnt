@@ -1600,6 +1600,38 @@ extension CodexService {
         updateCurrentOutput(for: threadId)
     }
 
+    @discardableResult
+    func finalizeExistingPlanMessage(
+        threadId: String,
+        turnId: String?,
+        itemId: String?
+    ) -> Bool {
+        guard let messageIndex = findLatestPlanMessageIndex(
+            threadId: threadId,
+            turnId: turnId,
+            itemId: itemId,
+            planPresentation: .resultStreaming
+        ),
+        let message = messagesByThread[threadId]?[messageIndex],
+        message.role == .system,
+        message.kind == .plan else {
+            return false
+        }
+
+        messagesByThread[threadId]?[messageIndex].isStreaming = false
+        messagesByThread[threadId]?[messageIndex].planPresentation = resolvedPlanPresentation(
+            requested: .resultCompletedItem,
+            turnId: turnId
+        )
+        refreshDerivedPlanMetadata(threadId: threadId, messageIndex: messageIndex)
+        streamingSystemMessageByItemID = streamingSystemMessageByItemID.filter { _, messageID in
+            messageID != message.id
+        }
+        persistMessages()
+        updateCurrentOutput(for: threadId)
+        return true
+    }
+
     // Keeps multi-agent orchestration events on a single structured timeline row.
     func upsertSubagentActionMessage(
         threadId: String,

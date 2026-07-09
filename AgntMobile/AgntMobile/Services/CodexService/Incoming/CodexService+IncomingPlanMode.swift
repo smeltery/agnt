@@ -6,6 +6,29 @@
 
 import Foundation
 
+enum CodexPlanUpdateVisibilityPolicy {
+    static func shouldApply(
+        text: String? = nil,
+        explanation: String? = nil,
+        steps: [CodexPlanStep] = []
+    ) -> Bool {
+        if !steps.isEmpty {
+            return true
+        }
+        return [text, explanation].contains { candidate in
+            candidate?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        }
+    }
+
+    static func shouldApply(text: String, planState: CodexPlanState?) -> Bool {
+        shouldApply(
+            text: text,
+            explanation: planState?.explanation,
+            steps: planState?.steps ?? []
+        )
+    }
+}
+
 extension CodexService {
     // Applies the latest structured plan snapshot for a turn while plan text keeps streaming separately.
     func handleTurnPlanUpdated(_ paramsObject: IncomingParamsObject?) {
@@ -18,6 +41,13 @@ extension CodexService {
         threadIdByTurnID[turnId] = threadId
         let explanation = normalizedOptionalPlanText(paramsObject["explanation"]?.stringValue)
         let steps = decodePlanSteps(from: paramsObject["plan"])
+
+        guard CodexPlanUpdateVisibilityPolicy.shouldApply(
+            explanation: explanation,
+            steps: steps
+        ) else {
+            return
+        }
 
         upsertPlanMessage(
             threadId: threadId,

@@ -1974,6 +1974,7 @@ extension CodexService {
 
         let kind: CodexMessageKind
         let body: String
+        var planState: CodexPlanState? = nil
         switch itemType {
         case "reasoning":
             kind = .thinking
@@ -2021,6 +2022,7 @@ extension CodexService {
         case "plan", "todolist":
             kind = .plan
             body = decodePlanItemBody(itemObject)
+            planState = decodePlanState(from: itemObject)
         case "enteredreviewmode":
             kind = .commandExecution
             let reviewLabel = firstNonEmptyString([
@@ -2044,11 +2046,26 @@ extension CodexService {
         }
 
         if kind == .plan {
+            guard CodexPlanUpdateVisibilityPolicy.shouldApply(
+                text: body,
+                planState: planState
+            ) else {
+                if isCompleted {
+                    finalizeExistingPlanMessage(
+                        threadId: threadId,
+                        turnId: turnId,
+                        itemId: itemId
+                    )
+                }
+                return true
+            }
             upsertPlanMessage(
                 threadId: threadId,
                 turnId: turnId,
                 itemId: itemId,
                 text: body,
+                explanation: planState?.explanation,
+                steps: planState?.steps,
                 isStreaming: !isCompleted,
                 planPresentation: isCompleted ? .resultCompletedItem : .resultStreaming
             )
@@ -2308,7 +2325,7 @@ extension CodexService {
             return summary
         }
 
-        return "Planning..."
+        return ""
     }
 
     private func decodeFileChangeItemBody(_ itemObject: IncomingParamsObject) -> String {
