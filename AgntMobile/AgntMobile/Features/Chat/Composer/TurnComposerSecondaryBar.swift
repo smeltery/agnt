@@ -2,7 +2,7 @@
 // Purpose: Owns the compact context controls shown above the main input card.
 // Layer: View Component
 // Exports: TurnComposerSecondaryBar
-// Depends on: SwiftUI, UIKit, TurnGitBranchSelector, CodexWorktreeIcon, QueuedStatusCapsule
+// Depends on: SwiftUI, UIKit, TurnGitBranchSelector, CodexWorktreeIcon, PlanAccessoryCard, QueuedStatusCapsule
 
 import SwiftUI
 import UIKit
@@ -35,11 +35,13 @@ struct TurnComposerSecondaryBar: View {
     let canHandOffToWorktree: Bool
     let onTapCreateWorktree: () -> Void
 
+    @Environment(\.pinnedPlanAccessory) private var pinnedPlanAccessory
+
     private let branchLabelColor = Color(.secondaryLabel)
     private var branchTextFont: Font { AppFont.footnote() }
     private var branchChevronFont: Font { AppFont.system(size: 9, weight: .regular) }
     private var hasContextContent: Bool {
-        hasWorkingDirectory || queuedDraftCount > 0
+        hasWorkingDirectory || pinnedPlanAccessory != nil || queuedDraftCount > 0
     }
 
     private var runtimeLabelTitle: String {
@@ -82,6 +84,14 @@ struct TurnComposerSecondaryBar: View {
                                     )
                                     .equatable()
                                 }
+                            }
+
+                            if let pinnedPlanAccessory {
+                                PlanAccessoryCard(
+                                    snapshot: pinnedPlanAccessory.snapshot,
+                                    onTap: pinnedPlanAccessory.onTap
+                                )
+                                .transition(.opacity.combined(with: .scale(scale: 0.94)))
                             }
 
                             if queuedDraftCount > 0 {

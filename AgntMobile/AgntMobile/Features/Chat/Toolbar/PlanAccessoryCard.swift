@@ -281,6 +281,24 @@ struct PlanAccessoryCard: View {
     }
 }
 
+/// Carries the pinned active-plan state from the conversation container down to
+/// the composer's carousel row without widening the composer parameter chain.
+struct PinnedPlanAccessoryContext {
+    let snapshot: PlanAccessorySnapshot
+    let onTap: () -> Void
+}
+
+private struct PinnedPlanAccessoryKey: EnvironmentKey {
+    static let defaultValue: PinnedPlanAccessoryContext? = nil
+}
+
+extension EnvironmentValues {
+    var pinnedPlanAccessory: PinnedPlanAccessoryContext? {
+        get { self[PinnedPlanAccessoryKey.self] }
+        set { self[PinnedPlanAccessoryKey.self] = newValue }
+    }
+}
+
 enum PlanAccessoryPreviewFixtures {
     static let threadID = "thread_preview_plan_accessory"
 
