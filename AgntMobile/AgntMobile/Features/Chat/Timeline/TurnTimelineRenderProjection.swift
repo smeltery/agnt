@@ -9,7 +9,7 @@ import Foundation
 // ─── Render Item Models ───────────────────────────────────────
 
 struct TurnTimelineToolBurstGroup: Identifiable, Equatable {
-    static let collapsedVisibleCount = 5
+    static let collapseThreshold = 4
 
     let id: String
     let messages: [CodexMessage]
@@ -19,12 +19,17 @@ struct TurnTimelineToolBurstGroup: Identifiable, Equatable {
         self.id = "tool-burst:\(messages.first?.id ?? "unknown")"
     }
 
-    var pinnedMessages: [CodexMessage] {
-        Array(messages.prefix(Self.collapsedVisibleCount))
+    var latestMessage: CodexMessage? {
+        messages.last
+    }
+
+    var visibleMessages: [CodexMessage] {
+        latestMessage.map { [$0] } ?? []
     }
 
     var overflowMessages: [CodexMessage] {
-        Array(messages.dropFirst(Self.collapsedVisibleCount))
+        guard !messages.isEmpty else { return [] }
+        return Array(messages.dropLast())
     }
 
     var hiddenCount: Int {
@@ -95,7 +100,7 @@ enum TurnTimelineRenderProjection {
 
         func flushBufferedToolMessages() {
             guard !bufferedToolMessages.isEmpty else { return }
-            if bufferedToolMessages.count > TurnTimelineToolBurstGroup.collapsedVisibleCount {
+            if bufferedToolMessages.count > TurnTimelineToolBurstGroup.collapseThreshold {
                 items.append(.toolBurst(TurnTimelineToolBurstGroup(messages: bufferedToolMessages)))
             } else {
                 items.append(contentsOf: bufferedToolMessages.map(TurnTimelineRenderItem.message))

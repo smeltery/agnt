@@ -155,7 +155,7 @@ private struct TurnTimelineToolBurstView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(group.pinnedMessages) { message in
+            ForEach(group.visibleMessages) { message in
                 TurnTimelineMessageRow(
                     message: message,
                     isRetryAvailable: isRetryAvailable,
