@@ -306,7 +306,7 @@ private struct CachingMarkdownParser: MarkupParser {
 }
 
 @MainActor
-private struct UncachedMarkdownParser: MarkupParser {
+struct UncachedMarkdownParser: MarkupParser {
     static let shared = UncachedMarkdownParser()
     private let inner: AttributedStringMarkdownParser = .markdown()
 
@@ -315,27 +315,64 @@ private struct UncachedMarkdownParser: MarkupParser {
     }
 }
 
+struct PreparsedMarkdown {
+    let value: AttributedString
+    let revision: String
+}
+
+@MainActor
+private struct PreparsedMarkdownParser: MarkupParser {
+    let value: AttributedString
+
+    func attributedString(for input: String) throws -> AttributedString {
+        value
+    }
+}
+
 struct MarkdownTextView: View {
-    let text: String
+    let text: String?
+    let preparsed: PreparsedMarkdown?
     let profile: MarkdownRenderProfile
     var enablesSelection: Bool = false
     var constrainsToAvailableWidth: Bool = false
     var usesCaches: Bool = true
 
+    init(
+        text: String,
+        profile: MarkdownRenderProfile,
+        enablesSelection: Bool = false,
+        constrainsToAvailableWidth: Bool = false,
+        usesCaches: Bool = true
+    ) {
+        self.text = text
+        self.preparsed = nil
+        self.profile = profile
+        self.enablesSelection = enablesSelection
+        self.constrainsToAvailableWidth = constrainsToAvailableWidth
+        self.usesCaches = usesCaches
+    }
+
+    init(
+        preparsed: PreparsedMarkdown,
+        profile: MarkdownRenderProfile,
+        enablesSelection: Bool = false,
+        constrainsToAvailableWidth: Bool = false
+    ) {
+        self.text = nil
+        self.preparsed = preparsed
+        self.profile = profile
+        self.enablesSelection = enablesSelection
+        self.constrainsToAvailableWidth = constrainsToAvailableWidth
+        self.usesCaches = false
+    }
+
     var body: some View {
-        let transformed = MarkdownTextFormatter.renderableText(
-            from: text,
-            profile: profile,
-            usesCache: usesCaches
-        )
-        let parser: any MarkupParser = usesCaches
-            ? CachingMarkdownParser.shared
-            : UncachedMarkdownParser.shared
+        let prepared = preparedMarkup()
         // Keep prose on the app font, but let Textual own markdown/code layout to avoid block sizing regressions.
         // Force code-block overflow to wrap instead of scroll so horizontal ScrollViews
         // inside the timeline do not compete with the sidebar swipe gesture or let
         // the chat feel like a pannable canvas.
-        let baseView = StructuredText(transformed, parser: parser)
+        let baseView = StructuredText(prepared.markup, parser: prepared.parser)
             .font(AppFont.body())
             .textual.structuredTextStyle(.gitHub)
             .textual.overflowMode(.wrap)
@@ -358,104 +395,24 @@ struct MarkdownTextView: View {
             renderedContent
         }
     }
-}
 
-private struct StreamingAssistantMarkdownTextView: View {
-    let text: String
-    var enablesSelection: Bool = false
-    var constrainsToAvailableWidth: Bool = false
+    private func preparedMarkup() -> (markup: String, parser: any MarkupParser) {
+        if let preparsed {
+            return (
+                preparsed.revision,
+                PreparsedMarkdownParser(value: preparsed.value)
+            )
+        }
 
-    @State private var displayedText = ""
-    @State private var displayedSegments: (settled: String, active: String)
-    @State private var textAdoptionTask: Task<Void, Never>?
-
-    init(
-        text: String,
-        enablesSelection: Bool = false,
-        constrainsToAvailableWidth: Bool = false
-    ) {
-        self.text = text
-        self.enablesSelection = enablesSelection
-        self.constrainsToAvailableWidth = constrainsToAvailableWidth
-        _displayedText = State(initialValue: text)
-        _displayedSegments = State(initialValue: StreamingMarkdownBlockSplitter.split(text))
-    }
-
-    var body: some View {
-        Group {
-            if constrainsToAvailableWidth {
-                renderedSegments(displayedSegments)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                renderedSegments(displayedSegments)
-            }
-        }
-        .onAppear {
-            reconcileDisplayedText(with: text)
-        }
-        .onChange(of: text) { _, nextText in
-            scheduleReconcile(with: nextText)
-        }
-        .onDisappear {
-            textAdoptionTask?.cancel()
-            textAdoptionTask = nil
-        }
-    }
-
-    // Coalesces rapid streaming text updates into a single per-frame state write so
-    // SwiftUI's "onChange(of: String) updated multiple times" runtime warning is not
-    // tripped by tightly-packed token deltas.
-    private func scheduleReconcile(with nextText: String) {
-        textAdoptionTask?.cancel()
-        textAdoptionTask = Task { @MainActor in
-            await Task.yield()
-            guard !Task.isCancelled else { return }
-            reconcileDisplayedText(with: nextText)
-            textAdoptionTask = nil
-        }
-    }
-
-    @ViewBuilder
-    private func renderedSegments(_ segments: (settled: String, active: String)) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if !segments.settled.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                MarkdownTextView(
-                    text: segments.settled,
-                    profile: .assistantProse,
-                    enablesSelection: enablesSelection,
-                    constrainsToAvailableWidth: constrainsToAvailableWidth
-                )
-            }
-
-            if !segments.active.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                MarkdownTextView(
-                    text: segments.active,
-                    profile: .assistantProse,
-                    enablesSelection: enablesSelection,
-                    constrainsToAvailableWidth: constrainsToAvailableWidth,
-                    usesCaches: false
-                )
-            }
-        }
-    }
-
-    // Keep streaming append-oriented while promoting completed blocks to cached markdown.
-    private func reconcileDisplayedText(with nextText: String) {
-        guard !nextText.isEmpty else {
-            guard !displayedText.isEmpty else { return }
-            displayedText = ""
-            displayedSegments = StreamingMarkdownBlockSplitter.split("")
-            return
-        }
-        if nextText.hasPrefix(displayedText) {
-            let appended = String(nextText.dropFirst(displayedText.count))
-            guard !appended.isEmpty else { return }
-            displayedText.append(appended)
-        } else {
-            guard displayedText != nextText else { return }
-            displayedText = nextText
-        }
-        displayedSegments = StreamingMarkdownBlockSplitter.split(displayedText)
+        let source = text ?? ""
+        return (
+            MarkdownTextFormatter.renderableText(
+                from: source,
+                profile: profile,
+                usesCache: usesCaches
+            ),
+            usesCaches ? CachingMarkdownParser.shared : UncachedMarkdownParser.shared
+        )
     }
 }
 
@@ -1736,7 +1693,8 @@ struct MessageRow: View, Equatable {
             StreamingAssistantMarkdownTextView(
                 text: visibleAssistantTextWithoutImageSyntax,
                 enablesSelection: enablesInlineMarkdownSelectionInTimeline,
-                constrainsToAvailableWidth: true
+                constrainsToAvailableWidth: true,
+                animatesReveal: showsStreamingAnimations
             )
         }
     }
