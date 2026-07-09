@@ -103,12 +103,11 @@ jobs:
           }
 
           ci_workflow='^\.github/workflows/ci\.yml'
-          setup_bun_action='^\.github/actions/setup-bun-package/'
           link_check_action='^\.github/actions/run-link-check/'
           flox_config='^\.flox/'
           github_workflows='^\.github/workflows/'
           android_ci='^\.flox/'
-          bun_common="$setup_bun_action|$flox_config"
+          bun_common="$flox_config"
           secure_bridge='^agnt-bridge/src/transport/secure-transport\.js'
           secure_web='^agnt-web/src/crypto/'
           secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
@@ -190,12 +189,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup Bun package
-        uses: ./.github/actions/setup-bun-package
-        with:
-          working-directory: ${{ matrix.working-directory }}
-          frozen-lockfile: ${{ matrix.frozen-lockfile }}
-          audit: ${{ matrix.audit }}
+      - name: Install Flox
+        uses: flox/install-flox-action@v2
+
+      - name: Install package dependencies
+        working-directory: ${{ matrix.working-directory }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ "${{ matrix.frozen-lockfile }}" == "true" ]]; then
+            args+=(--frozen-lockfile)
+          fi
+          flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"
+
+      - name: Audit package dependencies
+        if: matrix.audit == 'true'
+        continue-on-error: true
+        working-directory: ${{ matrix.working-directory }}
+        run: flox activate -d "$GITHUB_WORKSPACE" -- bun audit
 
       - name: Run package CI
         working-directory: ${{ matrix.working-directory }}
