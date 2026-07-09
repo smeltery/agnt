@@ -421,6 +421,26 @@ test("workspace/readImage allows macOS shared /tmp screenshot images", { skip: p
   }
 });
 
+test("workspace/readImage allows CleanShot media screenshots on macOS", async (t) => {
+  useProcessPlatform(t, "darwin");
+  const cleanShotRoot = path.join(os.homedir(), "Library", "Application Support", "CleanShot X", "media");
+  fs.mkdirSync(cleanShotRoot, { recursive: true });
+  const testDir = fs.mkdtempSync(path.join(cleanShotRoot, "agnt-image-"));
+  const imagePath = path.join(testDir, "capture.png");
+  const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  fs.writeFileSync(imagePath, bytes);
+  t.after(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  const result = await handleWorkspaceMethod("workspace/readImage", {
+    path: imagePath,
+  });
+
+  assert.equal(result.path, fs.realpathSync(imagePath));
+  assert.equal(result.dataBase64, bytes.toString("base64"));
+});
+
 test("workspace/readImage rejects cwd widening outside a repository", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.homedir(), "agnt-image-"));
   const imagePath = path.join(tempDir, "preview.png");

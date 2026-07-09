@@ -52,6 +52,39 @@ test("workspace/readFile can return metadata without file content", async () => 
   assert.equal(result.content, undefined);
 });
 
+test("workspace/readFile resolves a unique bare filename inside the workspace", async () => {
+  const tempDir = makeGitWorkspace();
+  const filePath = path.join(tempDir, "Sources", "Feature", "OnlyHere.swift");
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, "struct OnlyHere {}\n", "utf8");
+
+  const result = await handleWorkspaceMethod("workspace/readFile", {
+    cwd: tempDir,
+    path: "OnlyHere.swift",
+  });
+
+  assert.equal(result.path, fs.realpathSync(filePath));
+  assert.equal(result.content, "struct OnlyHere {}\n");
+});
+
+test("workspace/readFile rejects ambiguous bare filename matches", async () => {
+  const tempDir = makeGitWorkspace();
+  const firstPath = path.join(tempDir, "App", "Config.swift");
+  const secondPath = path.join(tempDir, "Tests", "Config.swift");
+  fs.mkdirSync(path.dirname(firstPath), { recursive: true });
+  fs.mkdirSync(path.dirname(secondPath), { recursive: true });
+  fs.writeFileSync(firstPath, "let target = 1\n", "utf8");
+  fs.writeFileSync(secondPath, "let target = 2\n", "utf8");
+
+  await assert.rejects(
+    () => handleWorkspaceMethod("workspace/readFile", {
+      cwd: tempDir,
+      path: "Config.swift",
+    }),
+    (err) => err.errorCode === "file_path_ambiguous"
+  );
+});
+
 test("workspace/readFile skips content when cached metadata still matches", async () => {
   const tempDir = makeGitWorkspace();
   const filePath = path.join(tempDir, "README.md");
