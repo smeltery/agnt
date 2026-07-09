@@ -36,13 +36,8 @@ jobs:
   changes:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
-      bridge: ${{ steps.filter.outputs.bridge }}
-      relay: ${{ steps.filter.outputs.relay }}
-      bun_core: ${{ steps.filter.outputs.bun_core }}
       workflow_config: ${{ steps.filter.outputs.workflow_config }}
-      web: ${{ steps.filter.outputs.web }}
       android: ${{ steps.filter.outputs.android }}
-      host: ${{ steps.filter.outputs.host }}
       ios: ${{ steps.filter.outputs.ios }}
       links: ${{ steps.filter.outputs.links }}
       bun_packages: ${{ steps.filter.outputs.bun_packages }}
@@ -111,43 +106,41 @@ jobs:
           setup_bun_action='^\.github/actions/setup-bun-package/'
           link_check_action='^\.github/actions/run-link-check/'
           flox_config='^\.flox/'
-          github_actions='^\.github/(workflows|actions)/'
+          github_workflows='^\.github/workflows/'
           android_ci='^\.flox/'
           bun_common="$setup_bun_action|$flox_config"
           secure_bridge='^agnt-bridge/src/transport/secure-transport\.js'
           secure_web='^agnt-web/src/crypto/'
           secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
+          secure_transport="$secure_bridge|$secure_web|$secure_android"
           android_code='^(AgntAndroid/(app|gradle)/|AgntAndroid/(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|gradlew\.bat))'
 
           bun_packages=()
-          bun_core=false
 
-          if matches "$github_actions"; then set_output workflow_config true; else set_output workflow_config false; fi
+          if matches "$github_workflows"; then set_output workflow_config true; else set_output workflow_config false; fi
 
-          if should_run bridge "$bun_common|$secure_bridge|^agnt-bridge/"; then
+          if should_run bridge "$bun_common|$secure_transport|^agnt-bridge/"; then
             set_output bridge true
-            bun_core=true
+            bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
           else
             set_output bridge false
           fi
 
           if should_run relay "$bun_common|^relay/"; then
             set_output relay true
-            bun_core=true
+            bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
           else
             set_output relay false
           fi
 
-          set_output bun_core "$bun_core"
-
-          if should_run web "$bun_common|$secure_web|^agnt-web/"; then
+          if should_run web "$bun_common|$secure_transport|^agnt-web/"; then
             set_output web true
             bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
           else
             set_output web false
           fi
 
-          if should_run android "$android_ci|$secure_android|$android_code"; then set_output android true; else set_output android false; fi
+          if should_run android "$android_ci|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
 
           if should_run host "$bun_common|^agnt-host/"; then
             set_output host true
@@ -163,46 +156,6 @@ jobs:
 
           bun_packages_json="$(printf '%s\n' "${bun_packages[@]}" | jq -s -c '.')"
           set_output bun_packages "$bun_packages_json"
-
-  bun-core:
-    needs: changes
-    if: needs.changes.outputs.bun_core == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    env:
-      AGNT_FLOX_QUIET: "1"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Install Flox
-        uses: flox/install-flox-action@v2
-
-      - name: Install bridge dependencies
-        working-directory: agnt-bridge
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun install --frozen-lockfile
-
-      - name: Install relay dependencies
-        working-directory: relay
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun install --frozen-lockfile
-
-      - name: Audit bridge dependencies
-        continue-on-error: true
-        working-directory: agnt-bridge
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun audit
-
-      - name: Audit relay dependencies
-        continue-on-error: true
-        working-directory: relay
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun audit
-
-      - name: Run bridge CI
-        working-directory: agnt-bridge
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
-
-      - name: Run relay CI
-        working-directory: relay
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
   workflow-config:
     needs: changes
@@ -369,7 +322,6 @@ jobs:
     needs:
       - changes
       - workflow-config
-      - bun-core
       - bun-packages
       - android
       - ios
@@ -384,7 +336,6 @@ jobs:
           for result in \
             "${{ needs.changes.result }}" \
             "${{ needs.workflow-config.result }}" \
-            "${{ needs.bun-core.result }}" \
             "${{ needs.bun-packages.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \
