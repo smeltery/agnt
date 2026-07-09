@@ -280,6 +280,25 @@ function startBridge({
     ? createDesktopIpcActionFollower({
       sendApplicationResponse,
       readConversationState: readDesktopConversationState,
+      forwardToLocalCodex: (rawMessage) => {
+        desktopIpcLiveOwner?.observeInbound(rawMessage);
+        const forwarded = activeProvider.id === "codex"
+          ? disableUnsupportedReasoningSummaryForTurnStart(rawMessage)
+          : rawMessage;
+        rememberThreadFromMessage("phone", forwarded);
+        codex.send(forwarded);
+      },
+      // Threads streamed by the bridge's own app-server must never be held,
+      // served from Desktop echoes, or routed over the IPC bus.
+      isLocallyOwnedThread: (threadId) => Boolean(desktopIpcLiveOwner?.isThreadOwned(threadId)),
+      normalizeTurnStartParams: (params) => {
+        if (activeProvider.id !== "codex") {
+          return params;
+        }
+        const raw = JSON.stringify({ method: "turn/start", params });
+        const normalized = disableUnsupportedReasoningSummaryForTurnStart(raw);
+        return safeParseJSON(normalized)?.params || params;
+      },
       socketPath: config.desktopIpcSocketPath || undefined,
     })
     : null;
