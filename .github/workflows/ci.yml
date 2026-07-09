@@ -196,17 +196,18 @@ jobs:
         working-directory: ${{ matrix.working-directory }}
         run: |
           set -euo pipefail
+          flox activate -d "$GITHUB_WORKSPACE" -- bun --version
           args=()
           if [[ "${{ matrix.frozen-lockfile }}" == "true" ]]; then
             args+=(--frozen-lockfile)
           fi
-          flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"
+          timeout 240s flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"
 
       - name: Audit package dependencies
         if: matrix.audit == 'true'
         continue-on-error: true
         working-directory: ${{ matrix.working-directory }}
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun audit
+        run: timeout 120s flox activate -d "$GITHUB_WORKSPACE" -- bun audit
 
       - name: Run package CI
         working-directory: ${{ matrix.working-directory }}
