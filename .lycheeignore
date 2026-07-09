@@ -35,6 +35,7 @@
 ^#
 
 # Known transient hosts that randomly return 503/429 even when up.
+^https://blacksmith\.sh/
 ^https://x\.com/
 ^https://twitter\.com/
 
