@@ -202,7 +202,9 @@ jobs:
 
       - name: Run package CI
         working-directory: ${{ matrix.working-directory }}
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bash -lc '${{ matrix.ci_command }}'
+        run: |
+          echo "Running: ${{ matrix.ci_command }}"
+          flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
   android:
     needs: changes
