@@ -16,8 +16,10 @@
     "node": ">=18"
   },
   "scripts": {
+    "ci": "bun run verify:entrypoints && bun run test",
     "start": "node ./bin/agnt.js up",
     "test": "node --test",
+    "verify:entrypoints": "node -e \"const mod = require('./src'); const names = ['startBridge', 'openLastActiveThread', 'watchThreadRollout']; for (const name of names) { if (typeof mod[name] !== 'function') { throw new Error('Missing export: ' + name); } }\"",
     "postinstall": "node ./src/bootstrap-provider.js",
     "prepack": "node ./scripts/prepare-private-defaults.js",
     "postpack": "node ./scripts/cleanup-private-defaults.js"

@@ -90,14 +90,9 @@ jobs:
         with:
           working-directory: agnt-bridge
 
-      - name: Verify entrypoints load
+      - name: Run package CI
         working-directory: agnt-bridge
-        run: |
-          flox activate -d "$GITHUB_WORKSPACE" -- node -e "const mod = require('./src'); const names = ['startBridge', 'openLastActiveThread', 'watchThreadRollout']; for (const name of names) { if (typeof mod[name] !== 'function') { throw new Error('Missing export: ' + name); } }"
-
-      - name: Run unit tests
-        working-directory: agnt-bridge
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run test
+        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
   relay:
     needs: changes
@@ -115,9 +110,9 @@ jobs:
         with:
           working-directory: relay
 
-      - name: Run unit tests
+      - name: Run package CI
         working-directory: relay
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run test
+        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
   web:
     needs: changes
@@ -135,21 +130,9 @@ jobs:
         with:
           working-directory: agnt-web
 
-      - name: Type check
+      - name: Run package CI
         working-directory: agnt-web
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run lint
-
-      - name: Run unit tests
-        working-directory: agnt-web
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run test
-
-      - name: Build production bundle
-        working-directory: agnt-web
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run build:vite
-
-      - name: Check bundle size
-        working-directory: agnt-web
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run size
+        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
   android:
     needs: changes
@@ -204,16 +187,13 @@ jobs:
         uses: ./.github/actions/setup-bun-package
         with:
           working-directory: agnt-host
+          # agnt-host does not commit a Bun lockfile yet.
           frozen-lockfile: "false"
           audit: "false"
 
-      - name: Lint
+      - name: Run package CI
         working-directory: agnt-host
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run lint
-
-      - name: Build frontend
-        working-directory: agnt-host
-        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run build
+        run: flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
 
   ci-summary:
     needs:

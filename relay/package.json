@@ -8,6 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "ci": "bun run test",
     "start": "node ./server.js",
     "test": "node --test --test-timeout=30000 ./*.test.js"
   },
