@@ -223,6 +223,11 @@ function createThreadRolloutLiveMirror({
       }
 
       if (currentTime - lastActivityAt >= idleTimeoutMs) {
+        if (partialLine) {
+          const flushLine = partialLine;
+          partialLine = "";
+          processRolloutLines([flushLine], state, sendApplicationResponse);
+        }
         stop();
       }
     } catch (error) {
@@ -550,20 +555,7 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
     }
 
     if (eventType === "agent_message") {
-      const message = readString(payload.message) || readString(payload.text);
-      if (!message) {
-        return [];
-      }
-      const turnId = resolveRolloutEventTurnId(state, payload);
-      const phase = readString(payload.phase);
-
-      notifications.push(createNotification("codex/event/agent_message", {
-        threadId: state.threadId,
-        turnId,
-        itemId: buildAgentMessageItemId(state.threadId, turnId, entry, message),
-        message,
-        ...(phase ? { phase } : {}),
-      }));
+      notifications.push(...agentMessageNotifications(state, entry, payload));
       return notifications;
     }
 
@@ -588,6 +580,11 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
 
   const payload = entry.payload || {};
   const itemType = normalizeRolloutItemType(payload.type);
+
+  if (itemType === "message") {
+    notifications.push(...responseItemMessageNotifications(state, entry, payload));
+    return notifications;
+  }
 
   if (itemType === "reasoning") {
     notifications.push(...reasoningNotifications(state, extractReasoningText(payload)));
@@ -615,6 +612,65 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
   }
 
   return notifications;
+}
+
+function responseItemMessageNotifications(state, entry, payload) {
+  const role = readString(payload?.role).toLowerCase();
+  if (role && role !== "assistant") {
+    return [];
+  }
+
+  const message = extractResponseItemMessageText(payload);
+  if (!message) {
+    return [];
+  }
+
+  return agentMessageNotifications(state, entry, {
+    message,
+    phase: payload?.phase,
+    itemId: readString(payload?.id),
+    turn_id: readString(payload?.turn_id) || readString(payload?.internal_chat_message_metadata_passthrough?.turn_id),
+    turnId: readString(payload?.turnId) || readString(payload?.internal_chat_message_metadata_passthrough?.turnId),
+  });
+}
+
+function agentMessageNotifications(state, entry, payload) {
+  const message = readString(payload?.message) || readString(payload?.text);
+  if (!message) {
+    return [];
+  }
+
+  const turnId = resolveRolloutEventTurnId(state, payload);
+  const dedupeKey = agentMessageDedupeKey(turnId, message);
+  if (state.emittedAgentMessageKeys.has(dedupeKey)) {
+    return [];
+  }
+  state.emittedAgentMessageKeys.add(dedupeKey);
+
+  const params = {
+    threadId: state.threadId,
+    turnId,
+    itemId: readString(payload?.itemId) || buildAgentMessageItemId(state.threadId, turnId, entry, message),
+    message,
+  };
+  const phase = readString(payload?.phase);
+  if (phase) {
+    params.phase = phase;
+  }
+
+  return [createNotification("codex/event/agent_message", params)];
+}
+
+function extractResponseItemMessageText(payload) {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+
+  const content = Array.isArray(payload.content) ? payload.content : [];
+  const parts = content
+    .map((part) => readString(part?.text) || readString(part?.content) || readString(part?.message))
+    .filter(Boolean);
+  return parts.join("\n");
 }
 
 function reasoningNotifications(state, text) {
@@ -950,6 +1006,7 @@ function createMirrorState(threadId) {
     commandCalls: new Map(),
     applyPatchCalls: new Map(),
     emittedPatchApplyEndCalls: new Set(),
+    emittedAgentMessageKeys: new Set(),
     pendingUserMessages: [],
     suppressLiveActivityUntilGrowth: false,
   };
@@ -1172,6 +1229,10 @@ function buildAgentMessageItemId(threadId, turnId, entry, message) {
   );
 }
 
+function agentMessageDedupeKey(turnId, message) {
+  return `${readString(turnId)}\n${readString(message)}`;
+}
+
 function generatedImagePathForRolloutItem(threadId, callId) {
   const resolvedThreadId = readString(threadId);
   const resolvedCallId = readString(callId);
@@ -1194,6 +1255,7 @@ function resetRunState(state) {
   state.commandCalls.clear();
   state.applyPatchCalls.clear();
   state.emittedPatchApplyEndCalls.clear();
+  state.emittedAgentMessageKeys.clear();
   state.pendingUserMessages.length = 0;
 }
 

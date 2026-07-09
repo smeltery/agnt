@@ -311,6 +311,87 @@ test("desktop-origin bootstrap emits terminal catch-up for failed runs", async (
   assert.equal(outbound[0].params.agntRolloutTerminalCatchUp, true);
 });
 
+test("desktop-origin mirror flushes a valid partial EOF line before stopping", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-partial-eof",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 25,
+    activityHeartbeatMs: 100,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-partial-eof" },
+  }));
+
+  await wait(10);
+  fs.appendFileSync(rolloutPath, taskStarted("turn-partial-eof"));
+  await wait(45);
+
+  assert.ok(outbound.some((message) => (
+    message.method === "turn/started"
+    && message.params.turnId === "turn-partial-eof"
+  )));
+});
+
+test("desktop-origin mirror emits response_item assistant messages when event_msg is absent", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-response-message",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-response-message"),
+      responseMessage("Only response item text", "final_answer", "msg-response-only"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-response-message" },
+  }));
+
+  await wait(30);
+
+  const message = outbound.find((entry) => entry.method === "codex/event/agent_message");
+  assert.ok(message);
+  assert.equal(message.params.message, "Only response item text");
+  assert.equal(message.params.phase, "final_answer");
+  assert.equal(message.params.itemId, "msg-response-only");
+});
+
 test("desktop-origin active runs mirror generated image previews", async (t) => {
   const { homeDir } = createTemporaryRolloutHome({
     threadId: "thread-image",
@@ -1423,6 +1504,31 @@ function agentMessage(message, phase = "final_answer") {
       message,
       phase,
     },
+  });
+}
+
+function responseMessage(message, phase = "final_answer", id = "msg-response", turnId = "") {
+  const payload = {
+    type: "message",
+    id,
+    role: "assistant",
+    phase,
+    content: [
+      {
+        type: "output_text",
+        text: message,
+      },
+    ],
+  };
+  if (turnId) {
+    payload.internal_chat_message_metadata_passthrough = {
+      turn_id: turnId,
+    };
+  }
+  return JSON.stringify({
+    timestamp: "2026-03-15T19:47:40.000Z",
+    type: "response_item",
+    payload,
   });
 }
 
