@@ -4,6 +4,15 @@ The web client is being built across a series of focused sessions. Each session
 delivers an end-to-end-usable slice; the foundation never gets restructured by a
 later session because the protocol and storage layers are already complete.
 
+## Session 42 — Workspace text-file previews ✅ DONE
+
+- ✅ **Syntax-highlighted workspace text previews.** Assistant markdown links to
+  repo-local text files now open a read-only sheet backed by `workspace/readFile`,
+  with cached metadata revalidation, Prism highlighting, selectable text, copy,
+  and line numbers enabled by default.
+- 7 new vitest assertions across `workspace-text-preview.test.ts` and
+  `markdown-inline.test.tsx`; focused tests, `tsc`, and Vite build pass.
+
 ## Session 41 — Hardened SVG workspace previews ✅ DONE
 
 - ✅ **Sandboxed SVG previews.** Workspace `.svg` artifacts and SVG data URLs now

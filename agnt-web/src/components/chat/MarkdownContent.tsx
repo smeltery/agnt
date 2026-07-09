@@ -8,13 +8,15 @@
 // nested lists, or HTML inline tags — bundle stays small and the output
 // stays predictable.
 
-import { Fragment, lazy, Suspense, type ReactNode, useEffect, useMemo, useState } from "react";
-import { copyText } from "../../lib/clipboard";
+import { Fragment, lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import { useConnectionStore } from "../../state/connection-store";
 import { useLightboxStore } from "../../state/lightbox-store";
 import { selectImageState, useWorkspaceImageCache } from "../../state/workspace-image-cache";
 import { decodeSvgDataUrl, isSvgDataUrl, isSvgPath } from "../../lib/workspace-svg-preview";
+import { isLocalWorkspaceLink } from "../../lib/workspace-text-preview";
+import { CodeBlock } from "./CodeBlock";
 import { WorkspaceSvgPreview } from "./WorkspaceSvgPreview";
+import { WorkspaceTextFilePreview } from "./WorkspaceTextFilePreview";
 
 // Mermaid lives in its own chunk via React.lazy so the mermaid library
 // (~150 KB gzip) only downloads when a diagram actually appears.
@@ -29,7 +31,6 @@ const MathBlock = lazy(() =>
   import("./MathBlock").then((m) => ({ default: m.MathBlock }))
 );
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
-import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
 
 const INLINE_CODE_PATTERN = /`([^`\n]+)`/g;
 const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
@@ -137,105 +138,6 @@ function renderFence(language: string | null, body: string): ReactNode {
   return <CodeBlock language={language} body={body} />;
 }
 
-/**
- * Code-fence renderer that lazy-loads the requested Prism language. While the
- * grammar is being fetched we render plain (HTML-escaped) text — same shape
- * as the highlighted output so the layout doesn't shift when the chunk lands.
- */
-function CodeBlock({ language, body }: { language: string | null; body: string }) {
-  const canonical = knownLanguage(language ?? undefined);
-  const [ready, setReady] = useState(canonical ? isLanguageReady(canonical) : false);
-  const [justCopied, setJustCopied] = useState(false);
-  const [showLineNumbers, setShowLineNumbers] = useState(false);
-
-  // Line count: split on `\n` and drop the trailing empty produced by a
-  // body that ends with a newline (every block does in practice).
-  const lineCount = useMemo(() => {
-    if (!body) return 0;
-    const lines = body.split("\n");
-    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-    return lines.length;
-  }, [body]);
-
-  useEffect(() => {
-    if (!canonical || ready) return;
-    let cancelled = false;
-    void ensureLanguage(canonical).then((ok) => {
-      if (!cancelled && ok) setReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [canonical, ready]);
-
-  async function handleCopy() {
-    const ok = await copyText(body);
-    if (!ok) return;
-    setJustCopied(true);
-    window.setTimeout(() => setJustCopied(false), 1200);
-  }
-
-  return (
-    <pre
-      className={
-        "agnt-md-pre"
-        + (canonical ? " agnt-md-lang-" + canonical : "")
-        + (showLineNumbers ? " agnt-md-pre-numbered" : "")
-      }
-    >
-      {/* Line-number gutter renders as a sibling so the highlighted code
-          can stay a single dangerously-set-innerHTML blob. Line height
-          on the gutter must match the `<code>` exactly (CSS handles it)
-          or a 200-line block will drift visibly toward the bottom. */}
-      {showLineNumbers && lineCount > 0 && (
-        <span className="agnt-md-pre-gutter" aria-hidden>
-          {Array.from({ length: lineCount }, (_, i) => (
-            <span key={i}>{i + 1}</span>
-          ))}
-        </span>
-      )}
-      {canonical && ready ? (
-        <code
-          className={"language-" + canonical}
-          dangerouslySetInnerHTML={{ __html: highlightCode(body, canonical) }}
-        />
-      ) : (
-        <code
-          className={canonical ? "language-" + canonical : undefined}
-          dangerouslySetInnerHTML={{ __html: escapeHtml(body) }}
-        />
-      )}
-      {canonical && (
-        <span className="agnt-md-pre-lang" aria-hidden>
-          {canonical}
-        </span>
-      )}
-      {/* Line-numbers toggle only renders for blocks that have at least
-          two lines — toggling a one-liner adds noise without value. */}
-      {lineCount > 1 && (
-        <button
-          type="button"
-          className={"agnt-md-pre-lines" + (showLineNumbers ? " agnt-md-pre-lines-on" : "")}
-          onClick={() => setShowLineNumbers((open) => !open)}
-          aria-pressed={showLineNumbers}
-          title={showLineNumbers ? "Hide line numbers" : "Show line numbers"}
-        >
-          #
-        </button>
-      )}
-      <button
-        type="button"
-        className={"agnt-md-pre-copy" + (justCopied ? " agnt-md-pre-copy-done" : "")}
-        onClick={handleCopy}
-        aria-label={justCopied ? "Copied" : "Copy code"}
-        title={justCopied ? "Copied" : "Copy code block"}
-      >
-        {justCopied ? "Copied" : "Copy"}
-      </button>
-    </pre>
-  );
-}
-
 function renderHeading(level: 1 | 2 | 3 | 4 | 5 | 6, text: string, cwd: string | undefined): ReactNode {
   const className = "agnt-md-heading agnt-md-h" + level;
   const children = renderInlineFragments(text, cwd);
@@ -308,6 +210,17 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
           </Suspense>
         );
       case "link":
+        if (isLocalWorkspaceLink(token.url)) {
+          return (
+            <WorkspaceTextFileLink
+              key={index}
+              cwd={cwd}
+              path={token.url}
+              label={token.label}
+              title={token.title}
+            />
+          );
+        }
         return (
           <a key={index} href={token.url} target="_blank" rel="noreferrer noopener" title={token.title}>
             {token.label}
@@ -356,6 +269,48 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
         );
     }
   });
+}
+
+interface WorkspaceTextFileLinkProps {
+  cwd: string | undefined;
+  path: string;
+  label: string;
+  title?: string;
+}
+
+function WorkspaceTextFileLink({ cwd, path, label, title }: WorkspaceTextFileLinkProps) {
+  const [open, setOpen] = useState(false);
+  const text = label || path;
+
+  if (!cwd) {
+    return (
+      <span className="agnt-md-file-link-disabled" title={`No workspace cwd; can't fetch ${path}`}>
+        {text}
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="agnt-md-file-link"
+        title={title ?? path}
+        onClick={() => setOpen(true)}
+      >
+        {text}
+      </button>
+      {open && (
+        <WorkspaceTextFilePreview
+          cwd={cwd}
+          path={path}
+          label={text}
+          open={open}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
 }
 
 interface WorkspaceImageProps {
@@ -487,7 +442,7 @@ function tokenizeInline(text: string): InlineToken[] {
   for (const match of text.matchAll(LINK_PATTERN)) {
     if (match.index === undefined) continue;
     const url = match[2];
-    if (!SAFE_LINK_SCHEMES.test(url)) continue;
+    if (HAS_URL_SCHEME.test(url) && !SAFE_LINK_SCHEMES.test(url)) continue;
     hits.push({
       kind: "link",
       start: match.index,

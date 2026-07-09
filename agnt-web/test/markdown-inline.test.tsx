@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MarkdownContent } from "../src/components/chat/MarkdownContent";
 
-function render(text: string): string {
-  return renderToStaticMarkup(<MarkdownContent text={text} />);
+function render(text: string, cwd?: string): string {
+  return renderToStaticMarkup(<MarkdownContent text={text} cwd={cwd} />);
 }
 
 describe("inline markdown — links", () => {
@@ -37,6 +37,19 @@ describe("inline markdown — links", () => {
 
   it("refuses unknown schemes", () => {
     expect(render("[x](file:///etc/passwd)")).not.toContain("href=\"file:");
+  });
+
+  it("renders local workspace links as preview buttons when cwd is supplied", () => {
+    const html = render("[README](README.md)", "/repo");
+    expect(html).toContain("agnt-md-file-link");
+    expect(html).toContain(">README</button>");
+    expect(html).not.toContain("href=\"README.md\"");
+  });
+
+  it("renders local workspace links as disabled text when cwd is missing", () => {
+    const html = render("[README](README.md)");
+    expect(html).toContain("agnt-md-file-link-disabled");
+    expect(html).not.toContain("href=\"README.md\"");
   });
 });
 
