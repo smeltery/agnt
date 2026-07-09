@@ -437,6 +437,125 @@ test("desktop-origin mirror dedupes the same assistant text across event and res
   assert.equal(messages.length, 1);
 });
 
+test("desktop-origin sibling terminal does not hijack a synthetic active turn", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-synthetic-sibling",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStartedWithoutTurnId(),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 200,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-synthetic-sibling" },
+  }));
+
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    taskComplete("turn-parallel-sibling"),
+  ]);
+  await wait(20);
+
+  const prematureSyntheticCompleted = outbound.find((message) => (
+    message.method === "turn/completed"
+    && /^rollout-turn:/.test(String(message.params.turnId))
+  ));
+  assert.equal(prematureSyntheticCompleted, undefined);
+
+  appendRolloutLines(rolloutPath, [
+    agentMessage("Synthetic run continues", "commentary"),
+  ]);
+  await wait(30);
+
+  const siblingCompleted = outbound.find((message) => (
+    message.method === "turn/completed"
+    && message.params.turnId === "turn-parallel-sibling"
+  ));
+  assert.ok(siblingCompleted);
+
+  const continuation = outbound.find((message) => (
+    message.method === "codex/event/agent_message"
+    && message.params.message === "Synthetic run continues"
+  ));
+  assert.ok(continuation);
+  assert.match(continuation.params.turnId, /^rollout-turn:/);
+
+  const syntheticCompleted = outbound.find((message) => (
+    message.method === "turn/completed"
+    && /^rollout-turn:/.test(String(message.params.turnId))
+  ));
+  assert.equal(syntheticCompleted, undefined);
+});
+
+test("desktop-origin terminal-only real id closes the synthetic active turn", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-synthetic-terminal",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStartedWithoutTurnId(),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 200,
+    syntheticTerminalGraceMs: 25,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-synthetic-terminal" },
+  }));
+
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    taskComplete("turn-real-terminal"),
+  ]);
+  await wait(70);
+
+  const realCompleted = outbound.find((message) => (
+    message.method === "turn/completed"
+    && message.params.turnId === "turn-real-terminal"
+  ));
+  assert.ok(realCompleted);
+
+  const syntheticCompleted = outbound.find((message) => (
+    message.method === "turn/completed"
+    && /^rollout-turn:/.test(String(message.params.turnId))
+  ));
+  assert.ok(syntheticCompleted);
+});
+
 test("desktop-origin mirror stays alive on heartbeat-only active runs", async (t) => {
   const { homeDir } = createTemporaryRolloutHome({
     threadId: "thread-heartbeat-idle",
@@ -1130,6 +1249,66 @@ test("desktop-origin bootstrap catches up aborted runs without replaying content
   assert.equal(outbound[0].params.agntRolloutTerminalCatchUp, true);
 });
 
+test("desktop-origin mirror re-bootstraps after rollout truncation", async (t) => {
+  const longMessage = "x".repeat(600);
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-truncate",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-truncate-old"),
+      agentMessage(longMessage, "commentary"),
+      agentMessage(`${longMessage}-more`, "commentary"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 200,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-truncate" },
+  }));
+
+  await wait(20);
+  fs.writeFileSync(rolloutPath, [
+    JSON.stringify({
+      timestamp: "2026-03-15T19:47:36.019Z",
+      type: "session_meta",
+      payload: {
+        id: "thread-truncate",
+        cwd: "/repo",
+        originator: "Codex Desktop",
+        source: "desktop",
+      },
+    }),
+    taskStarted("turn-truncate-new"),
+    agentMessage("Fresh rewritten rollout", "final_answer"),
+    "",
+  ].join("\n"));
+  await wait(40);
+
+  const freshMessage = outbound.find((message) => (
+    message.method === "codex/event/agent_message"
+    && message.params.message === "Fresh rewritten rollout"
+  ));
+  assert.ok(freshMessage);
+  assert.equal(freshMessage.params.turnId, "turn-truncate-new");
+});
+
 test("desktop-origin bootstrap skips stale active runs whose rollout stopped growing", async (t) => {
   const { homeDir, rolloutPath } = createTemporaryRolloutHome({
     threadId: "thread-stale",
@@ -1694,6 +1873,17 @@ function taskStarted(turnId) {
     payload: {
       type: "task_started",
       turn_id: turnId,
+      model_context_window: 258400,
+    },
+  });
+}
+
+function taskStartedWithoutTurnId() {
+  return JSON.stringify({
+    timestamp: "2026-03-15T19:47:37.000Z",
+    type: "event_msg",
+    payload: {
+      type: "task_started",
       model_context_window: 258400,
     },
   });

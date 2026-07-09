@@ -23,6 +23,7 @@ const DEFAULT_ACTIVITY_HEARTBEAT_MS = 5_000;
 // Bootstrap replay must not revive old runs whose rollout stopped growing
 // before a terminal event was written.
 const DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS = 10 * 60_000;
+const DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS = 1_000;
 const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
 const TERMINAL_TASK_EVENT_TYPES = new Set(["task_complete", "turn_aborted", "error"]);
 
@@ -45,6 +46,7 @@ function createRolloutLiveMirrorController({
   idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
   activityHeartbeatMs = DEFAULT_ACTIVITY_HEARTBEAT_MS,
   staleActiveRunMaxAgeMs = DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS,
+  syntheticTerminalGraceMs = DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS,
 } = {}) {
   const mirrorsByThreadId = new Map();
 
@@ -85,6 +87,7 @@ function createRolloutLiveMirrorController({
       idleTimeoutMs,
       activityHeartbeatMs,
       staleActiveRunMaxAgeMs,
+      syntheticTerminalGraceMs,
       onStop() {
         if (mirrorsByThreadId.get(threadId) === mirror) {
           mirrorsByThreadId.delete(threadId);
@@ -123,6 +126,7 @@ function createThreadRolloutLiveMirror({
   idleTimeoutMs,
   activityHeartbeatMs,
   staleActiveRunMaxAgeMs,
+  syntheticTerminalGraceMs,
   onStop = () => {},
 }) {
   const startedAt = now();
@@ -194,6 +198,15 @@ function createThreadRolloutLiveMirror({
         return;
       }
 
+      if (fileSize < lastSize) {
+        lastSize = 0;
+        partialLine = "";
+        didBootstrap = false;
+        resetRunState(state);
+        lastGrowthAt = currentTime;
+        return;
+      }
+
       if (fileSize > lastSize) {
         const chunk = readFileSlice(rolloutPath, lastSize, fileSize, fsModule);
         lastSize = fileSize;
@@ -208,7 +221,21 @@ function createThreadRolloutLiveMirror({
         const combined = `${partialLine}${chunk}`;
         const lines = combined.split("\n");
         partialLine = lines.pop() || "";
-        processRolloutLines(lines, state, sendApplicationResponse);
+        processRolloutLines(lines, state, sendApplicationResponse, { nowMs: currentTime });
+        return;
+      }
+
+      const syntheticTerminalNotifications = finalizePendingSyntheticTerminalIfReady(
+        state,
+        currentTime,
+        syntheticTerminalGraceMs
+      );
+      if (syntheticTerminalNotifications.length > 0) {
+        for (const notification of syntheticTerminalNotifications) {
+          sendApplicationResponse(JSON.stringify(notification));
+        }
+        lastActivityAt = currentTime;
+        lastHeartbeatAt = currentTime;
         return;
       }
 
@@ -415,11 +442,12 @@ function terminalCatchUpNotification(threadId, terminalRun) {
   return createNotification("turn/completed", params);
 }
 
-function processRolloutLines(lines, state, sendApplicationResponse) {
+function processRolloutLines(lines, state, sendApplicationResponse, options = {}) {
   if (!Array.isArray(lines) || lines.length === 0) {
     return;
   }
 
+  const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) {
@@ -431,14 +459,15 @@ function processRolloutLines(lines, state, sendApplicationResponse) {
       continue;
     }
 
-    const notifications = synthesizeNotificationsFromRolloutEntry(parsed, state);
+    const notifications = synthesizeNotificationsFromRolloutEntry(parsed, state, { nowMs });
     for (const notification of notifications) {
       sendApplicationResponse(JSON.stringify(notification));
     }
   }
 }
 
-function synthesizeNotificationsFromRolloutEntry(entry, state) {
+function synthesizeNotificationsFromRolloutEntry(entry, state, options = {}) {
+  const nowMs = Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
   if (entry?.type === "session_meta") {
     populateSessionMetaState(state, entry.payload);
     if (!isDesktopRolloutOrigin(state.sessionMeta)) {
@@ -468,6 +497,7 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
 
       state.activeTurnId = turnId;
       state.activeTurnIdIsSynthetic = !explicitTurnId;
+      clearPendingSyntheticTerminal(state);
       state.reasoningItemId = buildSyntheticItemId("thinking", state.threadId, turnId);
       state.hasThinking = false;
       state.commandCalls.clear();
@@ -514,23 +544,30 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
     }
 
     if (eventType === "task_complete") {
-      const turnId = resolveRolloutEventTurnId(state, payload);
+      const turnId = resolveRolloutEventTurnId(state, payload, { allowSyntheticPromotion: false });
       if (!turnId) {
         return [];
       }
 
-      notifications.push(...turnFileChangeSnapshotNotifications(state, turnId));
+      const closesActiveRun = terminalEventClosesTrackedTurn(turnId, state.activeTurnId);
+      if (closesActiveRun) {
+        notifications.push(...turnFileChangeSnapshotNotifications(state, turnId));
+      }
       notifications.push(createNotification("turn/completed", {
         threadId: state.threadId,
         turnId,
         id: turnId,
       }));
-      resetRunState(state);
+      if (closesActiveRun) {
+        resetRunState(state);
+      } else if (isSyntheticTerminalMismatch(state, turnId)) {
+        markPendingSyntheticTerminal(state, { status: "completed" }, nowMs);
+      }
       return notifications;
     }
 
     if (eventType === "turn_aborted" || eventType === "error") {
-      const turnId = resolveRolloutEventTurnId(state, payload);
+      const turnId = resolveRolloutEventTurnId(state, payload, { allowSyntheticPromotion: false });
       if (!turnId) {
         return [];
       }
@@ -546,7 +583,11 @@ function synthesizeNotificationsFromRolloutEntry(entry, state) {
         params.error = { message: errorMessage };
       }
       notifications.push(createNotification("turn/completed", params));
-      resetRunState(state);
+      if (terminalEventClosesTrackedTurn(turnId, state.activeTurnId)) {
+        resetRunState(state);
+      } else if (isSyntheticTerminalMismatch(state, turnId)) {
+        markPendingSyntheticTerminal(state, params, nowMs);
+      }
       return notifications;
     }
 
@@ -1011,6 +1052,10 @@ function createMirrorState(threadId) {
     isDesktopOrigin: null,
     activeTurnId: null,
     activeTurnIdIsSynthetic: false,
+    pendingSyntheticTerminalTurnId: null,
+    pendingSyntheticTerminalStartedAt: 0,
+    pendingSyntheticTerminalStatus: "",
+    pendingSyntheticTerminalErrorMessage: "",
     reasoningItemId: null,
     hasThinking: false,
     commandCalls: new Map(),
@@ -1184,11 +1229,82 @@ function buildSyntheticTurnId(state, entry) {
 
 // When the active turn id was synthesized, ignore any (absent) explicit turn id
 // on later events and keep them attached to the synthetic run.
-function resolveRolloutEventTurnId(state, payload = {}) {
+function resolveRolloutEventTurnId(state, payload = {}, options = {}) {
+  const explicitTurnId = readString(payload.turn_id) || readString(payload.turnId);
   if (state.activeTurnIdIsSynthetic && state.activeTurnId) {
+    if (options.allowSyntheticPromotion === false && explicitTurnId) {
+      return explicitTurnId;
+    }
     return state.activeTurnId;
   }
-  return readString(payload.turn_id) || readString(payload.turnId) || state.activeTurnId || "";
+  return explicitTurnId || state.activeTurnId || "";
+}
+
+function markPendingSyntheticTerminal(state, terminalParams, nowMs) {
+  if (state.activeTurnIdIsSynthetic && state.activeTurnId) {
+    state.pendingSyntheticTerminalTurnId = state.activeTurnId;
+    state.pendingSyntheticTerminalStartedAt = nowMs;
+    state.pendingSyntheticTerminalStatus = readString(terminalParams.status) || "";
+    state.pendingSyntheticTerminalErrorMessage = readString(terminalParams.error?.message) || "";
+  }
+}
+
+function clearPendingSyntheticTerminal(state) {
+  state.pendingSyntheticTerminalTurnId = null;
+  state.pendingSyntheticTerminalStartedAt = 0;
+  state.pendingSyntheticTerminalStatus = "";
+  state.pendingSyntheticTerminalErrorMessage = "";
+}
+
+function isSyntheticTerminalMismatch(state, terminalTurnId) {
+  return Boolean(
+    state.activeTurnIdIsSynthetic
+    && state.activeTurnId
+    && terminalTurnId
+    && terminalTurnId !== state.activeTurnId
+  );
+}
+
+function finalizePendingSyntheticTerminal(state) {
+  const turnId = state.pendingSyntheticTerminalTurnId;
+  if (!turnId) {
+    return [];
+  }
+
+  const terminalParams = {
+    threadId: state.threadId,
+    turnId,
+    id: turnId,
+  };
+  if (state.pendingSyntheticTerminalStatus) {
+    terminalParams.status = state.pendingSyntheticTerminalStatus;
+  }
+  if (state.pendingSyntheticTerminalErrorMessage) {
+    terminalParams.error = { message: state.pendingSyntheticTerminalErrorMessage };
+  }
+
+  const notifications = [
+    ...turnFileChangeSnapshotNotifications(state, turnId),
+    createNotification("turn/completed", terminalParams),
+  ];
+  resetRunState(state);
+  return notifications;
+}
+
+function finalizePendingSyntheticTerminalIfReady(state, nowMs, graceMs) {
+  if (!state.pendingSyntheticTerminalTurnId) {
+    return [];
+  }
+  const startedAt = Number.isFinite(state.pendingSyntheticTerminalStartedAt)
+    ? state.pendingSyntheticTerminalStartedAt
+    : nowMs;
+  const resolvedGraceMs = Number.isFinite(graceMs)
+    ? Math.max(0, graceMs)
+    : DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS;
+  if (nowMs - startedAt < resolvedGraceMs) {
+    return [];
+  }
+  return finalizePendingSyntheticTerminal(state);
 }
 
 function flushPendingUserMessageNotifications(state, turnId) {
@@ -1260,6 +1376,7 @@ function normalizeRolloutItemType(value) {
 function resetRunState(state) {
   state.activeTurnId = null;
   state.activeTurnIdIsSynthetic = false;
+  clearPendingSyntheticTerminal(state);
   state.reasoningItemId = null;
   state.hasThinking = false;
   state.commandCalls.clear();
