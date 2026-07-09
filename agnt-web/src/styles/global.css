@@ -1934,6 +1934,15 @@ button {
   border: 1px solid var(--agnt-border);
   margin: 6px 0;
 }
+.agnt-md-svg-preview {
+  display: block;
+  width: min(100%, 640px);
+  height: clamp(220px, 42vw, 420px);
+  border: 1px solid var(--agnt-border);
+  border-radius: var(--agnt-radius-card);
+  margin: 6px 0;
+  background: var(--agnt-bg-subtle);
+}
 .agnt-md-image-placeholder {
   display: inline-block;
   padding: 4px 8px;

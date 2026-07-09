@@ -4,6 +4,17 @@ The web client is being built across a series of focused sessions. Each session
 delivers an end-to-end-usable slice; the foundation never gets restructured by a
 later session because the protocol and storage layers are already complete.
 
+## Session 41 — Hardened SVG workspace previews ✅ DONE
+
+- ✅ **Sandboxed SVG previews.** Workspace `.svg` artifacts and SVG data URLs now
+  render through `WorkspaceSvgPreview`, a sandboxed iframe backed by an offline
+  CSP document. External `href` / `xlink:href` / `src` references pointing at
+  `http(s)`, protocol-relative URLs, or `file:` are stripped before render, so
+  generated vector artifacts preview as artwork without inheriting the normal
+  browser image path's SVG execution surface.
+- 6 new vitest assertions across `workspace-svg-preview.test.ts` and
+  `markdown-inline.test.tsx`; focused tests, `tsc`, and Vite build pass.
+
 ## Session 1 — Foundation (this branch)
 
 - Faithful port of secure transport + handshake + JSON-RPC framing

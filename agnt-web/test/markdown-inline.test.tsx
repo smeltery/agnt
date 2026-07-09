@@ -53,6 +53,17 @@ describe("inline markdown — images", () => {
     expect(html).toContain("src=\"data:image/png;base64,iVBORw0KG\"");
   });
 
+  it("renders SVG data URLs in a sandboxed iframe", () => {
+    const dataUrl = "data:image/svg+xml;base64," + Buffer.from("<svg><image href=\"https://example.com/pixel.png\"/></svg>").toString("base64");
+    const html = render(`![vector](${dataUrl})`);
+
+    expect(html).toContain("<iframe");
+    expect(html).toContain("sandbox=\"\"");
+    expect(html).toContain("script-src &#x27;none&#x27;");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("https://example.com/pixel.png");
+  });
+
   it("refuses non-image data URIs", () => {
     const html = render("![evil](data:text/html,<script>x</script>)");
     expect(html).not.toContain("<img");

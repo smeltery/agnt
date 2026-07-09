@@ -13,6 +13,8 @@ import { copyText } from "../../lib/clipboard";
 import { useConnectionStore } from "../../state/connection-store";
 import { useLightboxStore } from "../../state/lightbox-store";
 import { selectImageState, useWorkspaceImageCache } from "../../state/workspace-image-cache";
+import { decodeSvgDataUrl, isSvgDataUrl, isSvgPath } from "../../lib/workspace-svg-preview";
+import { WorkspaceSvgPreview } from "./WorkspaceSvgPreview";
 
 // Mermaid lives in its own chunk via React.lazy so the mermaid library
 // (~150 KB gzip) only downloads when a diagram actually appears.
@@ -314,6 +316,19 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
       case "image":
         // Direct http/data sources go straight to <img>; non-web paths route
         // through workspace/readImage if we have a cwd to resolve against.
+        if (isSvgDataUrl(token.url)) {
+          const svgSource = decodeSvgDataUrl(token.url);
+          if (svgSource) {
+            return (
+              <WorkspaceSvgPreview
+                key={index}
+                source={svgSource}
+                alt={token.label || token.title || "SVG image"}
+                title={token.title ?? token.label}
+              />
+            );
+          }
+        }
         if (token.url.startsWith("http") || token.url.startsWith("data:")) {
           return (
             <img
@@ -377,6 +392,16 @@ function WorkspaceImage({ cwd, path, label, title }: WorkspaceImageProps) {
     );
   }
   if (cached && typeof cached === "object" && "dataUrl" in cached) {
+    const svgSource = isSvgPath(path) || isSvgDataUrl(cached.dataUrl) ? decodeSvgDataUrl(cached.dataUrl) : null;
+    if (svgSource) {
+      return (
+        <WorkspaceSvgPreview
+          source={svgSource}
+          alt={label || title || path}
+          title={title ?? path}
+        />
+      );
+    }
     return (
       <img
         src={cached.dataUrl}
