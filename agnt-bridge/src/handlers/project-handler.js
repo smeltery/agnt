@@ -15,6 +15,10 @@ const DEFAULT_DIRECTORY_SEARCH_LIMIT = 80;
 const DEFAULT_DIRECTORY_SEARCH_MAX_DEPTH = 8;
 const DEFAULT_DIRECTORY_SEARCH_MAX_VISITED = 5000;
 const DEFAULT_HIDDEN_DIRECTORY_NAMES = new Set(["Library"]);
+const ROOTLESS_CHAT_SLUG_MAX_TOKENS = 6;
+const ROOTLESS_CHAT_SLUG_MAX_LENGTH = 60;
+const ROOTLESS_CHAT_SLUG_FALLBACK = "new-chat";
+const ROOTLESS_CHAT_DEDUP_LIMIT = 50;
 
 // ─── ENTRY POINT ─────────────────────────────────────────────
 
@@ -39,6 +43,8 @@ async function handleProjectMethod(method, params, options = {}) {
       return projectValidatePath(params, options);
     case "project/createDirectory":
       return projectCreateDirectory(params, options);
+    case "project/createRootlessChatRoot":
+      return projectCreateRootlessChatRoot(params, options);
     default:
       throw projectError("unknown_method", `Unknown project method: ${method}`);
   }
@@ -173,6 +179,102 @@ async function projectCreateDirectory(params, options = {}) {
     parentPath: parent.path,
     name: path.basename(created.path),
   };
+}
+
+async function projectCreateRootlessChatRoot(params = {}, options = {}) {
+  const homeDir = resolveHomeDir(options);
+  const desktopDocumentsRoot = path.join(homeDir, "Documents", "Codex");
+  const dateFolder = readString(params.dateFolder) || formatRootlessChatDate(new Date());
+  if (!isISODateFolderName(dateFolder)) {
+    throw projectError("invalid_date_folder", "The chat date folder must be in YYYY-MM-DD format.");
+  }
+
+  const slugBase = rootlessChatSlugFromPromptHint(params.promptHint);
+  const dateRootPath = path.join(desktopDocumentsRoot, dateFolder);
+
+  try {
+    await fs.promises.mkdir(dateRootPath, { recursive: true });
+  } catch (error) {
+    throw projectError("create_failed", error?.message || "Unable to prepare the Codex chats folder.");
+  }
+
+  const targetPath = await reserveUniqueRootlessChatPath(dateRootPath, slugBase);
+  try {
+    await fs.promises.mkdir(targetPath, { recursive: false });
+  } catch (error) {
+    if (error?.code !== "EEXIST") {
+      throw projectError("create_failed", error?.message || "Unable to create the rootless chat folder.");
+    }
+  }
+
+  const resolvedPath = await safeRealpath(targetPath);
+  return {
+    path: resolvedPath,
+    parentPath: dateRootPath,
+    name: path.basename(resolvedPath),
+    slug: slugBase,
+    dateFolder,
+    root: desktopDocumentsRoot,
+  };
+}
+
+function rootlessChatSlugFromPromptHint(rawPromptHint) {
+  const hint = typeof rawPromptHint === "string" ? rawPromptHint.normalize("NFKD") : "";
+  const sanitized = hint
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, " ")
+    .trim();
+  if (!sanitized) {
+    return ROOTLESS_CHAT_SLUG_FALLBACK;
+  }
+
+  const tokens = sanitized
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, ROOTLESS_CHAT_SLUG_MAX_TOKENS);
+  if (!tokens.length) {
+    return ROOTLESS_CHAT_SLUG_FALLBACK;
+  }
+
+  let slug = tokens.join("-");
+  if (slug.length > ROOTLESS_CHAT_SLUG_MAX_LENGTH) {
+    slug = slug.slice(0, ROOTLESS_CHAT_SLUG_MAX_LENGTH).replace(/-+$/g, "");
+  }
+  return slug || ROOTLESS_CHAT_SLUG_FALLBACK;
+}
+
+async function reserveUniqueRootlessChatPath(parentDirectory, slugBase) {
+  for (let attempt = 0; attempt < ROOTLESS_CHAT_DEDUP_LIMIT; attempt += 1) {
+    const candidateSlug = attempt === 0 ? slugBase : `${slugBase}-${attempt + 1}`;
+    const candidatePath = path.join(parentDirectory, candidateSlug);
+    try {
+      await fs.promises.access(candidatePath, fs.constants.F_OK);
+    } catch {
+      return candidatePath;
+    }
+  }
+
+  return path.join(parentDirectory, `${slugBase}-${Date.now()}`);
+}
+
+function formatRootlessChatDate(date) {
+  const year = date.getFullYear().toString().padStart(4, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isISODateFolderName(value) {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}$/u.test(value);
+}
+
+async function safeRealpath(candidatePath) {
+  try {
+    return await fs.promises.realpath(candidatePath);
+  } catch {
+    return path.resolve(candidatePath);
+  }
 }
 
 // ─── Filesystem Helpers ──────────────────────────────────────
@@ -498,5 +600,7 @@ module.exports = {
   projectSearchDirectories,
   projectValidatePath,
   projectCreateDirectory,
+  projectCreateRootlessChatRoot,
+  rootlessChatSlugFromPromptHint,
   validateDirectory,
 };
