@@ -100,6 +100,7 @@ cases=(
   "secure|push||agnt-web/src/crypto/transcript.ts|false|true|true|false|agnt-bridge agnt-web"
   "flox_config|push||.flox/env/manifest.toml|false|true|false|false|agnt-bridge relay agnt-web agnt-host"
   "flox_action|push||.github/actions/setup-flox/action.yml|true|true|false|false|agnt-bridge relay agnt-web agnt-host"
+  "bun_action|push||.github/actions/run-bun-package-ci/action.yml|true|false|false|false|agnt-bridge relay agnt-web agnt-host"
   "android_action|push||.github/actions/run-android-ci/action.yml|true|true|false|false|"
   "ios_action|push||.github/actions/build-unsigned-ios-ipa/action.yml|true|false|true|false|"
   "link_action|push||.github/actions/run-link-check/action.yml|true|false|false|true|"

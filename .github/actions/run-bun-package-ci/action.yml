@@ -1,0 +1,70 @@
+name: Run Bun package CI
+description: Install and run CI for the selected Bun package surfaces.
+
+inputs:
+  packages:
+    description: JSON array of package CI descriptors from detect-ci-changes.sh.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Flox
+      uses: ./.github/actions/setup-flox
+
+    - name: Run selected Bun package CI
+      shell: bash
+      env:
+        BUN_PACKAGES: ${{ inputs.packages }}
+      run: |
+        set -euo pipefail
+
+        flox activate -d "$GITHUB_WORKSPACE" -- bun --version
+
+        jq -c '.[]' <<< "$BUN_PACKAGES" | while read -r package; do
+          name="$(jq -r '.name' <<< "$package")"
+          working_directory="$(jq -r '."working-directory"' <<< "$package")"
+          frozen_lockfile="$(jq -r '."frozen-lockfile"' <<< "$package")"
+          audit="$(jq -r '.audit' <<< "$package")"
+
+          if [[ ! "$working_directory" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Unsafe package working directory: $working_directory" >&2
+            exit 1
+          fi
+
+          install_args=()
+          if [[ "$frozen_lockfile" == "true" ]]; then
+            install_args+=(--frozen-lockfile)
+          fi
+
+          echo "::group::$name install"
+          for attempt in 1 2 3; do
+            if (
+              cd "$working_directory"
+              timeout --kill-after=30s 240s flox activate -d "$GITHUB_WORKSPACE" -- bun install "${install_args[@]}"
+            ); then
+              break
+            fi
+            if [[ "$attempt" == "3" ]]; then
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+          echo "::endgroup::"
+
+          if [[ "$audit" == "true" ]]; then
+            echo "::group::$name audit"
+            (
+              cd "$working_directory"
+              timeout --kill-after=30s 120s flox activate -d "$GITHUB_WORKSPACE" -- bun audit
+            ) || true
+            echo "::endgroup::"
+          fi
+
+          echo "::group::$name ci"
+          (
+            cd "$working_directory"
+            flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
+          )
+          echo "::endgroup::"
+        done

@@ -55,11 +55,12 @@ set_output() {
 ci_config='^(\.github/workflows/|\.github/actions/|\.github/scripts/|\.github/actionlint\.ya?ml)'
 link_check_action='^\.github/actions/run-link-check/'
 setup_flox_action='^\.github/actions/setup-flox/'
+bun_ci_action='^\.github/actions/run-bun-package-ci/'
 android_ci_action='^\.github/actions/run-android-ci/'
 ios_ipa_action='^\.github/actions/build-unsigned-ios-ipa/'
 flox_config='^\.flox/'
 flox_common="$flox_config|$setup_flox_action"
-bun_common="$flox_common"
+bun_common="$flox_common|$bun_ci_action"
 secure_bridge='^agnt-bridge/src/(transport/)?secure-transport\.js'
 secure_web='^agnt-web/src/crypto/'
 secure_ios='^(AgntMobile/AgntMobile/Core/Networking/CodexSecureTransportModels\.swift|AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService\+SecureTransport\.swift)'
