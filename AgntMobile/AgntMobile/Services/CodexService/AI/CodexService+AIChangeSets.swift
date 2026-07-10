@@ -401,9 +401,40 @@ extension CodexService {
     }
 
     // Recovers legacy fallback change-set ledgers from persisted file-change message diff fences.
-    // No-op on agnt for now; full migration helper (depends on persistedFileChangePatches +
-    // unifiedDiffCodeBlocks) is not yet ported. Legacy users will need to recreate change sets.
-    func rehydrateLegacyFallbackChangeSetsFromPersistedMessages() {}
+    func rehydrateLegacyFallbackChangeSetsFromPersistedMessages() {
+        var didChange = false
+
+        for changeSetId in Array(aiChangeSetsByID.keys) {
+            guard var changeSet = aiChangeSetsByID[changeSetId],
+                  changeSet.source == .fileChangeFallback,
+                  changeSet.fallbackPatchBatches.isEmpty,
+                  changeSet.status != .reverted else {
+                continue
+            }
+
+            let patches = persistedFileChangePatches(threadId: changeSet.threadId, turnId: changeSet.turnId)
+            guard !patches.isEmpty else { continue }
+
+            for patch in patches {
+                let analysis = AIUnifiedPatchParser.analyze(patch)
+                appendFallbackPatchBatch(
+                    patch: patch,
+                    analysis: analysis,
+                    to: &changeSet
+                )
+            }
+
+            changeSet.status = .collecting
+            aiChangeSetsByID[changeSetId] = changeSet
+            finalizeChangeSetIfPossible(changeSetId: changeSetId)
+            didChange = true
+        }
+
+        if didChange {
+            persistAIChangeSets()
+            invalidateAssistantRevertStatesWithoutRefresh()
+        }
+    }
 }
 
 private extension CodexService {
@@ -579,12 +610,14 @@ private extension CodexService {
             turnId: changeSet.turnId
         )
 
-        if changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !hasRevertPatchPayload(changeSet) {
             changeSet.status = .notRevertable
             changeSet.unsupportedReasons = ["This response cannot be auto-reverted because no exact patch was captured."]
-        } else if changeSet.source == .fileChangeFallback && changeSet.fallbackPatchCount > 1 {
+        } else if changeSet.source == .fileChangeFallback
+                    && changeSet.fallbackPatchBatches.isEmpty
+                    && changeSet.fallbackPatchCount > 1 {
             changeSet.status = .notRevertable
-            changeSet.unsupportedReasons = ["This response emitted multiple file-change patches, so v1 cannot safely auto-revert it."]
+            changeSet.unsupportedReasons = ["This response was captured before ordered patch batches were stored, so it cannot be safely auto-reverted."]
         } else if !changeSet.unsupportedReasons.isEmpty || changeSet.fileChanges.isEmpty {
             changeSet.status = .notRevertable
         } else {
@@ -617,6 +650,52 @@ private extension CodexService {
         messagesByThread[threadId]?.last(where: { message in
             message.role == .assistant && message.turnId == turnId
         })?.id
+    }
+
+    func persistedFileChangePatches(threadId: String, turnId: String) -> [String] {
+        let messages = messagesByThread[threadId] ?? []
+        return messages
+            .filter { message in
+                message.kind == .fileChange && message.turnId == turnId
+            }
+            .sorted { lhs, rhs in
+                lhs.orderIndex < rhs.orderIndex
+            }
+            .flatMap { message in
+                unifiedDiffCodeBlocks(in: message.text)
+            }
+    }
+
+    func unifiedDiffCodeBlocks(in text: String) -> [String] {
+        var blocks: [String] = []
+        var currentLines: [String] = []
+        var isCollectingDiff = false
+
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedLine.hasPrefix("```") {
+                if isCollectingDiff {
+                    let patch = currentLines.joined(separator: "\n")
+                    if patch.contains("diff --git"),
+                       let normalizedPatch = normalizedUnifiedPatchPayload(patch) {
+                        blocks.append(normalizedPatch)
+                    }
+                    currentLines = []
+                    isCollectingDiff = false
+                    continue
+                }
+
+                let fenceLanguage = trimmedLine.dropFirst(3).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                isCollectingDiff = fenceLanguage == "diff" || fenceLanguage == "patch"
+                continue
+            }
+
+            if isCollectingDiff {
+                currentLines.append(line)
+            }
+        }
+
+        return blocks
     }
 
     func normalizedWorkingDirectory(_ rawValue: String?) -> String? {

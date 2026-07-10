@@ -325,7 +325,7 @@ final class AIChangeSetTests: XCTestCase {
         XCTAssertFalse(changeSet.forwardUnifiedPatch.contains("Sources/B.swift"))
     }
 
-    func testMultipleFallbackPatchesStayNotRevertable() {
+    func testMultipleFallbackPatchesStayRevertableAsOrderedBatches() throws {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"
         let turnID = "turn-\(UUID().uuidString)"
@@ -366,14 +366,94 @@ final class AIChangeSetTests: XCTestCase {
         service.noteTurnFinished(threadId: threadID, turnId: turnID)
 
         let assistantMessage = try XCTUnwrap(service.messages(for: threadID).last(where: { $0.role == .assistant }))
-        let changeSet = try XCTUnwrap(service.aiChangeSet(forAssistantMessage: assistantMessage))
+        let changeSet = try XCTUnwrap(service.readyChangeSet(forAssistantMessage: assistantMessage))
 
-        XCTAssertEqual(changeSet.status, .notRevertable)
-        XCTAssertTrue(
-            changeSet.unsupportedReasons.contains(
-                "This response emitted multiple file-change patches, so v1 cannot safely auto-revert it."
+        XCTAssertEqual(changeSet.status, .ready)
+        XCTAssertEqual(changeSet.fallbackPatchCount, 2)
+        XCTAssertEqual(changeSet.fallbackPatchBatches.map { $0.fileChanges.first?.path }, ["Sources/A.swift", "Sources/B.swift"])
+        XCTAssertTrue(changeSet.unsupportedReasons.isEmpty)
+    }
+
+    func testLegacyFallbackChangeSetRehydratesBatchesFromPersistedFileChanges() throws {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let changeSetID = "change-set-\(UUID().uuidString)"
+
+        service.completeAssistantMessage(
+            threadId: threadID,
+            turnId: turnID,
+            itemId: nil,
+            text: "Made several edits."
+        )
+        let assistantMessage = try XCTUnwrap(service.messages(for: threadID).last(where: { $0.role == .assistant }))
+
+        service.messagesByThread[threadID, default: []].append(
+            CodexMessage(
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: """
+                Applied patch:
+
+                ```diff
+                diff --git a/Sources/A.swift b/Sources/A.swift
+                index 1111111..2222222 100644
+                --- a/Sources/A.swift
+                +++ b/Sources/A.swift
+                @@ -1 +1,2 @@
+                 let a = 1
+                +let b = 2
+                ```
+                """,
+                turnId: turnID,
+                orderIndex: 10
             )
         )
+        service.messagesByThread[threadID, default: []].append(
+            CodexMessage(
+                threadId: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: """
+                Applied patch:
+
+                ```patch
+                diff --git a/Sources/B.swift b/Sources/B.swift
+                index 3333333..4444444 100644
+                --- a/Sources/B.swift
+                +++ b/Sources/B.swift
+                @@ -1 +1,2 @@
+                 let c = 3
+                +let d = 4
+                ```
+                """,
+                turnId: turnID,
+                orderIndex: 11
+            )
+        )
+        service.recordTurnTerminalState(threadId: threadID, turnId: turnID, state: .completed)
+        service.aiChangeSetsByID[changeSetID] = AIChangeSet(
+            id: changeSetID,
+            repoRoot: "/tmp/repo",
+            threadId: threadID,
+            turnId: turnID,
+            assistantMessageId: assistantMessage.id,
+            status: .notRevertable,
+            source: .fileChangeFallback,
+            fallbackPatchCount: 2
+        )
+        service.aiChangeSetIDByTurnKey[AIChangeSetTurnKey(threadId: threadID, turnId: turnID)!] = changeSetID
+        service.aiChangeSetIDByAssistantMessageID[assistantMessage.id] = changeSetID
+
+        service.rehydrateLegacyFallbackChangeSetsFromPersistedMessages()
+
+        let changeSet = try XCTUnwrap(service.readyChangeSet(forAssistantMessage: assistantMessage))
+        XCTAssertEqual(changeSet.status, .ready)
+        XCTAssertEqual(changeSet.fallbackPatchCount, 2)
+        XCTAssertEqual(changeSet.fallbackPatchBatches.map { $0.fileChanges.first?.path }, ["Sources/A.swift", "Sources/B.swift"])
+        XCTAssertTrue(changeSet.forwardUnifiedPatch.contains("Sources/A.swift"))
+        XCTAssertTrue(changeSet.forwardUnifiedPatch.contains("Sources/B.swift"))
     }
 
     func testAssistantRevertPresentationIsSafeForDistinctFilesInSameRepo() {
@@ -556,10 +636,11 @@ final class AIChangeSetTests: XCTestCase {
         XCTAssertFalse(presentation.isEnabled)
     }
 
-    func testAssistantRevertPresentationBlocksNotRevertableResponse() {
+    func testAssistantRevertPresentationBlocksLegacyFallbackWithoutBatches() throws {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"
         let turnID = "turn-\(UUID().uuidString)"
+        let changeSetID = "change-set-\(UUID().uuidString)"
 
         service.completeAssistantMessage(
             threadId: threadID,
@@ -567,36 +648,34 @@ final class AIChangeSetTests: XCTestCase {
             itemId: nil,
             text: "Made several edits."
         )
-        service.recordFallbackFileChangePatch(
-            threadId: threadID,
-            turnId: turnID,
-            patch: """
-            diff --git a/Sources/A.swift b/Sources/A.swift
-            index 1111111..2222222 100644
-            --- a/Sources/A.swift
-            +++ b/Sources/A.swift
-            @@ -1 +1,2 @@
-             let a = 1
-            +let b = 2
-            """
-        )
-        service.recordFallbackFileChangePatch(
-            threadId: threadID,
-            turnId: turnID,
-            patch: """
-            diff --git a/Sources/B.swift b/Sources/B.swift
-            index 3333333..4444444 100644
-            --- a/Sources/B.swift
-            +++ b/Sources/B.swift
-            @@ -1 +1,2 @@
-             let c = 3
-            +let d = 4
-            """
-        )
-        service.recordTurnTerminalState(threadId: threadID, turnId: turnID, state: .completed)
-        service.noteTurnFinished(threadId: threadID, turnId: turnID)
-
         let assistantMessage = try XCTUnwrap(service.messages(for: threadID).last(where: { $0.role == .assistant }))
+        service.recordTurnTerminalState(threadId: threadID, turnId: turnID, state: .completed)
+        service.aiChangeSetsByID[changeSetID] = AIChangeSet(
+            id: changeSetID,
+            repoRoot: "/tmp/repo",
+            threadId: threadID,
+            turnId: turnID,
+            assistantMessageId: assistantMessage.id,
+            status: .notRevertable,
+            source: .fileChangeFallback,
+            forwardUnifiedPatch: "legacy patch body",
+            fileChanges: [
+                AIFileChange(
+                    path: "Sources/A.swift",
+                    kind: .update,
+                    additions: 1,
+                    deletions: 0,
+                    isBinary: false,
+                    isRenameOrModeOnly: false,
+                    beforeContentHash: nil,
+                    afterContentHash: nil
+                )
+            ],
+            fallbackPatchCount: 2
+        )
+        service.aiChangeSetIDByTurnKey[AIChangeSetTurnKey(threadId: threadID, turnId: turnID)!] = changeSetID
+        service.aiChangeSetIDByAssistantMessageID[assistantMessage.id] = changeSetID
+        service.noteTurnFinished(threadId: threadID, turnId: turnID)
         let presentation = try XCTUnwrap(
             service.assistantRevertPresentation(for: assistantMessage, workingDirectory: "/tmp/repo")
         )
