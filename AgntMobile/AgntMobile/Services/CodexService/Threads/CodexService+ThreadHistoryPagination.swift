@@ -27,6 +27,7 @@ enum ThreadHistoryHydrationPolicy {
 struct ThreadTurnsHistoryPage {
     let turns: [JSONValue]
     let nextCursor: JSONValue
+    let isProvisionalJsonlFallback: Bool
 }
 
 extension CodexService {
@@ -35,7 +36,8 @@ extension CodexService {
         threadId: String,
         limit: Int,
         cursor: JSONValue?,
-        timeoutNanoseconds: UInt64
+        timeoutNanoseconds: UInt64,
+        requireCanonical: Bool = false
     ) async throws -> ThreadTurnsHistoryPage {
         var params: RPCObject = [
             "threadId": .string(threadId),
@@ -44,6 +46,9 @@ extension CodexService {
         ]
         if let cursor, cursorHasValue(cursor) {
             params["cursor"] = cursor
+        }
+        if requireCanonical {
+            params["agntRequireCanonical"] = .bool(true)
         }
 
         let response = try await sendRequest(
@@ -65,21 +70,26 @@ extension CodexService {
 
         return ThreadTurnsHistoryPage(
             turns: turns,
-            nextCursor: threadTurnsListCursor(from: resultObject)
+            nextCursor: threadTurnsListCursor(from: resultObject),
+            isProvisionalJsonlFallback: resultObject["agntJsonlFallback"]?.boolValue == true
         )
     }
 
     // Starts with Litter-sized pages so long chats always expose older history through a real cursor.
-    func fetchInitialThreadTurnsHistoryPage(threadId: String) async throws -> ThreadTurnsHistoryPage {
+    func fetchInitialThreadTurnsHistoryPage(
+        threadId: String,
+        requireCanonical: Bool = false
+    ) async throws -> ThreadTurnsHistoryPage {
         let startedAt = Date()
         let page = try await fetchThreadTurnsHistoryPage(
             threadId: threadId,
             limit: ThreadHistoryHydrationPolicy.initialTurnPageSize,
             cursor: nil,
-            timeoutNanoseconds: ThreadHistoryHydrationPolicy.initialPageSoftTimeoutNanoseconds
+            timeoutNanoseconds: ThreadHistoryHydrationPolicy.initialPageSoftTimeoutNanoseconds,
+            requireCanonical: requireCanonical
         )
         let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-        debugSyncLog("thread/turns/list initial thread=\(threadId) limit=\(ThreadHistoryHydrationPolicy.initialTurnPageSize) turns=\(page.turns.count) hasNextCursor=\(cursorHasValue(page.nextCursor)) elapsedMs=\(elapsedMs)")
+        debugSyncLog("thread/turns/list initial thread=\(threadId) limit=\(ThreadHistoryHydrationPolicy.initialTurnPageSize) turns=\(page.turns.count) provisional=\(page.isProvisionalJsonlFallback) hasNextCursor=\(cursorHasValue(page.nextCursor)) elapsedMs=\(elapsedMs)")
         return page
     }
 
@@ -376,10 +386,36 @@ extension CodexService {
 
     // Fails open after a chat-load timeout but leaves a retryable reconcile trail behind.
     func markThreadHistoryDeferredAfterTimeout(threadId: String) {
-        hydratedThreadIDs.insert(threadId)
-        initialTurnsLoadedByThreadID.insert(threadId)
-        if activeThreadId == threadId, (messagesByThread[threadId]?.isEmpty ?? true) {
-            lastErrorMessage = "Couldn't load this chat yet. Retrying in the background."
+        markThreadHistoryDeferred(
+            threadId: threadId,
+            activeErrorMessage: "Couldn't load this chat yet. Retrying in the background."
+        )
+    }
+
+    // Empty first pages are suspicious for existing chats; keep retrying until
+    // the bridge returns authoritative history or the thread is proven blank.
+    func markThreadHistoryDeferredAfterEmptyPage(threadId: String) {
+        markThreadHistoryDeferred(
+            threadId: threadId,
+            activeErrorMessage: "Couldn't verify this chat's history yet. Retrying in the background."
+        )
+    }
+
+    func markThreadHistoryDeferredAfterUnavailablePage(threadId: String) {
+        markThreadHistoryDeferred(
+            threadId: threadId,
+            activeErrorMessage: "Couldn't retrieve this chat's history yet. Retrying in the background."
+        )
+    }
+
+    private func markThreadHistoryDeferred(threadId: String, activeErrorMessage: String) {
+        let hasCachedMessages = !(messagesByThread[threadId]?.isEmpty ?? true)
+        if hasCachedMessages {
+            hydratedThreadIDs.insert(threadId)
+            initialTurnsLoadedByThreadID.insert(threadId)
+        }
+        if activeThreadId == threadId, !hasCachedMessages {
+            lastErrorMessage = activeErrorMessage
         } else {
             olderHistoryLoadErrorByThreadID[threadId] = "Couldn't load earlier messages. Tap to retry."
         }
@@ -390,7 +426,7 @@ extension CodexService {
     func clearDeferredThreadHistoryErrorIfNeeded(threadId: String) {
         olderHistoryLoadErrorByThreadID.removeValue(forKey: threadId)
         if activeThreadId == threadId,
-           lastErrorMessage == "Couldn't load this chat yet. Retrying in the background." {
+           lastErrorMessage?.hasSuffix("Retrying in the background.") == true {
             lastErrorMessage = nil
         }
     }
@@ -649,5 +685,12 @@ extension CodexService {
                 || message.localizedCaseInsensitiveContains("thread/turns/list")
         )
             && message.localizedCaseInsensitiveContains("timed out")
+    }
+
+    func shouldDeferThreadHistoryAfterBridgeFailure(_ error: CodexServiceError) -> Bool {
+        guard case .rpcError(let rpcError) = error else {
+            return false
+        }
+        return rpcError.data?.objectValue?["errorCode"]?.stringValue == "thread_turns_list_failed"
     }
 }

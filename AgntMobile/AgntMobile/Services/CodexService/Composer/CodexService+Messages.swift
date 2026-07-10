@@ -53,14 +53,22 @@ extension CodexService {
         case loadedCanonicalHistory
         case loadedRecentWindow
         case loadedPaginatedWindow
+        case loadedProvisionalPaginatedWindow
         case deferredAfterTimeout
+        case deferredAfterEmptyPage
+        case deferredAfterUnavailablePage
 
         var didCompleteCanonicalReconcile: Bool {
             self == .loadedCanonicalHistory
         }
 
         var needsCanonicalRetry: Bool {
-            self == .loadedRecentWindow || self == .skippedForRunningThread
+            self == .loadedRecentWindow
+                || self == .loadedProvisionalPaginatedWindow
+                || self == .skippedForRunningThread
+                || self == .deferredAfterTimeout
+                || self == .deferredAfterEmptyPage
+                || self == .deferredAfterUnavailablePage
         }
     }
 
@@ -158,6 +166,25 @@ extension CodexService {
         return thread.displayTitle == CodexThread.defaultDisplayTitle
     }
 
+    // Treat an empty paginated response as provisional when local evidence says
+    // this thread should already have visible history.
+    func shouldDeferEmptyThreadHistoryPage(
+        threadId: String,
+        loadedViaPagination: Bool
+    ) -> Bool {
+        guard loadedViaPagination else {
+            return false
+        }
+
+        if messagesByThread[threadId]?.isEmpty == false {
+            return true
+        }
+
+        let preview = (thread(for: threadId)?.preview ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return !preview.isEmpty
+    }
+
     // A freshly started thread has metadata but no server history until the
     // first user message materializes it. Treat that as an empty composer state.
     func shouldTreatAsEmptyUnmaterializedThreadHistory(
@@ -221,6 +248,7 @@ extension CodexService {
         cancelPendingStreamingDeltaFlushes(for: threadId)
         threadsPendingCompletionHaptic.remove(threadId)
         threadsNeedingCanonicalHistoryReconcile.remove(threadId)
+        provisionalPaginatedHistoryThreadIDs.remove(threadId)
         canonicalHistoryReconcileRetryAttemptByThreadID.removeValue(forKey: threadId)
         threadsWithSatisfiedDeferredHistoryHydration.remove(threadId)
         olderThreadHistoryCursorByThreadID.removeValue(forKey: threadId)
@@ -250,6 +278,7 @@ extension CodexService {
         projectedTerminalStateByThreadID.removeAll()
         cancelAllPendingStreamingDeltaFlushes()
         threadsNeedingCanonicalHistoryReconcile.removeAll()
+        provisionalPaginatedHistoryThreadIDs.removeAll()
         canonicalHistoryReconcileRetryAttemptByThreadID.removeAll()
         threadsWithSatisfiedDeferredHistoryHydration.removeAll()
         olderThreadHistoryCursorByThreadID.removeAll()
@@ -980,9 +1009,15 @@ extension CodexService {
         let task = Task<ThreadHistoryLoadOutcome, Error> { @MainActor in
             let hadInitialTurnsLoadedBeforeRefresh = initialTurnsLoadedByThreadID.contains(threadId)
             let hadAuthoritativeLocalStartBeforeRefresh = hasAuthoritativeLocalHistoryStart(threadId: threadId)
+            let hadProvisionalPaginatedHistoryBeforeRefresh = provisionalPaginatedHistoryThreadIDs.contains(threadId)
+            let requiresCanonicalPaginatedHistory = hadProvisionalPaginatedHistoryBeforeRefresh
+                || threadsNeedingCanonicalHistoryReconcile.contains(threadId)
             let initialTurnsTask = supportsTurnPagination
                 ? Task { @MainActor in
-                    try await self.fetchInitialThreadTurnsHistoryPage(threadId: threadId)
+                    try await self.fetchInitialThreadTurnsHistoryPage(
+                        threadId: threadId,
+                        requireCanonical: requiresCanonicalPaginatedHistory
+                    )
                 }
                 : nil
             loadingThreadIDs.insert(threadId)
@@ -1071,25 +1106,33 @@ extension CodexService {
             }
 
             var loadedViaPagination = false
+            var loadedProvisionalJsonlFallback = false
             if supportsTurnPagination {
                 do {
                     let turnsPage: ThreadTurnsHistoryPage
                     if let initialTurnsTask {
                         turnsPage = try await initialTurnsTask.value
                     } else {
-                        turnsPage = try await fetchInitialThreadTurnsHistoryPage(threadId: threadId)
+                        turnsPage = try await fetchInitialThreadTurnsHistoryPage(
+                            threadId: threadId,
+                            requireCanonical: requiresCanonicalPaginatedHistory
+                        )
                     }
                     loadedViaPagination = true
+                    loadedProvisionalJsonlFallback = turnsPage.isProvisionalJsonlFallback
                     let shouldSeedInitialCursor = !hadInitialTurnsLoadedBeforeRefresh
+                        || hadProvisionalPaginatedHistoryBeforeRefresh
                         || (
                             !hasRemoteOlderThreadHistoryCursor(threadId: threadId)
                                 && !hadAuthoritativeLocalStartBeforeRefresh
                         )
-                    updateOlderThreadHistoryCursorFromInitialPage(
-                        threadId: threadId,
-                        cursor: turnsPage.nextCursor,
-                        isFreshInitialLoad: shouldSeedInitialCursor
-                    )
+                    if !loadedProvisionalJsonlFallback {
+                        updateOlderThreadHistoryCursorFromInitialPage(
+                            threadId: threadId,
+                            cursor: turnsPage.nextCursor,
+                            isFreshInitialLoad: shouldSeedInitialCursor
+                        )
+                    }
                     threadObject["turns"] = .array(chronologicalTurnsFromDescendingPage(turnsPage.turns))
                 } catch let error as CodexServiceError {
                     if shouldTreatAsEmptyUnmaterializedThreadHistory(
@@ -1112,6 +1155,11 @@ extension CodexService {
                         markThreadHistoryDeferredAfterTimeout(threadId: threadId)
                         debugSyncLog("thread/turns/list timed out for thread=\(threadId); showing local timeline while history is deferred")
                         return .deferredAfterTimeout
+                    }
+                    if shouldDeferThreadHistoryAfterBridgeFailure(error) {
+                        markThreadHistoryDeferredAfterUnavailablePage(threadId: threadId)
+                        debugSyncLog("bridge could not supply thread/turns/list for thread=\(threadId); keeping local timeline while history retries")
+                        return .deferredAfterUnavailablePage
                     }
                     if consumeUnsupportedTurnPagination(error, attemptedMethod: "thread/turns/list") {
                         do {
@@ -1181,6 +1229,16 @@ extension CodexService {
                 terminalStatesByTurnID: historyTerminalStates
             )
             let historyMessages = decodeMessagesFromThreadRead(threadId: threadId, threadObject: threadObject)
+            let isSuspiciousEmptyHistory = historyMessages.isEmpty
+                && shouldDeferEmptyThreadHistoryPage(
+                    threadId: threadId,
+                    loadedViaPagination: loadedViaPagination
+                )
+            if isSuspiciousEmptyHistory {
+                markThreadHistoryDeferredAfterEmptyPage(threadId: threadId)
+                debugSyncLog("thread history returned no visible rows despite prior-content evidence thread=\(threadId); keeping cached timeline and retrying")
+                return .deferredAfterEmptyPage
+            }
             registerSubagentThreads(from: historyMessages, parentThreadId: threadId)
             if loadedViaPagination {
                 seedThreadTimelineProjectionForPaginatedHistory(
@@ -1192,7 +1250,9 @@ extension CodexService {
                 updateThreadTimelineProjectionForEmbeddedHistory(threadId: threadId, decodedMessageCount: historyMessages.count)
             }
             var outcome: ThreadHistoryLoadOutcome = loadedViaPagination
-                ? .loadedPaginatedWindow
+                ? (loadedProvisionalJsonlFallback
+                    ? .loadedProvisionalPaginatedWindow
+                    : .loadedPaginatedWindow)
                 : .loadedCanonicalHistory
             if !historyMessages.isEmpty {
                 let existingMessages = messagesByThread[threadId] ?? []
@@ -1254,8 +1314,19 @@ extension CodexService {
                 } else if outcome.didCompleteCanonicalReconcile, !threadHasActiveOrRunningTurn(threadId) {
                     markThreadCanonicalHistoryReconciled(threadId)
                 }
+                if loadedProvisionalJsonlFallback {
+                    provisionalPaginatedHistoryThreadIDs.insert(threadId)
+                    markThreadNeedingCanonicalHistoryReconcile(threadId)
+                } else if loadedViaPagination {
+                    provisionalPaginatedHistoryThreadIDs.remove(threadId)
+                }
             } else if didUpdateTerminalStates {
                 refreshThreadTimelineState(for: threadId)
+            } else if loadedProvisionalJsonlFallback {
+                provisionalPaginatedHistoryThreadIDs.insert(threadId)
+                markThreadNeedingCanonicalHistoryReconcile(threadId)
+            } else if loadedViaPagination {
+                provisionalPaginatedHistoryThreadIDs.remove(threadId)
             }
 
             guard !Task.isCancelled,

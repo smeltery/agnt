@@ -612,6 +612,9 @@ final class CodexService {
     @ObservationIgnored var lastForcedRunningResumeAtByThread: [String: Date] = [:]
     // Marks threads that used a lightweight running catch-up and still need one canonical history pass later.
     @ObservationIgnored var threadsNeedingCanonicalHistoryReconcile: Set<String> = []
+    // Tracks first-paint pages rebuilt from local Codex JSONL so the next
+    // quiet refresh asks the bridge for canonical app-server history.
+    @ObservationIgnored var provisionalPaginatedHistoryThreadIDs: Set<String> = []
     // Remembers which large closed chats already completed the one required canonical refresh after local-first paint.
     @ObservationIgnored var threadsWithSatisfiedDeferredHistoryHydration: Set<String> = []
     // Keeps post-run canonical reconcile work coalesced to one task per thread.

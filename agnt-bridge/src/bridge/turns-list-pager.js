@@ -296,7 +296,8 @@ function maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, respons
   const params = request?.params || {};
   const threadId = normalizeNonEmptyString(params.threadId)
     || normalizeNonEmptyString(params.thread_id);
-  if (!threadId || hasRelayCursor(params.cursor)) {
+  const requireCanonical = params.agntRequireCanonical === true;
+  if (!threadId || hasRelayCursor(params.cursor) || requireCanonical) {
     return null;
   }
 
