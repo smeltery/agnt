@@ -26,7 +26,15 @@ runs:
         if [[ "${{ inputs.frozen-lockfile }}" == "true" ]]; then
           args+=(--frozen-lockfile)
         fi
-        timeout --kill-after=30s 240s flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"
+        for attempt in 1 2 3; do
+          if timeout --kill-after=30s 240s flox activate -d "$GITHUB_WORKSPACE" -- bun install "${args[@]}"; then
+            exit 0
+          fi
+          if [[ "$attempt" == "3" ]]; then
+            exit 1
+          fi
+          sleep $((attempt * 10))
+        done
 
     - name: Audit package dependencies
       if: inputs.audit == 'true'
