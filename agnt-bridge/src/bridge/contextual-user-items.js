@@ -3,13 +3,14 @@
 //          but clients should not render as chat bubbles.
 // Layer: Bridge support
 // Exports: isContextualUserText, isUserRoleHistoryItem, historyItemUserText,
-//          visibleUserPromptText
+//          visibleUserPromptText, visibleUserPromptFromInputEntries
 
 const {
   isContextualUserText,
   isUserRoleItem,
   readUserItemText,
   sanitizeUserRoleItem,
+  visibleUserPromptFromInputEntries,
   visibleUserPromptText,
 } = require("../desktop/desktop-ipc-shared");
 
@@ -26,5 +27,6 @@ module.exports = {
   isContextualUserText,
   isUserRoleHistoryItem,
   sanitizeUserRoleItem,
+  visibleUserPromptFromInputEntries,
   visibleUserPromptText,
 };

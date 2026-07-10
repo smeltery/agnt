@@ -11,7 +11,9 @@ const {
   findRecentRolloutFileForContextRead,
   resolveSessionsRoot,
 } = require("./rollout-watch");
-const { visibleUserPromptText } = require("../bridge/contextual-user-items");
+const {
+  visibleUserPromptFromInputEntries,
+} = require("../bridge/contextual-user-items");
 const { resolveCodexGeneratedImagesRoot } = require("../providers/codex/home");
 const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
 const { hasVisiblePlanUpdate } = require("./desktop-ipc-shared");
@@ -515,9 +517,7 @@ function synthesizeNotificationsFromRolloutEntry(entry, state, options = {}) {
     }
 
     if (eventType === "user_message") {
-      const message = visibleUserPromptText(
-        readString(payload.message) || readString(payload.text)
-      );
+      const message = rolloutUserPromptText(payload);
       if (!message) {
         return [];
       }
@@ -1380,10 +1380,21 @@ function flushPendingUserMessageNotifications(state, turnId) {
   return messages.map((pending) => createNotification("codex/event/user_message", {
     threadId: state.threadId,
     ...(resolvedTurnId ? { turnId: resolvedTurnId } : {}),
-    message: visibleUserPromptText(pending.message),
+    message: visibleUserPromptFromInputEntries(pending.message),
     ...(pending.id ? { id: pending.id } : {}),
     ...timestampParams(pending.timestamp),
   })).filter((notification) => notification.params.message);
+}
+
+function rolloutUserPromptText(payload = {}) {
+  const candidates = [payload.message, payload.text, payload.input];
+  for (const candidate of candidates) {
+    const message = visibleUserPromptFromInputEntries(candidate);
+    if (message) {
+      return message;
+    }
+  }
+  return "";
 }
 
 function readUserMessageTimestamp(entry, payload = {}) {

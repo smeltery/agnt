@@ -1941,6 +1941,61 @@ Only show this prompt`),
   assert.equal(userNotification?.params.message, "Only show this prompt");
 });
 
+test("desktop-origin user messages extract visible text from structured input payloads", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-user-structured-context",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: {
+      threadId: "thread-user-structured-context",
+    },
+  }));
+
+  await wait(20);
+  appendRolloutLines(rolloutPath, [
+    userMessagePayload({
+      input: [
+        {
+          type: "input_text",
+          text: "# AGENTS.md instructions for /tmp/project\n\n<INSTRUCTIONS>\nrules\n</INSTRUCTIONS>",
+        },
+        {
+          type: "input_text",
+          text: "IDE context\n\n## My request for Codex:\nSummarize the failing checks",
+        },
+      ],
+    }),
+    taskStarted("turn-structured-context"),
+  ]);
+  await wait(30);
+
+  const userNotifications = outbound.filter((message) => message.method === "codex/event/user_message");
+  assert.equal(userNotifications.length, 1);
+  assert.equal(userNotifications[0].params.message, "Summarize the failing checks");
+  assert.equal(userNotifications[0].params.turnId, "turn-structured-context");
+});
+
 test("desktop-origin detection stays narrow", () => {
   assert.equal(isDesktopRolloutOrigin({ originator: "Codex Desktop", source: "vscode" }), true);
   assert.equal(isDesktopRolloutOrigin({ originator: "codex_vscode", source: "vscode" }), true);
@@ -2000,6 +2055,17 @@ function userMessage(message) {
     payload: {
       type: "user_message",
       message,
+    },
+  });
+}
+
+function userMessagePayload(payload) {
+  return JSON.stringify({
+    timestamp: "2026-03-15T19:47:36.500Z",
+    type: "event_msg",
+    payload: {
+      type: "user_message",
+      ...payload,
     },
   });
 }
