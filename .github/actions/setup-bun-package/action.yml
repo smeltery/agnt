@@ -16,7 +16,7 @@ runs:
   using: composite
   steps:
     - name: Setup Flox
-      uses: flox/install-flox-action@v2
+      uses: ./.github/actions/setup-flox
 
     - name: Install package dependencies
       shell: bash

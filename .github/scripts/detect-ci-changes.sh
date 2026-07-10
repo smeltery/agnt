@@ -53,12 +53,14 @@ set_output() {
 }
 
 ci_config='^(\.github/workflows/|\.github/actions/|\.github/scripts/|\.github/actionlint\.ya?ml)'
+ci_workflow='^\.github/workflows/ci\.yml'
 link_check_action='^\.github/actions/run-link-check/'
+setup_flox_action='^\.github/actions/setup-flox/'
 setup_bun_action='^\.github/actions/setup-bun-package/'
 android_ci_action='^\.github/actions/run-android-ci/'
 ios_ipa_action='^\.github/actions/build-unsigned-ios-ipa/'
 flox_config='^\.flox/'
-flox_common="$flox_config"
+flox_common="$flox_config|$setup_flox_action"
 bun_common="$flox_common|$setup_bun_action"
 secure_bridge='^agnt-bridge/src/(transport/)?secure-transport\.js'
 secure_web='^agnt-web/src/crypto/'
@@ -73,28 +75,28 @@ bun_packages=()
 
 if matches "$ci_config"; then set_output lint_workflows true; else set_output lint_workflows false; fi
 
-if should_run bridge "$bun_common|$secure_transport|^agnt-bridge/"; then
+if should_run bridge "$ci_workflow|$bun_common|$secure_transport|^agnt-bridge/"; then
   bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
 fi
 
-if should_run relay "$bun_common|^relay/"; then
+if should_run relay "$ci_workflow|$bun_common|^relay/"; then
   bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
 fi
 
-if should_run web "$bun_common|$secure_transport|^agnt-web/"; then
+if should_run web "$ci_workflow|$bun_common|$secure_transport|^agnt-web/"; then
   bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
 fi
 
-if should_run android "$android_ci_action|$flox_common|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
+if should_run android "$ci_workflow|$android_ci_action|$flox_common|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
 
-if should_run host "$bun_common|^agnt-host/"; then
+if should_run host "$ci_workflow|$bun_common|^agnt-host/"; then
   # agnt-host does not commit a Bun lockfile yet.
   bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
 fi
 
-if should_run ios "$ios_ipa_action|$secure_transport|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
+if should_run ios "$ci_workflow|$ios_ipa_action|$secure_transport|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
 
-if [[ "$event_name" == "schedule" ]] || requested links || matches "$link_check_action|^.*\.md$|^\.lycheeignore$"; then
+if [[ "$event_name" == "schedule" ]] || requested links || matches "$ci_workflow|$link_check_action|^.*\.md$|^\.lycheeignore$"; then
   set_output links true
 else
   set_output links false

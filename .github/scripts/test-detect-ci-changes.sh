@@ -66,73 +66,51 @@ assert_bun_names() {
   fi
 }
 
-workflow_output="$(run_detector workflow push "" ".github/workflows/ci.yml")"
-assert_output "$workflow_output" lint_workflows true
-assert_output "$workflow_output" android false
-assert_output "$workflow_output" ios false
-assert_output "$workflow_output" links false
-assert_bun_names "$workflow_output"
+assert_case() {
+  local name="$1"
+  local event_name="$2"
+  local scope="$3"
+  local changed_files="$4"
+  local expected_lint_workflows="$5"
+  local expected_android="$6"
+  local expected_ios="$7"
+  local expected_links="$8"
+  local expected_bun_names="$9"
+  local output_file
+  local -a bun_names=()
 
-bridge_output="$(run_detector bridge push "" "agnt-bridge/src/bridge/bridge.js")"
-assert_output "$bridge_output" lint_workflows false
-assert_output "$bridge_output" android false
-assert_output "$bridge_output" ios false
-assert_output "$bridge_output" links false
-assert_bun_names "$bridge_output" agnt-bridge
+  output_file="$(run_detector "$name" "$event_name" "$scope" "$changed_files")"
+  assert_output "$output_file" lint_workflows "$expected_lint_workflows"
+  assert_output "$output_file" android "$expected_android"
+  assert_output "$output_file" ios "$expected_ios"
+  assert_output "$output_file" links "$expected_links"
 
-secure_output="$(run_detector secure push "" "agnt-web/src/crypto/transcript.ts")"
-assert_output "$secure_output" android true
-assert_output "$secure_output" ios true
-assert_output "$secure_output" links false
-assert_bun_names "$secure_output" agnt-bridge agnt-web
+  if [[ -n "$expected_bun_names" ]]; then
+    read -r -a bun_names <<< "$expected_bun_names"
+    assert_bun_names "$output_file" "${bun_names[@]}"
+  else
+    assert_bun_names "$output_file"
+  fi
+}
 
-bun_action_output="$(run_detector bun_action push "" ".github/actions/setup-bun-package/action.yml")"
-assert_output "$bun_action_output" lint_workflows true
-assert_output "$bun_action_output" android false
-assert_output "$bun_action_output" ios false
-assert_output "$bun_action_output" links false
-assert_bun_names "$bun_action_output" agnt-bridge relay agnt-web agnt-host
+cases=(
+  "workflow|push||.github/workflows/ci.yml|true|true|true|true|agnt-bridge relay agnt-web agnt-host"
+  "bridge|push||agnt-bridge/src/bridge/bridge.js|false|false|false|false|agnt-bridge"
+  "secure|push||agnt-web/src/crypto/transcript.ts|false|true|true|false|agnt-bridge agnt-web"
+  "bun_action|push||.github/actions/setup-bun-package/action.yml|true|false|false|false|agnt-bridge relay agnt-web agnt-host"
+  "flox_config|push||.flox/env/manifest.toml|false|true|false|false|agnt-bridge relay agnt-web agnt-host"
+  "flox_action|push||.github/actions/setup-flox/action.yml|true|true|false|false|agnt-bridge relay agnt-web agnt-host"
+  "android_action|push||.github/actions/run-android-ci/action.yml|true|true|false|false|"
+  "ios_action|push||.github/actions/build-unsigned-ios-ipa/action.yml|true|false|true|false|"
+  "link_action|push||.github/actions/run-link-check/action.yml|true|false|false|true|"
+  "manual_bun|workflow_dispatch|bun||false|false|false|false|agnt-bridge relay agnt-web agnt-host"
+  "docs|push||README.md|false|false|false|true|"
+  "schedule|schedule|||false|false|false|true|"
+)
 
-flox_config_output="$(run_detector flox_config push "" ".flox/env/manifest.toml")"
-assert_output "$flox_config_output" lint_workflows false
-assert_output "$flox_config_output" android true
-assert_output "$flox_config_output" ios false
-assert_output "$flox_config_output" links false
-assert_bun_names "$flox_config_output" agnt-bridge relay agnt-web agnt-host
-
-android_action_output="$(run_detector android_action push "" ".github/actions/run-android-ci/action.yml")"
-assert_output "$android_action_output" lint_workflows true
-assert_output "$android_action_output" android true
-assert_output "$android_action_output" ios false
-assert_output "$android_action_output" links false
-assert_bun_names "$android_action_output"
-
-ios_action_output="$(run_detector ios_action push "" ".github/actions/build-unsigned-ios-ipa/action.yml")"
-assert_output "$ios_action_output" lint_workflows true
-assert_output "$ios_action_output" android false
-assert_output "$ios_action_output" ios true
-assert_output "$ios_action_output" links false
-assert_bun_names "$ios_action_output"
-
-manual_bun_output="$(run_detector manual_bun workflow_dispatch bun "")"
-assert_output "$manual_bun_output" lint_workflows false
-assert_output "$manual_bun_output" android false
-assert_output "$manual_bun_output" ios false
-assert_output "$manual_bun_output" links false
-assert_bun_names "$manual_bun_output" agnt-bridge relay agnt-web agnt-host
-
-docs_output="$(run_detector docs push "" "README.md")"
-assert_output "$docs_output" lint_workflows false
-assert_output "$docs_output" android false
-assert_output "$docs_output" ios false
-assert_output "$docs_output" links true
-assert_bun_names "$docs_output"
-
-schedule_output="$(run_detector schedule schedule "" "")"
-assert_output "$schedule_output" lint_workflows false
-assert_output "$schedule_output" android false
-assert_output "$schedule_output" ios false
-assert_output "$schedule_output" links true
-assert_bun_names "$schedule_output"
+for case_spec in "${cases[@]}"; do
+  IFS="|" read -r name event_name scope changed_files lint_workflows android ios links bun_names <<< "$case_spec"
+  assert_case "$name" "$event_name" "$scope" "$changed_files" "$lint_workflows" "$android" "$ios" "$links" "$bun_names"
+done
 
 echo "CI change detector tests passed."
