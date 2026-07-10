@@ -2213,6 +2213,194 @@ test("desktop IPC background recovery stays lifecycle-only until open", async (t
   )));
 });
 
+test("desktop IPC follower discovers normalized running sidebar threads before open", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-normalized-background-");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({ method: "thread/list", params: {} }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopConversationSnapshot(
+    "thread-normalized-background",
+    normalizedConversationState([
+      { id: "turn-normalized-old", status: "completed", text: "done" },
+      { id: "turn-normalized-running", status: "inProgress", text: "Working" },
+    ], { turns: [] })
+  ));
+
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/started"
+      && message.params?.threadId === "thread-normalized-background"
+      && message.params?.turnId === "turn-normalized-running"
+  )));
+  assert.equal(
+    outbound.some((message) => message.method === "item/agentMessage/delta"),
+    false,
+    "normalized unopened snapshots should remain lifecycle-only"
+  );
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 11,
+    params: {
+      conversationId: "thread-normalized-background",
+      change: {
+        type: "patches",
+        patches: [{
+          op: "replace",
+          path: ["turnHistory", "history", "entitiesByKey", "turn:turn-normalized-running", "status"],
+          value: "completed",
+        }],
+      },
+    },
+  });
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/completed"
+      && message.params?.threadId === "thread-normalized-background"
+      && message.params?.turnId === "turn-normalized-running"
+      && message.params?.status === "completed"
+  )));
+});
+
+test("desktop IPC follower yields normalized history reads while keeping live tail", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-normalized-live-tail-");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({ method: "thread/list", params: {} }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopConversationSnapshot(
+    "thread-normalized-live-tail",
+    normalizedConversationState([
+      { id: "turn-normalized-history", status: "completed", text: "old" },
+      { id: "turn-normalized-live", status: "inProgress", text: "A" },
+    ], { turns: [] })
+  ));
+  await waitFor(() => outbound.some((message) => message.method === "turn/started"));
+
+  const handledRead = follower.observeInbound(JSON.stringify({
+    id: "read-normalized-history",
+    method: "thread/read",
+    params: { threadId: "thread-normalized-live-tail" },
+  }));
+  assert.equal(handledRead, false);
+  assert.equal(
+    outbound.some((message) => message.id === "read-normalized-history"),
+    false,
+    "normalized history reads should fall through to canonical history"
+  );
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 11,
+    params: {
+      conversationId: "thread-normalized-live-tail",
+      change: {
+        type: "patches",
+        patches: [{
+          op: "replace",
+          path: ["turnHistory", "history", "entitiesByKey", "turn:turn-normalized-live", "items", 0, "text"],
+          value: "AB",
+        }],
+      },
+    },
+  });
+  await waitFor(() => outbound.some((message) => (
+    message.method === "thread/replaced"
+      && message.params?.threadId === "thread-normalized-live-tail"
+  )));
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 11,
+    params: {
+      conversationId: "thread-normalized-live-tail",
+      change: {
+        type: "patches",
+        patches: [{
+          op: "replace",
+          path: ["turnHistory", "history", "entitiesByKey", "turn:turn-normalized-live", "items", 0, "text"],
+          value: "ABC",
+        }],
+      },
+    },
+  });
+  await waitFor(() => outbound.some((message) => (
+    message.method === "item/agentMessage/delta"
+      && message.params?.threadId === "thread-normalized-live-tail"
+      && message.params?.turnId === "turn-normalized-live"
+      && message.params?.delta === "C"
+  )));
+});
+
 test("desktop IPC follower normalizes phone turn starts before Desktop follower requests", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-follower-normalize-");
   const serverFrames = [];
@@ -4215,6 +4403,40 @@ function desktopConversationSnapshot(threadId, conversationState) {
       change: {
         type: "snapshot",
         conversationState,
+      },
+    },
+  };
+}
+
+function normalizedConversationState(turns, overrides = {}) {
+  const entitiesByKey = {};
+  const entries = [];
+  for (const turn of turns) {
+    const entityKey = `turn:${turn.id}`;
+    entries.push({ key: entityKey, value: entityKey });
+    entitiesByKey[entityKey] = {
+      id: turn.id,
+      turnId: turn.id,
+      status: turn.status,
+      items: [{
+        id: `assistant-${turn.id}`,
+        type: "assistant_message",
+        text: turn.text,
+      }],
+    };
+  }
+  return {
+    turns: turns.map((turn) => ({
+      id: turn.id,
+      status: turn.status,
+      items: entitiesByKey[`turn:${turn.id}`].items,
+    })),
+    requests: [],
+    ...overrides,
+    turnHistory: {
+      history: {
+        entitiesByKey,
+        islands: [{ entries }],
       },
     },
   };
