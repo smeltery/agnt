@@ -1633,6 +1633,76 @@ final class CodexServiceIncomingRunIndicatorTests: XCTestCase {
         XCTAssertEqual(merged.last?.text, "\(finalText)\n\n\(imageMarkdown)")
     }
 
+    func testProjectionPreservesVisibleTurnPromptAndDurableArtifacts() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let visibleTurnID = "turn-\(UUID().uuidString)"
+        let olderTurnID = "turn-\(UUID().uuidString)"
+        var messages: [CodexMessage] = [
+            makeTimelineMessage(
+                id: "older-plan",
+                threadID: threadID,
+                role: .system,
+                kind: .plan,
+                text: "Older plan",
+                turnID: olderTurnID,
+                orderIndex: 0
+            ),
+            makeTimelineMessage(
+                id: "visible-prompt",
+                threadID: threadID,
+                role: .user,
+                text: "Fix the long-running thread",
+                turnID: visibleTurnID,
+                orderIndex: 1
+            ),
+            makeTimelineMessage(
+                id: "visible-plan",
+                threadID: threadID,
+                role: .system,
+                kind: .plan,
+                text: "1. Inspect\n2. Patch",
+                turnID: visibleTurnID,
+                orderIndex: 2
+            ),
+            makeTimelineMessage(
+                id: "visible-file-change",
+                threadID: threadID,
+                role: .system,
+                kind: .fileChange,
+                text: "Modified Sources/App.swift",
+                turnID: visibleTurnID,
+                orderIndex: 3
+            ),
+        ]
+
+        for index in 4..<95 {
+            messages.append(makeTimelineMessage(
+                id: "assistant-\(index)",
+                threadID: threadID,
+                role: .assistant,
+                text: "Chunk \(index)",
+                turnID: visibleTurnID,
+                orderIndex: index
+            ))
+        }
+
+        let projected = service.snapshotProjectionSourceMessages(
+            threadId: threadID,
+            from: messages,
+            usesPaginatedHistory: true
+        )
+        let projectedIDs = projected.map(\.id)
+
+        XCTAssertGreaterThan(messages.count, TurnTimelineProjectionPolicy.initialMessageLimit)
+        XCTAssertTrue(projectedIDs.contains("visible-prompt"))
+        XCTAssertTrue(projectedIDs.contains("visible-plan"))
+        XCTAssertTrue(projectedIDs.contains("visible-file-change"))
+        XCTAssertTrue(projectedIDs.contains("older-plan"))
+        XCTAssertEqual(projectedIDs.last, "assistant-94")
+        XCTAssertEqual(projected.map(\.orderIndex), projected.map(\.orderIndex).sorted())
+    }
+
     func testIdentifierlessLateCompletionDoesNotAttachPreviousResponseToNewTurn() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"
@@ -2532,6 +2602,27 @@ final class CodexServiceIncomingRunIndicatorTests: XCTestCase {
         // Keep instances alive for process lifetime so assertions remain deterministic.
         Self.retainedServices.append(service)
         return service
+    }
+
+    private func makeTimelineMessage(
+        id: String,
+        threadID: String,
+        role: CodexMessageRole,
+        kind: CodexMessageKind = .chat,
+        text: String,
+        turnID: String,
+        orderIndex: Int
+    ) -> CodexMessage {
+        CodexMessage(
+            id: id,
+            threadId: threadID,
+            role: role,
+            kind: kind,
+            text: text,
+            turnId: turnID,
+            isStreaming: false,
+            orderIndex: orderIndex
+        )
     }
 
     // Persists a relay pairing the same way the app does so close-code cleanup can be tested honestly.

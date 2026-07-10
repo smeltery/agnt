@@ -4784,7 +4784,63 @@ extension CodexService {
             return messages
         }
 
-        return Array(messages.suffix(limit))
+        let visibleTail = Array(messages.suffix(limit))
+        return visibleTailPreservingTurnArtifacts(
+            visibleTail: visibleTail,
+            omittedPrefix: messages.dropLast(limit)
+        )
+    }
+
+    // Preserve the visible turn's prompt and durable artifacts when a tool-heavy
+    // tail is larger than the first-paint render window.
+    func visibleTailPreservingTurnArtifacts(
+        visibleTail: [CodexMessage],
+        omittedPrefix: ArraySlice<CodexMessage>
+    ) -> [CodexMessage] {
+        let visibleTurnIDs = Set(visibleTail.compactMap { message -> String? in
+            guard let turnId = message.turnId?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !turnId.isEmpty else {
+                return nil
+            }
+            return turnId
+        })
+        let visibleMessageIDs = Set(visibleTail.map(\.id))
+        let preservedArtifactKinds: Set<CodexMessageKind> = [.fileChange, .plan]
+
+        let sameTurnContext = omittedPrefix.filter { message in
+            guard (message.role == .user || isPreservableTurnArtifact(message, kinds: preservedArtifactKinds)),
+                  let turnId = message.turnId?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  visibleTurnIDs.contains(turnId),
+                  !visibleMessageIDs.contains(message.id) else {
+                return false
+            }
+            return true
+        }
+
+        let sameTurnContextIDs = Set(sameTurnContext.map(\.id))
+        let recentOmittedArtifacts = omittedPrefix
+            .suffix(300)
+            .filter { message in
+                isPreservableTurnArtifact(message, kinds: preservedArtifactKinds)
+                    && !visibleMessageIDs.contains(message.id)
+                    && !sameTurnContextIDs.contains(message.id)
+            }
+            .suffix(8)
+
+        let preservedContext = Array(sameTurnContext) + Array(recentOmittedArtifacts)
+        guard !preservedContext.isEmpty else {
+            return visibleTail
+        }
+
+        return (preservedContext + visibleTail)
+            .sorted { $0.orderIndex < $1.orderIndex }
+    }
+
+    func isPreservableTurnArtifact(
+        _ message: CodexMessage,
+        kinds: Set<CodexMessageKind>
+    ) -> Bool {
+        message.role == .system && kinds.contains(message.kind)
     }
 
     // Refreshes every known timeline state when repo-busy status changes across threads.
