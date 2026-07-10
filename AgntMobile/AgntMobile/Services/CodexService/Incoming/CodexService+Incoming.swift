@@ -174,6 +174,14 @@ extension CodexService {
     func handleNotification(method: String, params: JSONValue?) {
         let paramsObject = params?.objectValue
         let previousReplayScope = isApplyingReplayedBridgeEvent
+        if isBufferedReplayResetEvent(method: method, paramsObject: paramsObject) {
+            handleBufferedReplayReset(paramsObject)
+            return
+        }
+        if isBufferedReplayGapEvent(method: method, paramsObject: paramsObject) {
+            handleBufferedReplayGap(paramsObject)
+            return
+        }
         if isReplayedBridgeEvent(paramsObject) {
             isApplyingReplayedBridgeEvent = true
         }
@@ -3311,6 +3319,55 @@ extension CodexService {
 
     func unregisterGitStackedActionProgressHandler(progressId: String) {
         gitStackedActionProgressHandlers.removeValue(forKey: progressId)
+    }
+}
+
+extension CodexService {
+    func isBufferedReplayGapEvent(method: String, paramsObject: IncomingParamsObject?) -> Bool {
+        method == "agnt/bufferedReplay/gap"
+            || paramsObject?["agntBufferedReplayGap"]?.boolValue == true
+    }
+
+    func isBufferedReplayResetEvent(method: String, paramsObject: IncomingParamsObject?) -> Bool {
+        method == "agnt/bufferedReplay/reset"
+            || paramsObject?["agntBufferedReplayReset"]?.boolValue == true
+    }
+
+    func handleBufferedReplayReset(_ paramsObject: IncomingParamsObject?) {
+        guard let resetSequence = paramsObject?["resetBridgeOutboundSeqTo"]?.intValue else {
+            return
+        }
+        setBridgeOutboundReplayCursor(to: resetSequence)
+        if let replayEpoch = paramsObject?["bridgeReplayEpoch"]?.stringValue {
+            setBridgeReplayEpoch(to: replayEpoch)
+        }
+        markReplayDiscontinuityForCanonicalRefresh()
+    }
+
+    func handleBufferedReplayGap(_ paramsObject: IncomingParamsObject?) {
+        guard let discardedThrough = paramsObject?["lastDiscardedBridgeOutboundSeq"]?.intValue,
+              discardedThrough > lastAppliedBridgeOutboundSeq else {
+            return
+        }
+        advanceBridgeOutboundReplayCursor(to: discardedThrough)
+        markReplayDiscontinuityForCanonicalRefresh()
+    }
+
+    func markReplayDiscontinuityForCanonicalRefresh() {
+        clearHydrationCaches()
+        pendingCanonicalHistoryRefreshAfterReplayDiscontinuity = true
+        flushPendingReplayDiscontinuityHistoryRefresh()
+    }
+
+    func flushPendingReplayDiscontinuityHistoryRefresh() {
+        guard pendingCanonicalHistoryRefreshAfterReplayDiscontinuity,
+              isConnected,
+              isInitialized,
+              activeThreadId != nil else {
+            return
+        }
+        pendingCanonicalHistoryRefreshAfterReplayDiscontinuity = false
+        requestImmediateActiveThreadSync()
     }
 }
 

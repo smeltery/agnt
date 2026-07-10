@@ -256,12 +256,14 @@ extension CodexService {
         SecureStore.deleteValue(for: CodexSecureKeys.relayMacIdentityPublicKey)
         SecureStore.deleteValue(for: CodexSecureKeys.relayProtocolVersion)
         SecureStore.deleteValue(for: CodexSecureKeys.relayLastAppliedBridgeOutboundSeq)
+        SecureStore.deleteValue(for: CodexSecureKeys.relayBridgeReplayEpoch)
         relaySessionId = nil
         relayUrl = nil
         relayMacDeviceId = nil
         relayMacIdentityPublicKey = nil
         relayProtocolVersion = codexSecureProtocolVersion
         lastAppliedBridgeOutboundSeq = 0
+        lastAppliedBridgeReplayEpoch = nil
         shouldForceQRBootstrapOnNextHandshake = false
         trustedReconnectFailureCount = 0
         if let trustedMac = currentTrustedMacRecord {
@@ -285,8 +287,10 @@ extension CodexService {
 
         SecureStore.deleteValue(for: CodexSecureKeys.relaySessionId)
         SecureStore.deleteValue(for: CodexSecureKeys.relayLastAppliedBridgeOutboundSeq)
+        SecureStore.deleteValue(for: CodexSecureKeys.relayBridgeReplayEpoch)
         relaySessionId = nil
         lastAppliedBridgeOutboundSeq = 0
+        lastAppliedBridgeReplayEpoch = nil
         shouldForceQRBootstrapOnNextHandshake = false
         trustedReconnectFailureCount = 0
         secureConnectionState = .liveSessionUnresolved
@@ -394,6 +398,7 @@ extension CodexService {
 
         try await sendNotification(method: "initialized", params: nil)
         isInitialized = true
+        flushPendingReplayDiscontinuityHistoryRefresh()
         if shouldProbePlanCollaborationMode {
             schedulePlanCollaborationModeProbe()
         }

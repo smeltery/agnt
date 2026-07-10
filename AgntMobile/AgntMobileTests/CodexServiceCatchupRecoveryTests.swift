@@ -11,6 +11,46 @@ import XCTest
 final class CodexServiceCatchupRecoveryTests: XCTestCase {
     private static var retainedServices: [CodexService] = []
 
+    func testReplayGapDuringHandshakeLatchesCanonicalRefreshUntilInitialization() {
+        let service = makeService()
+        let threadID = "thread-replay-gap"
+        service.activeThreadId = threadID
+        service.hydratedThreadIDs.insert(threadID)
+        service.lastAppliedBridgeOutboundSeq = 10
+        service.isConnected = false
+        service.isInitialized = false
+
+        service.handleNotification(
+            method: "agnt/bufferedReplay/gap",
+            params: .object([
+                "agntBufferedReplayGap": .bool(true),
+                "lastDiscardedBridgeOutboundSeq": .int(25),
+            ])
+        )
+
+        XCTAssertEqual(service.lastAppliedBridgeOutboundSeq, 25)
+        XCTAssertFalse(service.hydratedThreadIDs.contains(threadID))
+        XCTAssertTrue(service.pendingCanonicalHistoryRefreshAfterReplayDiscontinuity)
+    }
+
+    func testReplayResetCanMoveStaleCursorBackToCurrentBridgeEpoch() {
+        let service = makeService()
+        service.lastAppliedBridgeOutboundSeq = 999
+
+        service.handleNotification(
+            method: "agnt/bufferedReplay/reset",
+            params: .object([
+                "agntBufferedReplayReset": .bool(true),
+                "resetBridgeOutboundSeqTo": .int(0),
+                "bridgeReplayEpoch": .string("bridge-epoch-current"),
+            ])
+        )
+
+        XCTAssertEqual(service.lastAppliedBridgeOutboundSeq, 0)
+        XCTAssertEqual(service.lastAppliedBridgeReplayEpoch, "bridge-epoch-current")
+        XCTAssertTrue(service.pendingCanonicalHistoryRefreshAfterReplayDiscontinuity)
+    }
+
     func testRunningCatchupEscalatesExistingLightweightTaskIntoForcedResume() async {
         let service = makeService()
         let threadID = "thread-running"

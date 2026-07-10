@@ -490,6 +490,8 @@ final class CodexService {
     var relayMacIdentityPublicKey: String?
     var relayProtocolVersion: Int = codexSecureProtocolVersion
     var lastAppliedBridgeOutboundSeq = 0
+    var lastAppliedBridgeReplayEpoch: String?
+    @ObservationIgnored var pendingCanonicalHistoryRefreshAfterReplayDiscontinuity = false
     // Mirrors the bridge package version currently running on the Mac, if the bridge reports it.
     var bridgeInstalledVersion: String?
     // Mirrors the latest published bridge package version, when the bridge can resolve it.
@@ -865,6 +867,7 @@ final class CodexService {
            let parsedLastAppliedSeq = Int(rawLastAppliedSeq) {
             self.lastAppliedBridgeOutboundSeq = parsedLastAppliedSeq
         }
+        self.lastAppliedBridgeReplayEpoch = SecureStore.readString(for: CodexSecureKeys.relayBridgeReplayEpoch)
         migrateCurrentTrustedMacDeviceIdIfNeeded()
         migrateLegacyMacScopedDefaultsIfNeeded()
         loadCurrentMacScopedDefaultsState()

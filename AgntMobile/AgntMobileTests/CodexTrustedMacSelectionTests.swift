@@ -138,6 +138,7 @@ final class CodexTrustedMacSelectionTests: XCTestCase {
         SecureStore.deleteValue(for: CodexSecureKeys.relayMacIdentityPublicKey)
         SecureStore.deleteValue(for: CodexSecureKeys.relayProtocolVersion)
         SecureStore.deleteValue(for: CodexSecureKeys.relayLastAppliedBridgeOutboundSeq)
+        SecureStore.deleteValue(for: CodexSecureKeys.relayBridgeReplayEpoch)
         SecureStore.deleteValue(for: CodexSecureKeys.trustedMacRegistry)
         SecureStore.deleteValue(for: CodexSecureKeys.currentTrustedMacDeviceId)
         SecureStore.deleteValue(for: CodexSecureKeys.lastTrustedMacDeviceId)
