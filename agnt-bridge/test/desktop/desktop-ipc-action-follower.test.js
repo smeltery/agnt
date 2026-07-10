@@ -2401,6 +2401,81 @@ test("desktop IPC follower yields normalized history reads while keeping live ta
   )));
 });
 
+test("desktop IPC follower treats normalized rehydration snapshots as baselines", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-normalized-rehydrate-");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  const threadId = "thread-normalized-rehydrate";
+  follower.observeInbound(JSON.stringify({ method: "thread/resume", params: { threadId } }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopConversationSnapshot(
+    threadId,
+    normalizedConversationState([
+      { id: "turn-normalized-history", status: "completed", text: "old" },
+      { id: "turn-normalized-live", status: "inProgress", text: "A" },
+    ], { turns: [] })
+  ));
+  await waitFor(() => outbound.some((message) => message.method === "thread/replaced"));
+  outbound.length = 0;
+
+  writeFrame(serverSocket, desktopConversationSnapshot(
+    threadId,
+    normalizedConversationState([
+      { id: "turn-normalized-history", status: "completed", text: "old" },
+      {
+        id: "turn-normalized-live",
+        status: "inProgress",
+        text: "A",
+        itemId: "assistant-rehydrated-live",
+      },
+    ], { turns: [] })
+  ));
+  await wait(50);
+
+  assert.equal(
+    outbound.some((message) => message.method?.startsWith("item/")),
+    false,
+    "a full normalized rehydration snapshot must not replay historical item rows"
+  );
+  assert.equal(
+    outbound.some((message) => message.method === "turn/started"),
+    false,
+    "the same active turn must not restart on baseline rehydration"
+  );
+});
+
 test("desktop IPC follower normalizes phone turn starts before Desktop follower requests", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-follower-normalize-");
   const serverFrames = [];
@@ -4419,7 +4494,7 @@ function normalizedConversationState(turns, overrides = {}) {
       turnId: turn.id,
       status: turn.status,
       items: [{
-        id: `assistant-${turn.id}`,
+        id: turn.itemId || `assistant-${turn.id}`,
         type: "assistant_message",
         text: turn.text,
       }],

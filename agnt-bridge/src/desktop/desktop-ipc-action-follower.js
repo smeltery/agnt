@@ -467,7 +467,9 @@ function createDesktopIpcActionFollower({
     if (backgroundOnlyThreadIds.has(threadId)) {
       syncBackgroundThreadLifecycle(threadId, nextState);
     } else {
-      syncProjectedConversationState(threadId, nextState);
+      syncProjectedConversationState(threadId, nextState, {
+        isFullSnapshot: isSnapshotChange(params.change),
+      });
     }
     syncProjectedActions(threadId, projectPendingDesktopActions(threadId, nextState));
     releaseHeldFollowerRequests(threadId, { toDesktop: true });
@@ -845,12 +847,19 @@ function createDesktopIpcActionFollower({
     return now() - updatedAt > STALE_ACTIVE_READ_MAX_AGE_MS;
   }
 
-  function syncProjectedConversationState(threadId, nextState) {
+  function syncProjectedConversationState(threadId, nextState, { isFullSnapshot = false } = {}) {
     if (!canonicalHistoryThreadIds.has(threadId) && hasNormalizedHistoryOutsideRawTurns(nextState)) {
       canonicalHistoryThreadIds.add(threadId);
     }
 
     const liveState = desktopLiveStateForProjection(nextState);
+    if (isFullSnapshot
+      && canonicalHistoryThreadIds.has(threadId)
+      && canonicalHistoryReplacementSentThreadIds.has(threadId)
+      && hasActiveProjectedTurn(projectDesktopConversationStateToThread(threadId, liveState, { now }))) {
+      conversationProjector.seed(threadId, liveState);
+      return;
+    }
     if (canonicalHistoryThreadIds.has(threadId)
       && !canonicalHistoryReplacementSentThreadIds.has(threadId)) {
       canonicalHistoryReplacementSentThreadIds.add(threadId);
