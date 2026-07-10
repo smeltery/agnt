@@ -2368,6 +2368,94 @@ test("desktop IPC follower bootstraps normalized active turns when opened from b
   );
 });
 
+test("desktop IPC follower completes either parallel active turn across normalized snapshots", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-parallel-normalized-");
+  let serverSocket = null;
+  const nowValue = Date.now();
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    now: () => nowValue,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  const threadId = "thread-parallel-normalized";
+  const sendSnapshot = (firstStatus, secondStatus, runtimeType = "active") => {
+    writeFrame(serverSocket, desktopConversationSnapshot(
+      threadId,
+      normalizedConversationState([
+        { id: "turn-parallel-a", status: firstStatus, text: "" },
+        { id: "turn-parallel-b", status: secondStatus, text: "" },
+      ], {
+        turns: [],
+        threadRuntimeStatus: { type: runtimeType, activeFlags: [] },
+      })
+    ));
+  };
+
+  follower.observeInbound(JSON.stringify({ method: "thread/resume", params: { threadId } }));
+  await waitFor(() => serverSocket);
+
+  sendSnapshot("inProgress", "inProgress");
+  await waitFor(() => outbound.filter((message) => message.method === "turn/started").length === 2);
+  assert.deepEqual(
+    outbound
+      .filter((message) => message.method === "turn/started")
+      .map((message) => message.params?.turnId),
+    ["turn-parallel-a", "turn-parallel-b"]
+  );
+  outbound.length = 0;
+
+  sendSnapshot("completed", "inProgress");
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/completed"
+      && message.params?.turnId === "turn-parallel-a"
+  )));
+  assert.equal(
+    outbound.some((message) => (
+      message.method === "turn/completed"
+        && message.params?.turnId === "turn-parallel-b"
+    )),
+    false
+  );
+  assert.equal(outbound.some((message) => message.method?.startsWith("item/")), false);
+  outbound.length = 0;
+
+  sendSnapshot("completed", "completed", "idle");
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/completed"
+      && message.params?.turnId === "turn-parallel-b"
+  )));
+  assert.equal(outbound.some((message) => message.method === "turn/started"), false);
+});
+
 test("desktop IPC background recovery stays lifecycle-only until open", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-recovery-");
   let serverSocket = null;

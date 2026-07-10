@@ -226,6 +226,7 @@ function createDesktopIpcActionFollower({
   const backgroundDisconnectTimersByThreadId = new Map();
   const canonicalHistoryThreadIds = new Set();
   const canonicalHistoryReplacementSentThreadIds = new Set();
+  const canonicalActiveTurnsByThreadId = new Map();
   // JS Set preserves insertion order; delete-before-add refreshes recency, and
   // cap eviction skips threads with pending prompts so approvals are not lost.
   function rememberActiveThread(threadId) {
@@ -270,6 +271,7 @@ function createDesktopIpcActionFollower({
     rawStateUpdatedAtByThreadId.delete(threadId);
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
+    canonicalActiveTurnsByThreadId.delete(threadId);
     conversationProjector.remove(threadId);
     queuedChangesByThreadId.delete(threadId);
     baselineRecoveryStateByThreadId.delete(threadId);
@@ -334,6 +336,7 @@ function createDesktopIpcActionFollower({
                 sendApplicationResponse(JSON.stringify(notification));
               }
             }
+            rememberCanonicalActiveTurns(threadId, liveState);
           } else {
             conversationProjector.seed(threadId, liveState);
           }
@@ -385,6 +388,7 @@ function createDesktopIpcActionFollower({
     rawStateUpdatedAtByThreadId.clear();
     canonicalHistoryThreadIds.clear();
     canonicalHistoryReplacementSentThreadIds.clear();
+    canonicalActiveTurnsByThreadId.clear();
     conversationProjector.reset();
     pendingRoutesByRequestId.clear();
     activeThreadIds.clear();
@@ -512,6 +516,7 @@ function createDesktopIpcActionFollower({
     rawStatesByThreadId.clear();
     rawStateUpdatedAtByThreadId.clear();
     canonicalHistoryReplacementSentThreadIds.clear();
+    canonicalActiveTurnsByThreadId.clear();
     recoveringThreadIds.clear();
     baselineRecoveryStateByThreadId.clear();
     queuedChangesByThreadId.clear();
@@ -548,6 +553,7 @@ function createDesktopIpcActionFollower({
     rawStateUpdatedAtByThreadId.delete(threadId);
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
+    canonicalActiveTurnsByThreadId.delete(threadId);
     conversationProjector.remove(threadId);
     queuedChangesByThreadId.delete(threadId);
     baselineRecoveryStateByThreadId.delete(threadId);
@@ -573,6 +579,7 @@ function createDesktopIpcActionFollower({
     rawStateUpdatedAtByThreadId.delete(threadId);
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
+    canonicalActiveTurnsByThreadId.delete(threadId);
     conversationProjector.remove(threadId);
     queuedChangesByThreadId.delete(threadId);
     baselineRecoveryStateByThreadId.delete(threadId);
@@ -885,8 +892,8 @@ function createDesktopIpcActionFollower({
     const liveState = desktopLiveStateForProjection(nextState);
     if (isFullSnapshot
       && canonicalHistoryThreadIds.has(threadId)
-      && canonicalHistoryReplacementSentThreadIds.has(threadId)
-      && hasActiveProjectedTurn(projectDesktopConversationStateToThread(threadId, liveState, { now }))) {
+      && canonicalHistoryReplacementSentThreadIds.has(threadId)) {
+      syncCanonicalSnapshotLifecycle(threadId, liveState);
       conversationProjector.seed(threadId, liveState);
       return;
     }
@@ -904,7 +911,7 @@ function createDesktopIpcActionFollower({
           agntActionSource: DESKTOP_IPC_ACTION_SOURCE,
         },
       }));
-      syncBackgroundThreadLifecycle(threadId, nextState);
+      syncCanonicalSnapshotLifecycle(threadId, liveState);
       return;
     }
 
@@ -930,6 +937,81 @@ function createDesktopIpcActionFollower({
     for (const notification of output.notifications || []) {
       sendApplicationResponse(JSON.stringify(notification));
     }
+  }
+
+  function syncCanonicalSnapshotLifecycle(threadId, liveState) {
+    const previousTurns = canonicalActiveTurnsByThreadId.get(threadId) || new Map();
+    const nextTurns = activeCanonicalTurnsById(liveState);
+
+    for (const [turnId, previousTurn] of previousTurns.entries()) {
+      if (nextTurns.has(turnId)) {
+        continue;
+      }
+      const settledTurn = canonicalTurnById(liveState, turnId) || previousTurn;
+      const settledStatus = readString(settledTurn?.status);
+      sendApplicationResponse(JSON.stringify(backgroundTurnLifecycleNotification(
+        "turn/completed",
+        threadId,
+        {
+          ...settledTurn,
+          id: turnId,
+          status: settledStatus === "failed" || settledStatus === "interrupted"
+            ? settledStatus
+            : "completed",
+        }
+      )));
+    }
+
+    for (const [turnId, nextTurn] of nextTurns.entries()) {
+      if (previousTurns.has(turnId)) {
+        continue;
+      }
+      sendApplicationResponse(JSON.stringify(backgroundTurnLifecycleNotification(
+        "turn/started",
+        threadId,
+        nextTurn
+      )));
+    }
+
+    if (nextTurns.size > 0) {
+      canonicalActiveTurnsByThreadId.set(threadId, nextTurns);
+    } else {
+      canonicalActiveTurnsByThreadId.delete(threadId);
+    }
+  }
+
+  function rememberCanonicalActiveTurns(threadId, liveState) {
+    const activeTurns = activeCanonicalTurnsById(liveState);
+    if (activeTurns.size > 0) {
+      canonicalActiveTurnsByThreadId.set(threadId, activeTurns);
+    } else {
+      canonicalActiveTurnsByThreadId.delete(threadId);
+    }
+  }
+
+  function activeCanonicalTurnsById(liveState) {
+    const activeTurns = new Map();
+    for (const turn of canonicalTurns(liveState)) {
+      if (turn.status === "inProgress") {
+        activeTurns.set(turn.id, turn);
+      }
+    }
+    return activeTurns;
+  }
+
+  function canonicalTurnById(liveState, turnId) {
+    for (const turn of canonicalTurns(liveState)) {
+      if (turn.id === turnId) {
+        return turn;
+      }
+    }
+    return null;
+  }
+
+  function canonicalTurns(liveState) {
+    return normalizeBoundedTurnsForRuntime(backgroundHistoryTurns(liveState), liveState)
+      .map((turn, index) => backgroundRawTurn(turn, index))
+      .filter((turn) => readString(turn.id));
   }
 
   function syncBackgroundThreadLifecycle(threadId, nextState) {
