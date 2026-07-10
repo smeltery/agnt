@@ -61,6 +61,8 @@ secure_bridge='^agnt-bridge/src/(transport/)?secure-transport\.js'
 secure_web='^agnt-web/src/crypto/'
 secure_ios='^(AgntMobile/AgntMobile/Core/Networking/CodexSecureTransportModels\.swift|AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService\+SecureTransport\.swift)'
 secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
+# These files implement one shared encrypted transport contract across clients.
+# Any change fans out to every parity surface that can compile-test it.
 secure_transport="$secure_bridge|$secure_web|$secure_ios|$secure_android"
 android_code='^(AgntAndroid/(app|gradle)/|AgntAndroid/(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|gradlew\.bat))'
 
@@ -69,34 +71,22 @@ bun_packages=()
 if matches "$ci_config"; then set_output lint_workflows true; else set_output lint_workflows false; fi
 
 if should_run bridge "$bun_common|$secure_transport|^agnt-bridge/"; then
-  set_output bridge true
   bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
-else
-  set_output bridge false
 fi
 
 if should_run relay "$bun_common|^relay/"; then
-  set_output relay true
   bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
-else
-  set_output relay false
 fi
 
 if should_run web "$bun_common|$secure_transport|^agnt-web/"; then
-  set_output web true
   bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
-else
-  set_output web false
 fi
 
 if should_run android "$flox_config|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
 
 if should_run host "$bun_common|^agnt-host/"; then
-  set_output host true
   # agnt-host does not commit a Bun lockfile yet.
   bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
-else
-  set_output host false
 fi
 
 if should_run ios "$secure_transport|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
