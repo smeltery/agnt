@@ -618,6 +618,8 @@ final class CodexService {
     @ObservationIgnored var canonicalHistoryReconcileTaskByThreadID: [String: Task<Void, Never>] = [:]
     // Tracks delayed retry timers for canonical reconcile so teardown can cancel the backoff too.
     @ObservationIgnored var canonicalHistoryReconcileRetryTaskByThreadID: [String: Task<Void, Never>] = [:]
+    // Increases retry spacing for chats whose first history page remains unavailable.
+    @ObservationIgnored var canonicalHistoryReconcileRetryAttemptByThreadID: [String: Int] = [:]
     // Coalesces sidebar/bootstrap thread/list refreshes so launch paths do not duplicate the same fetch.
     @ObservationIgnored var threadListFetchTaskByLimit: [String: (id: UUID, task: Task<[CodexThread], Error>)] = [:]
     var isAppInForeground = true

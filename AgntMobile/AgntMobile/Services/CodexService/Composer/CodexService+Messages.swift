@@ -8,9 +8,18 @@ import Foundation
 import UIKit
 
 private enum CanonicalHistoryReconcileRetryPolicy {
-    // Transient thread/read failures should self-heal, but with a small delay so we do not
-    // spin aggressively when the bridge or socket is still recovering.
-    static let transientErrorDelayNanoseconds: UInt64 = 1_500_000_000
+    static let initialDelayNanoseconds: UInt64 = 1_500_000_000
+    static let maximumDelayNanoseconds: UInt64 = 60_000_000_000
+
+    // Giant histories can take tens of seconds per attempt. Exponential spacing
+    // keeps recovery persistent without hammering the bridge forever.
+    static func delayNanoseconds(forAttempt attempt: Int) -> UInt64 {
+        var delay = initialDelayNanoseconds
+        for _ in 1..<max(1, min(attempt, 7)) {
+            delay = min(delay * 2, maximumDelayNanoseconds)
+        }
+        return delay
+    }
 }
 
 private enum StreamingDeltaCoalescingPolicy {
@@ -212,6 +221,7 @@ extension CodexService {
         cancelPendingStreamingDeltaFlushes(for: threadId)
         threadsPendingCompletionHaptic.remove(threadId)
         threadsNeedingCanonicalHistoryReconcile.remove(threadId)
+        canonicalHistoryReconcileRetryAttemptByThreadID.removeValue(forKey: threadId)
         threadsWithSatisfiedDeferredHistoryHydration.remove(threadId)
         olderThreadHistoryCursorByThreadID.removeValue(forKey: threadId)
         exhaustedOlderThreadHistoryCursorByThreadID.removeValue(forKey: threadId)
@@ -240,6 +250,7 @@ extension CodexService {
         projectedTerminalStateByThreadID.removeAll()
         cancelAllPendingStreamingDeltaFlushes()
         threadsNeedingCanonicalHistoryReconcile.removeAll()
+        canonicalHistoryReconcileRetryAttemptByThreadID.removeAll()
         threadsWithSatisfiedDeferredHistoryHydration.removeAll()
         olderThreadHistoryCursorByThreadID.removeAll()
         exhaustedOlderThreadHistoryCursorByThreadID.removeAll()
@@ -501,6 +512,9 @@ extension CodexService {
                         guard !Task.isCancelled else {
                             return
                         }
+                        // Release this timer's single-flight slot before asking the scheduler
+                        // to create the next reconcile attempt.
+                        self?.canonicalHistoryReconcileRetryTaskByThreadID.removeValue(forKey: threadId)
                         self?.scheduleCanonicalHistoryReconcileIfNeeded(for: threadId)
                     }
                 }
@@ -534,16 +548,23 @@ extension CodexService {
                 if self.shouldTreatAsThreadNotFound(error) {
                     self.threadsNeedingCanonicalHistoryReconcile.remove(threadId)
                     self.threadsWithSatisfiedDeferredHistoryHydration.remove(threadId)
+                    self.canonicalHistoryReconcileRetryAttemptByThreadID.removeValue(forKey: threadId)
                     self.handleMissingThread(threadId)
                 } else if self.threadsNeedingCanonicalHistoryReconcile.contains(threadId),
                           self.isConnected,
                           !self.threadHasActiveOrRunningTurn(threadId),
                           self.thread(for: threadId)?.syncState == .live {
                     shouldRetry = true
-                    retryDelayNanoseconds = CanonicalHistoryReconcileRetryPolicy.transientErrorDelayNanoseconds
+                    retryDelayNanoseconds = self.nextCanonicalHistoryReconcileRetryDelay(for: threadId)
                 }
             }
         }
+    }
+
+    private func nextCanonicalHistoryReconcileRetryDelay(for threadId: String) -> UInt64 {
+        let nextAttempt = min((canonicalHistoryReconcileRetryAttemptByThreadID[threadId] ?? 0) + 1, 7)
+        canonicalHistoryReconcileRetryAttemptByThreadID[threadId] = nextAttempt
+        return CanonicalHistoryReconcileRetryPolicy.delayNanoseconds(forAttempt: nextAttempt)
     }
 
     // Marks a large chat as "local-first for now, but still needs one authoritative server merge".
@@ -552,7 +573,10 @@ extension CodexService {
         requestImmediateSync: Bool = false
     ) {
         threadsWithSatisfiedDeferredHistoryHydration.remove(threadId)
-        threadsNeedingCanonicalHistoryReconcile.insert(threadId)
+        let inserted = threadsNeedingCanonicalHistoryReconcile.insert(threadId).inserted
+        if inserted {
+            canonicalHistoryReconcileRetryAttemptByThreadID.removeValue(forKey: threadId)
+        }
         scheduleCanonicalHistoryReconcileIfNeeded(for: threadId)
 
         guard requestImmediateSync else {

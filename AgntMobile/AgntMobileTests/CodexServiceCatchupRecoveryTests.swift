@@ -173,6 +173,31 @@ final class CodexServiceCatchupRecoveryTests: XCTestCase {
         XCTAssertLessThanOrEqual(canonicalHistoryReadCount, 1)
     }
 
+    func testMarkingNewCanonicalReconcileClearsStaleRetryAttempt() {
+        let service = makeService()
+        let threadID = "thread-retry-attempt"
+
+        service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID] = 4
+
+        service.markThreadNeedingCanonicalHistoryReconcile(threadID)
+
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+        XCTAssertNil(service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID])
+    }
+
+    func testCancelPerThreadRefreshWorkClearsCanonicalRetryAttempt() {
+        let service = makeService()
+        let threadID = "thread-retry-cancel"
+
+        service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID] = 3
+        service.canonicalHistoryReconcileRetryTaskByThreadID[threadID] = Task { @MainActor in }
+
+        service.cancelPerThreadRefreshWork(for: threadID)
+
+        XCTAssertNil(service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID])
+        XCTAssertNil(service.canonicalHistoryReconcileRetryTaskByThreadID[threadID])
+    }
+
     private func makeService() -> CodexService {
         let suiteName = "CodexServiceCatchupRecoveryTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard

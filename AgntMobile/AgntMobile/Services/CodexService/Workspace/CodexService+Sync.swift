@@ -628,6 +628,7 @@ extension CodexService {
         lastForcedRunningResumeAtByThread.removeValue(forKey: threadId)
         canonicalHistoryReconcileRetryTaskByThreadID[threadId]?.cancel()
         canonicalHistoryReconcileRetryTaskByThreadID.removeValue(forKey: threadId)
+        canonicalHistoryReconcileRetryAttemptByThreadID.removeValue(forKey: threadId)
     }
 
     // Clears all in-flight thread refresh work during reconnect/disconnect baselines.
@@ -663,6 +664,7 @@ extension CodexService {
         workspaceCheckpointCopyTaskByTurnID.removeAll()
         canonicalHistoryReconcileRetryTaskByThreadID.values.forEach { $0.cancel() }
         canonicalHistoryReconcileRetryTaskByThreadID.removeAll()
+        canonicalHistoryReconcileRetryAttemptByThreadID.removeAll()
     }
 
     // Runs the full "running thread catch-up" pipeline once per thread so the
