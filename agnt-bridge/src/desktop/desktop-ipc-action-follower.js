@@ -203,6 +203,7 @@ function createDesktopIpcActionFollower({
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
   ownershipProbeTimeoutMs = OWNERSHIP_PROBE_TIMEOUT_MS,
   backgroundDisconnectGraceMs = BACKGROUND_DISCONNECT_GRACE_MS,
+  snapshotDebounceMs = 0,
 } = {}) {
   const ipc = createDesktopIpcClient({
     socketPath,
@@ -218,6 +219,7 @@ function createDesktopIpcActionFollower({
   });
   const rawStatesByThreadId = new Map();
   const rawStateUpdatedAtByThreadId = new Map();
+  const pendingSnapshotsByThreadId = new Map();
   const conversationProjector = createDesktopConversationProjector({ now });
   const pendingRoutesByRequestId = new Map();
   const activeThreadIds = new Set();
@@ -270,6 +272,7 @@ function createDesktopIpcActionFollower({
     backgroundOnlyThreadIds.delete(threadId);
     rawStatesByThreadId.delete(threadId);
     rawStateUpdatedAtByThreadId.delete(threadId);
+    cancelPendingSnapshot(threadId);
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
     canonicalActiveTurnsByThreadId.delete(threadId);
@@ -388,6 +391,9 @@ function createDesktopIpcActionFollower({
   function stopAll() {
     rawStatesByThreadId.clear();
     rawStateUpdatedAtByThreadId.clear();
+    for (const threadId of pendingSnapshotsByThreadId.keys()) {
+      cancelPendingSnapshot(threadId);
+    }
     canonicalHistoryThreadIds.clear();
     canonicalHistoryReplacementSentThreadIds.clear();
     canonicalActiveTurnsByThreadId.clear();
@@ -467,6 +473,16 @@ function createDesktopIpcActionFollower({
       return;
     }
 
+    const pendingSnapshot = pendingSnapshotsByThreadId.get(threadId);
+    if (pendingSnapshot && isPatchChange(params.change)) {
+      const patchedSnapshot = applyConversationStateChange(pendingSnapshot.state, params.change);
+      if (patchedSnapshot) {
+        pendingSnapshot.state = patchedSnapshot;
+        return;
+      }
+      cancelPendingSnapshot(threadId);
+    }
+
     const previousState = rawStatesByThreadId.get(threadId) || null;
     const nextState = applyConversationStateChange(previousState, params.change);
     if (!nextState) {
@@ -493,23 +509,70 @@ function createDesktopIpcActionFollower({
       return;
     }
 
+    if (isSnapshotChange(params.change) && snapshotDebounceMs > 0) {
+      schedulePendingSnapshot(threadId, nextState);
+      return;
+    }
+
+    commitConversationState(threadId, nextState, {
+      isFullSnapshot: isSnapshotChange(params.change),
+      isPatch: isPatchChange(params.change),
+    });
+  }
+
+  function schedulePendingSnapshot(threadId, state) {
+    cancelPendingSnapshot(threadId);
+    const timer = setTimeout(() => {
+      const pending = pendingSnapshotsByThreadId.get(threadId);
+      if (!pending || pending.timer !== timer) {
+        return;
+      }
+      pendingSnapshotsByThreadId.delete(threadId);
+      commitConversationState(threadId, pending.state, {
+        isFullSnapshot: true,
+        isPatch: false,
+      });
+    }, Math.max(0, snapshotDebounceMs));
+    timer.unref?.();
+    pendingSnapshotsByThreadId.set(threadId, { state, timer });
+  }
+
+  function cancelPendingSnapshot(threadId) {
+    const pending = pendingSnapshotsByThreadId.get(threadId);
+    if (!pending) {
+      return false;
+    }
+    clearTimeout(pending.timer);
+    pendingSnapshotsByThreadId.delete(threadId);
+    return true;
+  }
+
+  function commitConversationState(threadId, nextState, {
+    isFullSnapshot = false,
+    isPatch = false,
+  } = {}) {
+    if (liveOwnerThreadIds.has(threadId) || isLocallyOwnedThread(threadId)) {
+      return false;
+    }
+
     rawStatesByThreadId.set(threadId, nextState);
     rawStateUpdatedAtByThreadId.set(threadId, now());
     // A usable state arrived: recovery bookkeeping and pre-baseline queued
     // patches are obsolete (snapshots replace state wholesale).
     baselineRecoveryStateByThreadId.delete(threadId);
-    if (!isPatchChange(params.change)) {
+    if (!isPatch) {
       queuedChangesByThreadId.delete(threadId);
     }
     if (backgroundOnlyThreadIds.has(threadId)) {
       syncBackgroundThreadLifecycle(threadId, nextState);
     } else {
       syncProjectedConversationState(threadId, nextState, {
-        isFullSnapshot: isSnapshotChange(params.change),
+        isFullSnapshot,
       });
     }
     syncProjectedActions(threadId, projectPendingDesktopActions(threadId, nextState));
     releaseHeldFollowerRequests(threadId, { toDesktop: true });
+    return true;
   }
 
   function onDisconnect() {
@@ -554,6 +617,7 @@ function createDesktopIpcActionFollower({
     syncProjectedActions(threadId, []);
     rawStatesByThreadId.delete(threadId);
     rawStateUpdatedAtByThreadId.delete(threadId);
+    cancelPendingSnapshot(threadId);
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
     canonicalActiveTurnsByThreadId.delete(threadId);
@@ -581,6 +645,7 @@ function createDesktopIpcActionFollower({
     syncProjectedActions(threadId, []);
     rawStatesByThreadId.delete(threadId);
     rawStateUpdatedAtByThreadId.delete(threadId);
+    cancelPendingSnapshot(threadId);
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
     canonicalActiveTurnsByThreadId.delete(threadId);

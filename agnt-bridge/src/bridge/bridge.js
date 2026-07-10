@@ -276,6 +276,7 @@ function startBridge({
         return safeParseJSON(normalized)?.params || params;
       },
       socketPath: config.desktopIpcSocketPath || undefined,
+      snapshotDebounceMs: config.desktopIpcSnapshotDebounceMs,
     })
     : null;
   const desktopIpcActionFollower = !config.codexEndpoint
@@ -302,6 +303,7 @@ function startBridge({
         return safeParseJSON(normalized)?.params || params;
       },
       socketPath: config.desktopIpcSocketPath || undefined,
+      snapshotDebounceMs: config.desktopIpcSnapshotDebounceMs,
     })
     : null;
   // Only the spawned local runtime needs rollout mirroring; a real endpoint

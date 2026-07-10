@@ -116,6 +116,7 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
       AGNT_CODEX_ENDPOINT: "ws://localhost:8080",
       AGNT_REFRESH_ENABLED: "true",
       AGNT_DESKTOP_IPC_SOCKET: "/tmp/agnt-ipc.sock",
+      AGNT_DESKTOP_IPC_SNAPSHOT_DEBOUNCE_MS: "42",
     },
     platform: "darwin",
     runtimeRoot: "/tmp/agnt-package",
@@ -152,6 +153,8 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   assert.equal(linuxCommandConfig.refreshEnabled, false);
   assert.equal(explicitOnConfig.refreshEnabled, true);
   assert.equal(explicitOnConfig.desktopIpcSocketPath, "/tmp/agnt-ipc.sock");
+  assert.equal(explicitOnConfig.desktopIpcSnapshotDebounceMs, 42);
+  assert.equal(macConfig.desktopIpcSnapshotDebounceMs, 75);
   assert.equal(explicitOffConfig.refreshEnabled, false);
   assert.equal(explicitOffConfig.keepMacAwakeEnabled, false);
 });

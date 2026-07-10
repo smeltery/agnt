@@ -2456,6 +2456,109 @@ test("desktop IPC follower completes either parallel active turn across normaliz
   assert.equal(outbound.some((message) => message.method === "turn/started"), false);
 });
 
+test("desktop IPC follower coalesces stale normalized snapshot bursts before publishing lifecycle", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-snapshot-coalesce-");
+  let serverSocket = null;
+  const nowValue = Date.now();
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const locallyOwnedThreadIds = new Set();
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    now: () => nowValue,
+    snapshotDebounceMs: 75,
+    isLocallyOwnedThread: (threadId) => locallyOwnedThreadIds.has(threadId),
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  const sendSnapshot = ({ threadId = "thread-snapshot-coalesce", oldStatus, includeNewTurn }) => {
+    const turns = [{ id: "turn-old", status: oldStatus, text: "" }];
+    if (includeNewTurn) {
+      turns.push({ id: "turn-new", status: "inProgress", text: "" });
+    }
+    writeFrame(serverSocket, desktopConversationSnapshot(
+      threadId,
+      normalizedConversationState(turns, {
+        turns: [],
+        threadRuntimeStatus: { type: "active", activeFlags: [] },
+      })
+    ));
+  };
+
+  follower.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-snapshot-coalesce" },
+  }));
+  await waitFor(() => serverSocket);
+
+  sendSnapshot({ oldStatus: "inProgress", includeNewTurn: false });
+  await wait(25);
+  assert.equal(follower.hasLiveThreadState("thread-snapshot-coalesce"), false);
+  assert.deepEqual(outbound.filter((message) => message.method?.startsWith("turn/")), []);
+
+  sendSnapshot({ oldStatus: "completed", includeNewTurn: true });
+  await wait(50);
+  assert.deepEqual(outbound.filter((message) => message.method?.startsWith("turn/")), []);
+
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/started" && message.params?.turnId === "turn-new"
+  )));
+  assert.equal(
+    outbound.some((message) => (
+      message.method === "turn/started" && message.params?.turnId === "turn-old"
+    )),
+    false
+  );
+  assert.equal(
+    outbound.filter((message) => message.method === "thread/replaced").length,
+    1
+  );
+  outbound.length = 0;
+
+  const locallyOwnedThreadId = "thread-owned-during-snapshot-debounce";
+  follower.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: locallyOwnedThreadId },
+  }));
+  sendSnapshot({
+    threadId: locallyOwnedThreadId,
+    oldStatus: "inProgress",
+    includeNewTurn: false,
+  });
+  await wait(25);
+  locallyOwnedThreadIds.add(locallyOwnedThreadId);
+  await wait(75);
+
+  assert.deepEqual(outbound, []);
+  assert.equal(follower.hasLiveThreadState(locallyOwnedThreadId), false);
+});
+
 test("desktop IPC background recovery stays lifecycle-only until open", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-recovery-");
   let serverSocket = null;
