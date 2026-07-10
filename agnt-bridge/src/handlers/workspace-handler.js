@@ -42,6 +42,7 @@ const IMAGE_MIME_TYPES_BY_EXTENSION = new Map([
   [".webp", "image/webp"],
   [".heic", "image/heic"],
   [".heif", "image/heif"],
+  [".svg", "image/svg+xml"],
 ]);
 const repoMutationLocks = new Map();
 
@@ -215,7 +216,7 @@ async function workspaceReadImage(params, options = {}) {
     };
   }
 
-  const data = maxPixelDimension
+  const data = maxPixelDimension && mimeType !== "image/svg+xml"
     ? await readPreviewImageData(realImagePath, maxPixelDimension, stat.size)
     : await fs.promises.readFile(realImagePath);
   return {

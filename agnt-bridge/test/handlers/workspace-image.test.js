@@ -48,6 +48,26 @@ test("workspace/readImage returns base64 image data for a file inside cwd", asyn
   assert.equal(result.dataBase64, bytes.toString("base64"));
 });
 
+test("workspace/readImage returns SVG source as image data", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
+  execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
+  const imagePath = path.join(tempDir, "icon.svg");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>`;
+  fs.writeFileSync(imagePath, svg);
+
+  const result = await handleWorkspaceMethod("workspace/readImage", {
+    cwd: tempDir,
+    path: imagePath,
+    maxPixelDimension: 1600,
+  });
+
+  assert.equal(result.path, fs.realpathSync(imagePath));
+  assert.equal(result.fileName, "icon.svg");
+  assert.equal(result.mimeType, "image/svg+xml");
+  assert.equal(result.byteLength, Buffer.byteLength(svg));
+  assert.equal(result.dataBase64, Buffer.from(svg).toString("base64"));
+});
+
 test("workspace/readImage can return metadata without image bytes", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
