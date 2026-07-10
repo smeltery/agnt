@@ -437,6 +437,63 @@ test("desktop-origin mirror dedupes the same assistant text across event and res
   assert.equal(messages.length, 1);
 });
 
+test("desktop-origin mirror dedupes cumulative reasoning summaries across rollout shapes", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-reasoning-dedupe-shapes",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [taskStarted("turn-reasoning-dedupe-shapes")],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 200,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-reasoning-dedupe-shapes" },
+  }));
+
+  await wait(20);
+  outbound.length = 0;
+  appendRolloutLines(rolloutPath, [
+    agentReasoning("Testing notify command behavior"),
+    agentReasoning("Analyzing notify hook JSON output format"),
+    responseReasoning("reasoning-duplicate", [
+      "Testing notify command behavior",
+      "Analyzing notify hook JSON output format",
+    ]),
+    responseReasoning("reasoning-cumulative", [
+      "Testing notify command behavior",
+      "Analyzing notify hook JSON output format",
+      "Planning parser fix",
+    ]),
+  ]);
+  await wait(30);
+
+  const deltas = outbound
+    .filter((message) => message.method === "item/reasoning/textDelta")
+    .map((message) => message.params.delta);
+  assert.deepEqual(deltas, [
+    "**Testing notify command behavior**\n\n<!-- -->",
+    "\n\n**Analyzing notify hook JSON output format**\n\n<!-- -->",
+    "\n\n**Planning parser fix**\n\n<!-- -->",
+  ]);
+  assert.equal(deltas.join("").includes("-->**"), false);
+});
+
 test("desktop-origin sibling terminal does not hijack a synthetic active turn", async (t) => {
   const { homeDir, rolloutPath } = createTemporaryRolloutHome({
     threadId: "thread-synthetic-sibling",
@@ -1981,6 +2038,32 @@ function responseMessage(message, phase = "final_answer", id = "msg-response", t
     timestamp: "2026-03-15T19:47:40.000Z",
     type: "response_item",
     payload,
+  });
+}
+
+function agentReasoning(title) {
+  return JSON.stringify({
+    timestamp: "2026-03-15T19:47:39.000Z",
+    type: "event_msg",
+    payload: {
+      type: "agent_reasoning",
+      text: `**${title}**\n\n<!-- -->`,
+    },
+  });
+}
+
+function responseReasoning(id, titles) {
+  return JSON.stringify({
+    timestamp: "2026-03-15T19:47:39.500Z",
+    type: "response_item",
+    payload: {
+      type: "reasoning",
+      id,
+      summary: titles.map((title) => ({
+        type: "summary_text",
+        text: `**${title}**\n\n<!-- -->`,
+      })),
+    },
   });
 }
 

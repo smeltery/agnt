@@ -729,12 +729,32 @@ function reasoningNotifications(state, text) {
     return [];
   }
 
-  const delta = readString(text);
-  if (!delta) {
+  const rawText = readString(text);
+  if (!rawText) {
     return ensureThinkingNotifications(state);
   }
 
+  const summaryEntries = summaryOnlyReasoningEntries(rawText);
+  let visibleText = rawText;
+  if (summaryEntries) {
+    const unseenEntries = summaryEntries.filter((entry) => {
+      if (state.emittedReasoningSummaryKeys.has(entry.key)) {
+        return false;
+      }
+      state.emittedReasoningSummaryKeys.add(entry.key);
+      return true;
+    });
+    if (unseenEntries.length === 0) {
+      return [];
+    }
+    visibleText = unseenEntries
+      .map((entry) => `**${entry.title}**\n\n<!-- -->`)
+      .join("\n\n");
+  }
+
   state.hasThinking = true;
+  const delta = `${state.hasReasoningContent ? "\n\n" : ""}${visibleText}`;
+  state.hasReasoningContent = true;
   return [
     createNotification("item/reasoning/textDelta", {
       threadId: state.threadId,
@@ -743,6 +763,29 @@ function reasoningNotifications(state, text) {
       delta,
     }),
   ];
+}
+
+function summaryOnlyReasoningEntries(text) {
+  const entries = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || /^<!--.*-->$/.test(line)) {
+      continue;
+    }
+    const match = /^\*\*(.+?)\*\*$/.exec(line);
+    if (!match) {
+      return null;
+    }
+    const title = match[1].trim();
+    if (!title) {
+      return null;
+    }
+    entries.push({
+      title,
+      key: title.replace(/\s+/g, " ").toLowerCase(),
+    });
+  }
+  return entries.length > 0 ? entries : null;
 }
 
 function toolStartNotifications(state, payload) {
@@ -1058,6 +1101,8 @@ function createMirrorState(threadId) {
     pendingSyntheticTerminalErrorMessage: "",
     reasoningItemId: null,
     hasThinking: false,
+    hasReasoningContent: false,
+    emittedReasoningSummaryKeys: new Set(),
     commandCalls: new Map(),
     applyPatchCalls: new Map(),
     emittedPatchApplyEndCalls: new Set(),
@@ -1397,6 +1442,8 @@ function resetRunState(state) {
   clearPendingSyntheticTerminal(state);
   state.reasoningItemId = null;
   state.hasThinking = false;
+  state.hasReasoningContent = false;
+  state.emittedReasoningSummaryKeys.clear();
   state.commandCalls.clear();
   state.applyPatchCalls.clear();
   state.emittedPatchApplyEndCalls.clear();
