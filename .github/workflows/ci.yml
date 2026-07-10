@@ -79,6 +79,16 @@ jobs:
             rhysd/actionlint:latest \
             -color
 
+  ci-routing:
+    needs: changes
+    if: needs.changes.outputs.lint_workflows == 'true'
+    name: CI routing tests
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
       - name: Test CI change detector
         run: ./.github/scripts/test-detect-ci-changes.sh
 
@@ -175,6 +185,7 @@ jobs:
     needs:
       - changes
       - workflow-lint
+      - ci-routing
       - bun-packages
       - android
       - ios
@@ -189,6 +200,7 @@ jobs:
           for result in \
             "${{ needs.changes.result }}" \
             "${{ needs.workflow-lint.result }}" \
+            "${{ needs.ci-routing.result }}" \
             "${{ needs.bun-packages.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \
