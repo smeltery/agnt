@@ -1,5 +1,5 @@
-name: Setup Bun package
-description: Install, optionally audit, and run CI for a Bun package through Flox.
+name: Run Bun package CI
+description: Install, optionally audit, and run a Bun package CI script through Flox.
 
 inputs:
   working-directory:

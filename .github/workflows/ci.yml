@@ -58,7 +58,7 @@ jobs:
         run: |
           ./.github/scripts/detect-ci-changes.sh
 
-  workflow-checks:
+  ci-config:
     needs: changes
     if: needs.changes.outputs.lint_workflows == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -95,7 +95,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup and run package CI
-        uses: ./.github/actions/setup-bun-package
+        uses: ./.github/actions/run-bun-package-ci
         with:
           working-directory: ${{ matrix.working-directory }}
           frozen-lockfile: ${{ matrix.frozen-lockfile }}
@@ -173,7 +173,7 @@ jobs:
   ci-summary:
     needs:
       - changes
-      - workflow-checks
+      - ci-config
       - bun-packages
       - android
       - ios
@@ -187,7 +187,7 @@ jobs:
 
           for result in \
             "${{ needs.changes.result }}" \
-            "${{ needs.workflow-checks.result }}" \
+            "${{ needs.ci-config.result }}" \
             "${{ needs.bun-packages.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \

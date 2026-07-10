@@ -97,7 +97,7 @@ cases=(
   "workflow|push||.github/workflows/ci.yml|true|true|true|true|agnt-bridge relay agnt-web agnt-host"
   "bridge|push||agnt-bridge/src/bridge/bridge.js|false|false|false|false|agnt-bridge"
   "secure|push||agnt-web/src/crypto/transcript.ts|false|true|true|false|agnt-bridge agnt-web"
-  "bun_action|push||.github/actions/setup-bun-package/action.yml|true|false|false|false|agnt-bridge relay agnt-web agnt-host"
+  "bun_action|push||.github/actions/run-bun-package-ci/action.yml|true|false|false|false|agnt-bridge relay agnt-web agnt-host"
   "flox_config|push||.flox/env/manifest.toml|false|true|false|false|agnt-bridge relay agnt-web agnt-host"
   "flox_action|push||.github/actions/setup-flox/action.yml|true|true|false|false|agnt-bridge relay agnt-web agnt-host"
   "android_action|push||.github/actions/run-android-ci/action.yml|true|true|false|false|"
