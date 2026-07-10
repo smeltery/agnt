@@ -326,6 +326,54 @@ final class CodexServiceCatchupRecoveryTests: XCTestCase {
         XCTAssertEqual(service.threadDisplayPhase(threadId: threadID), .loading)
     }
 
+    func testEmptyCanonicalSourceReplacementKeepsCachedRowsAndRetries() async throws {
+        let service = makeService()
+        let threadID = "thread-empty-replacement"
+        service.isConnected = true
+        service.isInitialized = true
+        service.supportsTurnPagination = true
+        service.activeThreadId = threadID
+        service.pendingCanonicalSourceReplacementThreadIDs.insert(threadID)
+        service.upsertThread(CodexThread(id: threadID, title: "Existing chat"))
+        service.messagesByThread[threadID] = [
+            CodexMessage(id: "cached", threadId: threadID, role: .assistant, text: "Cached replacement source"),
+        ]
+        service.requestTransportOverride = { method, _ in
+            switch method {
+            case "thread/read":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "thread": .object([
+                            "id": .string(threadID),
+                            "title": .string("Existing chat"),
+                        ]),
+                    ]),
+                    includeJSONRPC: false
+                )
+            case "thread/turns/list":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object(["data": .array([]), "nextCursor": .null]),
+                    includeJSONRPC: false
+                )
+            default:
+                return RPCMessage(id: .string(UUID().uuidString), result: .object([:]), includeJSONRPC: false)
+            }
+        }
+
+        let outcome = try await service.loadThreadHistoryIfNeeded(threadId: threadID, forceRefresh: true)
+        service.isConnected = false
+        service.canonicalHistoryReconcileTaskByThreadID[threadID]?.cancel()
+        service.canonicalHistoryReconcileRetryTaskByThreadID[threadID]?.cancel()
+
+        XCTAssertEqual(outcome, .deferredAfterEmptyPage)
+        XCTAssertEqual(service.messages(for: threadID).map(\.text), ["Cached replacement source"])
+        XCTAssertTrue(service.pendingCanonicalSourceReplacementThreadIDs.contains(threadID))
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+        XCTAssertFalse(service.hydratedThreadIDs.contains(threadID))
+    }
+
     func testBridgePaginationFailureKeepsCachedRowsAndRetries() async throws {
         let service = makeService()
         let threadID = "thread-bridge-retry"

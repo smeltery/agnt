@@ -2288,6 +2288,93 @@ final class CodexServiceIncomingCommandExecutionTests: XCTestCase {
         XCTAssertEqual(imageRows[0].text, "![Generated image](</Users/example/generated image.png>)")
     }
 
+    func testThreadReplacedMarksCanonicalSourceReplacement() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        service.projectedTerminalStateByThreadID[threadID] = ["ipc-turn-1": .completed]
+
+        service.handleNotification(
+            method: "thread/replaced",
+            params: .object(["threadId": .string(threadID)])
+        )
+
+        XCTAssertNil(service.projectedTerminalStateByThreadID[threadID])
+        XCTAssertTrue(service.pendingCanonicalSourceReplacementThreadIDs.contains(threadID))
+        XCTAssertTrue(service.forcedHistoryLoadThreadIDs.contains(threadID))
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+    }
+
+    func testCanonicalSourceReplacementPrunesStaleMirrorRows() {
+        let threadID = "thread-\(UUID().uuidString)"
+        let existing = [
+            CodexMessage(
+                id: "older",
+                threadId: threadID,
+                role: .assistant,
+                text: "Older cached page",
+                turnId: "old-real-turn",
+                itemId: "old-real-item",
+                orderIndex: 0
+            ),
+            CodexMessage(
+                id: "mirror-user",
+                threadId: threadID,
+                role: .user,
+                text: "Build the app",
+                turnId: "ipc-turn-1",
+                itemId: "ipc-turn-1:input",
+                deliveryState: .confirmed,
+                orderIndex: 1
+            ),
+            CodexMessage(
+                id: "mirror-finding",
+                threadId: threadID,
+                role: .system,
+                kind: .thinking,
+                text: "Stale synthetic finding",
+                turnId: "ipc-turn-1",
+                itemId: "turn:ipc-turn-1|kind:thinking",
+                orderIndex: 2
+            ),
+            CodexMessage(
+                id: "pending-user",
+                threadId: threadID,
+                role: .user,
+                text: "Still sending",
+                deliveryState: .pending,
+                orderIndex: 3
+            ),
+        ]
+        let history = [
+            CodexMessage(
+                id: "canonical-user",
+                threadId: threadID,
+                role: .user,
+                text: "Build the app",
+                turnId: "turn-real",
+                itemId: "item-user",
+                deliveryState: .confirmed,
+                orderIndex: 0
+            ),
+            CodexMessage(
+                id: "canonical-assistant",
+                threadId: threadID,
+                role: .assistant,
+                text: "Done",
+                turnId: "turn-real",
+                itemId: "item-assistant",
+                orderIndex: 1
+            ),
+        ]
+
+        let repaired = CodexService.existingMessagesForCanonicalSourceReplacement(existing, history: history)
+
+        XCTAssertTrue(repaired.contains { $0.id == "older" })
+        XCTAssertTrue(repaired.contains { $0.id == "mirror-user" })
+        XCTAssertFalse(repaired.contains { $0.id == "mirror-finding" })
+        XCTAssertTrue(repaired.contains { $0.id == "pending-user" })
+    }
+
     func testTurnTerminalStatePersistsCompletedGroupingAfterRelaunch() {
         let suiteName = "CodexServiceIncomingCommandExecutionTests.persist.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard

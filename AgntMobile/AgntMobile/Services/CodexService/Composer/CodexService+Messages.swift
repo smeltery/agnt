@@ -172,8 +172,13 @@ extension CodexService {
         threadId: String,
         loadedViaPagination: Bool
     ) -> Bool {
-        guard loadedViaPagination else {
+        let hasPendingSourceReplacement = pendingCanonicalSourceReplacementThreadIDs.contains(threadId)
+        guard loadedViaPagination || hasPendingSourceReplacement else {
             return false
+        }
+
+        if hasPendingSourceReplacement {
+            return true
         }
 
         if messagesByThread[threadId]?.isEmpty == false {
@@ -249,6 +254,7 @@ extension CodexService {
         threadsPendingCompletionHaptic.remove(threadId)
         threadsNeedingCanonicalHistoryReconcile.remove(threadId)
         provisionalPaginatedHistoryThreadIDs.remove(threadId)
+        pendingCanonicalSourceReplacementThreadIDs.remove(threadId)
         canonicalHistoryReconcileRetryAttemptByThreadID.removeValue(forKey: threadId)
         threadsWithSatisfiedDeferredHistoryHydration.remove(threadId)
         olderThreadHistoryCursorByThreadID.removeValue(forKey: threadId)
@@ -279,6 +285,7 @@ extension CodexService {
         cancelAllPendingStreamingDeltaFlushes()
         threadsNeedingCanonicalHistoryReconcile.removeAll()
         provisionalPaginatedHistoryThreadIDs.removeAll()
+        pendingCanonicalSourceReplacementThreadIDs.removeAll()
         canonicalHistoryReconcileRetryAttemptByThreadID.removeAll()
         threadsWithSatisfiedDeferredHistoryHydration.removeAll()
         olderThreadHistoryCursorByThreadID.removeAll()
@@ -1255,10 +1262,16 @@ extension CodexService {
                     : .loadedPaginatedWindow)
                 : .loadedCanonicalHistory
             if !historyMessages.isEmpty {
-                let existingMessages = messagesByThread[threadId] ?? []
+                let cachedMessages = messagesByThread[threadId] ?? []
+                let replacesMirroredSourceEpoch = !loadedProvisionalJsonlFallback
+                    && pendingCanonicalSourceReplacementThreadIDs.contains(threadId)
+                let existingMessages = replacesMirroredSourceEpoch
+                    ? Self.existingMessagesForCanonicalSourceReplacement(cachedMessages, history: historyMessages)
+                    : cachedMessages
                 let activeThreadIDs = Set(activeTurnIdByThread.keys)
                 let runningIDs = runningThreadIDs
-                let usedRecentWindow = shouldForceRefresh
+                let usedRecentWindow = !replacesMirroredSourceEpoch
+                    && shouldForceRefresh
                     && threadHasActiveOrRunningTurn(threadId)
                     && Self.shouldPreferRecentHistoryWindow(
                         existingCount: existingMessages.count,
@@ -1299,7 +1312,7 @@ extension CodexService {
                 // Keep any already-hydrated local transcript and merge pages into it. Do not
                 // shrink a legacy/full local cache down to only the first paginated page.
                 let nextMessages = merged
-                if nextMessages != existingMessages {
+                if nextMessages != cachedMessages {
                     messagesByThread[threadId] = nextMessages
                     persistMessages()
                     updateCurrentOutput(for: threadId)
@@ -1319,6 +1332,9 @@ extension CodexService {
                     markThreadNeedingCanonicalHistoryReconcile(threadId)
                 } else if loadedViaPagination {
                     provisionalPaginatedHistoryThreadIDs.remove(threadId)
+                }
+                if replacesMirroredSourceEpoch {
+                    pendingCanonicalSourceReplacementThreadIDs.remove(threadId)
                 }
             } else if didUpdateTerminalStates {
                 refreshThreadTimelineState(for: threadId)

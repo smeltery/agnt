@@ -592,6 +592,8 @@ final class CodexService {
     @ObservationIgnored var isApplyingReplayedBridgeEvent = false
     // Lets a late force caller upgrade an in-flight history load without spawning another thread/read.
     @ObservationIgnored var forcedHistoryLoadThreadIDs: Set<String> = []
+    // Marks desktop mirror source handoffs that need canonical history to replace stale mirror rows.
+    @ObservationIgnored var pendingCanonicalSourceReplacementThreadIDs: Set<String> = []
     // Preserves callers that need "not materialized" reads to keep retrying instead of marking hydrated.
     @ObservationIgnored var deferHydratedMarkForNotMaterializedThreadIDs: Set<String> = []
     // Coalesces per-thread resume work so rapid thread switches reuse the same in-flight refresh.

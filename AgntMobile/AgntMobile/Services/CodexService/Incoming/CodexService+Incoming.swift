@@ -279,6 +279,9 @@ extension CodexService {
         case "thread/tokenUsage/updated":
             handleThreadTokenUsageUpdated(paramsObject)
 
+        case "thread/replaced":
+            handleThreadReplaced(paramsObject)
+
         case "account/updated":
             handleGPTAccountUpdated(paramsObject)
 
@@ -439,6 +442,19 @@ extension CodexService {
             activeThreadId = thread.id
         }
         requestImmediateSync(threadId: thread.id)
+    }
+
+    private func handleThreadReplaced(_ paramsObject: IncomingParamsObject?) {
+        guard let threadId = extractThreadID(from: paramsObject)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !threadId.isEmpty else {
+            return
+        }
+
+        projectedTerminalStateByThreadID.removeValue(forKey: threadId)
+        pendingCanonicalSourceReplacementThreadIDs.insert(threadId)
+        forcedHistoryLoadThreadIDs.insert(threadId)
+        markThreadNeedingCanonicalHistoryReconcile(threadId, requestImmediateSync: true)
     }
 
     // Mirrors desktop behavior: when server pushes a thread rename, update local
