@@ -4,6 +4,7 @@
 // Exports: createVoiceHandler
 // Depends on: global fetch/FormData/Blob, local codex app-server auth via sendCodexRequest
 
+const { isChatGPTAuthMethod } = require("./account-status");
 const { createJsonRpcRequestHandler } = require("./handler-utils");
 
 const CHATGPT_TRANSCRIPTIONS_URL = "https://chatgpt.com/backend-api/transcribe";
@@ -154,7 +155,7 @@ async function loadAuthContext(sendCodexRequest) {
 
   const authMethod = readString(authStatus?.authMethod);
   const token = readString(authStatus?.authToken);
-  const isChatGPT = authMethod === "chatgpt" || authMethod === "chatgptAuthTokens";
+  const isChatGPT = isChatGPTAuthMethod(authMethod);
 
   if (!token) {
     throw voiceError("not_authenticated", "Sign in with ChatGPT before using voice transcription.");
@@ -303,7 +304,7 @@ async function resolveVoiceAuth(sendCodexRequest) {
 
   const authMethod = readString(authStatus?.authMethod);
   const token = readString(authStatus?.authToken);
-  const isChatGPT = authMethod === "chatgpt" || authMethod === "chatgptAuthTokens";
+  const isChatGPT = isChatGPTAuthMethod(authMethod);
 
   // Check for a usable ChatGPT token first. The runtime may set requiresOpenaiAuth
   // even when a valid ChatGPT session is present (the flag is about the runtime's

@@ -164,6 +164,46 @@ test("voice/transcribe rejects API-key auth because voice remains ChatGPT-only",
   assert.match(responses[0].error?.message || "", /requires a ChatGPT account/);
 });
 
+test("voice/transcribe accepts snake-case ChatGPT auth methods", async () => {
+  const responses = [];
+  let fetchCalls = 0;
+  const handler = createVoiceHandler({
+    sendCodexRequest: async () => ({
+      authMethod: "chatgpt_auth_tokens",
+      authToken: "chatgpt-token",
+      requiresOpenaiAuth: true,
+    }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { text: "snake case transcript" };
+        },
+      };
+    },
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-snake-chatgpt",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/wav",
+      audioBase64: makeTestWavBase64(),
+      sampleRateHz: 24_000,
+      durationMs: 300,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await tick();
+
+  assert.equal(fetchCalls, 1);
+  assert.equal(responses[0].result?.text, "snake case transcript");
+});
+
 test("voice/transcribe returns a user-facing auth error when Mac auth is missing", async () => {
   const responses = [];
   const handler = createVoiceHandler({
@@ -337,6 +377,16 @@ test("resolveVoiceAuth returns token for ChatGPT sessions", async () => {
       requiresOpenaiAuth: false,
     };
   });
+
+  assert.deepEqual(result, { token: "chatgpt-token-abc" });
+});
+
+test("resolveVoiceAuth accepts snake-case ChatGPT auth methods", async () => {
+  const result = await resolveVoiceAuth(async () => ({
+    authMethod: "chatgpt_auth_tokens",
+    authToken: "chatgpt-token-abc",
+    requiresOpenaiAuth: true,
+  }));
 
   assert.deepEqual(result, { token: "chatgpt-token-abc" });
 });
