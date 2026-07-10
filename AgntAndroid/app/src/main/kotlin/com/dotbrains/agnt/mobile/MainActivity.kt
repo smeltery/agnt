@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.dotbrains.agnt.mobile.core.model.AppLanguagePreference
 import com.dotbrains.agnt.mobile.core.model.AppThemePreference
 import com.dotbrains.agnt.mobile.core.notification.AgntLocalNotificationPresenter
+import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutCatalog
 import com.dotbrains.agnt.mobile.data.LanguagePreferences
 import com.dotbrains.agnt.mobile.data.ThemePreferences
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
@@ -32,6 +33,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleNotificationLaunchIntent(intent)
+        handleShortcutLaunchIntent(intent)
         setContent {
             val context = LocalContext.current
             var themePref by remember { mutableStateOf(ThemePreferences.read(context)) }
@@ -70,6 +72,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleNotificationLaunchIntent(intent)
+        handleShortcutLaunchIntent(intent)
     }
 
     private fun handleNotificationLaunchIntent(intent: Intent?) {
@@ -79,5 +82,15 @@ class MainActivity : ComponentActivity() {
         if (tid.isNotEmpty() && AgntLocalNotificationPresenter.consumeLaunchToken(this, intent, tid)) {
             AppContainer.setPendingOpenThreadFromNotification(tid)
         }
+    }
+
+    private fun handleShortcutLaunchIntent(intent: Intent?) {
+        if (intent?.action != AgntShortcutCatalog.ACTION_SHORTCUT) return
+        val action =
+            AgntShortcutCatalog.actionFromIntentExtras(
+                action = intent.getStringExtra(AgntShortcutCatalog.EXTRA_ACTION),
+                threadId = intent.getStringExtra(AgntShortcutCatalog.EXTRA_THREAD_ID),
+            ) ?: return
+        AppContainer.publishShortcutLaunch(action)
     }
 }

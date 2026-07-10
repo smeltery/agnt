@@ -5,6 +5,7 @@ import com.dotbrains.agnt.mobile.core.persistence.AIChangeSetPersistence
 import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
 import com.dotbrains.agnt.mobile.core.persistence.SessionPersistence
 import com.dotbrains.agnt.mobile.core.security.SecureStore
+import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutAction
 import com.dotbrains.agnt.mobile.core.terminal.TerminalController
 import com.dotbrains.agnt.mobile.core.terminal.TerminalKnownHostStore
 import com.dotbrains.agnt.mobile.core.terminal.TerminalPrivateKeyStore
@@ -12,15 +13,24 @@ import com.dotbrains.agnt.mobile.core.terminal.TerminalProfileStore
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.PetCompanionStore
 import com.dotbrains.agnt.mobile.services.agent.AgentService
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 /** Application-wide services (secure store, persistence, OkHttp, bridge client). */
 object AppContainer {
     private val pendingNotificationThreadLock = Any()
+    private val pendingShortcutLock = Any()
 
     @Volatile
     private var pendingNotificationThreadId: String? = null
+
+    @Volatile
+    private var pendingShortcutAction: AgntShortcutAction? = null
+
+    private val shortcutLaunchEvents = MutableSharedFlow<AgntShortcutAction>(extraBufferCapacity = 1)
+    val shortcutLaunches = shortcutLaunchEvents.asSharedFlow()
 
     /** Set when the user taps a local notification ([AgntLocalNotificationPresenter]). */
     fun setPendingOpenThreadFromNotification(threadId: String?) {
@@ -34,6 +44,20 @@ object AppContainer {
         synchronized(pendingNotificationThreadLock) {
             val v = pendingNotificationThreadId
             pendingNotificationThreadId = null
+            v
+        }
+
+    fun publishShortcutLaunch(action: AgntShortcutAction) {
+        synchronized(pendingShortcutLock) {
+            pendingShortcutAction = action
+        }
+        shortcutLaunchEvents.tryEmit(action)
+    }
+
+    fun consumePendingShortcutLaunch(): AgntShortcutAction? =
+        synchronized(pendingShortcutLock) {
+            val v = pendingShortcutAction
+            pendingShortcutAction = null
             v
         }
 

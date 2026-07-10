@@ -476,6 +476,14 @@ Banned-identifier sweep clean over added/changed files.
       language-token highlighting, and a 512 KB highlight cap that falls back to
       plain monospace for large files. Coverage: `WorkspaceCodePreviewTest`.
 
+### P3.2 — launcher quick actions
+
+- [x] **Home Screen quick actions.** Android now publishes dynamic launcher
+      shortcuts for New Chat plus the two most recent live threads. Shortcut
+      taps are parsed by `MainActivity`, buffered through `AppContainer`, and
+      routed by `MainShell` to either the new-chat draft screen or the selected
+      thread. Coverage: `AgntShortcutCatalogTest`.
+
 ## Finishing the upstream parity audit
 
 Per `ios-android-parity-plan.md`, the reasonable code-inspection parity gaps

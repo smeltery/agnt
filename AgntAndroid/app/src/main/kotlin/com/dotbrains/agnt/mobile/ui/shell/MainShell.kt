@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.GitDiffTotals
@@ -63,6 +64,8 @@ import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightPolicy
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlert
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertAction
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertButtonRole
+import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutAction
+import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutPublisher
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnAggregator
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnFileRow
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
@@ -78,6 +81,7 @@ import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
 import com.dotbrains.agnt.mobile.ui.agent.ConversationHeader
 import com.dotbrains.agnt.mobile.ui.agent.SidebarDrawerContent
 import com.dotbrains.agnt.mobile.ui.agent.truncatePathMiddle
+import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftSource
 import com.dotbrains.agnt.mobile.ui.home.BridgeUpdateSheet
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressBannerState
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressPhase
@@ -929,6 +933,31 @@ fun MainShell(
     }
 
     val hasSidebarSnapshot = threads.isNotEmpty()
+    LaunchedEffect(context, threads) {
+        AgntShortcutPublisher.publish(context, threads)
+    }
+
+    LaunchedEffect(navController, repository) {
+        suspend fun routeShortcut(action: AgntShortcutAction) {
+            when (action) {
+                AgntShortcutAction.NewChat -> {
+                    navController.navigate(AppRoutes.newChatDraftRoute(NewChatDraftSource.generalChat.name)) {
+                        launchSingleTop = true
+                    }
+                }
+                is AgntShortcutAction.OpenThread -> {
+                    repository.setActiveThreadId(action.threadId)
+                    navController.popBackStack(AppRoutes.Home, inclusive = false)
+                }
+            }
+        }
+        AppContainer.consumePendingShortcutLaunch()?.let { routeShortcut(it) }
+        AppContainer.shortcutLaunches.collect {
+            AppContainer.consumePendingShortcutLaunch()
+            routeShortcut(it)
+        }
+    }
+
     LaunchedEffect(drawerState, ready, hasSidebarSnapshot) {
         snapshotFlow { drawerState.isOpen }
             .collect { open ->
