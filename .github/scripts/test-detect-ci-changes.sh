@@ -93,12 +93,26 @@ assert_output "$bun_action_output" ios false
 assert_output "$bun_action_output" links false
 assert_bun_names "$bun_action_output" agnt-bridge relay agnt-web agnt-host
 
-flox_action_output="$(run_detector flox_action push "" ".github/actions/setup-flox/action.yml")"
-assert_output "$flox_action_output" lint_workflows true
-assert_output "$flox_action_output" android true
-assert_output "$flox_action_output" ios false
-assert_output "$flox_action_output" links false
-assert_bun_names "$flox_action_output" agnt-bridge relay agnt-web agnt-host
+flox_config_output="$(run_detector flox_config push "" ".flox/env/manifest.toml")"
+assert_output "$flox_config_output" lint_workflows false
+assert_output "$flox_config_output" android true
+assert_output "$flox_config_output" ios false
+assert_output "$flox_config_output" links false
+assert_bun_names "$flox_config_output" agnt-bridge relay agnt-web agnt-host
+
+android_action_output="$(run_detector android_action push "" ".github/actions/run-android-ci/action.yml")"
+assert_output "$android_action_output" lint_workflows true
+assert_output "$android_action_output" android true
+assert_output "$android_action_output" ios false
+assert_output "$android_action_output" links false
+assert_bun_names "$android_action_output"
+
+ios_action_output="$(run_detector ios_action push "" ".github/actions/build-unsigned-ios-ipa/action.yml")"
+assert_output "$ios_action_output" lint_workflows true
+assert_output "$ios_action_output" android false
+assert_output "$ios_action_output" ios true
+assert_output "$ios_action_output" links false
+assert_bun_names "$ios_action_output"
 
 manual_bun_output="$(run_detector manual_bun workflow_dispatch bun "")"
 assert_output "$manual_bun_output" lint_workflows false

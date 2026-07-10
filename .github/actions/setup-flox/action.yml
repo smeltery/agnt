@@ -1,8 +1,0 @@
-name: Setup Flox
-description: Install the pinned Flox environment used by agnt CI.
-
-runs:
-  using: composite
-  steps:
-    - name: Install Flox
-      uses: flox/install-flox-action@v2

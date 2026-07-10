@@ -55,9 +55,10 @@ set_output() {
 ci_config='^(\.github/workflows/|\.github/actions/|\.github/scripts/|\.github/actionlint\.ya?ml)'
 link_check_action='^\.github/actions/run-link-check/'
 setup_bun_action='^\.github/actions/setup-bun-package/'
-setup_flox_action='^\.github/actions/setup-flox/'
+android_ci_action='^\.github/actions/run-android-ci/'
+ios_ipa_action='^\.github/actions/build-unsigned-ios-ipa/'
 flox_config='^\.flox/'
-flox_common="$flox_config|$setup_flox_action"
+flox_common="$flox_config"
 bun_common="$flox_common|$setup_bun_action"
 secure_bridge='^agnt-bridge/src/(transport/)?secure-transport\.js'
 secure_web='^agnt-web/src/crypto/'
@@ -84,14 +85,14 @@ if should_run web "$bun_common|$secure_transport|^agnt-web/"; then
   bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
 fi
 
-if should_run android "$flox_common|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
+if should_run android "$android_ci_action|$flox_common|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
 
 if should_run host "$bun_common|^agnt-host/"; then
   # agnt-host does not commit a Bun lockfile yet.
   bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
 fi
 
-if should_run ios "$secure_transport|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
+if should_run ios "$ios_ipa_action|$secure_transport|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
 
 if [[ "$event_name" == "schedule" ]] || requested links || matches "$link_check_action|^.*\.md$|^\.lycheeignore$"; then
   set_output links true
