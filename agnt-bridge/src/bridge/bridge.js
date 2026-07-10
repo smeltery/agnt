@@ -55,6 +55,7 @@ const {
   truncateRelayTextTail,
   parseAdaptiveThreadTurnsListRequest,
   fetchAdaptiveThreadTurnsListForRelay,
+  createThreadTurnsListFastPageCoordinator,
   maybeBuildJsonlThreadTurnsListFallback,
   buildEmptyTurnsListResponse,
   isEmptyTurnsListResponse,
@@ -166,6 +167,7 @@ function startBridge({
     enabled: config.keepMacAwakeEnabled,
   });
   const bridgePreferences = createBridgePreferences({ config, bridgeWakeAssertion });
+  const threadTurnsListFastPageCoordinator = createThreadTurnsListFastPageCoordinator();
   // Static desktop-bundle metadata for the active provider (Codex.app today,
   // null for Claude / opencode / Cursor). Provider-agnostic handlers consume
   // this instead of reaching into Codex-named config fields.
@@ -629,15 +631,24 @@ function startBridge({
     rememberThreadFromMessage("phone", rawMessage);
     (async () => {
       try {
-        const response = await fetchAdaptiveThreadTurnsListForRelay(request, {
-          fetchPage: (params) => bridgeManagedCodex.sendRequest("thread/turns/list", params),
-          sanitizeForRelay: (raw, method) => sanitizeThreadHistoryImagesForRelay(raw, method, {
-            activeProviderId: activeProvider.id,
+        const selection = await threadTurnsListFastPageCoordinator.resolve(request, {
+          fetchCanonical: (canonicalRequest) => fetchAdaptiveThreadTurnsListForRelay(canonicalRequest, {
+            fetchPage: (params) => bridgeManagedCodex.sendRequest("thread/turns/list", params),
+            sanitizeForRelay: (raw, method) => sanitizeThreadHistoryImagesForRelay(raw, method, {
+              activeProviderId: activeProvider.id,
+            }),
+          }),
+          readJsonl: (jsonlRequest) => ({
+            response: maybeBuildJsonlThreadTurnsListFallback(
+              activeProvider,
+              jsonlRequest,
+              buildEmptyTurnsListResponse(jsonlRequest)
+            ),
+            usesJsonl: true,
           }),
         });
-        const fallbackResponse = maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, response);
         forwardedRequestTracker.markSanitizedResponse(request.id, "thread/turns/list");
-        sendApplicationResponse(JSON.stringify(fallbackResponse ?? response));
+        sendApplicationResponse(JSON.stringify(selection.response));
       } catch (error) {
         sendApplicationResponse(createJsonRpcErrorResponse(
           request.id,
