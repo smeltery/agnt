@@ -47,6 +47,7 @@ const {
 } = require("../desktop/rollout-watch");
 const {
   parseSessionJsonlMetadata,
+  readSessionJsonlMetadataFromFile,
 } = require("../providers/codex/session-jsonl-history");
 const {
   isUserRoleHistoryItem,
@@ -194,6 +195,7 @@ function augmentRelayThreadWithJsonlMetadata(thread, threadId = "", {
   resolveSessionsRootImpl = resolveSessionsRoot,
   findRecentRolloutFileForContextReadImpl = findRecentRolloutFileForContextRead,
   parseSessionJsonlMetadataImpl = parseSessionJsonlMetadata,
+  readSessionJsonlMetadataFromFileImpl = readSessionJsonlMetadataFromFile,
   fsModule = fs,
   now = () => Date.now(),
   logger = console,
@@ -202,6 +204,7 @@ function augmentRelayThreadWithJsonlMetadata(thread, threadId = "", {
     resolveSessionsRootImpl,
     findRecentRolloutFileForContextReadImpl,
     parseSessionJsonlMetadataImpl,
+    readSessionJsonlMetadataFromFileImpl,
     fsModule,
     now,
     logger,
@@ -229,6 +232,7 @@ function readJsonlThreadCwd(threadId, {
   resolveSessionsRootImpl,
   findRecentRolloutFileForContextReadImpl,
   parseSessionJsonlMetadataImpl,
+  readSessionJsonlMetadataFromFileImpl,
   fsModule,
   now,
   logger,
@@ -275,7 +279,9 @@ function readJsonlThreadCwd(threadId, {
       }
     }
 
-    const metadata = parseSessionJsonlMetadataImpl(fsModule.readFileSync(rolloutPath, "utf8"));
+    const metadata = readSessionJsonlMetadataFromFileImpl
+      ? readSessionJsonlMetadataFromFileImpl(rolloutPath, { fsModule })
+      : parseSessionJsonlMetadataImpl(fsModule.readFileSync(rolloutPath, "utf8"));
     const cwd = normalizeNonEmptyString(metadata?.cwd);
     rememberJsonlThreadCwdCache(cacheKey, {
       rolloutPath,

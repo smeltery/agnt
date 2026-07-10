@@ -15,19 +15,38 @@ const {
   visibleUserPromptText,
 } = require("../../bridge/contextual-user-items");
 
+const JSONL_OLDER_HANDOFF_CURSOR = "agnt-jsonl-fallback-older-unavailable";
+const DEFAULT_SESSION_JSONL_METADATA_HEAD_BYTES = 256 * 1024;
+const DEFAULT_SESSION_JSONL_INITIAL_TAIL_BYTES = 4 * 1024 * 1024;
+const DEFAULT_SESSION_JSONL_MAX_TAIL_BYTES = 64 * 1024 * 1024;
+
 function readThreadTurnsListPageFromSessionJsonl(filePath, {
   threadId = "",
   limit = 5,
   maxLimit = 5,
   cursor = null,
   fsModule = fs,
+  metadataHeadBytes = DEFAULT_SESSION_JSONL_METADATA_HEAD_BYTES,
+  initialTailBytes = DEFAULT_SESSION_JSONL_INITIAL_TAIL_BYTES,
+  maxTailBytes = DEFAULT_SESSION_JSONL_MAX_TAIL_BYTES,
 } = {}) {
   if (!filePath || cursor != null) {
     return null;
   }
 
-  const content = fsModule.readFileSync(filePath, "utf8");
-  const turns = parseSessionJsonlTurns(content, { threadId });
+  const recent = readRecentSessionJsonlTurns(filePath, {
+    threadId,
+    limit: Math.min(
+      Number.isInteger(limit) && limit > 0 ? limit : 5,
+      Number.isInteger(maxLimit) && maxLimit > 0 ? maxLimit : 5,
+      5
+    ),
+    fsModule,
+    metadataHeadBytes,
+    initialTailBytes,
+    maxTailBytes,
+  });
+  const turns = recent?.turns || [];
   if (turns.length === 0) {
     return null;
   }
@@ -38,9 +57,187 @@ function readThreadTurnsListPageFromSessionJsonl(filePath, {
   const pageTurns = turns.slice(-safeLimit).reverse();
   return {
     data: pageTurns,
-    nextCursor: turns.length > pageTurns.length ? "agnt-jsonl-fallback-older-unavailable" : null,
+    nextCursor: recent.hasOlderTurns || turns.length > pageTurns.length ? JSONL_OLDER_HANDOFF_CURSOR : null,
     agntJsonlFallback: true,
   };
+}
+
+function readRecentSessionJsonlTurns(filePath, {
+  threadId = "",
+  limit = 5,
+  fsModule = fs,
+  metadataHeadBytes = DEFAULT_SESSION_JSONL_METADATA_HEAD_BYTES,
+  initialTailBytes = DEFAULT_SESSION_JSONL_INITIAL_TAIL_BYTES,
+  maxTailBytes = DEFAULT_SESSION_JSONL_MAX_TAIL_BYTES,
+} = {}) {
+  if (!filePath) {
+    return null;
+  }
+
+  if (!supportsBoundedSessionJsonlReads(fsModule)) {
+    const content = fsModule.readFileSync(filePath, "utf8");
+    const turns = parseSessionJsonlTurns(content, { threadId });
+    return turns.length > 0 ? { turns, hasOlderTurns: false, bytesRead: Buffer.byteLength(content, "utf8") } : null;
+  }
+
+  const stat = fsModule.statSync(filePath);
+  const snapshotSize = Math.max(0, Number(stat?.size) || 0);
+  if (snapshotSize === 0) {
+    return null;
+  }
+
+  const safeLimit = Math.max(1, Math.min(Number.isInteger(limit) ? limit : 5, 5));
+  const safeMetadataHeadBytes = Math.max(1, Math.min(metadataHeadBytes, snapshotSize));
+  const safeMaximumTailBytes = Math.max(1, Math.min(maxTailBytes, snapshotSize));
+  let tailBytes = Math.max(1, Math.min(initialTailBytes, safeMaximumTailBytes));
+  const fileHandle = fsModule.openSync(filePath, "r");
+
+  try {
+    const metadataBuffer = readSessionJsonlRange(fileHandle, 0, safeMetadataHeadBytes, fsModule);
+    const initialMetadata = parseSessionJsonlMetadata(metadataBuffer.toString("utf8"));
+
+    while (true) {
+      const rawStart = Math.max(0, snapshotSize - tailBytes);
+      const tailBuffer = readSessionJsonlRange(fileHandle, rawStart, snapshotSize - rawStart, fsModule);
+      const aligned = alignSessionJsonlTailBuffer(tailBuffer, rawStart);
+      if (aligned) {
+        const content = aligned.buffer.toString("utf8");
+        const sourceLineByteOffsets = sessionJsonlLineByteOffsets(aligned.buffer, aligned.sourceByteOffset);
+        const turns = parseSessionJsonlTurns(content, {
+          threadId,
+          initialMetadata,
+          sourceLineByteOffsets,
+        });
+        const observedStartedTurnIDs = observedTaskStartedTurnIDs(content, { sourceLineByteOffsets });
+        const safeTurns = rawStart === 0
+          ? turns
+          : turns.filter((turn) => (
+            observedStartedTurnIDs.has(normalizeString(turn?.id))
+              && turnHasVisibleUserItem(turn)
+          ));
+
+        if (safeTurns.length >= safeLimit || tailBytes >= safeMaximumTailBytes || rawStart === 0) {
+          if (safeTurns.length === 0) {
+            return null;
+          }
+          return {
+            turns: safeTurns,
+            hasOlderTurns: rawStart > 0 || turns.length > safeTurns.length,
+            bytesRead: metadataBuffer.length + tailBuffer.length,
+          };
+        }
+      }
+
+      if (tailBytes >= safeMaximumTailBytes || rawStart === 0) {
+        return null;
+      }
+      tailBytes = Math.min(safeMaximumTailBytes, tailBytes * 2);
+    }
+  } finally {
+    fsModule.closeSync(fileHandle);
+  }
+}
+
+function readSessionJsonlMetadataFromFile(filePath, {
+  fsModule = fs,
+  metadataHeadBytes = DEFAULT_SESSION_JSONL_METADATA_HEAD_BYTES,
+} = {}) {
+  if (!filePath) {
+    return { threadId: "", cwd: "" };
+  }
+  if (!supportsBoundedSessionJsonlReads(fsModule)) {
+    return parseSessionJsonlMetadata(fsModule.readFileSync(filePath, "utf8"));
+  }
+
+  const stat = fsModule.statSync(filePath);
+  const snapshotSize = Math.max(0, Number(stat?.size) || 0);
+  if (snapshotSize === 0) {
+    return { threadId: "", cwd: "" };
+  }
+  const fileHandle = fsModule.openSync(filePath, "r");
+  try {
+    const head = readSessionJsonlRange(
+      fileHandle,
+      0,
+      Math.min(snapshotSize, Math.max(1, metadataHeadBytes)),
+      fsModule
+    );
+    return parseSessionJsonlMetadata(head.toString("utf8"));
+  } finally {
+    fsModule.closeSync(fileHandle);
+  }
+}
+
+function supportsBoundedSessionJsonlReads(fsModule) {
+  return typeof fsModule?.statSync === "function"
+    && typeof fsModule?.openSync === "function"
+    && typeof fsModule?.readSync === "function"
+    && typeof fsModule?.closeSync === "function";
+}
+
+function readSessionJsonlRange(fileHandle, start, length, fsModule) {
+  const safeLength = Math.max(0, length);
+  const buffer = Buffer.allocUnsafe(safeLength);
+  const bytesRead = safeLength > 0
+    ? fsModule.readSync(fileHandle, buffer, 0, safeLength, start)
+    : 0;
+  return buffer.subarray(0, bytesRead);
+}
+
+function alignSessionJsonlTailBuffer(buffer, rawStart) {
+  if (rawStart === 0) {
+    return { buffer, sourceByteOffset: 0 };
+  }
+  const firstLineFeed = buffer.indexOf(0x0a);
+  if (firstLineFeed === -1 || firstLineFeed + 1 >= buffer.length) {
+    return null;
+  }
+  return {
+    buffer: buffer.subarray(firstLineFeed + 1),
+    sourceByteOffset: rawStart + firstLineFeed + 1,
+  };
+}
+
+function sessionJsonlLineByteOffsets(buffer, sourceByteOffset) {
+  const offsets = [sourceByteOffset];
+  for (let index = 0; index < buffer.length; index += 1) {
+    if (buffer[index] === 0x0a && index + 1 < buffer.length) {
+      offsets.push(sourceByteOffset + index + 1);
+    }
+  }
+  return offsets;
+}
+
+function observedTaskStartedTurnIDs(content, { sourceLineByteOffsets = null } = {}) {
+  const turnIDs = new Set();
+  const lines = String(content || "").split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (!line) {
+      continue;
+    }
+    try {
+      const entry = JSON.parse(line);
+      const payload = objectValue(entry?.payload);
+      if (entry?.type !== "event_msg" || normalizeString(payload?.type) !== "task_started") {
+        continue;
+      }
+      const sourceLineNumber = sourceLineByteOffsets?.[index] ?? index + 1;
+      const turnID = normalizeString(payload?.turn_id)
+        || normalizeString(payload?.turnId)
+        || `turn-line-${sourceLineNumber}`;
+      if (turnID) {
+        turnIDs.add(turnID);
+      }
+    } catch {
+      // A live rollout may end with a partial line; ignore it until the next read.
+    }
+  }
+  return turnIDs;
+}
+
+function turnHasVisibleUserItem(turn) {
+  return Array.isArray(turn?.items) && turn.items.some((item) => isUserRoleHistoryItem(item));
 }
 
 function parseSessionJsonlMetadata(content) {
@@ -81,14 +278,19 @@ function parseSessionJsonlMetadata(content) {
   return metadata;
 }
 
-function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
+function parseSessionJsonlTurns(content, {
+  threadId = "",
+  initialMetadata = null,
+  sourceLineByteOffsets = null,
+} = {}) {
   const turns = [];
   const turnsById = new Map();
   let activeTurnId = "";
-  let sessionThreadId = normalizeString(threadId);
+  let sessionThreadId = normalizeString(threadId) || normalizeString(initialMetadata?.threadId);
 
   const lines = String(content || "").split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
+    const sourceLineNumber = sourceLineByteOffsets?.[index] ?? index + 1;
     const line = lines[index].trim();
     if (!line) {
       continue;
@@ -116,7 +318,7 @@ function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
         activeTurnId = normalizeString(payload?.turn_id)
           || normalizeString(payload?.turnId)
           || activeTurnId
-          || `turn-line-${index + 1}`;
+          || `turn-line-${sourceLineNumber}`;
         ensureTurn(turns, turnsById, activeTurnId, sessionThreadId, entry.timestamp);
         continue;
       }
@@ -125,7 +327,7 @@ function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
         const turn = ensureTurn(
           turns,
           turnsById,
-          normalizeString(payload?.turn_id) || normalizeString(payload?.turnId) || activeTurnId || `turn-line-${index + 1}`,
+          normalizeString(payload?.turn_id) || normalizeString(payload?.turnId) || activeTurnId || `turn-line-${sourceLineNumber}`,
           sessionThreadId,
           entry.timestamp
         );
@@ -143,12 +345,12 @@ function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
         const turn = ensureTurn(
           turns,
           turnsById,
-          normalizeString(payload?.turn_id) || normalizeString(payload?.turnId) || activeTurnId || `turn-line-${index + 1}`,
+          normalizeString(payload?.turn_id) || normalizeString(payload?.turnId) || activeTurnId || `turn-line-${sourceLineNumber}`,
           sessionThreadId,
           entry.timestamp
         );
         turn.items.push({
-          id: normalizeString(payload?.id) || `user-message-line-${index + 1}`,
+          id: normalizeString(payload?.id) || `user-message-line-${sourceLineNumber}`,
           type: "user_message",
           role: "user",
           text,
@@ -169,11 +371,11 @@ function parseSessionJsonlTurns(content, { threadId = "" } = {}) {
       const turn = ensureTurn(
         turns,
         turnsById,
-        responseItemTurnId(payload) || activeTurnId || `turn-line-${index + 1}`,
+        responseItemTurnId(payload) || activeTurnId || `turn-line-${sourceLineNumber}`,
         sessionThreadId,
         entry.timestamp
       );
-      const item = normalizeResponseItemForHistory(payload, index + 1);
+      const item = normalizeResponseItemForHistory(payload, sourceLineNumber);
       if (item) {
         turn.items.push(item);
       }
@@ -265,5 +467,7 @@ function normalizeString(value) {
 module.exports = {
   parseSessionJsonlMetadata,
   parseSessionJsonlTurns,
+  readRecentSessionJsonlTurns,
+  readSessionJsonlMetadataFromFile,
   readThreadTurnsListPageFromSessionJsonl,
 };
