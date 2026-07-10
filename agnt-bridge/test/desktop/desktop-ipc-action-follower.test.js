@@ -15,6 +15,7 @@ const { setTimeout: wait } = require("node:timers/promises");
 
 const {
   applyConversationStateChange,
+  buildDesktopTurnsListResult,
   createDesktopIpcActionFollower,
   desktopFollowerPayloadForResponse,
   projectDesktopAssistantDeltaNotifications,
@@ -22,6 +23,95 @@ const {
   resolveDefaultIpcSocketPath,
   seedConversationStateFromThreadRead,
 } = require("../../src/desktop/desktop-ipc-action-follower");
+
+test("desktop turns/list returns newest-first pages without reversing reopen history", () => {
+  const chronologicalTurns = [
+    { id: "turn-1", items: [{ id: "message-1", type: "agentMessage", text: "one" }] },
+    { id: "turn-2", items: [{ id: "message-2", type: "agentMessage", text: "two" }] },
+    { id: "turn-3", items: [{ id: "message-3", type: "agentMessage", text: "three" }] },
+  ];
+
+  const firstPage = buildDesktopTurnsListResult(chronologicalTurns, {
+    sortDirection: "desc",
+    limit: 2,
+  });
+  assert.deepEqual(firstPage.data.map((turn) => turn.id), ["turn-3", "turn-2"]);
+  assert.equal(Object.hasOwn(firstPage, "turns"), false);
+  assert.equal(firstPage.hasMore, true);
+  assert.ok(firstPage.nextCursor);
+
+  const secondPage = buildDesktopTurnsListResult(chronologicalTurns, {
+    sortDirection: "desc",
+    limit: 2,
+    cursor: firstPage.nextCursor,
+  });
+  assert.deepEqual(secondPage.data.map((turn) => turn.id), ["turn-1"]);
+  assert.equal(secondPage.hasMore, false);
+  assert.equal(secondPage.nextCursor, null);
+
+  const streamingGrowth = structuredClone(chronologicalTurns);
+  streamingGrowth[2].items[0].text = "three, still streaming";
+  const pageAfterStreamingGrowth = buildDesktopTurnsListResult(streamingGrowth, {
+    sortDirection: "desc",
+    limit: 2,
+    cursor: firstPage.nextCursor,
+  });
+  assert.deepEqual(pageAfterStreamingGrowth.data.map((turn) => turn.id), ["turn-1"]);
+
+  const itemGrowth = structuredClone(chronologicalTurns);
+  itemGrowth[2].items.push({ id: "tool-3", type: "toolCall", text: "running" });
+  const pageAfterNonUserItemGrowth = buildDesktopTurnsListResult(itemGrowth, {
+    sortDirection: "desc",
+    limit: 2,
+    cursor: firstPage.nextCursor,
+  });
+  assert.deepEqual(pageAfterNonUserItemGrowth.data.map((turn) => turn.id), ["turn-1"]);
+
+  const changedSnapshot = buildDesktopTurnsListResult(
+    chronologicalTurns.filter((turn) => turn.id !== "turn-2"),
+    {
+      sortDirection: "desc",
+      limit: 2,
+      cursor: firstPage.nextCursor,
+    }
+  );
+  assert.equal(changedSnapshot, null);
+
+  const prependedSnapshot = buildDesktopTurnsListResult(
+    [{ id: "turn-x", items: [{ id: "message-x" }] }, ...chronologicalTurns],
+    {
+      sortDirection: "desc",
+      limit: 2,
+      cursor: firstPage.nextCursor,
+    }
+  );
+  assert.equal(prependedSnapshot, null);
+});
+
+test("desktop turns/list private cursors never fall through to app-server", (t) => {
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath: path.join(os.tmpdir(), `missing-agnt-${Date.now()}-${process.pid}.sock`),
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+  });
+  t.after(() => follower.stopAll());
+
+  const handled = follower.observeInbound(JSON.stringify({
+    id: "private-cursor-read",
+    method: "thread/turns/list",
+    params: {
+      threadId: "thread-with-expired-desktop-page",
+      cursor: "agnt-desktop-turns:desc:id:missing-turn",
+    },
+  }));
+
+  assert.equal(handled, true);
+  assert.equal(outbound.length, 1);
+  assert.equal(outbound[0].id, "private-cursor-read");
+  assert.equal(outbound[0].error.code, -32602);
+});
 
 test("projects desktop pending user input as an app-server request shape", () => {
   const actions = projectPendingDesktopActions("thread-1", {

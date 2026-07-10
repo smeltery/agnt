@@ -5,6 +5,7 @@
 // Depends on: net, ./desktop-ipc-conversation-projector, ./desktop-ipc-shared
 
 const net = require("net");
+const { createHash } = require("crypto");
 
 const {
   createDesktopConversationProjector,
@@ -38,6 +39,7 @@ const MAX_ACTIVE_THREAD_IDS = 512;
 const DESKTOP_IPC_ACTION_SOURCE = "desktop-ipc-action-follower";
 const AGNT_LIVE_OWNER_SOURCE = "desktop-ipc-live-owner";
 const DESKTOP_STATE_READ_METHODS = new Set(["thread/read", "thread/resume", "thread/turns/list"]);
+const DESKTOP_TURNS_CURSOR_PREFIX = "agnt-desktop-turns:";
 // A cached Desktop state that claims an active turn is only trustworthy while
 // Desktop keeps streaming updates for it. Live runs broadcast deltas far more
 // often than this window; a silent "active" cache is a stale reconnect echo
@@ -65,6 +67,121 @@ const REPLY_METHOD_BY_ACTION_METHOD = new Map([
   ["item/tool/requestUserInput", "thread-follower-submit-user-input"],
 ]);
 const APPROVAL_DECISIONS = new Set(["accept", "acceptForSession", "decline", "cancel"]);
+
+// The app-server turns/list contract is newest-first by default. Preserve that
+// shape for projected Desktop snapshots so clients do not reverse reopened
+// history twice.
+function buildDesktopTurnsListResult(turns, params = {}) {
+  const chronologicalTurns = Array.isArray(turns) ? turns : [];
+  const snapshotRevision = desktopTurnsSnapshotRevision(chronologicalTurns);
+  const direction = normalizeToken(readString(params?.sortDirection) || "desc") === "asc"
+    ? "asc"
+    : "desc";
+  const orderedTurns = direction === "asc"
+    ? chronologicalTurns.slice()
+    : chronologicalTurns.slice().reverse();
+
+  let startIndex = 0;
+  const cursor = readString(params?.cursor);
+  if (cursor) {
+    const parsedCursor = parseDesktopTurnsCursor(
+      cursor,
+      direction,
+      snapshotRevision,
+      orderedTurns
+    );
+    if (parsedCursor == null) {
+      return null;
+    }
+    startIndex = parsedCursor;
+  }
+
+  const requestedLimit = Number(params?.limit);
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+    ? Math.floor(requestedLimit)
+    : orderedTurns.length;
+  const page = orderedTurns.slice(startIndex, startIndex + limit);
+  const hasMore = startIndex + page.length < orderedTurns.length;
+  const nextCursor = hasMore && page.length > 0
+    ? desktopTurnsCursor(
+      direction,
+      snapshotRevision,
+      page[page.length - 1],
+      startIndex + page.length
+    )
+    : null;
+
+  return {
+    data: cloneJSON(page),
+    nextCursor,
+    hasMore,
+  };
+}
+
+function isDesktopTurnsCursor(value) {
+  return readString(value).startsWith(DESKTOP_TURNS_CURSOR_PREFIX);
+}
+
+function desktopTurnsCursor(direction, snapshotRevision, turn, nextIndex) {
+  const turnId = readString(turn?.id)
+    || readString(turn?.turnId)
+    || readString(turn?.turn_id);
+  const anchor = turnId ? `id:${encodeURIComponent(turnId)}` : `index:${nextIndex}`;
+  return `${DESKTOP_TURNS_CURSOR_PREFIX}${direction}:${snapshotRevision}:${anchor}`;
+}
+
+function parseDesktopTurnsCursor(cursor, direction, snapshotRevision, orderedTurns) {
+  const prefix = `${DESKTOP_TURNS_CURSOR_PREFIX}${direction}:${snapshotRevision}:`;
+  if (!cursor.startsWith(prefix)) {
+    return null;
+  }
+  const anchor = cursor.slice(prefix.length);
+  if (anchor.startsWith("id:")) {
+    let turnId = "";
+    try {
+      turnId = decodeURIComponent(anchor.slice(3));
+    } catch {
+      return null;
+    }
+    const anchorIndex = orderedTurns.findIndex((turn) => (
+      readString(turn?.id) === turnId
+      || readString(turn?.turnId) === turnId
+      || readString(turn?.turn_id) === turnId
+    ));
+    return anchorIndex === -1 ? null : anchorIndex + 1;
+  }
+  if (anchor.startsWith("index:")) {
+    const parsedIndex = Number(anchor.slice(6));
+    return Number.isInteger(parsedIndex) && parsedIndex >= 0 && parsedIndex <= orderedTurns.length
+      ? parsedIndex
+      : null;
+  }
+  return null;
+}
+
+function desktopTurnsSnapshotRevision(turns) {
+  const hash = createHash("sha256");
+  const paginationStructure = (Array.isArray(turns) ? turns : []).map((turn) => ({
+    id: readString(turn?.id) || readString(turn?.turnId) || readString(turn?.turn_id),
+    input: turn?.input ?? turn?.prompt ?? null,
+    userItems: (Array.isArray(turn?.items) ? turn.items : []).flatMap((item) => {
+      const role = readString(item?.role).toLowerCase();
+      const type = normalizeToken(readString(item?.type));
+      const isUserItem = role === "user" || type === "usermessage";
+      if (!isUserItem) {
+        return [];
+      }
+      return [{
+        id: readString(item?.id) || readString(item?.itemId) || readString(item?.item_id),
+        role,
+        type,
+        userContent: item?.text ?? item?.content ?? null,
+      }];
+    }),
+  }));
+  hash.update(JSON.stringify(paginationStructure));
+  return hash.digest("hex").slice(0, 24);
+}
 
 // Opens the Desktop IPC bus on demand and exposes Mac-owned pending actions as normal app-server requests.
 function createDesktopIpcActionFollower({
@@ -600,12 +717,14 @@ function createDesktopIpcActionFollower({
       return false;
     }
     const threadId = readThreadId(message.params);
+    const ownsDesktopCursor = method === "thread/turns/list"
+      && isDesktopTurnsCursor(message.params?.cursor);
     if (!threadId || liveOwnerThreadIds.has(threadId) || isLocallyOwnedThread(threadId)) {
-      return false;
+      return ownsDesktopCursor ? rejectDesktopTurnsCursor(message) : false;
     }
     const rawState = rawStatesByThreadId.get(threadId);
     if (!rawState) {
-      return false;
+      return ownsDesktopCursor ? rejectDesktopTurnsCursor(message) : false;
     }
 
     rememberActiveThread(threadId);
@@ -613,25 +732,36 @@ function createDesktopIpcActionFollower({
     // A run that Desktop stopped streaming updates for is not a live run: serving
     // it from cache would answer thread-list refreshes with a phantom "running"
     // turn until real history loads. Let the local app-server answer instead.
-    if (hasActiveProjectedTurn(thread) && isRawStateStaleForActiveRead(threadId)) {
+    if (hasActiveProjectedTurn(thread)
+      && isRawStateStaleForActiveRead(threadId)
+      && !ownsDesktopCursor) {
       return false;
     }
     const result = method === "thread/turns/list"
-      ? {
-          data: cloneJSON(thread.turns || []),
-          turns: cloneJSON(thread.turns || []),
-          nextCursor: null,
-          hasMore: false,
-        }
+      ? buildDesktopTurnsListResult(thread.turns, message.params)
       : {
           // The projected thread is the entire payload the phone decodes;
           // echoing the raw Desktop conversationState alongside it doubled
           // heavy threads past the relay frame limit for nothing.
           thread,
         };
+    if (!result) {
+      return ownsDesktopCursor ? rejectDesktopTurnsCursor(message) : false;
+    }
     sendApplicationResponse(JSON.stringify({
       id: message.id,
       result,
+    }));
+    return true;
+  }
+
+  function rejectDesktopTurnsCursor(message) {
+    sendApplicationResponse(JSON.stringify({
+      id: message.id,
+      error: {
+        code: -32602,
+        message: "Desktop history changed while paging. Reload this thread to restart history pagination.",
+      },
     }));
     return true;
   }
@@ -1590,6 +1720,7 @@ function readThreadId(params) {
 
 module.exports = {
   applyConversationStateChange,
+  buildDesktopTurnsListResult,
   createDesktopIpcActionFollower,
   desktopFollowerPayloadForResponse,
   projectDesktopAssistantDeltaNotifications,
