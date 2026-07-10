@@ -93,6 +93,13 @@ assert_output "$bun_action_output" ios false
 assert_output "$bun_action_output" links false
 assert_bun_names "$bun_action_output" agnt-bridge relay agnt-web agnt-host
 
+flox_action_output="$(run_detector flox_action push "" ".github/actions/setup-flox/action.yml")"
+assert_output "$flox_action_output" lint_workflows true
+assert_output "$flox_action_output" android true
+assert_output "$flox_action_output" ios false
+assert_output "$flox_action_output" links false
+assert_bun_names "$flox_action_output" agnt-bridge relay agnt-web agnt-host
+
 manual_bun_output="$(run_detector manual_bun workflow_dispatch bun "")"
 assert_output "$manual_bun_output" lint_workflows false
 assert_output "$manual_bun_output" android false
