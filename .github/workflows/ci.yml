@@ -74,18 +74,26 @@ jobs:
   bun-packages:
     needs: changes
     if: needs.changes.outputs.bun_packages != '[]'
+    name: Bun package CI (${{ matrix.package.name }})
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.changes.outputs.bun_packages) }}
     env:
       AGNT_FLOX_QUIET: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Run selected Bun package CI
+      - name: Run Bun package CI
         uses: ./.github/actions/run-bun-package-ci
         with:
-          packages: ${{ needs.changes.outputs.bun_packages }}
+          name: ${{ matrix.package.name }}
+          working-directory: ${{ matrix.package.working-directory }}
+          frozen-lockfile: ${{ matrix.package.frozen-lockfile }}
+          audit: ${{ matrix.package.audit }}
 
   android:
     needs: changes
