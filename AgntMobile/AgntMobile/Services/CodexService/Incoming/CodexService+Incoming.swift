@@ -543,7 +543,7 @@ extension CodexService {
                 turnFailureMessage: turnFailureMessage
             )
             recordTurnTerminalState(threadId: threadId, turnId: resolvedTurnID, state: terminalState)
-            noteTurnFinished(turnId: resolvedTurnID)
+            noteTurnFinished(threadId: threadId, turnId: resolvedTurnID)
             markTurnCompleted(threadId: threadId, turnId: resolvedTurnID)
             if terminalState == .completed {
                 Task { @MainActor [weak self] in
@@ -632,7 +632,7 @@ extension CodexService {
                 appendSystemMessage(threadId: threadId, text: "Error: \(userFacingErrorMessage)", turnId: turnId)
             }
             recordTurnTerminalState(threadId: threadId, turnId: resolvedTurnID, state: .failed)
-            noteTurnFinished(turnId: resolvedTurnID)
+            noteTurnFinished(threadId: threadId, turnId: resolvedTurnID)
             markTurnCompleted(threadId: threadId, turnId: resolvedTurnID)
             discardTurnStartWorkspaceCheckpointCopyIfNeeded(turnId: resolvedTurnID)
             markFailedIfUnread(threadId: threadId)
@@ -711,7 +711,7 @@ extension CodexService {
                     turnId: activeTurnIdForThread,
                     state: terminalState
                 )
-                noteTurnFinished(turnId: activeTurnIdForThread)
+                noteTurnFinished(threadId: threadId, turnId: activeTurnIdForThread)
                 if let completionResult = runCompletionResult(for: terminalState) {
                     notifyRunCompletionIfNeeded(
                         threadId: threadId,

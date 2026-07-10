@@ -607,7 +607,7 @@ final class CodexServiceIncomingCommandExecutionTests: XCTestCase {
         XCTAssertTrue(visibleFileRows.isEmpty)
 
         service.recordTurnTerminalState(threadId: threadID, turnId: turnID, state: .completed)
-        service.noteTurnFinished(turnId: turnID)
+        service.noteTurnFinished(threadId: threadID, turnId: turnID)
         let assistantMessage = try? XCTUnwrap(service.messages(for: threadID).last(where: { $0.role == .assistant }))
         XCTAssertNil(assistantMessage.flatMap { service.readyChangeSet(forAssistantMessage: $0) })
     }
@@ -653,7 +653,7 @@ final class CodexServiceIncomingCommandExecutionTests: XCTestCase {
             ])
         )
         service.recordTurnTerminalState(threadId: threadID, turnId: turnID, state: .completed)
-        service.noteTurnFinished(turnId: turnID)
+        service.noteTurnFinished(threadId: threadID, turnId: turnID)
 
         let assistantMessage = try? XCTUnwrap(service.messages(for: threadID).last(where: { $0.role == .assistant }))
         let changeSet = assistantMessage.flatMap { service.readyChangeSet(forAssistantMessage: $0) }
@@ -700,7 +700,7 @@ final class CodexServiceIncomingCommandExecutionTests: XCTestCase {
             ])
         )
         service.recordTurnTerminalState(threadId: threadID, turnId: turnID, state: .completed)
-        service.noteTurnFinished(turnId: turnID)
+        service.noteTurnFinished(threadId: threadID, turnId: turnID)
 
         let assistantMessage = try? XCTUnwrap(service.messages(for: threadID).last(where: { $0.role == .assistant }))
         XCTAssertNil(assistantMessage.flatMap { service.readyChangeSet(forAssistantMessage: $0) })

@@ -702,7 +702,7 @@ final class CodexService {
     var bufferedSecureControlMessages: [String: [String]] = [:]
     // Assistant-scoped patch ledger used by the revert-changes flow.
     var aiChangeSetsByID: [String: AIChangeSet] = [:]
-    var aiChangeSetIDByTurnID: [String: String] = [:]
+    var aiChangeSetIDByTurnKey: [AIChangeSetTurnKey: String] = [:]
     var aiChangeSetIDByAssistantMessageID: [String: String] = [:]
     @ObservationIgnored var workspaceCheckpointCopyTaskByTurnID: [String: Task<Void, Never>] = [:]
     // Keeps hot-path thread lookups O(1) instead of rescanning the full sidebar list.
@@ -785,7 +785,7 @@ final class CodexService {
         self.composerDraftsByThreadID = [:]
         rebuildSubagentIdentityDirectory()
         self.aiChangeSetsByID = [:]
-        self.aiChangeSetIDByTurnID = [:]
+        self.aiChangeSetIDByTurnKey = [:]
         self.aiChangeSetIDByAssistantMessageID = [:]
 
         let savedModelId = defaults.string(forKey: Self.selectedModelIdDefaultsKey)?
