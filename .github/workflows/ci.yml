@@ -40,6 +40,7 @@ jobs:
       android: ${{ steps.filter.outputs.android }}
       ios: ${{ steps.filter.outputs.ios }}
       links: ${{ steps.filter.outputs.links }}
+      lint_workflows: ${{ steps.filter.outputs.lint_workflows }}
       bun_packages: ${{ steps.filter.outputs.bun_packages }}
     steps:
       - name: Checkout repository
@@ -57,8 +58,16 @@ jobs:
         run: |
           ./.github/scripts/detect-ci-changes.sh
 
+  workflow-checks:
+    needs: changes
+    if: needs.changes.outputs.lint_workflows == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
       - name: Lint GitHub Actions workflows
-        if: steps.filter.outputs.lint_workflows == 'true'
         run: |
           docker run --rm \
             -v "$PWD:/repo" \
@@ -67,7 +76,6 @@ jobs:
             -color
 
       - name: Test CI change detector
-        if: steps.filter.outputs.lint_workflows == 'true'
         run: ./.github/scripts/test-detect-ci-changes.sh
 
   bun-packages:
@@ -119,11 +127,7 @@ jobs:
       - name: Check and assemble debug
         working-directory: AgntAndroid
         run: |
-          flox activate -d "$GITHUB_WORKSPACE" -- ./gradlew \
-            :app:ktlintCheck \
-            :app:testDebugUnitTest \
-            :app:assembleDebug \
-            --no-daemon
+          flox activate -d "$GITHUB_WORKSPACE" -- ./gradlew ciDebug --no-daemon
 
       - name: Upload debug APK
         if: github.event_name == 'pull_request'
@@ -224,6 +228,7 @@ jobs:
   ci-summary:
     needs:
       - changes
+      - workflow-checks
       - bun-packages
       - android
       - ios
@@ -237,6 +242,7 @@ jobs:
 
           for result in \
             "${{ needs.changes.result }}" \
+            "${{ needs.workflow-checks.result }}" \
             "${{ needs.bun-packages.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \

@@ -108,7 +108,7 @@ The main CI workflow uses one change detector and only runs jobs for changed sur
 | Relay | `cd relay && bun run ci` |
 | Web | `cd agnt-web && bun run ci` |
 | Host | `cd agnt-host && bun run ci` |
-| Android | `cd AgntAndroid && ./gradlew :app:ktlintCheck :app:testDebugUnitTest :app:assembleDebug --no-daemon` |
+| Android | `cd AgntAndroid && ./gradlew ciDebug --no-daemon` |
 | iOS | `xcodebuild ... archive CODE_SIGNING_ALLOWED=NO` |
 | Markdown links | `lycheeverse/lychee` over `./**/*.md` |
 
