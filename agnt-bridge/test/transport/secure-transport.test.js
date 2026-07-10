@@ -200,6 +200,7 @@ test("secure transport round-trips encrypted payloads after a trusted reconnect 
       sessionId: "session-2",
       keyEpoch: serverHello.keyEpoch,
       lastAppliedBridgeOutboundSeq: 0,
+      bridgeReplayEpoch: serverHello.bridgeReplayEpoch,
     }),
     {
       sendControlMessage(message) {
@@ -579,12 +580,101 @@ test("previous-session replayed notifications are tagged as catch-up history", (
     transcriptBytes,
   });
 
-  assert.equal(replayWireMessages.length, 1);
+  assert.equal(replayWireMessages.length, 2);
   const replayedNotification = decryptEnvelope(JSON.parse(replayWireMessages[0]), macToPhoneKey);
   const replayedNotificationPayload = JSON.parse(replayedNotification.payloadText);
   assert.equal(replayedNotificationPayload.method, "turn/started");
   assert.equal(replayedNotificationPayload.params.threadId, "thread-previous-session");
   assert.equal(replayedNotificationPayload.params.agntReplayedEvent, true);
+  const completionMarker = decryptEnvelope(JSON.parse(replayWireMessages[1]), macToPhoneKey);
+  const completionPayload = JSON.parse(completionMarker.payloadText);
+  assert.equal(completionPayload.method, "agnt/bufferedReplay/completed");
+  assert.equal(completionPayload.params.agntBufferedReplayComplete, true);
+});
+
+test("truncated resume replay declares a canonical-history gap", () => {
+  const macIdentity = createOkpKeyPair("ed25519");
+  const phoneIdentity = createOkpKeyPair("ed25519");
+  const phoneEphemeral = createOkpKeyPair("x25519");
+  const secureTransport = createBridgeSecureTransport({
+    sessionId: "session-truncated-replay",
+    relayUrl: "wss://relay.example/relay",
+    deviceState: {
+      macDeviceId: "mac-truncated-replay",
+      macIdentityPrivateKey: macIdentity.privateKey,
+      macIdentityPublicKey: macIdentity.publicKey,
+      trustedPhones: {},
+    },
+  });
+
+  finishHandshake({
+    secureTransport,
+    sessionId: "session-truncated-replay",
+    macDeviceId: "mac-truncated-replay",
+    phoneDeviceId: "phone-truncated-replay",
+    macIdentity,
+    phoneIdentity,
+    phoneEphemeral,
+    handshakeMode: HANDSHAKE_MODE_QR_BOOTSTRAP,
+    lastAppliedBridgeOutboundSeq: 0,
+  });
+
+  let captureReplay = false;
+  const replayWireMessages = [];
+  secureTransport.bindLiveSendWireMessage((message) => {
+    if (captureReplay) {
+      replayWireMessages.push(message);
+    }
+    return true;
+  });
+
+  for (let index = 0; index < 505; index += 1) {
+    secureTransport.queueOutboundApplicationMessage(
+      JSON.stringify({
+        method: "item/updated",
+        params: { threadId: "thread-truncated-replay", itemId: `item-${index}` },
+      }),
+      () => false
+    );
+  }
+
+  const reconnectEphemeral = createOkpKeyPair("x25519");
+  captureReplay = true;
+  const { serverHello, transcriptBytes } = finishHandshake({
+    secureTransport,
+    sessionId: "session-truncated-replay",
+    macDeviceId: "mac-truncated-replay",
+    phoneDeviceId: "phone-truncated-replay",
+    macIdentity,
+    phoneIdentity,
+    phoneEphemeral: reconnectEphemeral,
+    handshakeMode: HANDSHAKE_MODE_TRUSTED_RECONNECT,
+    lastAppliedBridgeOutboundSeq: 0,
+  });
+  const macToPhoneKey = deriveMacToPhoneKey({
+    sessionId: "session-truncated-replay",
+    macDeviceId: "mac-truncated-replay",
+    phoneDeviceId: "phone-truncated-replay",
+    phoneEphemeral: reconnectEphemeral,
+    serverHello,
+    transcriptBytes,
+  });
+
+  assert.equal(replayWireMessages.length, 2);
+  const gapPayload = decryptEnvelope(JSON.parse(replayWireMessages[0]), macToPhoneKey);
+  const gapMessage = JSON.parse(gapPayload.payloadText);
+  assert.equal(gapMessage.method, "agnt/bufferedReplay/gap");
+  assert.deepEqual(gapMessage.params, {
+    agntBufferedReplayGap: true,
+    expectedBridgeOutboundSeq: 1,
+    firstAvailableBridgeOutboundSeq: 6,
+    lastDiscardedBridgeOutboundSeq: 505,
+  });
+
+  const completionPayload = decryptEnvelope(JSON.parse(replayWireMessages[1]), macToPhoneKey);
+  const completionMessage = JSON.parse(completionPayload.payloadText);
+  assert.equal(completionMessage.method, "agnt/bufferedReplay/completed");
+  assert.equal(completionMessage.params.agntBufferedReplayComplete, true);
 });
 
 test("resume replay does not advance the replay watermark before a phone ack", () => {
@@ -634,6 +724,7 @@ test("resume replay does not advance the replay watermark before a phone ack", (
       sessionId: "session-6",
       keyEpoch: serverHello.keyEpoch,
       lastAppliedBridgeOutboundSeq: 0,
+      bridgeReplayEpoch: serverHello.bridgeReplayEpoch,
     }),
     {
       sendControlMessage() {},
@@ -730,6 +821,7 @@ test("resume replay keeps current handshake output when the phone cursor is stal
       sessionId: "session-7",
       keyEpoch: serverHello.keyEpoch,
       lastAppliedBridgeOutboundSeq: 999,
+      bridgeReplayEpoch: serverHello.bridgeReplayEpoch,
     }),
     {
       sendControlMessage() {},
@@ -762,8 +854,18 @@ test("resume replay keeps current handshake output when the phone cursor is stal
     hkdfSync("sha256", sharedSecret, salt, Buffer.from(`${infoPrefix}|macToPhone`, "utf8"), 32)
   );
 
-  assert.equal(replayWireMessages.length, 1);
-  const outboundEnvelope = JSON.parse(replayWireMessages[0]);
+  assert.equal(replayWireMessages.length, 2);
+  const resetEnvelope = JSON.parse(replayWireMessages[0]);
+  const resetPayload = decryptEnvelope(resetEnvelope, macToPhoneKey);
+  const resetMessage = JSON.parse(resetPayload.payloadText);
+  assert.equal(resetMessage.method, "agnt/bufferedReplay/reset");
+  assert.deepEqual(resetMessage.params, {
+    agntBufferedReplayReset: true,
+    resetBridgeOutboundSeqTo: 0,
+    bridgeReplayEpoch: serverHello.bridgeReplayEpoch,
+  });
+
+  const outboundEnvelope = JSON.parse(replayWireMessages[1]);
   const outboundPayload = decryptEnvelope(outboundEnvelope, macToPhoneKey);
   assert.equal(outboundPayload.bridgeOutboundSeq, 1);
   assert.equal(outboundPayload.payloadText, JSON.stringify({ id: "initialize", result: { ok: true } }));
@@ -870,6 +972,7 @@ function finishHandshake({
         sessionId,
         keyEpoch: serverHello.keyEpoch,
         lastAppliedBridgeOutboundSeq,
+        bridgeReplayEpoch: serverHello.bridgeReplayEpoch,
       }),
       {
         sendControlMessage(message) {

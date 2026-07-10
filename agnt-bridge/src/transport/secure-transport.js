@@ -50,6 +50,7 @@ function createBridgeSecureTransport({
   let lastRelayedBridgeOutboundSeq = 0;
   let currentPairingExpiresAt = Date.now() + MAX_PAIRING_AGE_MS;
   let nextKeyEpoch = 1;
+  const bridgeReplayEpoch = randomBytes(16).toString("hex");
   let nextBridgeOutboundSeq = 1;
   let outboundBufferBytes = 0;
   const outboundBuffer = [];
@@ -259,6 +260,7 @@ function createBridgeSecureTransport({
       macEphemeralPublicKey: pendingHandshake.macEphemeralPublicKey,
       serverNonce: serverNonce.toString("base64"),
       keyEpoch,
+      bridgeReplayEpoch,
       expiresAtForTranscript,
       macSignature,
       clientNonce: clientNonceBase64,
@@ -398,15 +400,42 @@ function createBridgeSecureTransport({
     }
 
     const lastAppliedBridgeOutboundSeq = Number(message.lastAppliedBridgeOutboundSeq) || 0;
-    lastRelayedBridgeOutboundSeq = lastAppliedBridgeOutboundSeq;
-    const missingEntries = replayableOutboundEntries(lastAppliedBridgeOutboundSeq, {
+    const phoneReplayEpoch = normalizeNonEmptyString(message.bridgeReplayEpoch);
+    let effectiveReplayCursor = lastAppliedBridgeOutboundSeq;
+    activeSession.isResumed = true;
+    if (phoneReplayEpoch !== bridgeReplayEpoch || lastAppliedBridgeOutboundSeq >= nextBridgeOutboundSeq) {
+      effectiveReplayCursor = Math.max(0, activeSession.firstOutboundSeq - 1);
+      sendBufferedReplayResetMarker(
+        activeSession.sendWireMessage,
+        effectiveReplayCursor,
+        bridgeReplayEpoch
+      );
+    }
+
+    lastRelayedBridgeOutboundSeq = effectiveReplayCursor;
+    let missingEntries = replayableOutboundEntries(effectiveReplayCursor, {
       includeCurrentSessionEntries: true,
     });
-    activeSession.isResumed = true;
+    const replayGap = bufferedReplayGapAfter(effectiveReplayCursor);
+    if (replayGap) {
+      sendBufferedReplayGapMarker(activeSession.sendWireMessage, replayGap);
+      sendBufferedReplayCompleteMarker(activeSession.sendWireMessage);
+      missingEntries = missingEntries.filter((entry) => (
+        entry.bridgeOutboundSeq > replayGap.lastDiscardedBridgeOutboundSeq
+      ));
+    }
+    let replayedHistoricalBacklog = false;
     for (const entry of missingEntries) {
-      if (!sendBufferedEntry(replayTaggedEntryIfHistorical(entry), activeSession.sendWireMessage)) {
-        break;
+      const outboundEntry = replayTaggedEntryIfHistorical(entry);
+      if (!sendBufferedEntry(outboundEntry, activeSession.sendWireMessage)) {
+        return;
       }
+      if (outboundEntry !== entry) {
+        replayedHistoricalBacklog = true;
+      }
+    }
+    if (replayedHistoricalBacklog) {
+      sendBufferedReplayCompleteMarker(activeSession.sendWireMessage);
     }
   }
 
@@ -541,11 +570,112 @@ function createBridgeSecureTransport({
       return;
     }
 
-    for (const entry of replayableOutboundEntries(lastRelayedBridgeOutboundSeq)) {
-      if (!sendBufferedEntry(replayTaggedEntryIfHistorical(entry), activeSession.sendWireMessage)) {
-        break;
+    let replayEntries = replayableOutboundEntries(lastRelayedBridgeOutboundSeq);
+    const replayGap = bufferedReplayGapAfter(lastRelayedBridgeOutboundSeq);
+    if (replayGap) {
+      sendBufferedReplayGapMarker(activeSession.sendWireMessage, replayGap);
+      sendBufferedReplayCompleteMarker(activeSession.sendWireMessage);
+      replayEntries = replayEntries.filter((entry) => (
+        entry.bridgeOutboundSeq > replayGap.lastDiscardedBridgeOutboundSeq
+      ));
+    }
+
+    let replayedHistoricalBacklog = false;
+    for (const entry of replayEntries) {
+      const outboundEntry = replayTaggedEntryIfHistorical(entry);
+      if (!sendBufferedEntry(outboundEntry, activeSession.sendWireMessage)) {
+        return;
+      }
+      if (outboundEntry !== entry) {
+        replayedHistoricalBacklog = true;
       }
     }
+    if (replayedHistoricalBacklog) {
+      sendBufferedReplayCompleteMarker(activeSession.sendWireMessage);
+    }
+  }
+
+  function bufferedReplayGapAfter(lastAppliedBridgeOutboundSeq) {
+    const firstUnappliedEntry = outboundBuffer.find((entry) => (
+      entry.bridgeOutboundSeq > lastAppliedBridgeOutboundSeq
+    ));
+    if (
+      !firstUnappliedEntry
+      || firstUnappliedEntry.bridgeOutboundSeq <= lastAppliedBridgeOutboundSeq + 1
+    ) {
+      return null;
+    }
+
+    const lastAvailableBridgeOutboundSeq = outboundBuffer[outboundBuffer.length - 1]?.bridgeOutboundSeq
+      || firstUnappliedEntry.bridgeOutboundSeq;
+    const historicalBoundary = (activeSession?.firstOutboundSeq || firstUnappliedEntry.bridgeOutboundSeq) - 1;
+    const lastDiscardedBridgeOutboundSeq = firstUnappliedEntry.bridgeOutboundSeq <= historicalBoundary
+      ? historicalBoundary
+      : lastAvailableBridgeOutboundSeq;
+    return {
+      expectedBridgeOutboundSeq: lastAppliedBridgeOutboundSeq + 1,
+      firstAvailableBridgeOutboundSeq: firstUnappliedEntry.bridgeOutboundSeq,
+      lastDiscardedBridgeOutboundSeq: Math.max(lastAppliedBridgeOutboundSeq, lastDiscardedBridgeOutboundSeq),
+    };
+  }
+
+  function sendBufferedReplayGapMarker(sendWireMessage, replayGap) {
+    if (!activeSession?.isResumed || typeof sendWireMessage !== "function" || !replayGap) {
+      return;
+    }
+
+    sendTransientReplayMarker(sendWireMessage, {
+      method: "agnt/bufferedReplay/gap",
+      params: {
+        agntBufferedReplayGap: true,
+        ...replayGap,
+      },
+    });
+  }
+
+  function sendBufferedReplayResetMarker(
+    sendWireMessage,
+    resetBridgeOutboundSeqTo,
+    replayEpoch
+  ) {
+    if (!activeSession?.isResumed || typeof sendWireMessage !== "function") {
+      return;
+    }
+
+    sendTransientReplayMarker(sendWireMessage, {
+      method: "agnt/bufferedReplay/reset",
+      params: {
+        agntBufferedReplayReset: true,
+        resetBridgeOutboundSeqTo,
+        bridgeReplayEpoch: replayEpoch,
+      },
+    });
+  }
+
+  function sendBufferedReplayCompleteMarker(sendWireMessage) {
+    if (!activeSession?.isResumed || typeof sendWireMessage !== "function") {
+      return;
+    }
+
+    sendTransientReplayMarker(sendWireMessage, {
+      method: "agnt/bufferedReplay/completed",
+      params: { agntBufferedReplayComplete: true },
+    });
+  }
+
+  function sendTransientReplayMarker(sendWireMessage, payload) {
+    const envelope = encryptEnvelopePayload(
+      {
+        payloadText: JSON.stringify(payload),
+      },
+      activeSession.macToPhoneKey,
+      SECURE_SENDER_MAC,
+      activeSession.nextOutboundCounter,
+      sessionId,
+      activeSession.keyEpoch
+    );
+    activeSession.nextOutboundCounter += 1;
+    sendWireMessage(JSON.stringify(envelope));
   }
 
   // Only prior secure-session backlog is catch-up history; same-session retries
