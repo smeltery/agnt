@@ -2090,6 +2090,284 @@ test("desktop IPC follower settles background runs on completion and disconnect"
   )), 1_000);
 });
 
+test("desktop IPC follower settles a running background thread before archive", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-archive-");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({ method: "thread/list", params: {} }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopConversationSnapshot("thread-background-archive", {
+    turns: [{ id: "turn-background-archive", status: "inProgress", items: [] }],
+    requests: [],
+  }));
+  await waitFor(() => outbound.some((message) => message.method === "turn/started"));
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-archived",
+    sourceClientId: "desktop",
+    version: 2,
+    params: { conversationId: "thread-background-archive" },
+  });
+  await waitFor(() => outbound.some((message) => message.method === "thread/archived"));
+
+  const completionIndex = outbound.findIndex((message) => (
+    message.method === "turn/completed"
+      && message.params?.threadId === "thread-background-archive"
+  ));
+  const archiveIndex = outbound.findIndex((message) => message.method === "thread/archived");
+  assert.ok(completionIndex >= 0 && completionIndex < archiveIndex);
+  assert.equal(outbound[completionIndex].params.status, "interrupted");
+});
+
+test("desktop IPC follower keeps announced background turns through active-thread LRU", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-lru-");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({ method: "thread/list", params: {} }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopConversationSnapshot("thread-background-lru-protected", {
+    turns: [{ id: "turn-background-lru-protected", status: "inProgress", items: [] }],
+    requests: [],
+  }));
+  await waitFor(() => outbound.some((message) => message.method === "turn/started"));
+
+  for (let index = 0; index < 512; index += 1) {
+    writeFrame(serverSocket, desktopConversationSnapshot(`thread-background-lru-fill-${index}`, {
+      turns: [{ id: `turn-background-lru-fill-${index}`, status: "completed", items: [] }],
+      requests: [],
+    }));
+  }
+  await wait(75);
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 11,
+    params: {
+      conversationId: "thread-background-lru-protected",
+      change: {
+        type: "patches",
+        patches: [{ op: "replace", path: ["turns", 0, "status"], value: "completed" }],
+      },
+    },
+  });
+
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/completed"
+      && message.params?.threadId === "thread-background-lru-protected"
+      && message.params?.status === "completed"
+  )));
+});
+
+test("desktop IPC follower bootstraps normalized active turns when opened from background", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-normalized-open-");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  const threadId = "thread-background-normalized-open";
+  follower.observeInbound(JSON.stringify({ id: "sidebar", method: "thread/list", params: {} }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopConversationSnapshot(
+    threadId,
+    normalizedConversationState([
+      { id: "turn-background-history", status: "completed", text: "Older completed output" },
+      {
+        id: "turn-background-parallel",
+        status: "inProgress",
+        items: [{ id: "assistant-background-parallel", type: "agentMessage", text: "Parallel active block" }],
+      },
+      {
+        id: "turn-background-open",
+        status: "inProgress",
+        input: [{ type: "text", text: "Continue the active task" }],
+        items: [
+          { id: "assistant-background-first", type: "agentMessage", text: "First active block" },
+          { id: "assistant-background-second", type: "agentMessage", text: "Second active block" },
+        ],
+      },
+    ], {
+      turns: [],
+      threadRuntimeStatus: { type: "active", activeFlags: [] },
+    })
+  ));
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/started" && message.params?.threadId === threadId
+  )));
+  assert.equal(
+    outbound.filter((message) => (
+      message.method === "turn/started" && message.params?.threadId === threadId
+    )).length,
+    1,
+    "background discovery should announce one active turn"
+  );
+  outbound.length = 0;
+
+  const handled = follower.observeInbound(JSON.stringify({
+    id: "metadata-only-resume",
+    method: "thread/resume",
+    params: { threadId, excludeTurns: true },
+  }));
+  assert.equal(handled, false);
+  await waitFor(() => outbound.some((message) => (
+    message.method === "item/started"
+      && message.params?.itemId === "assistant-background-second"
+  )));
+
+  assert.equal(outbound[0].method, "thread/replaced");
+  assert.deepEqual(
+    outbound
+      .filter((message) => message.method === "turn/started")
+      .map((message) => message.params.turnId),
+    ["turn-background-parallel"],
+    "opening should add the other active turn without repeating the sidebar-announced run"
+  );
+  assert.deepEqual(
+    outbound
+      .filter((message) => message.method === "item/started")
+      .map((message) => message.params.itemId),
+    [
+      "assistant-background-parallel",
+      "turn-background-open:input",
+      "assistant-background-first",
+      "assistant-background-second",
+    ]
+  );
+  assert.equal(
+    outbound.some((message) => message.params?.itemId === "assistant-turn-background-history"),
+    false,
+    "opening an active chat must not replay completed historical turns"
+  );
+  outbound.length = 0;
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 11,
+    params: {
+      conversationId: threadId,
+      change: {
+        type: "patches",
+        patches: [{
+          op: "replace",
+          path: ["turnHistory", "history", "entitiesByKey", "turn:turn-background-open", "items", 1, "text"],
+          value: "Second active block continued",
+        }],
+      },
+    },
+  });
+  await waitFor(() => outbound.some((message) => message.method === "item/agentMessage/delta"));
+  assert.deepEqual(
+    outbound.map((message) => ({
+      method: message.method,
+      itemId: message.params?.itemId,
+      delta: message.params?.delta,
+    })),
+    [{
+      method: "item/agentMessage/delta",
+      itemId: "assistant-background-second",
+      delta: " continued",
+    }]
+  );
+});
+
 test("desktop IPC background recovery stays lifecycle-only until open", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-recovery-");
   let serverSocket = null;
@@ -4493,7 +4771,8 @@ function normalizedConversationState(turns, overrides = {}) {
       id: turn.id,
       turnId: turn.id,
       status: turn.status,
-      items: [{
+      ...(turn.input ? { params: { input: turn.input } } : {}),
+      items: turn.items || [{
         id: turn.itemId || `assistant-${turn.id}`,
         type: "assistant_message",
         text: turn.text,

@@ -306,7 +306,37 @@ function createDesktopIpcActionFollower({
         const rawState = rawStatesByThreadId.get(threadId);
         if (rawState) {
           syncBackgroundThreadLifecycle(threadId, rawState);
-          conversationProjector.seed(threadId, desktopLiveStateForProjection(rawState));
+          const announcedBackgroundTurn = announcedBackgroundTurnsByThreadId.get(threadId) || null;
+          const announcedBackgroundTurnId = readString(announcedBackgroundTurn?.id);
+          const hasCanonicalNormalizedHistory = canonicalHistoryThreadIds.has(threadId)
+            || hasNormalizedHistoryOutsideRawTurns(rawState);
+          const liveState = desktopLiveStateForProjection(rawState);
+          if (hasCanonicalNormalizedHistory) {
+            canonicalHistoryThreadIds.add(threadId);
+            canonicalHistoryReplacementSentThreadIds.add(threadId);
+            conversationProjector.remove(threadId);
+            sendApplicationResponse(JSON.stringify({
+              method: "thread/replaced",
+              params: {
+                threadId,
+                agntDesktopMirror: true,
+                agntDesktopIpcMirror: true,
+                agntActionSource: DESKTOP_IPC_ACTION_SOURCE,
+              },
+            }));
+            const output = conversationProjector.project(threadId, liveState, {
+              includeAllActiveTurns: true,
+            });
+            for (const notification of output.notifications || []) {
+              const isDuplicateBackgroundStart = notification.method === "turn/started"
+                && readString(notification.params?.turnId) === announcedBackgroundTurnId;
+              if (!isDuplicateBackgroundStart) {
+                sendApplicationResponse(JSON.stringify(notification));
+              }
+            }
+          } else {
+            conversationProjector.seed(threadId, liveState);
+          }
           clearBackgroundDisconnectTimer(threadId);
           announcedBackgroundTurnsByThreadId.delete(threadId);
         } else {
