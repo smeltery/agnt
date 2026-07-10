@@ -2090,6 +2090,129 @@ test("desktop IPC follower settles background runs on completion and disconnect"
   )), 1_000);
 });
 
+test("desktop IPC background recovery stays lifecycle-only until open", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-recovery-");
+  let serverSocket = null;
+  let readAttempts = 0;
+  const baseline = {
+    turns: [{
+      status: "inProgress",
+      items: [{ id: "assistant-background-recovery", type: "assistant_message", text: "A" }],
+    }],
+    requests: [],
+  };
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    async readConversationState() {
+      readAttempts += 1;
+      return structuredClone(baseline);
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({ method: "thread/list", params: {} }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, desktopConversationSnapshot("thread-background-recovery", {
+    turns: [{ status: "inProgress", items: [] }],
+    requests: [],
+  }));
+  await waitFor(() => outbound.some((message) => message.method === "turn/started"));
+  const started = outbound.find((message) => message.method === "turn/started");
+  assert.equal(started.params.turnId, "ipc-turn-0");
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 11,
+    params: {
+      conversationId: "thread-background-recovery",
+      change: {
+        type: "patches",
+        patches: [{
+          op: "replace",
+          path: ["turns", 0, "items", 0, "text"],
+          value: "AB",
+        }],
+      },
+    },
+  });
+
+  await waitFor(() => readAttempts > 0);
+  await wait(25);
+  assert.equal(
+    outbound.some((message) => (
+      message.method === "item/agentMessage/delta"
+        && message.params?.threadId === "thread-background-recovery"
+    )),
+    false,
+    "baseline recovery for unopened chats should not publish transcript deltas"
+  );
+
+  const readHandled = follower.observeInbound(JSON.stringify({
+    id: "open-background-recovery",
+    method: "thread/read",
+    params: { threadId: "thread-background-recovery" },
+  }));
+  assert.equal(readHandled, true);
+  assert.equal(
+    outbound.find((message) => message.id === "open-background-recovery")
+      ?.result?.thread?.turns?.[0]?.items?.[0]?.text,
+    "AB"
+  );
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 11,
+    params: {
+      conversationId: "thread-background-recovery",
+      change: {
+        type: "patches",
+        patches: [{
+          op: "replace",
+          path: ["turns", 0, "items", 0, "text"],
+          value: "ABC",
+        }],
+      },
+    },
+  });
+  await waitFor(() => outbound.some((message) => (
+    message.method === "item/agentMessage/delta"
+      && message.params?.threadId === "thread-background-recovery"
+      && message.params?.delta === "C"
+  )));
+});
+
 test("desktop IPC follower normalizes phone turn starts before Desktop follower requests", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-follower-normalize-");
   const serverFrames = [];

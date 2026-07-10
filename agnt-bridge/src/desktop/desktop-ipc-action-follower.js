@@ -1138,7 +1138,7 @@ function createDesktopIpcActionFollower({
 
   function recoverThreadBaseline(threadId) {
     if (recoveringThreadIds.has(threadId)
-      || rawStatesByThreadId.has(threadId)) {
+      || (rawStatesByThreadId.has(threadId) && !backgroundOnlyThreadIds.has(threadId))) {
       return;
     }
     const recoveryState = baselineRecoveryStateByThreadId.get(threadId) || {
@@ -1198,10 +1198,14 @@ function createDesktopIpcActionFollower({
 
     rawStatesByThreadId.set(threadId, nextState);
     rawStateUpdatedAtByThreadId.set(threadId, now());
-    if (baselineState && typeof baselineState === "object") {
+    if (baselineState && typeof baselineState === "object" && !backgroundOnlyThreadIds.has(threadId)) {
       conversationProjector.seed(threadId, baselineState);
     }
-    syncProjectedConversationState(threadId, nextState);
+    if (backgroundOnlyThreadIds.has(threadId)) {
+      syncBackgroundThreadLifecycle(threadId, nextState);
+    } else {
+      syncProjectedConversationState(threadId, nextState);
+    }
     syncProjectedActions(threadId, projectPendingDesktopActions(threadId, nextState));
     releaseHeldFollowerRequests(threadId, { toDesktop: true });
   }
