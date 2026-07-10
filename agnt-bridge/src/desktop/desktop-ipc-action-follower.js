@@ -227,6 +227,7 @@ function createDesktopIpcActionFollower({
   const canonicalHistoryThreadIds = new Set();
   const canonicalHistoryReplacementSentThreadIds = new Set();
   const canonicalActiveTurnsByThreadId = new Map();
+  const staleYieldedThreadIds = new Set();
   // JS Set preserves insertion order; delete-before-add refreshes recency, and
   // cap eviction skips threads with pending prompts so approvals are not lost.
   function rememberActiveThread(threadId) {
@@ -272,6 +273,7 @@ function createDesktopIpcActionFollower({
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
     canonicalActiveTurnsByThreadId.delete(threadId);
+    staleYieldedThreadIds.delete(threadId);
     conversationProjector.remove(threadId);
     queuedChangesByThreadId.delete(threadId);
     baselineRecoveryStateByThreadId.delete(threadId);
@@ -389,6 +391,7 @@ function createDesktopIpcActionFollower({
     canonicalHistoryThreadIds.clear();
     canonicalHistoryReplacementSentThreadIds.clear();
     canonicalActiveTurnsByThreadId.clear();
+    staleYieldedThreadIds.clear();
     conversationProjector.reset();
     pendingRoutesByRequestId.clear();
     activeThreadIds.clear();
@@ -554,6 +557,7 @@ function createDesktopIpcActionFollower({
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
     canonicalActiveTurnsByThreadId.delete(threadId);
+    staleYieldedThreadIds.delete(threadId);
     conversationProjector.remove(threadId);
     queuedChangesByThreadId.delete(threadId);
     baselineRecoveryStateByThreadId.delete(threadId);
@@ -580,6 +584,7 @@ function createDesktopIpcActionFollower({
     canonicalHistoryThreadIds.delete(threadId);
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
     canonicalActiveTurnsByThreadId.delete(threadId);
+    staleYieldedThreadIds.delete(threadId);
     conversationProjector.remove(threadId);
     queuedChangesByThreadId.delete(threadId);
     baselineRecoveryStateByThreadId.delete(threadId);
@@ -843,6 +848,7 @@ function createDesktopIpcActionFollower({
     if (hasActiveProjectedTurn(thread)
       && isRawStateStaleForActiveRead(threadId)
       && !ownsDesktopCursor) {
+      staleYieldedThreadIds.add(threadId);
       return false;
     }
     const result = method === "thread/turns/list"
@@ -885,6 +891,7 @@ function createDesktopIpcActionFollower({
   }
 
   function syncProjectedConversationState(threadId, nextState, { isFullSnapshot = false } = {}) {
+    const resumedAfterStaleYield = staleYieldedThreadIds.delete(threadId);
     if (!canonicalHistoryThreadIds.has(threadId) && hasNormalizedHistoryOutsideRawTurns(nextState)) {
       canonicalHistoryThreadIds.add(threadId);
     }
@@ -915,8 +922,14 @@ function createDesktopIpcActionFollower({
       return;
     }
 
+    if (resumedAfterStaleYield) {
+      // Switching back from rollout/app-server history to fresh Desktop state is
+      // a source epoch change. Force a baseline repair instead of completing a
+      // stale in-progress turn from the old cache.
+      conversationProjector.remove(threadId);
+    }
     const output = conversationProjector.project(threadId, liveState);
-    if (output.type === "fullReplace" || output.type === "baseline") {
+    if (resumedAfterStaleYield || output.type === "fullReplace" || output.type === "baseline") {
       // fullReplace: synthesized turn ids just became real, stale rows must go.
       // baseline: the projector cache was evicted, so updates that arrived while
       // unobserved were never mirrored. Both cases need the phone to rebuild the

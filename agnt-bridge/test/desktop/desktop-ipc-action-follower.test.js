@@ -4418,7 +4418,9 @@ test("desktop IPC follower stops serving stale active-turn caches to phone reads
   assert.equal(staleServed, false);
   assert.equal(outbound.some((message) => message.id === "read-stale"), false);
 
-  // Idle cached threads have no phantom-running risk: they stay servable.
+  // The next fresh Desktop snapshot starts a new source epoch. It must arrive as
+  // one replacement bootstrap, not as an incremental completion of stale state.
+  const freshEpochStartIndex = outbound.length;
   writeFrame(serverSocket, {
     type: "broadcast",
     method: "thread-stream-state-changed",
@@ -4432,14 +4434,56 @@ test("desktop IPC follower stops serving stale active-turn caches to phone reads
           turns: [{
             id: "turn-stale-active",
             status: "completed",
-            items: [],
+            items: [{
+              id: "assistant-fresh-epoch",
+              type: "agentMessage",
+              text: "Fresh Desktop epoch.",
+            }],
           }],
           requests: [],
         },
       },
     },
   });
-  await waitFor(() => outbound.some((message) => message.method === "turn/completed"));
+  await waitFor(() => {
+    const messages = outbound.slice(freshEpochStartIndex);
+    return messages.some((message) => message.method === "thread/replaced")
+      && messages.some((message) => message.method === "thread/started");
+  });
+  const freshEpochMessages = outbound.slice(freshEpochStartIndex);
+  const replacementAnnouncementIndex = freshEpochMessages.findIndex((message) => (
+    message.method === "thread/replaced"
+  ));
+  const replacementBootstrapIndex = freshEpochMessages.findIndex((message) => (
+    message.method === "thread/started"
+  ));
+  assert.ok(replacementAnnouncementIndex >= 0);
+  assert.ok(replacementAnnouncementIndex < replacementBootstrapIndex);
+  const replacementBootstrap = freshEpochMessages.find((message) => (
+    message.method === "thread/started"
+  ));
+  assert.equal(replacementBootstrap.params.threadId, "thread-stale-active");
+  assert.equal(replacementBootstrap.params.agntDesktopMirror, true);
+  assert.deepEqual(
+    replacementBootstrap.params.thread.turns.map((turn) => ({
+      id: turn.id,
+      status: turn.status,
+      itemIDs: turn.items.map((item) => item.id),
+    })),
+    [{
+      id: "turn-stale-active",
+      status: "completed",
+      itemIDs: ["assistant-fresh-epoch"],
+    }]
+  );
+  assert.equal(
+    freshEpochMessages.some((message) => message.method === "turn/completed"),
+    false
+  );
+  assert.equal(follower.hasLiveThreadState("thread-stale-active"), true);
+
+  // Idle cached threads have no phantom-running risk: they stay servable even
+  // after the active-state freshness window elapses again.
   fakeNow += 60_000;
   const idleServed = follower.observeInbound(JSON.stringify({
     id: "read-idle",
@@ -4447,7 +4491,9 @@ test("desktop IPC follower stops serving stale active-turn caches to phone reads
     params: { threadId: "thread-stale-active" },
   }));
   assert.equal(idleServed, true);
-  assert.equal(outbound.some((message) => message.id === "read-idle"), true);
+  const idleResponse = outbound.find((message) => message.id === "read-idle");
+  assert.equal(idleResponse.result.thread.turns[0].status, "completed");
+  assert.equal(idleResponse.result.thread.turns[0].items[0].id, "assistant-fresh-epoch");
 });
 
 test("desktop IPC follower keeps phone interest in a thread across a Desktop disconnect", async (t) => {
