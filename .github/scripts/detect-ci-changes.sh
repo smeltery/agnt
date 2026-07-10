@@ -74,7 +74,6 @@ relay_code='^relay/([^/]+\.js|[^/]+\.test\.js|package\.json|bun\.lock)'
 web_code='^agnt-web/(src/|test/|public/|index\.html|package\.json|bun\.lock|tsconfig\.json|vite\.config\.ts|\.size-limit\.json)'
 host_code='^agnt-host/(src/|scripts/|public/|index\.html|pet\.html|popup\.html|copy-bundled\.mjs|package\.json|tsconfig[^/]*\.json|vite\.config\.ts|eslint\.config\.js)'
 
-package_surfaces=(bridge relay web host)
 platform_surfaces=(android ios)
 
 surface_pattern() {
@@ -90,57 +89,9 @@ surface_pattern() {
   esac
 }
 
-package_workdir() {
-  case "$1" in
-    bridge) printf '%s\n' "agnt-bridge" ;;
-    relay) printf '%s\n' "relay" ;;
-    web) printf '%s\n' "agnt-web" ;;
-    host) printf '%s\n' "agnt-host" ;;
-    *) echo "Unknown Bun package surface: $1" >&2; return 1 ;;
-  esac
-}
-
-package_frozen_lockfile() {
-  case "$1" in
-    bridge|relay|web) printf '%s\n' "true" ;;
-    host) printf '%s\n' "false" ;;
-    *) echo "Unknown Bun package surface: $1" >&2; return 1 ;;
-  esac
-}
-
-package_audit() {
-  case "$1" in
-    bridge|relay|web) printf '%s\n' "true" ;;
-    host) printf '%s\n' "false" ;;
-    *) echo "Unknown Bun package surface: $1" >&2; return 1 ;;
-  esac
-}
-
 surface_enabled() {
   local surface="$1"
   should_run "$surface" "$(surface_pattern "$surface")"
-}
-
-package_matrix_entry() {
-  local surface="$1"
-  local workdir
-  local frozen_lockfile
-  local audit
-  workdir="$(package_workdir "$surface")"
-  frozen_lockfile="$(package_frozen_lockfile "$surface")"
-  audit="$(package_audit "$surface")"
-
-  jq -n -c \
-    --arg name "$workdir" \
-    --arg working_directory "$workdir" \
-    --arg frozen_lockfile "$frozen_lockfile" \
-    --arg audit "$audit" \
-    '{
-      name: $name,
-      "working-directory": $working_directory,
-      "frozen-lockfile": $frozen_lockfile,
-      audit: $audit
-    }'
 }
 
 if matches "$ci_config"; then set_output lint_workflows true; else set_output lint_workflows false; fi
@@ -155,16 +106,6 @@ else
   set_output links false
 fi
 
-package_matrix=()
-for surface in "${package_surfaces[@]}"; do
-  if surface_enabled "$surface"; then
-    package_matrix+=("$(package_matrix_entry "$surface")")
-  fi
+for surface in bridge relay web host; do
+  if surface_enabled "$surface"; then set_output "$surface" true; else set_output "$surface" false; fi
 done
-
-if ((${#package_matrix[@]} == 0)); then
-  bun_packages_json="[]"
-else
-  bun_packages_json="$(printf '%s\n' "${package_matrix[@]}" | jq -s -c '.')"
-fi
-set_output bun_packages "$bun_packages_json"

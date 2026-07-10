@@ -41,10 +41,13 @@ jobs:
     timeout-minutes: 10
     outputs:
       android: ${{ steps.filter.outputs.android }}
+      bridge: ${{ steps.filter.outputs.bridge }}
+      host: ${{ steps.filter.outputs.host }}
       ios: ${{ steps.filter.outputs.ios }}
       links: ${{ steps.filter.outputs.links }}
       lint_workflows: ${{ steps.filter.outputs.lint_workflows }}
-      bun_packages: ${{ steps.filter.outputs.bun_packages }}
+      relay: ${{ steps.filter.outputs.relay }}
+      web: ${{ steps.filter.outputs.web }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -61,10 +64,10 @@ jobs:
         run: |
           ./.github/scripts/detect-ci-changes.sh
 
-  workflow-lint:
+  ci-config:
     needs: changes
     if: needs.changes.outputs.lint_workflows == 'true'
-    name: GitHub Actions lint
+    name: CI config checks
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -79,29 +82,15 @@ jobs:
             rhysd/actionlint:latest \
             -color
 
-  ci-routing:
-    needs: changes
-    if: needs.changes.outputs.lint_workflows == 'true'
-    name: CI routing tests
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
       - name: Test CI change detector
         run: ./.github/scripts/test-detect-ci-changes.sh
 
-  bun-packages:
+  bridge:
     needs: changes
-    if: needs.changes.outputs.bun_packages != '[]'
-    name: Bun package CI (${{ matrix.package.name }})
+    if: needs.changes.outputs.bridge == 'true'
+    name: Bun package CI (agnt-bridge)
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJSON(needs.changes.outputs.bun_packages) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -109,10 +98,64 @@ jobs:
       - name: Run Bun package CI
         uses: ./.github/actions/run-bun-package-ci
         with:
-          name: ${{ matrix.package.name }}
-          working-directory: ${{ matrix.package.working-directory }}
-          frozen-lockfile: ${{ matrix.package.frozen-lockfile }}
-          audit: ${{ matrix.package.audit }}
+          name: agnt-bridge
+          working-directory: agnt-bridge
+          frozen-lockfile: "true"
+          audit: "true"
+
+  relay:
+    needs: changes
+    if: needs.changes.outputs.relay == 'true'
+    name: Bun package CI (relay)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run Bun package CI
+        uses: ./.github/actions/run-bun-package-ci
+        with:
+          name: relay
+          working-directory: relay
+          frozen-lockfile: "true"
+          audit: "true"
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    name: Bun package CI (agnt-web)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run Bun package CI
+        uses: ./.github/actions/run-bun-package-ci
+        with:
+          name: agnt-web
+          working-directory: agnt-web
+          frozen-lockfile: "true"
+          audit: "true"
+
+  host:
+    needs: changes
+    if: needs.changes.outputs.host == 'true'
+    name: Bun package CI (agnt-host)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run Bun package CI
+        uses: ./.github/actions/run-bun-package-ci
+        with:
+          name: agnt-host
+          working-directory: agnt-host
+          frozen-lockfile: "false"
+          audit: "false"
 
   android:
     needs: changes
@@ -184,9 +227,11 @@ jobs:
   ci-summary:
     needs:
       - changes
-      - workflow-lint
-      - ci-routing
-      - bun-packages
+      - ci-config
+      - bridge
+      - relay
+      - web
+      - host
       - android
       - ios
       - links
@@ -199,9 +244,11 @@ jobs:
 
           for result in \
             "${{ needs.changes.result }}" \
-            "${{ needs.workflow-lint.result }}" \
-            "${{ needs.ci-routing.result }}" \
-            "${{ needs.bun-packages.result }}" \
+            "${{ needs.ci-config.result }}" \
+            "${{ needs.bridge.result }}" \
+            "${{ needs.relay.result }}" \
+            "${{ needs.web.result }}" \
+            "${{ needs.host.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \
             "${{ needs.links.result }}"

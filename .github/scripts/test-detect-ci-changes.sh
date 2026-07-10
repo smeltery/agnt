@@ -46,26 +46,6 @@ assert_output() {
   fi
 }
 
-assert_bun_names() {
-  local output_file="$1"
-  shift
-  local expected_json
-  local actual_json
-
-  if (($# == 0)); then
-    expected_json="[]"
-  else
-    expected_json="$(printf '%s\n' "$@" | jq -R -s -c 'split("\n")[:-1]')"
-  fi
-  actual_json="$(get_output "$output_file" bun_packages | jq -c '[.[].name]')"
-  if [[ "$actual_json" != "$expected_json" ]]; then
-    printf 'Expected bun packages %s, got %s\n' "$expected_json" "$actual_json" >&2
-    printf 'Outputs from %s:\n' "$output_file" >&2
-    cat "$output_file" >&2
-    exit 1
-  fi
-}
-
 assert_case() {
   local name="$1"
   local event_name="$2"
@@ -75,47 +55,46 @@ assert_case() {
   local expected_android="$6"
   local expected_ios="$7"
   local expected_links="$8"
-  local expected_bun_names="$9"
+  local expected_bridge="${9}"
+  local expected_relay="${10}"
+  local expected_web="${11}"
+  local expected_host="${12}"
   local output_file
-  local -a bun_names=()
 
   output_file="$(run_detector "$name" "$event_name" "$scope" "$changed_files")"
   assert_output "$output_file" lint_workflows "$expected_lint_workflows"
   assert_output "$output_file" android "$expected_android"
   assert_output "$output_file" ios "$expected_ios"
   assert_output "$output_file" links "$expected_links"
-
-  if [[ -n "$expected_bun_names" ]]; then
-    read -r -a bun_names <<< "$expected_bun_names"
-    assert_bun_names "$output_file" "${bun_names[@]}"
-  else
-    assert_bun_names "$output_file"
-  fi
+  assert_output "$output_file" bridge "$expected_bridge"
+  assert_output "$output_file" relay "$expected_relay"
+  assert_output "$output_file" web "$expected_web"
+  assert_output "$output_file" host "$expected_host"
 }
 
 cases=(
-  "workflow|push||.github/workflows/ci.yml|true|false|false|false|"
-  "bridge|push||agnt-bridge/src/bridge/bridge.js|false|false|false|false|agnt-bridge"
-  "bridge_docs|push||agnt-bridge/README.md|false|false|false|true|"
-  "secure|push||agnt-web/src/crypto/transcript.ts|false|true|true|false|agnt-bridge agnt-web"
-  "flox_config|push||.flox/env/manifest.toml|false|true|false|false|agnt-bridge relay agnt-web agnt-host"
-  "flox_action|push||.github/actions/setup-flox/action.yml|true|true|false|false|agnt-bridge relay agnt-web agnt-host"
-  "bun_action|push||.github/actions/run-bun-package-ci/action.yml|true|false|false|false|agnt-bridge relay agnt-web agnt-host"
-  "android_action|push||.github/actions/run-android-ci/action.yml|true|true|false|false|"
-  "ios_action|push||.github/actions/build-unsigned-ios-ipa/action.yml|true|false|true|false|"
-  "link_action|push||.github/actions/run-link-check/action.yml|true|false|false|true|"
-  "web_docs|push||agnt-web/README.md|false|false|false|true|"
-  "host_docs|push||agnt-host/README.md|false|false|false|true|"
-  "relay_docs|push||relay/README.md|false|false|false|true|"
-  "manual_packages|workflow_dispatch|packages||false|false|false|false|agnt-bridge relay agnt-web agnt-host"
-  "manual_host|workflow_dispatch|host||false|false|false|false|agnt-host"
-  "docs|push||README.md|false|false|false|true|"
-  "schedule|schedule|||false|false|false|true|"
+  "workflow|push||.github/workflows/ci.yml|true|false|false|false|false|false|false|false"
+  "bridge|push||agnt-bridge/src/bridge/bridge.js|false|false|false|false|true|false|false|false"
+  "bridge_docs|push||agnt-bridge/README.md|false|false|false|true|false|false|false|false"
+  "secure|push||agnt-web/src/crypto/transcript.ts|false|true|true|false|true|false|true|false"
+  "flox_config|push||.flox/env/manifest.toml|false|true|false|false|true|true|true|true"
+  "flox_action|push||.github/actions/setup-flox/action.yml|true|true|false|false|true|true|true|true"
+  "bun_action|push||.github/actions/run-bun-package-ci/action.yml|true|false|false|false|true|true|true|true"
+  "android_action|push||.github/actions/run-android-ci/action.yml|true|true|false|false|false|false|false|false"
+  "ios_action|push||.github/actions/build-unsigned-ios-ipa/action.yml|true|false|true|false|false|false|false|false"
+  "link_action|push||.github/actions/run-link-check/action.yml|true|false|false|true|false|false|false|false"
+  "web_docs|push||agnt-web/README.md|false|false|false|true|false|false|false|false"
+  "host_docs|push||agnt-host/README.md|false|false|false|true|false|false|false|false"
+  "relay_docs|push||relay/README.md|false|false|false|true|false|false|false|false"
+  "manual_packages|workflow_dispatch|packages||false|false|false|false|true|true|true|true"
+  "manual_host|workflow_dispatch|host||false|false|false|false|false|false|false|true"
+  "docs|push||README.md|false|false|false|true|false|false|false|false"
+  "schedule|schedule|||false|false|false|true|false|false|false|false"
 )
 
 for case_spec in "${cases[@]}"; do
-  IFS="|" read -r name event_name scope changed_files lint_workflows android ios links bun_names <<< "$case_spec"
-  assert_case "$name" "$event_name" "$scope" "$changed_files" "$lint_workflows" "$android" "$ios" "$links" "$bun_names"
+  IFS="|" read -r name event_name scope changed_files lint_workflows android ios links bridge relay web host <<< "$case_spec"
+  assert_case "$name" "$event_name" "$scope" "$changed_files" "$lint_workflows" "$android" "$ios" "$links" "$bridge" "$relay" "$web" "$host"
 done
 
 echo "CI change detector tests passed."
