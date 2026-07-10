@@ -94,14 +94,18 @@ assert_case() {
 }
 
 cases=(
-  "workflow|push||.github/workflows/ci.yml|true|true|true|true|agnt-bridge relay agnt-web agnt-host"
+  "workflow|push||.github/workflows/ci.yml|true|false|false|false|"
   "bridge|push||agnt-bridge/src/bridge/bridge.js|false|false|false|false|agnt-bridge"
+  "bridge_docs|push||agnt-bridge/README.md|false|false|false|true|"
   "secure|push||agnt-web/src/crypto/transcript.ts|false|true|true|false|agnt-bridge agnt-web"
   "flox_config|push||.flox/env/manifest.toml|false|true|false|false|agnt-bridge relay agnt-web agnt-host"
   "flox_action|push||.github/actions/setup-flox/action.yml|true|true|false|false|agnt-bridge relay agnt-web agnt-host"
   "android_action|push||.github/actions/run-android-ci/action.yml|true|true|false|false|"
   "ios_action|push||.github/actions/build-unsigned-ios-ipa/action.yml|true|false|true|false|"
   "link_action|push||.github/actions/run-link-check/action.yml|true|false|false|true|"
+  "web_docs|push||agnt-web/README.md|false|false|false|true|"
+  "host_docs|push||agnt-host/README.md|false|false|false|true|"
+  "relay_docs|push||relay/README.md|false|false|false|true|"
   "manual_packages|workflow_dispatch|packages||false|false|false|false|agnt-bridge relay agnt-web agnt-host"
   "manual_host|workflow_dispatch|host||false|false|false|false|agnt-host"
   "docs|push||README.md|false|false|false|true|"

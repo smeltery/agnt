@@ -53,7 +53,6 @@ set_output() {
 }
 
 ci_config='^(\.github/workflows/|\.github/actions/|\.github/scripts/|\.github/actionlint\.ya?ml)'
-ci_workflow='^\.github/workflows/ci\.yml'
 link_check_action='^\.github/actions/run-link-check/'
 setup_flox_action='^\.github/actions/setup-flox/'
 android_ci_action='^\.github/actions/run-android-ci/'
@@ -69,19 +68,23 @@ secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core
 # Any change fans out to every parity surface that can compile-test it.
 secure_transport="$secure_bridge|$secure_web|$secure_ios|$secure_android"
 android_code='^(AgntAndroid/(app|gradle)/|AgntAndroid/(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|gradlew\.bat))'
+bridge_code='^agnt-bridge/(bin/|scripts/|src/|test/|package\.json|bun\.lock)'
+relay_code='^relay/([^/]+\.js|[^/]+\.test\.js|package\.json|bun\.lock)'
+web_code='^agnt-web/(src/|test/|public/|index\.html|package\.json|bun\.lock|tsconfig\.json|vite\.config\.ts|\.size-limit\.json)'
+host_code='^agnt-host/(src/|scripts/|public/|index\.html|pet\.html|popup\.html|copy-bundled\.mjs|package\.json|tsconfig[^/]*\.json|vite\.config\.ts|eslint\.config\.js)'
 
 package_surfaces=(bridge relay web host)
 platform_surfaces=(android ios)
 
 surface_pattern() {
   case "$1" in
-    bridge) printf '%s\n' "$ci_workflow|$bun_common|$secure_transport|^agnt-bridge/" ;;
-    relay) printf '%s\n' "$ci_workflow|$bun_common|^relay/" ;;
-    web) printf '%s\n' "$ci_workflow|$bun_common|$secure_transport|^agnt-web/" ;;
-    host) printf '%s\n' "$ci_workflow|$bun_common|^agnt-host/" ;;
-    android) printf '%s\n' "$ci_workflow|$android_ci_action|$flox_common|$secure_transport|$android_code" ;;
-    ios) printf '%s\n' "$ci_workflow|$ios_ipa_action|$secure_transport|^AgntMobile/" ;;
-    links) printf '%s\n' "$ci_workflow|$link_check_action|^.*\.md$|^\.lycheeignore$" ;;
+    bridge) printf '%s\n' "$bun_common|$secure_transport|$bridge_code" ;;
+    relay) printf '%s\n' "$bun_common|$relay_code" ;;
+    web) printf '%s\n' "$bun_common|$secure_transport|$web_code" ;;
+    host) printf '%s\n' "$bun_common|$host_code" ;;
+    android) printf '%s\n' "$android_ci_action|$flox_common|$secure_transport|$android_code" ;;
+    ios) printf '%s\n' "$ios_ipa_action|$secure_transport|^AgntMobile/" ;;
+    links) printf '%s\n' "$link_check_action|^.*\.md$|^\.lycheeignore$" ;;
     *) echo "Unknown CI surface: $1" >&2; return 1 ;;
   esac
 }
