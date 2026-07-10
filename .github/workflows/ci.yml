@@ -32,6 +32,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  AGNT_FLOX_QUIET: "1"
+
 jobs:
   changes:
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -58,8 +61,17 @@ jobs:
         run: |
           ./.github/scripts/detect-ci-changes.sh
 
+  workflow-lint:
+    needs: changes
+    if: needs.changes.outputs.lint_workflows == 'true'
+    name: GitHub Actions lint
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
       - name: Lint GitHub Actions workflows
-        if: steps.filter.outputs.lint_workflows == 'true'
         run: |
           docker run --rm \
             -v "$PWD:/repo" \
@@ -68,7 +80,6 @@ jobs:
             -color
 
       - name: Test CI change detector
-        if: steps.filter.outputs.lint_workflows == 'true'
         run: ./.github/scripts/test-detect-ci-changes.sh
 
   bun-packages:
@@ -81,8 +92,6 @@ jobs:
       fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.bun_packages) }}
-    env:
-      AGNT_FLOX_QUIET: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -100,8 +109,6 @@ jobs:
     if: needs.changes.outputs.android == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
-    env:
-      AGNT_FLOX_QUIET: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -167,6 +174,7 @@ jobs:
   ci-summary:
     needs:
       - changes
+      - workflow-lint
       - bun-packages
       - android
       - ios
@@ -180,6 +188,7 @@ jobs:
 
           for result in \
             "${{ needs.changes.result }}" \
+            "${{ needs.workflow-lint.result }}" \
             "${{ needs.bun-packages.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \
