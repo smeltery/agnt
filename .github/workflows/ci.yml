@@ -14,6 +14,7 @@ on:
         type: choice
         options:
           - all
+          - packages
           - bun
           - bridge
           - relay
@@ -58,16 +59,8 @@ jobs:
         run: |
           ./.github/scripts/detect-ci-changes.sh
 
-  ci-config:
-    needs: changes
-    if: needs.changes.outputs.lint_workflows == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
       - name: Lint GitHub Actions workflows
+        if: steps.filter.outputs.lint_workflows == 'true'
         run: |
           docker run --rm \
             -v "$PWD:/repo" \
@@ -76,6 +69,7 @@ jobs:
             -color
 
       - name: Test CI change detector
+        if: steps.filter.outputs.lint_workflows == 'true'
         run: ./.github/scripts/test-detect-ci-changes.sh
 
   bun-packages:
@@ -173,7 +167,6 @@ jobs:
   ci-summary:
     needs:
       - changes
-      - ci-config
       - bun-packages
       - android
       - ios
@@ -187,7 +180,6 @@ jobs:
 
           for result in \
             "${{ needs.changes.result }}" \
-            "${{ needs.ci-config.result }}" \
             "${{ needs.bun-packages.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \

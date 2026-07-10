@@ -103,6 +103,7 @@ cases=(
   "android_action|push||.github/actions/run-android-ci/action.yml|true|true|false|false|"
   "ios_action|push||.github/actions/build-unsigned-ios-ipa/action.yml|true|false|true|false|"
   "link_action|push||.github/actions/run-link-check/action.yml|true|false|false|true|"
+  "manual_packages|workflow_dispatch|packages||false|false|false|false|agnt-bridge relay agnt-web agnt-host"
   "manual_bun|workflow_dispatch|bun||false|false|false|false|agnt-bridge relay agnt-web agnt-host"
   "docs|push||README.md|false|false|false|true|"
   "schedule|schedule|||false|false|false|true|"

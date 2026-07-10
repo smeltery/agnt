@@ -36,7 +36,7 @@ requested() {
   local surface="$1"
   [[ "$event_name" == "workflow_dispatch" ]] || return 1
   [[ "$manual_scope" == "all" || "$manual_scope" == "$surface" ]] && return 0
-  [[ "$manual_scope" == "bun" && "$surface" =~ ^(bridge|relay|web|host)$ ]]
+  [[ "$manual_scope" =~ ^(packages|bun)$ && "$surface" =~ ^(bridge|relay|web|host)$ ]]
 }
 
 should_run() {
