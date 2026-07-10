@@ -113,6 +113,44 @@ final class TurnTimelineReducerTests: XCTestCase {
         XCTAssertEqual(projection.messages.map(\.id), ["thinking-1", "thinking-2"])
     }
 
+    func testDeduplicatesCumulativeReasoningSummarySnapshots() {
+        let threadID = "thread"
+        let now = Date()
+
+        let messages = [
+            makeMessage(
+                id: "summary-a",
+                threadID: threadID,
+                role: .system,
+                kind: .thinking,
+                text: "**Testing notify command behavior**\n\n<!-- -->",
+                createdAt: now,
+                turnID: "turn-1",
+                itemID: "summary-a",
+                orderIndex: 1
+            ),
+            makeMessage(
+                id: "summary-b",
+                threadID: threadID,
+                role: .system,
+                kind: .thinking,
+                text: "**Testing notify command behavior**\n\n<!-- -->\n\n**Analyzing notify hook JSON output format**\n\n<!-- -->",
+                createdAt: now.addingTimeInterval(1),
+                turnID: "turn-1",
+                itemID: "summary-b",
+                orderIndex: 2
+            ),
+        ]
+
+        let projection = TurnTimelineReducer.project(messages: messages)
+
+        XCTAssertEqual(projection.messages.map(\.id), ["summary-a", "summary-b"])
+        XCTAssertEqual(
+            projection.messages[1].text,
+            "**Analyzing notify hook JSON output format**\n\n<!-- -->"
+        )
+    }
+
     func testDeduplicatesStalePendingImagePromptWhenConfirmedEchoUsesDifferentAttachmentIdentity() {
         let threadID = "thread"
         let now = Date()

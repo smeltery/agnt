@@ -17,6 +17,9 @@ struct ThinkingDisclosureContent: Equatable {
     let fallbackText: String
 
     var showsDisclosure: Bool { !sections.isEmpty }
+    var isSummaryOnly: Bool {
+        !sections.isEmpty && sections.allSatisfy(\.detail.isEmpty)
+    }
 }
 
 enum ThinkingDisclosureParser {
@@ -119,16 +122,26 @@ enum ThinkingDisclosureParser {
         let trimmed = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
 
-        if trimmed.lowercased().hasPrefix("thinking...") {
-            let start = trimmed.index(trimmed.startIndex, offsetBy: "thinking...".count)
-            return String(trimmed[start...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let repairedSummaryBoundaries = trimmed.replacingOccurrences(
+            of: #"<!--\s*-->\s*(?=\*\*)"#,
+            with: "<!-- -->\n\n",
+            options: .regularExpression
+        )
+
+        if repairedSummaryBoundaries.lowercased().hasPrefix("thinking...") {
+            let start = repairedSummaryBoundaries.index(
+                repairedSummaryBoundaries.startIndex,
+                offsetBy: "thinking...".count
+            )
+            return String(repairedSummaryBoundaries[start...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        if trimmed.lowercased() == "thinking" {
+        if repairedSummaryBoundaries.lowercased() == "thinking" {
             return ""
         }
 
-        return trimmed
+        return repairedSummaryBoundaries
     }
 
     // Collapses activity-only tool traces down to the latest status line for compact timeline rendering.
