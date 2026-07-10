@@ -415,6 +415,8 @@ final class CodexService {
     var latestTurnTerminalStateByThread: [String: CodexTurnTerminalState] = [:]
     // Preserves terminal outcome per turn so completed/stopped blocks stay distinguishable.
     var terminalStateByTurnID: [String: CodexTurnTerminalState] = [:]
+    // Desktop-projected turn ids are scoped to one thread; `ipc-turn-1` can repeat.
+    var projectedTerminalStateByThreadID: [String: [String: CodexTurnTerminalState]] = [:]
     // Ordered pending runtime approvals keyed by request id so concurrent prompts do not overwrite each other.
     var pendingApprovals: [CodexApprovalRequest] = []
     var lastRawMessage: String?
@@ -819,6 +821,7 @@ final class CodexService {
         self.pinnedThreadSnapshotsByRootID = [:]
         self.associatedManagedWorktreePathByThreadID = [:]
         self.terminalStateByTurnID = [:]
+        self.projectedTerminalStateByThreadID = [:]
 
         let savedServiceTier = defaults.string(forKey: Self.selectedServiceTierDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)

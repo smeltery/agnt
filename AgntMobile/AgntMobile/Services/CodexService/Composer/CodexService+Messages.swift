@@ -208,6 +208,7 @@ extension CodexService {
         latestAssistantMessageIDByThread.removeValue(forKey: threadId)
         latestRepoAffectingMessageSignalByThread.removeValue(forKey: threadId)
         assistantRevertStateCacheByThread.removeValue(forKey: threadId)
+        projectedTerminalStateByThreadID.removeValue(forKey: threadId)
         cancelPendingStreamingDeltaFlushes(for: threadId)
         threadsPendingCompletionHaptic.remove(threadId)
         threadsNeedingCanonicalHistoryReconcile.remove(threadId)
@@ -236,6 +237,7 @@ extension CodexService {
         latestAssistantMessageIDByThread.removeAll()
         latestRepoAffectingMessageSignalByThread.removeAll()
         assistantRevertStateCacheByThread.removeAll()
+        projectedTerminalStateByThreadID.removeAll()
         cancelAllPendingStreamingDeltaFlushes()
         threadsNeedingCanonicalHistoryReconcile.removeAll()
         threadsWithSatisfiedDeferredHistoryHydration.removeAll()
@@ -586,7 +588,17 @@ extension CodexService {
 
     // Returns the terminal outcome for a specific turn when known.
     func turnTerminalState(for turnId: String?) -> CodexTurnTerminalState? {
+        turnTerminalState(for: turnId, threadId: nil)
+    }
+
+    // Returns the terminal outcome for a turn. Desktop-projected turn ids are
+    // only unique inside their thread, so callers with thread context must use it.
+    func turnTerminalState(for turnId: String?, threadId: String?) -> CodexTurnTerminalState? {
         guard let turnId else { return nil }
+        if CodexSyntheticIdentifiers.isProjectedDesktopTurnID(turnId),
+           let threadId {
+            return projectedTerminalStateByThreadID[threadId]?[turnId]
+        }
         return terminalStateByTurnID[turnId]
     }
 
@@ -689,7 +701,9 @@ extension CodexService {
         let previousState = latestTurnTerminalStateByThread[threadId]
         latestTurnTerminalStateByThread[threadId] = state
         if let turnId {
-            if terminalStateByTurnID[turnId] != state {
+            if CodexSyntheticIdentifiers.isProjectedDesktopTurnID(turnId) {
+                projectedTerminalStateByThreadID[threadId, default: [:]][turnId] = state
+            } else if terminalStateByTurnID[turnId] != state {
                 terminalStateByTurnID[turnId] = state
                 persistTurnTerminalStates()
             }
@@ -1594,7 +1608,8 @@ extension CodexService {
         messagesByThread[threadId]?[messageIndex].planState = planState
         messagesByThread[threadId]?[messageIndex].planPresentation = resolvedPlanPresentation(
             requested: planPresentation,
-            turnId: turnId
+            turnId: turnId,
+            threadId: threadId
         )
         refreshDerivedPlanMetadata(threadId: threadId, messageIndex: messageIndex)
         persistMessages()
@@ -1622,7 +1637,8 @@ extension CodexService {
         messagesByThread[threadId]?[messageIndex].isStreaming = false
         messagesByThread[threadId]?[messageIndex].planPresentation = resolvedPlanPresentation(
             requested: .resultCompletedItem,
-            turnId: turnId
+            turnId: turnId,
+            threadId: threadId
         )
         refreshDerivedPlanMetadata(threadId: threadId, messageIndex: messageIndex)
         streamingSystemMessageByItemID = streamingSystemMessageByItemID.filter { _, messageID in
@@ -3193,7 +3209,7 @@ extension CodexService {
     ) -> Bool {
         let normalizedTurnId = turnId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedTurnId.isEmpty,
-              terminalStateByTurnID[normalizedTurnId] != nil,
+              turnTerminalState(for: normalizedTurnId, threadId: threadId) != nil,
               activeTurnIdByThread[threadId] != normalizedTurnId,
               var threadMessages = messagesByThread[threadId] else {
             return false
@@ -4160,7 +4176,7 @@ extension CodexService {
         clearRunningThreadWatch(threadId)
         let shouldFinalizePlanSteps: Bool = {
             if let resolvedTurnId {
-                return terminalStateByTurnID[resolvedTurnId] == .completed
+                return turnTerminalState(for: resolvedTurnId, threadId: threadId) == .completed
             }
             return latestTurnTerminalStateByThread[threadId] == .completed
         }()
@@ -4692,7 +4708,7 @@ extension CodexService {
         let completedTurnIDs = Set(
             projectedMessages.compactMap { message -> String? in
                 guard let turnId = message.turnId,
-                      terminalStateByTurnID[turnId] == .completed else {
+                      turnTerminalState(for: turnId, threadId: threadId) == .completed else {
                     return nil
                 }
                 return turnId
@@ -4820,7 +4836,7 @@ extension CodexService {
     func rebuildStoppedTurnIDs(for threadId: String, messages: [CodexMessage]) -> Set<String> {
         let stoppedTurnIDs = Set(
             messages.compactMap(\.turnId)
-                .filter { terminalStateByTurnID[$0] == .stopped }
+                .filter { turnTerminalState(for: $0, threadId: threadId) == .stopped }
         )
         stoppedTurnIDsByThread[threadId] = stoppedTurnIDs
         return stoppedTurnIDs
@@ -4837,13 +4853,21 @@ extension CodexService {
         }
 
         var didChange = false
+        var didChangePersistedState = false
         for (turnId, state) in historyStates {
+            if CodexSyntheticIdentifiers.isProjectedDesktopTurnID(turnId) {
+                guard projectedTerminalStateByThreadID[threadId]?[turnId] != state else { continue }
+                projectedTerminalStateByThreadID[threadId, default: [:]][turnId] = state
+                didChange = true
+                continue
+            }
             guard terminalStateByTurnID[turnId] != state else { continue }
             terminalStateByTurnID[turnId] = state
             didChange = true
+            didChangePersistedState = true
         }
 
-        if didChange {
+        if didChangePersistedState {
             persistTurnTerminalStates()
         }
         return didChange
@@ -5109,13 +5133,14 @@ extension CodexService {
 
     private func resolvedPlanPresentation(
         requested: CodexPlanPresentation,
-        turnId: String?
+        turnId: String?,
+        threadId: String
     ) -> CodexPlanPresentation {
         guard requested == .resultCompletedItem else {
             return requested
         }
 
-        switch turnTerminalState(for: turnId) {
+        switch turnTerminalState(for: turnId, threadId: threadId) {
         case .completed:
             return .resultReady
         case .failed, .stopped:

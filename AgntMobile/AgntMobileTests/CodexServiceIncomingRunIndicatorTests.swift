@@ -558,6 +558,63 @@ final class CodexServiceIncomingRunIndicatorTests: XCTestCase {
         XCTAssertEqual(service.timelineState(for: threadID).renderSnapshot.stoppedTurnIDs, Set([turnID]))
     }
 
+    func testProjectedDesktopTurnTerminalStateIsThreadScoped() {
+        let service = makeService()
+        let firstThreadID = "thread-\(UUID().uuidString)"
+        let secondThreadID = "thread-\(UUID().uuidString)"
+        let projectedTurnID = "ipc-turn-1"
+
+        service.appendMessage(
+            CodexMessage(
+                threadId: firstThreadID,
+                role: .assistant,
+                text: "First projected reply",
+                turnId: projectedTurnID,
+                isStreaming: false
+            )
+        )
+        service.appendMessage(
+            CodexMessage(
+                threadId: secondThreadID,
+                role: .assistant,
+                text: "Second projected reply",
+                turnId: projectedTurnID,
+                isStreaming: false
+            )
+        )
+        service.recordTurnTerminalState(threadId: firstThreadID, turnId: projectedTurnID, state: .completed)
+        service.recordTurnTerminalState(threadId: secondThreadID, turnId: projectedTurnID, state: .stopped)
+
+        XCTAssertNil(service.turnTerminalState(for: projectedTurnID))
+        XCTAssertEqual(service.turnTerminalState(for: projectedTurnID, threadId: firstThreadID), .completed)
+        XCTAssertEqual(service.turnTerminalState(for: projectedTurnID, threadId: secondThreadID), .stopped)
+        XCTAssertTrue(service.timelineState(for: firstThreadID).renderSnapshot.completedTurnIDs.contains(projectedTurnID))
+        XCTAssertEqual(service.timelineState(for: secondThreadID).renderSnapshot.stoppedTurnIDs, Set([projectedTurnID]))
+    }
+
+    func testProjectedDesktopTurnTerminalStateFromHistoryDoesNotPersistGlobally() {
+        let suiteName = "CodexServiceIncomingRunIndicatorTests.projected.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defaults.removePersistentDomain(forName: suiteName)
+        let firstService = CodexService(defaults: defaults)
+        let threadID = "thread-\(UUID().uuidString)"
+        let projectedTurnID = "ipc-turn-1"
+
+        firstService.mergeHistoryTurnTerminalStates(
+            threadId: threadID,
+            terminalStatesByTurnID: [projectedTurnID: .completed]
+        )
+
+        let reloadedService = CodexService(defaults: defaults)
+        Self.retainedServices.append(firstService)
+        Self.retainedServices.append(reloadedService)
+
+        XCTAssertEqual(firstService.turnTerminalState(for: projectedTurnID, threadId: threadID), .completed)
+        XCTAssertNil(firstService.turnTerminalState(for: projectedTurnID))
+        XCTAssertNil(reloadedService.turnTerminalState(for: projectedTurnID))
+        XCTAssertNil(reloadedService.turnTerminalState(for: projectedTurnID, threadId: threadID))
+    }
+
     func testTimelineStateTracksLatestRepoRefreshSignal() {
         let service = makeService()
         let threadID = "thread-\(UUID().uuidString)"

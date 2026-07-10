@@ -184,6 +184,7 @@ extension CodexService {
             } else {
                 terminalStateByTurnID = [:]
             }
+            projectedTerminalStateByThreadID = [:]
             latestTurnTerminalStateByThread = [:]
 
             if let savedThreadHistoryPaginationState = defaults.data(
@@ -272,6 +273,7 @@ extension CodexService {
             currentOutput = ""
             latestTurnTerminalStateByThread.removeAll()
             terminalStateByTurnID.removeAll()
+            projectedTerminalStateByThreadID.removeAll()
             olderThreadHistoryCursorByThreadID.removeAll()
             exhaustedOlderThreadHistoryCursorByThreadID.removeAll()
             loadingOlderThreadHistoryIDs.removeAll()
