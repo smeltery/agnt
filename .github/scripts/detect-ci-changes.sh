@@ -36,7 +36,7 @@ requested() {
   local surface="$1"
   [[ "$event_name" == "workflow_dispatch" ]] || return 1
   [[ "$manual_scope" == "all" || "$manual_scope" == "$surface" ]] && return 0
-  [[ "$manual_scope" =~ ^(packages|bun)$ && "$surface" =~ ^(bridge|relay|web|host)$ ]]
+  [[ "$manual_scope" == "packages" && "$surface" =~ ^(bridge|relay|web|host)$ ]]
 }
 
 should_run() {
@@ -56,12 +56,11 @@ ci_config='^(\.github/workflows/|\.github/actions/|\.github/scripts/|\.github/ac
 ci_workflow='^\.github/workflows/ci\.yml'
 link_check_action='^\.github/actions/run-link-check/'
 setup_flox_action='^\.github/actions/setup-flox/'
-run_bun_package_ci_action='^\.github/actions/run-bun-package-ci/'
 android_ci_action='^\.github/actions/run-android-ci/'
 ios_ipa_action='^\.github/actions/build-unsigned-ios-ipa/'
 flox_config='^\.flox/'
 flox_common="$flox_config|$setup_flox_action"
-bun_common="$flox_common|$run_bun_package_ci_action"
+bun_common="$flox_common"
 secure_bridge='^agnt-bridge/src/(transport/)?secure-transport\.js'
 secure_web='^agnt-web/src/crypto/'
 secure_ios='^(AgntMobile/AgntMobile/Core/Networking/CodexSecureTransportModels\.swift|AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService\+SecureTransport\.swift)'
@@ -71,40 +70,97 @@ secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core
 secure_transport="$secure_bridge|$secure_web|$secure_ios|$secure_android"
 android_code='^(AgntAndroid/(app|gradle)/|AgntAndroid/(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|gradlew|gradlew\.bat))'
 
-bun_packages=()
+package_surfaces=(bridge relay web host)
+platform_surfaces=(android ios)
+
+surface_pattern() {
+  case "$1" in
+    bridge) printf '%s\n' "$ci_workflow|$bun_common|$secure_transport|^agnt-bridge/" ;;
+    relay) printf '%s\n' "$ci_workflow|$bun_common|^relay/" ;;
+    web) printf '%s\n' "$ci_workflow|$bun_common|$secure_transport|^agnt-web/" ;;
+    host) printf '%s\n' "$ci_workflow|$bun_common|^agnt-host/" ;;
+    android) printf '%s\n' "$ci_workflow|$android_ci_action|$flox_common|$secure_transport|$android_code" ;;
+    ios) printf '%s\n' "$ci_workflow|$ios_ipa_action|$secure_transport|^AgntMobile/" ;;
+    links) printf '%s\n' "$ci_workflow|$link_check_action|^.*\.md$|^\.lycheeignore$" ;;
+    *) echo "Unknown CI surface: $1" >&2; return 1 ;;
+  esac
+}
+
+package_workdir() {
+  case "$1" in
+    bridge) printf '%s\n' "agnt-bridge" ;;
+    relay) printf '%s\n' "relay" ;;
+    web) printf '%s\n' "agnt-web" ;;
+    host) printf '%s\n' "agnt-host" ;;
+    *) echo "Unknown Bun package surface: $1" >&2; return 1 ;;
+  esac
+}
+
+package_frozen_lockfile() {
+  case "$1" in
+    bridge|relay|web) printf '%s\n' "true" ;;
+    host) printf '%s\n' "false" ;;
+    *) echo "Unknown Bun package surface: $1" >&2; return 1 ;;
+  esac
+}
+
+package_audit() {
+  case "$1" in
+    bridge|relay|web) printf '%s\n' "true" ;;
+    host) printf '%s\n' "false" ;;
+    *) echo "Unknown Bun package surface: $1" >&2; return 1 ;;
+  esac
+}
+
+surface_enabled() {
+  local surface="$1"
+  should_run "$surface" "$(surface_pattern "$surface")"
+}
+
+package_matrix_entry() {
+  local surface="$1"
+  local workdir
+  local frozen_lockfile
+  local audit
+  workdir="$(package_workdir "$surface")"
+  frozen_lockfile="$(package_frozen_lockfile "$surface")"
+  audit="$(package_audit "$surface")"
+
+  jq -n -c \
+    --arg name "$workdir" \
+    --arg working_directory "$workdir" \
+    --arg frozen_lockfile "$frozen_lockfile" \
+    --arg audit "$audit" \
+    '{
+      name: $name,
+      "working-directory": $working_directory,
+      "frozen-lockfile": $frozen_lockfile,
+      audit: $audit
+    }'
+}
 
 if matches "$ci_config"; then set_output lint_workflows true; else set_output lint_workflows false; fi
 
-if should_run bridge "$ci_workflow|$bun_common|$secure_transport|^agnt-bridge/"; then
-  bun_packages+=('{"name":"agnt-bridge","working-directory":"agnt-bridge","frozen-lockfile":"true","audit":"true"}')
-fi
+for surface in "${platform_surfaces[@]}"; do
+  if surface_enabled "$surface"; then set_output "$surface" true; else set_output "$surface" false; fi
+done
 
-if should_run relay "$ci_workflow|$bun_common|^relay/"; then
-  bun_packages+=('{"name":"relay","working-directory":"relay","frozen-lockfile":"true","audit":"true"}')
-fi
-
-if should_run web "$ci_workflow|$bun_common|$secure_transport|^agnt-web/"; then
-  bun_packages+=('{"name":"agnt-web","working-directory":"agnt-web","frozen-lockfile":"true","audit":"true"}')
-fi
-
-if should_run android "$ci_workflow|$android_ci_action|$flox_common|$secure_transport|$android_code"; then set_output android true; else set_output android false; fi
-
-if should_run host "$ci_workflow|$bun_common|^agnt-host/"; then
-  # agnt-host does not commit a Bun lockfile yet.
-  bun_packages+=('{"name":"agnt-host","working-directory":"agnt-host","frozen-lockfile":"false","audit":"false"}')
-fi
-
-if should_run ios "$ci_workflow|$ios_ipa_action|$secure_transport|^AgntMobile/"; then set_output ios true; else set_output ios false; fi
-
-if [[ "$event_name" == "schedule" ]] || requested links || matches "$ci_workflow|$link_check_action|^.*\.md$|^\.lycheeignore$"; then
+if [[ "$event_name" == "schedule" ]] || surface_enabled links; then
   set_output links true
 else
   set_output links false
 fi
 
-if ((${#bun_packages[@]} == 0)); then
+package_matrix=()
+for surface in "${package_surfaces[@]}"; do
+  if surface_enabled "$surface"; then
+    package_matrix+=("$(package_matrix_entry "$surface")")
+  fi
+done
+
+if ((${#package_matrix[@]} == 0)); then
   bun_packages_json="[]"
 else
-  bun_packages_json="$(printf '%s\n' "${bun_packages[@]}" | jq -s -c '.')"
+  bun_packages_json="$(printf '%s\n' "${package_matrix[@]}" | jq -s -c '.')"
 fi
 set_output bun_packages "$bun_packages_json"
