@@ -8,8 +8,66 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   createDesktopConversationProjector,
+  matchDesktopTurnIdentityContinuities,
   projectDesktopConversationStateToThread,
 } = require("../../src/desktop/desktop-ipc-conversation-projector");
+
+test("desktop identity repair pairs synthetic turns independently of parallel active turns", () => {
+  const sharedTurn = {
+    status: "inProgress",
+    params: { input: [{ type: "text", text: "Repair A" }] },
+    items: [{ id: "assistant-a-stable", type: "agentMessage", text: "Working" }],
+  };
+  const stableParallelTurn = {
+    id: "turn-c",
+    status: "inProgress",
+    items: [{ id: "assistant-c", type: "agentMessage", text: "Parallel" }],
+  };
+  const matches = matchDesktopTurnIdentityContinuities(
+    [
+      { id: "ipc-turn-0", turn: sharedTurn },
+      { id: "turn-c", turn: stableParallelTurn },
+    ],
+    [
+      { id: "turn-real-a", turn: { ...sharedTurn, turnId: "turn-real-a" } },
+      { id: "turn-c", turn: stableParallelTurn },
+    ]
+  );
+
+  assert.deepEqual([...matches.previousTurnIds], ["ipc-turn-0"]);
+  assert.deepEqual([...matches.nextTurnIds], ["turn-real-a"]);
+
+  const stablePriority = matchDesktopTurnIdentityContinuities(
+    [
+      {
+        id: "ipc-turn-0",
+        turn: {
+          startedAt: 123,
+          params: { input: [{ type: "text", text: "same prompt" }] },
+          items: [{ id: "assistant-fallback", type: "agentMessage", text: "Old" }],
+        },
+      },
+      {
+        id: "ipc-turn-1",
+        turn: {
+          startedAt: 999,
+          params: { input: [{ type: "text", text: "other prompt" }] },
+          items: [{ id: "assistant-stable", type: "agentMessage", text: "Stable" }],
+        },
+      },
+    ],
+    [{
+      id: "turn-real-stable",
+      turn: {
+        startedAt: 123,
+        params: { input: [{ type: "text", text: "same prompt" }] },
+        items: [{ id: "assistant-stable", type: "agentMessage", text: "Stable" }],
+      },
+    }]
+  );
+  assert.deepEqual([...stablePriority.previousTurnIds], ["ipc-turn-1"]);
+  assert.deepEqual([...stablePriority.nextTurnIds], ["turn-real-stable"]);
+});
 
 test("desktop conversation projector bootstraps active Desktop turns for mobile", () => {
   const projector = createDesktopConversationProjector({ now: () => 1_710_000_000_000 });
@@ -97,6 +155,49 @@ test("desktop conversation projector emits plan reasoning and command deltas", (
       ["item/reasoning/textDelta", "ing"],
       ["item/commandExecution/outputDelta", "line 2\n"],
     ]
+  );
+});
+
+test("desktop conversation projector repairs synthetic turn ids without dropping parallel active turns", () => {
+  const projector = createDesktopConversationProjector();
+  projector.project("thread-identity-repair", {
+    turns: [
+      {
+        status: "inProgress",
+        params: { input: [{ type: "text", text: "Repair A" }] },
+        items: [{ id: "assistant-a-stable", type: "agentMessage", text: "Working" }],
+      },
+      {
+        turnId: "turn-c",
+        status: "inProgress",
+        items: [{ id: "assistant-c", type: "agentMessage", text: "Parallel" }],
+      },
+    ],
+  });
+
+  const output = projector.project("thread-identity-repair", {
+    turns: [
+      {
+        turnId: "turn-real-a",
+        status: "inProgress",
+        params: { input: [{ type: "text", text: "Repair A" }] },
+        items: [{ id: "assistant-a-stable", type: "agentMessage", text: "Working" }],
+      },
+      {
+        turnId: "turn-c",
+        status: "inProgress",
+        items: [{ id: "assistant-c", type: "agentMessage", text: "Parallel" }],
+      },
+    ],
+  });
+
+  assert.equal(output.type, "fullReplace");
+  assert.deepEqual(output.turnIdentityContinuityTurnIds, ["turn-real-a", "turn-c"]);
+  assert.deepEqual(
+    output.notifications
+      .filter((notification) => notification.method === "turn/started")
+      .map((notification) => notification.params.turnId),
+    ["turn-real-a", "turn-c"]
   );
 });
 
