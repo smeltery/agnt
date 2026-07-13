@@ -3,7 +3,7 @@
     "default_lines": 1200,
     "files": {
       "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 3500,
-      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 3600,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 3100,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 3400,
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+Incoming.swift": 3000,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 3200,
