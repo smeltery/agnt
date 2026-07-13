@@ -49,6 +49,10 @@ const {
   safeParseJson,
 } = require("../_shared/translator-utils");
 const { reconstructThreadFromJsonl } = require("../_shared/thread-jsonl-reconstructor");
+const {
+  buildClaudeUserMessageLine,
+  mapCodexEffortToClaude,
+} = require("./turn-input");
 
 const PROTO_VERSION = "1.0.0-claude-shim";
 
@@ -1078,90 +1082,7 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     });
   }
 
-  // Codex's reasoning_effort levels (`minimal|low|medium|high`) overlap but
-  // do not match Claude's `--effort` levels (`low|medium|high|xhigh|max`).
-  // Map cleanly so iOS picker selections drive Claude's actual flag instead
-  // of being silently dropped.
-  function mapCodexEffortToClaude(level) {
-    switch (level) {
-      case "minimal":
-      case "low":
-        return "low";
-      case "medium":
-        return "medium";
-      case "high":
-        return "high";
-      case "xhigh":
-      case "very_high":
-      case "very-high":
-        return "xhigh";
-      case "max":
-      case "maximum":
-        return "max";
-      default:
-        return "";
-    }
-  }
-
   // ── helpers ────────────────────────────────────────────────────────────
-  function buildClaudeUserMessageLine(params) {
-    const items = Array.isArray(params?.input) ? params.input : [];
-    const contentParts = [];
-    let textBuffer = "";
-    for (const item of items) {
-      if (!item || typeof item !== "object") continue;
-      const t = readString(item.type);
-      if (t === "text") {
-        const text = readString(item.text);
-        if (text) textBuffer += textBuffer ? `\n${text}` : text;
-      } else if (t === "image") {
-        const url = readString(item.image_url) || readString(item.url);
-        if (!url) continue;
-        contentParts.push({
-          type: "image",
-          source: imageSourceFromUrl(url),
-        });
-      } else if (t === "skill") {
-        const name = readString(item.name) || readString(item.id);
-        if (name) textBuffer += `\n[skill: ${name}]`;
-      } else if (t === "mention") {
-        const name = readString(item.name);
-        const p = readString(item.path);
-        if (name && p) textBuffer += `\n@${name} (${p})`;
-      }
-    }
-    if (textBuffer) {
-      contentParts.unshift({ type: "text", text: textBuffer });
-    }
-    if (contentParts.length === 0) return "";
-    const wire = {
-      type: "user",
-      message: {
-        role: "user",
-        // Claude accepts string or array content; arrays are required when
-        // images are present.
-        content: contentParts.length === 1 && contentParts[0].type === "text"
-          ? contentParts[0].text
-          : contentParts,
-      },
-    };
-    return JSON.stringify(wire);
-  }
-
-  function imageSourceFromUrl(url) {
-    if (url.startsWith("data:")) {
-      const match = /^data:([^;]+);base64,(.+)$/.exec(url);
-      if (match) {
-        return {
-          type: "base64",
-          media_type: match[1],
-          data: match[2],
-        };
-      }
-    }
-    return { type: "url", url };
-  }
-
   function emitTurnStarted(turnId) {
     didEmitTurnStarted = true;
     turnLifecycle.emitTurnStarted(threadId, turnId);

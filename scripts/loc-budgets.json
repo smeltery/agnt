@@ -32,7 +32,6 @@
       "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 1350,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches.swift": 1250,
-      "agnt-bridge/src/providers/claude/translate.js": 1220,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150
     }
