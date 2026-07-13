@@ -54,13 +54,15 @@ const {
   isPeerOwnershipBroadcast,
 } = require("./desktop-ipc-live-owner-support");
 const {
-  normalizeInputEntriesForDesktop,
   readConversationIdFromFollowerParams,
   readThreadFromPayload,
   readThreadFromResponse,
   readTurnIdFromResult,
   sanitizeTurnStartParams,
 } = require("./desktop-ipc-live-owner-utils");
+const {
+  createPendingTurnStartState,
+} = require("./desktop-ipc-live-owner-pending-turns");
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_RECONNECT_MS = 1_500;
@@ -137,7 +139,17 @@ function createDesktopIpcLiveOwner({
   const pendingThreadArchiveMetadataByThreadId = new Map();
   const dirtyThreadIds = new Set();
   let snapshotTimer = null;
-  let optimisticTurnSerial = 0;
+  const pendingTurnStarts = createPendingTurnStartState({
+    conversations,
+    pendingTurnStartParamsByThreadId,
+    pendingTurnStartEntriesByRequestId,
+    fallbackTurnIdsByThreadId,
+    threadsAwaitingInitialHistoryByThreadId,
+    ensureConversation,
+    removeOwnedThread,
+    scheduleSnapshot,
+    now,
+  });
 
   const ipc = createDesktopOwnerIpcClient({
     socketPath,
@@ -227,7 +239,7 @@ function createDesktopIpcLiveOwner({
     }
     let pendingTurnStartEntry = null;
     if (method === "turn/start") {
-      pendingTurnStartEntry = rememberPendingTurnStart(threadId, message?.params, message?.id);
+      pendingTurnStartEntry = pendingTurnStarts.remember(threadId, message?.params, message?.id);
       scheduleSidebarAnnouncement(threadId);
     }
     if (method === "turn/interrupt") {
@@ -237,7 +249,7 @@ function createDesktopIpcLiveOwner({
       cwd: readString(message?.params?.cwd),
     });
     if (pendingTurnStartEntry) {
-      insertOptimisticPendingTurn(threadId, pendingTurnStartEntry);
+      pendingTurnStarts.insertOptimistic(threadId, pendingTurnStartEntry);
     }
     if (!hadConversation && !hadCachedThread) {
       requestInitialHistoryBaselineIfDue(threadId);
@@ -253,7 +265,7 @@ function createDesktopIpcLiveOwner({
 
     const responseId = message.id == null ? "" : String(message.id);
     if (responseId && !message.method) {
-      resolvePendingTurnStartResponse(responseId, message);
+      pendingTurnStarts.resolveResponse(responseId, message);
     }
     if (responseId && pendingThreadReadRequestIds.has(responseId)) {
       pendingThreadReadRequestIds.delete(responseId);
@@ -294,7 +306,7 @@ function createDesktopIpcLiveOwner({
       if (readString(message.method) === "thread/started") {
         stopAwaitingInitialHistory(update.threadId);
       }
-      refreshOptimisticFallbackForThread(update.threadId);
+      pendingTurnStarts.refreshFallback(update.threadId);
       scheduleSnapshot(update.threadId);
     }
 
@@ -339,8 +351,7 @@ function createDesktopIpcLiveOwner({
     }
     sidebarRefreshTimersByThreadId.clear();
     announcedSidebarThreadIds.clear();
-    pendingTurnStartParamsByThreadId.clear();
-    pendingTurnStartEntriesByRequestId.clear();
+    pendingTurnStarts.clear();
     followerRuntimeOverridesByThreadId.clear();
     pendingThreadArchiveMetadataByThreadId.clear();
     queuedFollowUpsByThreadId.clear();
@@ -399,180 +410,6 @@ function createDesktopIpcLiveOwner({
         return;
       }
     }
-  }
-
-  // Phone-origin prompts only exist in the inbound turn/start params, so cache
-  // them for the matching turn/started snapshot instead of losing the user row.
-  // Entries are FIFO per thread so rapid consecutive starts keep their own prompt,
-  // and failed starts are discarded so stale input never attaches to a later turn.
-  function rememberPendingTurnStart(threadId, params, requestId) {
-    const normalizedThreadId = readString(threadId);
-    if (!normalizedThreadId) {
-      return null;
-    }
-    const normalizedRequestId = requestIdKey(requestId);
-    const existingPending = normalizedRequestId ? pendingTurnStartEntriesByRequestId.get(normalizedRequestId) : null;
-    if (existingPending?.threadId === normalizedThreadId) {
-      return existingPending.entry?.consumed ? null : existingPending.entry;
-    }
-    const input = Array.isArray(params?.input) ? params.input : [];
-    if (input.length === 0) {
-      return null;
-    }
-    const sanitizedParams = sanitizeTurnStartParams(cloneJSON(params));
-    sanitizedParams.input = normalizeInputEntriesForDesktop(sanitizedParams.input);
-    const entry = { params: sanitizedParams, requestId: normalizedRequestId || null };
-    const queue = pendingTurnStartParamsByThreadId.get(normalizedThreadId) || [];
-    queue.push(entry);
-    pendingTurnStartParamsByThreadId.set(normalizedThreadId, queue);
-    if (normalizedRequestId) {
-      pendingTurnStartEntriesByRequestId.set(normalizedRequestId, {
-        threadId: normalizedThreadId,
-        entry,
-      });
-    }
-    return entry;
-  }
-
-  function discardPendingTurnStartEntry(threadId, entry) {
-    const normalizedThreadId = readString(threadId);
-    if (!normalizedThreadId || !entry) {
-      return;
-    }
-    const didRemoveOptimisticTurn = removeOptimisticPendingTurn(normalizedThreadId, entry);
-    const queue = pendingTurnStartParamsByThreadId.get(normalizedThreadId);
-    if (!queue) {
-      if (didRemoveOptimisticTurn) {
-        scheduleSnapshot(normalizedThreadId);
-      }
-      return;
-    }
-    const index = queue.indexOf(entry);
-    if (index >= 0) {
-      queue.splice(index, 1);
-    }
-    if (queue.length === 0) {
-      pendingTurnStartParamsByThreadId.delete(normalizedThreadId);
-    }
-    refreshOptimisticFallbackForThread(normalizedThreadId);
-    if (didRemoveOptimisticTurn) {
-      scheduleSnapshot(normalizedThreadId);
-    }
-  }
-
-  function resolvePendingTurnStartResponse(responseId, message) {
-    const pending = pendingTurnStartEntriesByRequestId.get(responseId);
-    if (!pending) {
-      return;
-    }
-    pendingTurnStartEntriesByRequestId.delete(responseId);
-    if (message.error) {
-      discardPendingTurnStartEntry(pending.threadId, pending.entry);
-      const remainingStarts = pendingTurnStartParamsByThreadId.get(pending.threadId) || [];
-      if (remainingStarts.length === 0
-        && threadsAwaitingInitialHistoryByThreadId.has(pending.threadId)) {
-        removeOwnedThread(pending.threadId);
-      }
-    }
-  }
-
-  // Publishes phone-origin turns as soon as the bridge sees turn/start, instead
-  // of waiting for image-heavy turn/started events to come back from the runtime.
-  function insertOptimisticPendingTurn(threadId, entry) {
-    const normalizedThreadId = readString(threadId);
-    const params = entry?.params;
-    const input = Array.isArray(params?.input) ? params.input : [];
-    if (!normalizedThreadId || entry?.consumed || !params || input.length === 0) {
-      return null;
-    }
-
-    const conversation = ensureConversation(normalizedThreadId, {
-      cwd: readString(params.cwd),
-    });
-    if (!conversation) {
-      return null;
-    }
-
-    const optimisticTurnId = ensureOptimisticTurnId(normalizedThreadId, entry);
-    if (!readString(fallbackTurnIdsByThreadId.get(normalizedThreadId))) {
-      fallbackTurnIdsByThreadId.set(normalizedThreadId, optimisticTurnId);
-    }
-    if (conversation.turns.some((turn) => (
-      (readString(turn?.turnId) || readString(turn?.id)) === optimisticTurnId
-    ))) {
-      return optimisticTurnId;
-    }
-
-    const timestamp = now();
-    const turnParams = cloneJSON(params);
-    turnParams.threadId = normalizedThreadId;
-    turnParams.cwd = readString(params.cwd) || conversation.cwd || null;
-
-    conversation.turns.push({
-      id: optimisticTurnId,
-      turnId: optimisticTurnId,
-      params: turnParams,
-      turnStartedAtMs: timestamp,
-      durationMs: null,
-      firstTurnWorkItemStartedAtMs: null,
-      finalAssistantStartedAtMs: null,
-      status: "inProgress",
-      error: null,
-      diff: null,
-      hookRuns: [],
-      commandExecutionStartedAtMsById: {},
-      items: [],
-      agntOptimisticPendingTurn: true,
-    });
-    conversation.hasUnreadTurn = true;
-    conversation.updatedAt = timestamp;
-    return optimisticTurnId;
-  }
-
-  function refreshOptimisticFallbackForThread(threadId) {
-    const normalizedThreadId = readString(threadId);
-    if (!normalizedThreadId || readString(fallbackTurnIdsByThreadId.get(normalizedThreadId))) {
-      return;
-    }
-    const queue = pendingTurnStartParamsByThreadId.get(normalizedThreadId);
-    const nextEntry = Array.isArray(queue)
-      ? queue.find((entry) => readString(entry?.optimisticTurnId))
-      : null;
-    const nextOptimisticTurnId = readString(nextEntry?.optimisticTurnId);
-    if (nextOptimisticTurnId) {
-      fallbackTurnIdsByThreadId.set(normalizedThreadId, nextOptimisticTurnId);
-    }
-  }
-
-  function ensureOptimisticTurnId(threadId, entry) {
-    if (entry.optimisticTurnId) {
-      return entry.optimisticTurnId;
-    }
-    optimisticTurnSerial += 1;
-    const requestSegment = readString(entry.requestId) || `local-${optimisticTurnSerial}`;
-    entry.optimisticTurnId = `agnt-pending-turn:${threadId}:${requestSegment}`;
-    return entry.optimisticTurnId;
-  }
-
-  function removeOptimisticPendingTurn(threadId, entry) {
-    const optimisticTurnId = readString(entry?.optimisticTurnId);
-    const conversation = optimisticTurnId ? conversations.get(threadId) : null;
-    if (!conversation || !Array.isArray(conversation.turns)) {
-      return false;
-    }
-    const index = conversation.turns.findIndex((turn) => (
-      turn?.agntOptimisticPendingTurn
-        && (readString(turn.turnId) || readString(turn.id)) === optimisticTurnId
-    ));
-    if (index < 0) {
-      return false;
-    }
-    conversation.turns.splice(index, 1);
-    if (readString(fallbackTurnIdsByThreadId.get(threadId)) === optimisticTurnId) {
-      fallbackTurnIdsByThreadId.delete(threadId);
-    }
-    conversation.updatedAt = now();
-    return true;
   }
 
   function markOwnedThread(threadId) {
@@ -638,13 +475,8 @@ function createDesktopIpcLiveOwner({
     announcedReadStateThreadIds.delete(normalizedThreadId);
     cancelSidebarAnnouncement(normalizedThreadId);
     announcedSidebarThreadIds.delete(normalizedThreadId);
-    pendingTurnStartParamsByThreadId.delete(normalizedThreadId);
+    pendingTurnStarts.removeThread(normalizedThreadId);
     followerRuntimeOverridesByThreadId.delete(normalizedThreadId);
-    for (const [requestId, pending] of Array.from(pendingTurnStartEntriesByRequestId.entries())) {
-      if (pending.threadId === normalizedThreadId) {
-        pendingTurnStartEntriesByRequestId.delete(requestId);
-      }
-    }
     dirtyThreadIds.delete(normalizedThreadId);
   }
 
@@ -1192,15 +1024,15 @@ function createDesktopIpcLiveOwner({
     const senderRequestId = params.senderRequestId || params.sender_request_id;
     const isKnownHeldPhoneStart = Boolean(
       requestIdKey(senderRequestId)
-      && pendingTurnStartEntriesByRequestId.has(requestIdKey(senderRequestId))
+      && pendingTurnStarts.hasRequestId(senderRequestId)
     );
-    const pendingEntry = rememberPendingTurnStart(
+    const pendingEntry = pendingTurnStarts.remember(
       conversationId,
       nextCodexParams,
       senderRequestId
     );
     if (pendingEntry) {
-      insertOptimisticPendingTurn(conversationId, pendingEntry);
+      pendingTurnStarts.insertOptimistic(conversationId, pendingEntry);
       scheduleSnapshot(conversationId);
     }
     try {
@@ -1220,7 +1052,7 @@ function createDesktopIpcLiveOwner({
       // undefined ("Error creating task"), even though the turn did start.
       return { result: turnStartResult ?? null };
     } catch (error) {
-      discardPendingTurnStartEntry(conversationId, pendingEntry);
+      pendingTurnStarts.discard(conversationId, pendingEntry);
       throw error;
     }
   }
@@ -1389,9 +1221,9 @@ function createDesktopIpcLiveOwner({
           ? normalized
           : startParams;
         queuedTurnParams = params;
-        const pendingEntry = rememberPendingTurnStart(threadId, params);
+        const pendingEntry = pendingTurnStarts.remember(threadId, params);
         if (pendingEntry) {
-          insertOptimisticPendingTurn(threadId, pendingEntry);
+          pendingTurnStarts.insertOptimistic(threadId, pendingEntry);
           scheduleSnapshot(threadId);
         }
         return sendCodexRequest("turn/start", params);
@@ -1419,7 +1251,7 @@ function createDesktopIpcLiveOwner({
   // that still holds drafts would silently discard them. Such threads must not
   // be handed to peers or released on unsubscribe.
   function hasActiveLocalTurn(threadId) {
-    if (pendingTurnStartParamsByThreadId.has(threadId)) {
+    if (pendingTurnStarts.hasPendingThread(threadId)) {
       return true;
     }
     if ((queuedFollowUpsByThreadId.get(threadId) || []).length > 0) {
