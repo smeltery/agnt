@@ -39,7 +39,7 @@ struct AgntLiveActivity: Widget {
                     .resizable()
                     .renderingMode(.template)
                     .scaledToFit()
-                    .foregroundStyle(context.isStale ? .secondary : .accentColor)
+                    .foregroundStyle(context.isStale ? Color.secondary : Color.accentColor)
                     .padding(.vertical, 2)
             } compactTrailing: {
                 Text(compactStatusText(for: context.state, isStale: context.isStale))
@@ -50,7 +50,7 @@ struct AgntLiveActivity: Widget {
                     .resizable()
                     .renderingMode(.template)
                     .scaledToFit()
-                    .foregroundStyle(context.isStale ? .secondary : .accentColor)
+                    .foregroundStyle(context.isStale ? Color.secondary : Color.accentColor)
                     .padding(.vertical, 2)
             }
             .keylineTint(context.isStale ? .gray : .accentColor)
@@ -83,7 +83,7 @@ private struct AgntLiveActivityLockScreenView: View {
                     .resizable()
                     .renderingMode(.template)
                     .scaledToFit()
-                    .foregroundStyle(isStale ? .secondary : .accentColor)
+                    .foregroundStyle(isStale ? Color.secondary : Color.accentColor)
                     .frame(width: 24, height: 24)
 
                 VStack(alignment: .leading, spacing: 1) {
