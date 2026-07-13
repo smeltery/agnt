@@ -16,6 +16,7 @@ struct TurnComposerHostView: View {
     let isEmptyThread: Bool
     let isWorktreeProject: Bool
     var activeFileChangeStatus: FileChangeStatusSnapshot? = nil
+    var threadGoal: CodexThreadGoal? = nil
     let canForkLocally: Bool
     let isInputFocused: Binding<Bool>
     let orderedModelOptions: [CodexModelOption]
@@ -132,6 +133,7 @@ struct TurnComposerHostView: View {
             hasWorkingDirectory: thread.gitWorkingDirectory != nil,
             isWorktreeProject: isWorktreeProject,
             activeFileChangeStatus: activeFileChangeStatus,
+            threadGoal: threadGoal,
             orderedModelOptions: orderedModelOptions,
             selectedModelID: selectedModelID,
             selectedModelTitle: selectedModelTitle,
@@ -165,6 +167,33 @@ struct TurnComposerHostView: View {
             onRefreshGitBranches: onRefreshGitBranches,
             onRefreshUsageStatus: {
                 await codex.refreshUsageStatus(threadId: thread.id)
+            },
+            onResumeGoal: {
+                Task {
+                    do {
+                        _ = try await codex.setThreadGoal(threadId: thread.id, status: .active)
+                    } catch {
+                        codex.lastErrorMessage = error.localizedDescription
+                    }
+                }
+            },
+            onPauseGoal: {
+                Task {
+                    do {
+                        _ = try await codex.setThreadGoal(threadId: thread.id, status: .paused)
+                    } catch {
+                        codex.lastErrorMessage = error.localizedDescription
+                    }
+                }
+            },
+            onRemoveGoal: {
+                Task {
+                    do {
+                        _ = try await codex.clearThreadGoal(threadId: thread.id)
+                    } catch {
+                        codex.lastErrorMessage = error.localizedDescription
+                    }
+                }
             },
             onSelectAccessMode: codex.setSelectedAccessMode,
             canHandOffToWorktree: isGitBranchSelectorEnabled
@@ -304,6 +333,14 @@ struct TurnComposerHostView: View {
         )
         .onChange(of: viewModel.input) { _, _ in
             viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+        }
+        .task(id: "\(thread.id):\(codex.isConnected):\(codex.supportsThreadGoals)") {
+            guard codex.isConnected,
+                  codex.supportsThreadGoals,
+                  thread.syncState == .live else {
+                return
+            }
+            await codex.refreshThreadGoalMirror(threadId: thread.id)
         }
     }
 }

@@ -208,6 +208,12 @@ extension CodexService {
         case "thread/status/changed":
             handleThreadStatusChanged(paramsObject)
 
+        case "thread/goal/updated":
+            handleThreadGoalUpdated(paramsObject)
+
+        case "thread/goal/cleared":
+            handleThreadGoalCleared(paramsObject)
+
         case "turn/started":
             handleTurnStarted(paramsObject)
 

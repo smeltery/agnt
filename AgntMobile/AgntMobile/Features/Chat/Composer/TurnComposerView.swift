@@ -26,6 +26,7 @@ struct TurnComposerView: View {
     let hasWorkingDirectory: Bool
     let isWorktreeProject: Bool
     var activeFileChangeStatus: FileChangeStatusSnapshot? = nil
+    var threadGoal: CodexThreadGoal? = nil
 
     let orderedModelOptions: [CodexModelOption]
     let selectedModelID: String?
@@ -60,6 +61,9 @@ struct TurnComposerView: View {
     let onSelectGitBaseBranch: (String) -> Void
     let onRefreshGitBranches: () -> Void
     let onRefreshUsageStatus: () async -> Void
+    let onResumeGoal: () -> Void
+    let onPauseGoal: () -> Void
+    let onRemoveGoal: () -> Void
 
     let onSelectAccessMode: (CodexAccessMode) -> Void
     let canHandOffToWorktree: Bool
@@ -138,6 +142,11 @@ struct TurnComposerView: View {
                     hasWorkingDirectory: hasWorkingDirectory,
                     isWorktreeProject: isWorktreeProject,
                     activeFileChangeStatus: activeFileChangeStatus,
+                    threadGoal: threadGoal,
+                    isThreadRunning: isThreadRunning,
+                    onResumeGoal: onResumeGoal,
+                    onPauseGoal: onPauseGoal,
+                    onRemoveGoal: onRemoveGoal,
                     queuedDraftCount: accessoryState.queuedDrafts.count,
                     onTapQueuedDrafts: { isShowingQueuedDraftsSheet = true },
                     showsGitBranchSelector: showsGitBranchSelector,
@@ -868,6 +877,9 @@ private struct ComposerPreviewContent: View {
             onSelectGitBaseBranch: { _ in },
             onRefreshGitBranches: {},
             onRefreshUsageStatus: {},
+            onResumeGoal: {},
+            onPauseGoal: {},
+            onRemoveGoal: {},
             onSelectAccessMode: { _ in },
             canHandOffToWorktree: false,
             onTapAddImage: {},

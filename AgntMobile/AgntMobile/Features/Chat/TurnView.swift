@@ -1476,6 +1476,7 @@ struct TurnView: View {
                 isEmptyThread: isEmptyThread,
                 isWorktreeProject: isWorktreeProject,
                 activeFileChangeStatus: activeFileChangeStatus,
+                threadGoal: codex.goalByThreadID[thread.id],
                 canForkLocally: showsGitControls && gitWorkingDirectory != nil && WorktreeFlowCoordinator.localForkProjectPath(
                     for: currentThread,
                     localCheckoutPath: viewModel.gitLocalCheckoutPath

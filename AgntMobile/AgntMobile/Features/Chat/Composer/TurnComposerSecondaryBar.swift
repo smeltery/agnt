@@ -13,6 +13,11 @@ struct TurnComposerSecondaryBar: View {
     let hasWorkingDirectory: Bool
     let isWorktreeProject: Bool
     var activeFileChangeStatus: FileChangeStatusSnapshot? = nil
+    var threadGoal: CodexThreadGoal? = nil
+    var isThreadRunning = false
+    var onResumeGoal: () -> Void = {}
+    var onPauseGoal: () -> Void = {}
+    var onRemoveGoal: () -> Void = {}
     var queuedDraftCount: Int = 0
     var onTapQueuedDrafts: () -> Void = {}
 
@@ -41,7 +46,7 @@ struct TurnComposerSecondaryBar: View {
     private var branchTextFont: Font { AppFont.footnote() }
     private var branchChevronFont: Font { AppFont.system(size: 9, weight: .regular) }
     private var hasContextContent: Bool {
-        hasWorkingDirectory || pinnedPlanAccessory != nil || queuedDraftCount > 0
+        hasWorkingDirectory || threadGoal != nil || pinnedPlanAccessory != nil || queuedDraftCount > 0
     }
 
     private var runtimeLabelTitle: String {
@@ -94,6 +99,17 @@ struct TurnComposerSecondaryBar: View {
                                 .transition(.opacity.combined(with: .scale(scale: 0.94)))
                             }
 
+                            if let threadGoal {
+                                GoalStatusChip(
+                                    goal: threadGoal,
+                                    isThreadRunning: isThreadRunning,
+                                    onResume: onResumeGoal,
+                                    onPause: onPauseGoal,
+                                    onRemove: onRemoveGoal
+                                )
+                                .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                            }
+
                             if queuedDraftCount > 0 {
                                 QueuedStatusCapsule(count: queuedDraftCount, onTap: onTapQueuedDrafts)
                                     .transition(.opacity.combined(with: .scale(scale: 0.94)))
@@ -107,6 +123,7 @@ struct TurnComposerSecondaryBar: View {
             .frame(maxWidth: .infinity)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.spring(response: 0.28, dampingFraction: 0.88), value: activeFileChangeStatus)
+            .animation(.spring(response: 0.28, dampingFraction: 0.88), value: threadGoal != nil)
             .animation(.spring(response: 0.28, dampingFraction: 0.88), value: queuedDraftCount > 0)
         }
     }

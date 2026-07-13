@@ -429,6 +429,8 @@ final class CodexService {
     var queuedTurnDraftsByThread: [String: [QueuedTurnDraft]] = [:]
     // Per-thread queue pause state (active by default when absent).
     var queuePauseStateByThread: [String: QueuePauseState] = [:]
+    // Mirrors the Codex runtime persisted thread goal (`thread/goal/updated|cleared`).
+    var goalByThreadID: [String: CodexThreadGoal] = [:]
     // Per-thread unsent composer drafts that survive chat switches and app restarts.
     var composerDraftsByThreadID: [String: TurnComposerLocalDraft] = [:]
     // Guards late async attachment completions so cleared drafts are not resurrected.
@@ -476,6 +478,8 @@ final class CodexService {
     var supportsBridgeVoiceAuth = true
     // Runtime compatibility flag for native `thread/fork` conversation branching.
     var supportsThreadFork = true
+    // Runtime compatibility flag for the Codex `thread/goal/*` API.
+    var supportsThreadGoals = true
     // Runtime compatibility flag for `thread/turns/list` and `excludeTurns`.
     var supportsTurnPagination = true
     // Seeds brand-new chats with one-shot composer actions like code review.
