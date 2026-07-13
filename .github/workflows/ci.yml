@@ -21,7 +21,6 @@ on:
           - host
           - loc-budgets
           - android
-          - ios
           - links
   schedule:
     - cron: "0 6 * * 1"
@@ -196,30 +195,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  ios:
-    needs: changes
-    if: needs.changes.outputs.ios == 'true'
-    name: Build unsigned release IPA
-    runs-on: blacksmith-6vcpu-macos-26
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Build unsigned IPA
-        uses: ./.github/actions/build-unsigned-ios-ipa
-
-      - name: Upload unsigned IPA
-        uses: actions/upload-artifact@v7
-        with:
-          name: agnt-unsigned-ipa
-          path: build/unsigned-ipa/agnt-unsigned-release.ipa
-          if-no-files-found: error
-          retention-days: 14
-
   links:
     needs: changes
     if: needs.changes.outputs.links == 'true'
@@ -252,7 +227,6 @@ jobs:
       - host
       - loc_budgets
       - android
-      - ios
       - links
     if: always()
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -270,7 +244,6 @@ jobs:
             "${{ needs.host.result }}" \
             "${{ needs.loc_budgets.result }}" \
             "${{ needs.android.result }}" \
-            "${{ needs.ios.result }}" \
             "${{ needs.links.result }}"
           do
             case "$result" in

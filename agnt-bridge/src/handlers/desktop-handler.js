@@ -52,6 +52,7 @@ async function handleDesktopMethod(method, params, options = {}) {
 
   switch (method) {
     case "desktop/continueOnMac":
+    case "desktop/continueOnDesktop":
       return continueOnMac(params, {
         bundleId,
         appPath,

@@ -1,0 +1,41 @@
+name: Build Unsigned IPA
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/actions/build-unsigned-ios-ipa/**"
+      - ".github/workflows/build-unsigned-ipa.yml"
+      - "AgntMobile/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-ipa:
+    name: Build unsigned release IPA
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Build unsigned IPA
+        uses: ./.github/actions/build-unsigned-ios-ipa
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v7
+        with:
+          name: agnt-unsigned-ipa
+          path: build/unsigned-ipa/agnt-unsigned-release.ipa
+          if-no-files-found: error
+          retention-days: 14
