@@ -104,6 +104,117 @@ func testTimelineRenderProjectionSplitsToolRunsAcrossStableTurnIDs() {
     XCTAssertEqual(messageIDs, ["tool-1", "tool-2"])
 }
 
+func testTimelineRenderProjectionGroupsFinishedCommandsIntoDisclosureItem() {
+    let now = Date()
+    let messages = [
+        makeTimelineTestMessage(
+            id: "command-1",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed rg -n \"needle\" Sources",
+            createdAt: now,
+            turnID: "turn-1",
+            itemID: "command-1"
+        ),
+        makeTimelineTestMessage(
+            id: "command-2",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Failed git diff --check",
+            createdAt: now.addingTimeInterval(1),
+            turnID: "turn-1",
+            itemID: "command-2"
+        ),
+        makeTimelineTestMessage(
+            id: "command-3",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Stopped bun test",
+            createdAt: now.addingTimeInterval(2),
+            turnID: "turn-1",
+            itemID: "command-3"
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(messages: messages)
+
+    XCTAssertEqual(items.map(\.id), ["command-group:command-1"])
+    guard case .commandGroup(let group) = items.first else {
+        return XCTFail("Expected completed commands behind one disclosure")
+    }
+    XCTAssertEqual(group.messages.map(\.id), ["command-1", "command-2", "command-3"])
+    XCTAssertEqual(group.commandCount, 3)
+    XCTAssertEqual(group.failedCommandCount, 1)
+    XCTAssertEqual(group.stoppedCommandCount, 1)
+    XCTAssertTrue(group.hasUnsuccessfulCommands)
+}
+
+func testTimelineRenderProjectionPreservesCommandTraceOrderInsideDisclosure() {
+    let now = Date()
+    let messages = [
+        makeTimelineTestMessage(
+            id: "command-1",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed git status",
+            createdAt: now,
+            turnID: "turn-1",
+            itemID: "command-1"
+        ),
+        makeTimelineTestMessage(
+            id: "reasoning",
+            threadID: "thread",
+            role: .system,
+            kind: .thinking,
+            text: "Reasoning summary between command tool calls",
+            createdAt: now.addingTimeInterval(1),
+            turnID: "turn-1",
+            itemID: "reasoning"
+        ),
+        makeTimelineTestMessage(
+            id: "file-change",
+            threadID: "thread",
+            role: .system,
+            kind: .fileChange,
+            text: """
+            Status: completed
+
+            Path: Sources/App.swift
+            Kind: update
+            Totals: +2 -1
+            """,
+            createdAt: now.addingTimeInterval(2),
+            turnID: "turn-1",
+            itemID: "file-change"
+        ),
+        makeTimelineTestMessage(
+            id: "command-2",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed git diff --stat",
+            createdAt: now.addingTimeInterval(3),
+            turnID: "turn-1",
+            itemID: "command-2"
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(messages: messages)
+
+    XCTAssertEqual(items.map(\.id), ["command-group:command-1"])
+    guard case .commandGroup(let group) = items.first else {
+        return XCTFail("Expected one command disclosure across the trace")
+    }
+    XCTAssertEqual(group.messages.map(\.id), ["command-1", "command-2"])
+    XCTAssertEqual(group.traceMessages.map(\.id), ["reasoning"])
+    XCTAssertEqual(group.collapsedDetailMessages.map(\.id), ["reasoning", "file-change"])
+    XCTAssertEqual(group.orderedMessages.map(\.id), ["command-1", "reasoning", "file-change", "command-2"])
+}
+
 func testTimelineRenderProjectionCollapsesCompletedTurnBeforeFinalAnswer() {
     let now = Date()
     let messages = [

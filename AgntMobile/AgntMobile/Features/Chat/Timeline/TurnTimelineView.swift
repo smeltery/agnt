@@ -130,7 +130,7 @@ enum TurnTimelineToolBurstAccessoryResolver {
     }
 }
 
-private struct TurnTimelineMessageRow: View {
+struct TurnTimelineMessageRow: View {
     let message: CodexMessage
     let isRetryAvailable: Bool
     let cachedBlockInfoByMessageID: [String: AssistantBlockAccessoryState]
@@ -428,6 +428,24 @@ private struct TurnTimelineRowsSection: View {
                 )
             case .toolBurst(let group):
                 TurnTimelineToolBurstView(
+                    group: group,
+                    isRetryAvailable: isRetryAvailable,
+                    cachedBlockInfoByMessageID: cachedBlockInfoByMessageID,
+                    planSessionSource: planSessionSource,
+                    allowsAssistantPlanFallbackRecovery: allowsAssistantPlanFallbackRecovery,
+                    completedTurnIDs: completedTurnIDs,
+                    threadMessagesForPlanMatching: threadMessagesForPlanMatching,
+                    currentWorkingDirectory: currentWorkingDirectory,
+                    planMatchingFingerprint: planMatchingFingerprint,
+                    newestStreamingMessageID: newestStreamingMessageID,
+                    autoScrollMode: autoScrollMode,
+                    showsGlobalRunningIndicator: shouldShowPendingAssistantIndicator,
+                    onRetryUserMessage: onRetryUserMessage,
+                    onTapAssistantRevert: onTapAssistantRevert,
+                    onTapSubagent: onTapSubagent
+                )
+            case .commandGroup(let group):
+                TurnTimelineCommandGroupView(
                     group: group,
                     isRetryAvailable: isRetryAvailable,
                     cachedBlockInfoByMessageID: cachedBlockInfoByMessageID,
@@ -1770,6 +1788,8 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                 ids.insert(message.id)
             case .toolBurst(let group):
                 ids.formUnion(group.visibleMessages.map(\.id))
+            case .commandGroup(let group):
+                ids.formUnion(group.orderedMessages.map(\.id))
             case .previousMessages:
                 break
             }

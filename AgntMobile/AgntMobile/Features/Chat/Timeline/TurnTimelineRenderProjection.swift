@@ -53,9 +53,61 @@ struct TurnTimelinePreviousMessagesGroup: Identifiable, Equatable {
     }
 }
 
+struct TurnTimelineCommandGroup: Identifiable, Equatable {
+    let id: String
+    let messages: [CodexMessage]
+    let orderedMessages: [CodexMessage]
+
+    init(messages: [CodexMessage], orderedMessages: [CodexMessage]? = nil) {
+        self.messages = messages
+        self.orderedMessages = orderedMessages ?? messages
+        self.id = "command-group:\(messages.first?.id ?? "unknown")"
+    }
+
+    var commandCount: Int {
+        messages.count
+    }
+
+    var traceMessages: [CodexMessage] {
+        orderedMessages.filter { $0.role == .system && $0.kind == .thinking }
+    }
+
+    var collapsedDetailMessages: [CodexMessage] {
+        orderedMessages.filter { message in
+            guard message.role == .system else { return false }
+            return message.kind == .thinking || message.kind == .fileChange
+        }
+    }
+
+    var accessoryHostMessage: CodexMessage? {
+        orderedMessages.last
+    }
+
+    var failedCommandCount: Int {
+        messages.count { commandStatusWord(in: $0) == "failed" }
+    }
+
+    var stoppedCommandCount: Int {
+        messages.count { commandStatusWord(in: $0) == "stopped" }
+    }
+
+    var hasUnsuccessfulCommands: Bool {
+        failedCommandCount > 0 || stoppedCommandCount > 0
+    }
+
+    private func commandStatusWord(in message: CodexMessage) -> String? {
+        message.text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: \.isWhitespace)
+            .first?
+            .lowercased()
+    }
+}
+
 enum TurnTimelineRenderItem: Identifiable, Equatable {
     case message(CodexMessage)
     case toolBurst(TurnTimelineToolBurstGroup)
+    case commandGroup(TurnTimelineCommandGroup)
     case previousMessages(TurnTimelinePreviousMessagesGroup)
 
     var id: String {
@@ -63,6 +115,8 @@ enum TurnTimelineRenderItem: Identifiable, Equatable {
         case .message(let message):
             return message.id
         case .toolBurst(let group):
+            return group.id
+        case .commandGroup(let group):
             return group.id
         case .previousMessages(let group):
             return group.id
@@ -82,6 +136,9 @@ enum TurnTimelineRenderProjection {
     ) -> [TurnTimelineRenderItem] {
         var items: [TurnTimelineRenderItem] = []
         var bufferedToolMessages: [CodexMessage] = []
+        var bufferedCommandMessages: [CodexMessage] = []
+        var bufferedCommandOrderedMessages: [CodexMessage] = []
+        var bufferedCommandTrailingFileChanges: [CodexMessage] = []
         let fileChangePlan = fileChangeCollapsePlan(in: messages)
         let finalCollapsePlan = previousMessagesCollapsePlan(
             in: messages,
@@ -108,15 +165,39 @@ enum TurnTimelineRenderProjection {
             bufferedToolMessages.removeAll(keepingCapacity: true)
         }
 
+        func flushBufferedCommandMessages() {
+            if !bufferedCommandMessages.isEmpty {
+                items.append(.commandGroup(TurnTimelineCommandGroup(
+                    messages: bufferedCommandMessages,
+                    orderedMessages: bufferedCommandOrderedMessages
+                )))
+            }
+            items.append(contentsOf: bufferedCommandTrailingFileChanges.map(TurnTimelineRenderItem.message))
+            bufferedCommandMessages.removeAll(keepingCapacity: true)
+            bufferedCommandOrderedMessages.removeAll(keepingCapacity: true)
+            bufferedCommandTrailingFileChanges.removeAll(keepingCapacity: true)
+        }
+
+        func commitBufferedCommandTrailingFileChanges() {
+            guard !bufferedCommandTrailingFileChanges.isEmpty else { return }
+            bufferedCommandOrderedMessages.append(contentsOf: bufferedCommandTrailingFileChanges)
+            bufferedCommandTrailingFileChanges.removeAll(keepingCapacity: true)
+        }
+
         for (index, message) in messages.enumerated() {
             if let group = groupByInsertionIndex[index] {
                 flushBufferedToolMessages()
+                flushBufferedCommandMessages()
                 if group.group.hiddenCount > 0 {
                     items.append(.previousMessages(group.group))
                 }
             }
 
             if hiddenIndices.contains(index) {
+                if !isCommandGroupingInterstitial(message) {
+                    flushBufferedToolMessages()
+                    flushBufferedCommandMessages()
+                }
                 continue
             }
 
@@ -128,12 +209,43 @@ enum TurnTimelineRenderProjection {
             ) {
                 continue
             }
+
+            if !bufferedCommandMessages.isEmpty,
+               isCommandGroupingInterstitial(renderedMessage) {
+                flushBufferedToolMessages()
+                if let previous = bufferedCommandMessages.last,
+                   !canShareToolBurst(previous: previous, incoming: renderedMessage) {
+                    flushBufferedCommandMessages()
+                    items.append(.message(renderedMessage))
+                } else if isCommandGroupingTrace(renderedMessage) {
+                    commitBufferedCommandTrailingFileChanges()
+                    bufferedCommandOrderedMessages.append(renderedMessage)
+                } else {
+                    bufferedCommandTrailingFileChanges.append(renderedMessage)
+                }
+                continue
+            }
+
             guard isToolBurstCandidate(message) else {
                 flushBufferedToolMessages()
+                flushBufferedCommandMessages()
                 items.append(.message(renderedMessage))
                 continue
             }
 
+            guard !isFinishedCommandToolCall(renderedMessage) else {
+                flushBufferedToolMessages()
+                if let previous = bufferedCommandMessages.last,
+                   !canShareToolBurst(previous: previous, incoming: renderedMessage) {
+                    flushBufferedCommandMessages()
+                }
+                commitBufferedCommandTrailingFileChanges()
+                bufferedCommandMessages.append(renderedMessage)
+                bufferedCommandOrderedMessages.append(renderedMessage)
+                continue
+            }
+
+            flushBufferedCommandMessages()
             if let previous = bufferedToolMessages.last,
                !canShareToolBurst(previous: previous, incoming: renderedMessage) {
                 flushBufferedToolMessages()
@@ -143,6 +255,7 @@ enum TurnTimelineRenderProjection {
         }
 
         flushBufferedToolMessages()
+        flushBufferedCommandMessages()
         return mergeAdjacentFileChangeItems(items)
     }
 
@@ -669,6 +782,35 @@ enum TurnTimelineRenderProjection {
         case .thinking, .chat, .plan, .userInputPrompt, .fileChange, .subagentAction:
             return false
         }
+    }
+
+    private static func isFinishedCommandToolCall(_ message: CodexMessage) -> Bool {
+        guard message.role == .system,
+              message.kind == .commandExecution,
+              !message.isStreaming else {
+            return false
+        }
+
+        guard let firstWord = message.text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: \.isWhitespace)
+            .first?
+            .lowercased() else {
+            return false
+        }
+
+        return firstWord == "completed"
+            || firstWord == "failed"
+            || firstWord == "stopped"
+    }
+
+    private static func isCommandGroupingTrace(_ message: CodexMessage) -> Bool {
+        message.role == .system && message.kind == .thinking
+    }
+
+    private static func isCommandGroupingInterstitial(_ message: CodexMessage) -> Bool {
+        guard message.role == .system else { return false }
+        return message.kind == .thinking || message.kind == .fileChange
     }
 
     // Drops placeholder-only system rows before SwiftUI can reserve timeline spacing for them.
