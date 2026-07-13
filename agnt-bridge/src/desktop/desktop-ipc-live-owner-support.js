@@ -40,6 +40,35 @@ const OWNER_INBOUND_METHODS = new Set([
 
 const THREAD_READ_METHODS = new Set(["thread/read", "thread/resume"]);
 
+function isPeerOwnershipBroadcast(params, { readString, normalizeToken }) {
+  if (readString(params?.agntOwnerSource) === AGNT_LIVE_OWNER_SOURCE) {
+    return false;
+  }
+  return normalizeToken(params?.change?.type) === "snapshot";
+}
+
+function conversationHasActiveTurn(conversation, { normalizeToken }) {
+  const turns = Array.isArray(conversation?.turns) ? conversation.turns : [];
+  return turns.some((turn) => {
+    const status = normalizeToken(turn?.status);
+    return status === "inprogress" || status === "running" || status === "active";
+  });
+}
+
+function activeTurnIdFromConversation(conversation, { normalizeToken, readString }) {
+  const turns = Array.isArray(conversation?.turns) ? conversation.turns : [];
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const turn = turns[index];
+    const status = normalizeToken(turn?.status);
+    const turnId = readString(turn?.turnId) || readString(turn?.id);
+    if (turnId && (!status || status === "inprogress" || status === "running" || status === "active")) {
+      return turnId;
+    }
+  }
+  const latestTurn = turns[turns.length - 1];
+  return readString(latestTurn?.turnId) || readString(latestTurn?.id);
+}
+
 function createDisabledDesktopIpcLiveOwner() {
   return {
     observeInbound() {},
@@ -61,5 +90,8 @@ module.exports = {
   THREAD_READ_STATE_CHANGED,
   THREAD_STREAM_STATE_CHANGED,
   THREAD_UNARCHIVED,
+  activeTurnIdFromConversation,
+  conversationHasActiveTurn,
   createDisabledDesktopIpcLiveOwner,
+  isPeerOwnershipBroadcast,
 };

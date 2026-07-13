@@ -45,7 +45,10 @@ const {
   THREAD_READ_STATE_CHANGED,
   THREAD_STREAM_STATE_CHANGED,
   THREAD_UNARCHIVED,
+  activeTurnIdFromConversation,
+  conversationHasActiveTurn,
   createDisabledDesktopIpcLiveOwner,
+  isPeerOwnershipBroadcast,
 } = require("./desktop-ipc-live-owner-support");
 const {
   normalizeInputEntriesForDesktop,
@@ -1060,7 +1063,7 @@ function createDesktopIpcLiveOwner({
     if (envelope.sourceClientId && envelope.sourceClientId === ipc.clientId) {
       return;
     }
-    if (!isPeerOwnershipBroadcast(params)) {
+    if (!isPeerOwnershipBroadcast(params, { normalizeToken, readString })) {
       return;
     }
     if (hasActiveLocalTurn(threadId) && !conversationSnapshotShowsActiveTurn(params.change)) {
@@ -1075,14 +1078,6 @@ function createDesktopIpcLiveOwner({
     // and all cached conversation state so a later re-claim rehydrates fresh data
     // instead of republishing stale turns and requests.
     removeOwnedThread(threadId);
-  }
-
-  function isPeerOwnershipBroadcast(params) {
-    if (readString(params?.agntOwnerSource) === AGNT_LIVE_OWNER_SOURCE) {
-      return false;
-    }
-    const changeType = normalizeToken(params?.change?.type);
-    return changeType === "snapshot";
   }
 
   function canHandleFollowerRequest(envelope) {
@@ -1409,11 +1404,7 @@ function createDesktopIpcLiveOwner({
       queuedFollowUpsByThreadId.delete(conversationId);
     }
     broadcastQueuedFollowUps(conversationId);
-    const conversation = conversations.get(conversationId);
-    const hasActiveTurn = conversation
-      ? conversation.turns.some((turn) => normalizeToken(turn?.status) === "inprogress")
-      : false;
-    if (!hasActiveTurn) {
+    if (!conversationHasActiveTurn(conversations.get(conversationId), { normalizeToken })) {
       runNextQueuedFollowUp(conversationId);
     }
     return { ok: true };
@@ -1556,25 +1547,11 @@ function createDesktopIpcLiveOwner({
     if ((queuedFollowUpsByThreadId.get(threadId) || []).length > 0) {
       return true;
     }
-    const turns = conversations.get(threadId)?.turns || [];
-    return turns.some((turn) => {
-      const status = normalizeToken(turn?.status);
-      return status === "inprogress" || status === "running" || status === "active";
-    });
+    return conversationHasActiveTurn(conversations.get(threadId), { normalizeToken });
   }
 
   function activeTurnIdForConversation(conversationId) {
-    const turns = conversations.get(conversationId)?.turns || [];
-    for (let index = turns.length - 1; index >= 0; index -= 1) {
-      const turn = turns[index];
-      const status = normalizeToken(turn?.status);
-      const turnId = readString(turn?.turnId) || readString(turn?.id);
-      if (turnId && (!status || status === "inprogress" || status === "running" || status === "active")) {
-        return turnId;
-      }
-    }
-    const latestTurn = turns[turns.length - 1];
-    return readString(latestTurn?.turnId) || readString(latestTurn?.id);
+    return activeTurnIdFromConversation(conversations.get(conversationId), { normalizeToken, readString });
   }
 
   return {
