@@ -30,6 +30,20 @@ flowchart LR
 
 agnt started from a Codex-only transport and generalizes it behind a provider plugin contract so other agents can be added without touching the bridge core.
 
+## Features
+
+- End-to-end encrypted pairing and chats between your client and local host
+- One-time QR bootstrap, short pairing codes, and trusted reconnects
+- Live streaming while the agent CLI runs on your Mac or Linux machine
+- Plan mode, model selection, reasoning controls, and provider-specific turn settings when the active CLI supports them
+- Subagents, slash commands, skills, and structured mentions from the chat composer
+- Follow-up prompt queueing while a turn is still running
+- In-app notifications for finished turns, approvals, and attention-needed states
+- Git actions from the client, including branch switching, commit, pull, push, and PR helpers
+- File, image, photo, and workspace attachments where the client supports them
+- Optional web terminal access through the bridge for browser sessions
+- Shared local thread history and Codex desktop live mirroring on macOS when using the Codex provider
+
 ## Quickstart
 
 ```sh
@@ -67,6 +81,8 @@ Pair from any client:
 - **iOS app** — install [agnt](https://github.com/dotbrains/agnt), scan the QR. The phone reconnects automatically afterward.
 - **Android app** — build from `AgntAndroid/` (`./gradlew :app:installDebug`), scan the QR. Alpha — see [`AgntAndroid/README.md`](AgntAndroid/README.md) and [`AgntAndroid/PARITY.md`](AgntAndroid/PARITY.md) for status. Apache-2.0 attribution in [`AgntAndroid/NOTICE`](AgntAndroid/NOTICE).
 - **Browser** — `cd agnt-web && bun install && bun run dev`, open `http://localhost:5173`, then paste the JSON, type the short code, or scan the QR with your camera. Same E2EE handshake. See [`agnt-web/README.md`](agnt-web/README.md) for static-build deployment (Tailscale, VPS, S3+CloudFront, …).
+
+Scan the QR from inside an agnt client. A generic camera or QR reader may treat the pairing payload as plain text instead of starting the secure pairing flow.
 
 For self-hosting (Tailscale, public VPS, etc.) see [`docs/operations/self-hosting.md`](docs/operations/self-hosting.md).
 
