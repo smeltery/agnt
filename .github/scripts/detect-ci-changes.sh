@@ -4,6 +4,11 @@ set -euo pipefail
 manual_scope="${INPUT_SCOPE:-}"
 event_name="${GITHUB_EVENT_NAME:-}"
 
+git_object_exists() {
+  local ref="$1"
+  git cat-file -e "${ref}^{commit}" 2>/dev/null
+}
+
 if [[ -n "${CHANGED_FILES_OVERRIDE:-}" ]]; then
   changed_files="$CHANGED_FILES_OVERRIDE"
 elif [[ "$event_name" == "schedule" ]]; then
@@ -17,8 +22,12 @@ elif [[ "$event_name" == "pull_request" ]]; then
 else
   if [[ "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
     changed_files="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA")"
-  else
+  elif git_object_exists "$PUSH_BEFORE_SHA"; then
     changed_files="$(git diff --name-only "$PUSH_BEFORE_SHA" "$GITHUB_SHA")"
+  elif git_object_exists "$GITHUB_SHA^"; then
+    changed_files="$(git diff --name-only "$GITHUB_SHA^" "$GITHUB_SHA")"
+  else
+    changed_files="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA")"
   fi
 fi
 
