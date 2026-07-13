@@ -196,13 +196,14 @@ struct StreamingAssistantMarkdownTextView: View {
 
     @MainActor
     private static func parse(_ text: String) -> AttributedString {
+        let stableText = StreamingInlineMarkupAutoCloser.autoClosed(text)
         let transformed = MarkdownTextFormatter.renderableText(
-            from: text,
+            from: stableText,
             profile: .assistantProse,
             usesCache: false
         )
         return (try? UncachedMarkdownParser.shared.attributedString(for: transformed))
-            ?? AttributedString(text)
+            ?? AttributedString(stableText)
     }
 
     private static func applyFrontierFade(
