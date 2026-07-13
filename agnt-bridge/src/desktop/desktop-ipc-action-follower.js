@@ -5,12 +5,19 @@
 // Depends on: net, ./desktop-ipc-conversation-projector, ./desktop-ipc-shared
 
 const net = require("net");
-const { createHash } = require("crypto");
 
 const {
   createDesktopConversationProjector,
   projectDesktopConversationStateToThread,
 } = require("./desktop-ipc-conversation-projector");
+const {
+  buildDesktopTurnsListResult,
+  isDesktopTurnsCursor,
+} = require("./desktop-turns-pagination");
+const {
+  projectDesktopAssistantDeltaNotifications,
+  projectPendingDesktopActions,
+} = require("./desktop-action-projection");
 const {
   DESKTOP_IPC_METHOD_VERSIONS: METHOD_VERSION_BY_NAME,
   FRAME_HEADER_BYTES,
@@ -41,7 +48,6 @@ const DESKTOP_IPC_ACTION_SOURCE = "desktop-ipc-action-follower";
 const AGNT_LIVE_OWNER_SOURCE = "desktop-ipc-live-owner";
 const DESKTOP_STATE_READ_METHODS = new Set(["thread/read", "thread/resume", "thread/turns/list"]);
 const DESKTOP_BACKGROUND_DISCOVERY_METHODS = new Set(["thread/list"]);
-const DESKTOP_TURNS_CURSOR_PREFIX = "agnt-desktop-turns:";
 // A cached Desktop state that claims an active turn is only trustworthy while
 // Desktop keeps streaming updates for it. Live runs broadcast deltas far more
 // often than this window; a silent "active" cache is a stale reconnect echo
@@ -54,13 +60,6 @@ const DESKTOP_FOLLOWER_REQUEST_METHODS = new Set([
   "turn/interrupt",
   "thread/compact/start",
 ]);
-const ACTION_METHODS = new Set([
-  "item/commandExecution/requestApproval",
-  "item/fileChange/requestApproval",
-  "item/fileRead/requestApproval",
-  "item/permissions/requestApproval",
-  "item/tool/requestUserInput",
-]);
 const REPLY_METHOD_BY_ACTION_METHOD = new Map([
   ["item/commandExecution/requestApproval", "thread-follower-command-approval-decision"],
   ["item/fileChange/requestApproval", "thread-follower-file-approval-decision"],
@@ -69,121 +68,6 @@ const REPLY_METHOD_BY_ACTION_METHOD = new Map([
   ["item/tool/requestUserInput", "thread-follower-submit-user-input"],
 ]);
 const APPROVAL_DECISIONS = new Set(["accept", "acceptForSession", "decline", "cancel"]);
-
-// The app-server turns/list contract is newest-first by default. Preserve that
-// shape for projected Desktop snapshots so clients do not reverse reopened
-// history twice.
-function buildDesktopTurnsListResult(turns, params = {}) {
-  const chronologicalTurns = Array.isArray(turns) ? turns : [];
-  const snapshotRevision = desktopTurnsSnapshotRevision(chronologicalTurns);
-  const direction = normalizeToken(readString(params?.sortDirection) || "desc") === "asc"
-    ? "asc"
-    : "desc";
-  const orderedTurns = direction === "asc"
-    ? chronologicalTurns.slice()
-    : chronologicalTurns.slice().reverse();
-
-  let startIndex = 0;
-  const cursor = readString(params?.cursor);
-  if (cursor) {
-    const parsedCursor = parseDesktopTurnsCursor(
-      cursor,
-      direction,
-      snapshotRevision,
-      orderedTurns
-    );
-    if (parsedCursor == null) {
-      return null;
-    }
-    startIndex = parsedCursor;
-  }
-
-  const requestedLimit = Number(params?.limit);
-  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
-    ? Math.floor(requestedLimit)
-    : orderedTurns.length;
-  const page = orderedTurns.slice(startIndex, startIndex + limit);
-  const hasMore = startIndex + page.length < orderedTurns.length;
-  const nextCursor = hasMore && page.length > 0
-    ? desktopTurnsCursor(
-      direction,
-      snapshotRevision,
-      page[page.length - 1],
-      startIndex + page.length
-    )
-    : null;
-
-  return {
-    data: cloneJSON(page),
-    nextCursor,
-    hasMore,
-  };
-}
-
-function isDesktopTurnsCursor(value) {
-  return readString(value).startsWith(DESKTOP_TURNS_CURSOR_PREFIX);
-}
-
-function desktopTurnsCursor(direction, snapshotRevision, turn, nextIndex) {
-  const turnId = readString(turn?.id)
-    || readString(turn?.turnId)
-    || readString(turn?.turn_id);
-  const anchor = turnId ? `id:${encodeURIComponent(turnId)}` : `index:${nextIndex}`;
-  return `${DESKTOP_TURNS_CURSOR_PREFIX}${direction}:${snapshotRevision}:${anchor}`;
-}
-
-function parseDesktopTurnsCursor(cursor, direction, snapshotRevision, orderedTurns) {
-  const prefix = `${DESKTOP_TURNS_CURSOR_PREFIX}${direction}:${snapshotRevision}:`;
-  if (!cursor.startsWith(prefix)) {
-    return null;
-  }
-  const anchor = cursor.slice(prefix.length);
-  if (anchor.startsWith("id:")) {
-    let turnId = "";
-    try {
-      turnId = decodeURIComponent(anchor.slice(3));
-    } catch {
-      return null;
-    }
-    const anchorIndex = orderedTurns.findIndex((turn) => (
-      readString(turn?.id) === turnId
-      || readString(turn?.turnId) === turnId
-      || readString(turn?.turn_id) === turnId
-    ));
-    return anchorIndex === -1 ? null : anchorIndex + 1;
-  }
-  if (anchor.startsWith("index:")) {
-    const parsedIndex = Number(anchor.slice(6));
-    return Number.isInteger(parsedIndex) && parsedIndex >= 0 && parsedIndex <= orderedTurns.length
-      ? parsedIndex
-      : null;
-  }
-  return null;
-}
-
-function desktopTurnsSnapshotRevision(turns) {
-  const hash = createHash("sha256");
-  const paginationStructure = (Array.isArray(turns) ? turns : []).map((turn) => ({
-    id: readString(turn?.id) || readString(turn?.turnId) || readString(turn?.turn_id),
-    input: turn?.input ?? turn?.prompt ?? null,
-    userItems: (Array.isArray(turn?.items) ? turn.items : []).flatMap((item) => {
-      const role = readString(item?.role).toLowerCase();
-      const type = normalizeToken(readString(item?.type));
-      const isUserItem = role === "user" || type === "usermessage";
-      if (!isUserItem) {
-        return [];
-      }
-      return [{
-        id: readString(item?.id) || readString(item?.itemId) || readString(item?.item_id),
-        role,
-        type,
-        userContent: item?.text ?? item?.content ?? null,
-      }];
-    }),
-  }));
-  hash.update(JSON.stringify(paginationStructure));
-  return hash.digest("hex").slice(0, 24);
-}
 
 // Opens the Desktop IPC bus on demand and exposes Mac-owned pending actions as normal app-server requests.
 function createDesktopIpcActionFollower({
@@ -1791,132 +1675,6 @@ function hasGrantedPermission(value) {
     }
     return true;
   });
-}
-
-function projectPendingDesktopActions(threadId, conversationState) {
-  const requests = Array.isArray(conversationState?.requests) ? conversationState.requests : [];
-  return requests
-    .filter((request) => request && request.completed !== true)
-    .filter((request) => ACTION_METHODS.has(readString(request.method)))
-    .map((request) => projectPendingDesktopAction(threadId, request))
-    .filter(Boolean);
-}
-
-// Desktop IPC exposes full conversation snapshots/patches, not app-server assistant delta events.
-// Mirror only suffix growth for assistant rows so phones can render the same live text progression.
-function projectDesktopAssistantDeltaNotifications(
-  threadId,
-  previousState,
-  nextState,
-  previousTexts = snapshotAssistantMessageTexts(previousState)
-) {
-  const nextMessages = collectAssistantMessages(nextState);
-  const notifications = [];
-
-  for (const message of nextMessages) {
-    const previousText = previousTexts.get(message.key) || "";
-    if (!message.text || !message.text.startsWith(previousText) || message.text.length <= previousText.length) {
-      continue;
-    }
-
-    const delta = message.text.slice(previousText.length);
-    notifications.push({
-      method: "item/agentMessage/delta",
-      params: {
-        threadId,
-        turnId: message.turnId,
-        itemId: message.itemId,
-        delta,
-      },
-    });
-  }
-
-  return notifications;
-}
-
-function snapshotAssistantMessageTexts(conversationState) {
-  return new Map(collectAssistantMessages(conversationState).map((message) => [message.key, message.text]));
-}
-
-function collectAssistantMessages(conversationState) {
-  const turns = Array.isArray(conversationState?.turns) ? conversationState.turns : [];
-  const messages = [];
-  for (const turn of turns) {
-    const turnId = readString(turn?.id) || readString(turn?.turnId) || readString(turn?.turn_id);
-    const items = Array.isArray(turn?.items) ? turn.items : [];
-    for (const item of items) {
-      if (!isAssistantMessageItem(item)) {
-        continue;
-      }
-
-      const itemId = readString(item?.id) || readString(item?.itemId) || readString(item?.item_id);
-      const text = assistantMessageText(item);
-      if (!turnId || !itemId) {
-        continue;
-      }
-
-      messages.push({
-        key: `${turnId}:${itemId}`,
-        turnId,
-        itemId,
-        text,
-      });
-    }
-  }
-  return messages;
-}
-
-function isAssistantMessageItem(item) {
-  const type = normalizeToken(item?.type);
-  if (type === "agentmessage" || type === "assistantmessage") {
-    return true;
-  }
-  return type === "message" && normalizeToken(item?.role) === "assistant";
-}
-
-function assistantMessageText(item) {
-  const directText = readString(item?.text) || readString(item?.message);
-  if (directText) {
-    return directText;
-  }
-
-  const content = Array.isArray(item?.content) ? item.content : [];
-  return content
-    .map((entry) => entry && typeof entry === "object" ? entry : null)
-    .filter(Boolean)
-    .map((entry) => readString(entry.text) || readString(entry?.data?.text))
-    .filter(Boolean)
-    .join("");
-}
-
-function projectPendingDesktopAction(threadId, request) {
-  const requestId = requestIdKey(request.id);
-  const method = readString(request.method);
-  const params = request.params && typeof request.params === "object" && !Array.isArray(request.params)
-    ? request.params
-    : {};
-  if (!requestId || !method) {
-    return null;
-  }
-
-  if (method === "item/tool/requestUserInput") {
-    const questions = Array.isArray(params.questions) ? params.questions : [];
-    if (questions.length === 0) {
-      return null;
-    }
-  }
-
-  return {
-    id: requestId,
-    method,
-    params: {
-      ...params,
-      agntActionSource: DESKTOP_IPC_ACTION_SOURCE,
-      agntDesktopMirror: true,
-      agntDesktopIpcMirror: true,
-      threadId: readString(params.threadId) || readString(params.thread_id) || threadId,
-    },
-  };
 }
 
 function applyConversationStateChange(previousState, change) {
