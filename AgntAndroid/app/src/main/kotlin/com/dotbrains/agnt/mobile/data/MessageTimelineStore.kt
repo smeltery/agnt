@@ -248,20 +248,6 @@ internal class MessageTimelineStore(
         }
     }
 
-    private fun isStructuredFileChangeSnapshot(text: String): Boolean {
-        val t = text.trim()
-        if (t.isEmpty()) return false
-        if (t.contains("\nPath:", ignoreCase = true) || t.startsWith("Path:", ignoreCase = true)) return true
-        if (t.contains("\nTotals:", ignoreCase = true) || t.startsWith("Totals:", ignoreCase = true)) return true
-        if (t.contains("```diff", ignoreCase = true)) return true
-        if (t.contains("diff --git")) return true
-        return false
-    }
-
-    private fun isFileChangePlaceholder(text: String): Boolean =
-        text.trim().equals("[file change]", ignoreCase = true) ||
-            text.trim().equals("file change", ignoreCase = true)
-
     /**
      * Ensures a streaming system item exists for the given identity, without appending output deltas into its `text`.
      * This is used for command execution previews where the live output is stored separately.

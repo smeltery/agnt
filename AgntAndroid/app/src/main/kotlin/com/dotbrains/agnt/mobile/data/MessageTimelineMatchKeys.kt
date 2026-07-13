@@ -47,6 +47,20 @@ internal fun normalizedFileChangePathKeys(text: String): Set<String> {
     return keys
 }
 
+internal fun isStructuredFileChangeSnapshot(text: String): Boolean {
+    val t = text.trim()
+    if (t.isEmpty()) return false
+    if (t.contains("\nPath:", ignoreCase = true) || t.startsWith("Path:", ignoreCase = true)) return true
+    if (t.contains("\nTotals:", ignoreCase = true) || t.startsWith("Totals:", ignoreCase = true)) return true
+    if (t.contains("```diff", ignoreCase = true)) return true
+    if (t.contains("diff --git")) return true
+    return false
+}
+
+internal fun isFileChangePlaceholder(text: String): Boolean =
+    text.trim().equals("[file change]", ignoreCase = true) ||
+        text.trim().equals("file change", ignoreCase = true)
+
 private fun normalizedFileChangePathAliases(rawPath: String): Set<String> {
     val normalized = normalizeFileChangePathKey(rawPath) ?: return emptySet()
     val aliases = linkedSetOf(normalized)
