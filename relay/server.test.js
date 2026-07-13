@@ -676,6 +676,37 @@ test("relay logs redact live session identifiers", async () => {
   assert.ok(capturedLogs.every((line) => !line.includes("session-sensitive")));
 });
 
+test("relay upgrade logs include query-string roles without leaking session ids", async () => {
+  const capturedLogs = [];
+  const originalLog = console.log;
+  console.log = (...args) => {
+    capturedLogs.push(args.join(" "));
+  };
+
+  try {
+    await withServer(async ({ port }) => {
+      const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-query-log`, {
+        headers: { "x-role": "mac" },
+      });
+      const iphone = new WebSocket(`ws://127.0.0.1:${port}/relay/session-query-log?role=iphone`);
+
+      await Promise.all([onceOpen(mac), onceOpen(iphone)]);
+
+      const macClosed = onceClosed(mac);
+      const iphoneClosed = onceClosed(iphone);
+      mac.close();
+      iphone.close();
+      await Promise.all([macClosed, iphoneClosed]);
+    });
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.ok(capturedLogs.some((line) => line.includes("role=iphone")));
+  assert.ok(capturedLogs.some((line) => line.includes("/relay/[session]")));
+  assert.ok(capturedLogs.every((line) => !line.includes("session-query-log")));
+});
+
 test("redactRelayPathname hides the session path segment", () => {
   assert.equal(redactRelayPathname("/relay/session-123"), "/relay/[session]");
   assert.equal(redactRelayPathname("/relay/session-123/extra"), "/relay/[session]/extra");
@@ -730,6 +761,70 @@ test("websocket relay accepts android as a mobile role from query string", async
     android.close();
     mac.close();
     await Promise.all([androidClosed, macClosed]);
+  });
+});
+
+test("websocket relay accepts iphone as a mobile role from query string", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-iphone-query`, {
+      headers: { "x-role": "mac" },
+    });
+    const iphone = new WebSocket(`ws://127.0.0.1:${port}/relay/session-iphone-query?role=iphone`);
+
+    await Promise.all([onceOpen(mac), onceOpen(iphone)]);
+
+    const received = onceMessage(iphone);
+    mac.send(JSON.stringify({ ok: true }));
+    assert.equal(await received, "{\"ok\":true}");
+
+    const macClosed = onceClosed(mac);
+    const iphoneClosed = onceClosed(iphone);
+    mac.close();
+    iphone.close();
+    await Promise.all([macClosed, iphoneClosed]);
+  });
+});
+
+test("websocket relay prefers x-role over query role", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-role-precedence`, {
+      headers: { "x-role": "mac" },
+    });
+    const invalidClient = new WebSocket(
+      `ws://127.0.0.1:${port}/relay/session-role-precedence?role=android`,
+      { headers: { "x-role": "tablet" } }
+    );
+
+    await onceOpen(mac);
+    const { code, reason } = await onceCloseDetails(invalidClient);
+
+    assert.equal(code, 4000);
+    assert.equal(reason, "Missing sessionId or invalid role");
+
+    const macClosed = onceClosed(mac);
+    mac.close();
+    await macClosed;
+  });
+});
+
+test("websocket relay rejects invalid query roles", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-invalid-query-role`, {
+      headers: { "x-role": "mac" },
+    });
+    const invalidClient = new WebSocket(
+      `ws://127.0.0.1:${port}/relay/session-invalid-query-role?role=tablet`
+    );
+
+    await onceOpen(mac);
+    const { code, reason } = await onceCloseDetails(invalidClient);
+
+    assert.equal(code, 4000);
+    assert.equal(reason, "Missing sessionId or invalid role");
+
+    const macClosed = onceClosed(mac);
+    mac.close();
+    await macClosed;
   });
 });
 
