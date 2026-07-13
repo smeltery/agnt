@@ -1185,7 +1185,13 @@ function createDesktopIpcActionFollower({
   function submitDesktopFollowerRequest(route, originalMessage) {
     Promise.resolve()
       .then(() => resolveFollowerRequestParams(route))
-      .then((params) => ipc.sendRequest(route.method, params))
+      .then(async (params) => {
+        if (route.method === "thread-follower-start-turn") {
+          await syncDesktopOwnerRuntimeSettings(route.threadId, params.turnStartParams)
+            .catch((error) => { throw markDeliveryFailureError(error); });
+        }
+        return ipc.sendRequest(route.method, params);
+      })
       .then((result) => {
         sendApplicationResponse(JSON.stringify({
           id: originalMessage.id,
@@ -1224,6 +1230,23 @@ function createDesktopIpcActionFollower({
       return result.result ?? null;
     }
     return result ?? null;
+  }
+
+  async function syncDesktopOwnerRuntimeSettings(threadId, turnStartParams) {
+    const params = turnStartParams && typeof turnStartParams === "object" ? turnStartParams : {};
+    const collaborationMode = params.collaborationMode && typeof params.collaborationMode === "object"
+      ? cloneJSON(params.collaborationMode) : null;
+    const collaborationSettings = collaborationMode?.settings;
+    const model = readString(params.model) || readString(collaborationSettings?.model);
+    const effort = readString(params.effort) || readString(params.reasoningEffort)
+      || readString(collaborationSettings?.reasoning_effort) || readString(collaborationSettings?.reasoningEffort);
+    const serviceTier = readString(params.serviceTier) || readString(params.service_tier) || null;
+    if (!model && !effort && !collaborationMode) return;
+    await ipc.sendRequest("thread-follower-update-thread-settings", {
+      conversationId: threadId,
+      threadSettings: { ...(model ? { model } : {}), effort: effort || null, serviceTier,
+        ...(collaborationMode ? { collaborationMode } : {}) }
+    });
   }
 
   // Desktop-followed turn starts must apply the same param normalization as

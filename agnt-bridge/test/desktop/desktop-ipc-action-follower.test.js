@@ -1128,14 +1128,7 @@ test("desktop IPC follower answers client discovery requests as a passive client
     attachFrameReader(socket, (frame) => {
       serverFrames.push(frame);
       if (frame.method === "initialize") {
-        writeFrame(socket, {
-          type: "response",
-          requestId: frame.requestId,
-          resultType: "success",
-          method: "initialize",
-          handledByClientId: "desktop",
-          result: { clientId: "agnt-test" },
-        });
+        writeFrame(socket, { type: "response", requestId: frame.requestId, resultType: "success", method: "initialize" });
       }
     });
   });
@@ -1674,6 +1667,68 @@ test("desktop IPC follower falls back locally when no Desktop client can handle 
   );
 });
 
+test("desktop IPC follower falls back locally when Desktop settings sync times out before turn delivery", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-follower-settings-timeout-");
+  const serverFrames = [];
+  const localForwards = [];
+  const outbound = [];
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      serverFrames.push(frame);
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve)); t.after(() => { server.close(); serverSocket?.destroy(); fs.rmSync(tempDir, { recursive: true, force: true }); });
+
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse: (message) => outbound.push(JSON.parse(message)),
+    forwardToLocalCodex: (rawMessage) => localForwards.push(JSON.parse(rawMessage)),
+    requestTimeoutMs: 100,
+  }); t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({ method: "thread/resume", params: { threadId: "thread-settings-timeout" } }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 6,
+    params: {
+      conversationId: "thread-settings-timeout",
+      change: { type: "snapshot", conversationState: { turns: [], requests: [] } },
+    },
+  });
+  await wait(25);
+
+  assert.equal(follower.observeInbound(JSON.stringify({
+    id: "phone-turn-start-settings-timeout",
+    method: "turn/start",
+    params: {
+      threadId: "thread-settings-timeout",
+      input: [{ type: "input_text", text: "continue despite stale Desktop owner" }],
+      model: "gpt-test",
+      effort: "low",
+    },
+  })), true);
+
+  await waitFor(() => localForwards.length === 1, 1_000);
+  assert.deepEqual([localForwards[0].id, localForwards[0].method], ["phone-turn-start-settings-timeout", "turn/start"]);
+  assert.equal(serverFrames.some((frame) => frame.method === "thread-follower-start-turn"), false);
+  assert.equal(outbound.some((message) => message.id === "phone-turn-start-settings-timeout"), false);
+});
 test("desktop IPC follower does not rerun ambiguous Desktop failures locally", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-follower-ambiguous-error-");
   const localForwards = [];
