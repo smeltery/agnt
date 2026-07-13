@@ -3,7 +3,7 @@
     "default_lines": 1200,
     "files": {
       "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+Messages.swift": 5700,
-      "agnt-bridge/test/desktop/desktop-ipc-action-follower.test.js": 5100,
+      "agnt-bridge/test/desktop/desktop-ipc-action-follower.test.js": 4600,
       "AgntMobile/AgntMobileTests/TurnTimelineReducerTests.swift": 4200,
       "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 3700,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 3600,
