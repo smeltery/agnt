@@ -36,6 +36,18 @@ const {
   createDesktopOwnerIpcClient,
 } = require("./desktop-ipc-owner-transport");
 const {
+  AGNT_LIVE_OWNER_SOURCE,
+  OWNER_INBOUND_METHODS,
+  SUPPORTED_FOLLOWER_REQUEST_METHODS,
+  THREAD_ARCHIVED,
+  THREAD_QUEUED_FOLLOWUPS_CHANGED,
+  THREAD_READ_METHODS,
+  THREAD_READ_STATE_CHANGED,
+  THREAD_STREAM_STATE_CHANGED,
+  THREAD_UNARCHIVED,
+  createDisabledDesktopIpcLiveOwner,
+} = require("./desktop-ipc-live-owner-support");
+const {
   normalizeInputEntriesForDesktop,
   readConversationIdFromFollowerParams,
   readThreadFromPayload,
@@ -54,45 +66,9 @@ const DEFAULT_INITIAL_HISTORY_MAX_ATTEMPTS = 5;
 // persist session_meta + the first user event so the refreshed thread/list scan
 // can actually see the thread.
 const DEFAULT_SIDEBAR_REFRESH_DELAY_MS = 1_200;
-const THREAD_STREAM_STATE_CHANGED = "thread-stream-state-changed";
 // Cached thread/read responses are only a hydration convenience; owned threads
 // are never evicted, so a small cap keeps long browsing sessions bounded.
 const MAX_CACHED_THREADS = 30;
-const THREAD_ARCHIVED = "thread-archived";
-const THREAD_UNARCHIVED = "thread-unarchived";
-const THREAD_READ_STATE_CHANGED = "thread-read-state-changed";
-const THREAD_QUEUED_FOLLOWUPS_CHANGED = "thread-queued-followups-changed";
-const AGNT_LIVE_OWNER_SOURCE = "desktop-ipc-live-owner";
-
-const SUPPORTED_FOLLOWER_REQUEST_METHODS = new Set([
-  "thread-follower-start-turn",
-  "thread-follower-load-complete-history",
-  "thread-follower-update-thread-settings",
-  "thread-follower-compact-thread",
-  "thread-follower-steer-turn",
-  "thread-follower-interrupt-turn",
-  "thread-follower-set-model-and-reasoning",
-  "thread-follower-set-collaboration-mode",
-  "thread-follower-command-approval-decision",
-  "thread-follower-file-approval-decision",
-  "thread-follower-permissions-request-approval-response",
-  "thread-follower-submit-user-input",
-  "thread-follower-submit-mcp-server-elicitation-response",
-  "thread-follower-set-queued-follow-ups-state",
-]);
-
-const OWNER_INBOUND_METHODS = new Set([
-  "thread/start",
-  "turn/start",
-  "turn/steer",
-  "turn/interrupt",
-  "thread/compact/start",
-  "thread/archive",
-  "thread/unarchive",
-  "thread/unsubscribe",
-]);
-
-const THREAD_READ_METHODS = new Set(["thread/read", "thread/resume"]);
 
 function createDesktopIpcLiveOwner({
   enabled = true,
@@ -1612,17 +1588,6 @@ function createDesktopIpcLiveOwner({
     },
     _debugSnapshot(threadId) {
       return cloneJSON(conversations.get(threadId) || null);
-    },
-  };
-}
-
-function createDisabledDesktopIpcLiveOwner() {
-  return {
-    observeInbound() {},
-    observeOutbound() {},
-    stopAll() {},
-    isThreadOwned() {
-      return false;
     },
   };
 }
