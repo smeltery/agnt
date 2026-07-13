@@ -55,6 +55,7 @@ import { prefsStore, type ThreadColor, type ThreadOverride } from "../storage/pr
 import { buildTurnInput } from "./turn-input";
 import { applyHistoryEvent, flattenTurnsToEvents } from "./thread-history-events";
 import type { ImageAttachment } from "../models";
+import { useThreadGoalsStore } from "./thread-goals-store";
 import {
   buildReviewStartParams,
   effectiveServiceTier,
@@ -299,6 +300,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     useGitStore.getState().reset();
     useAccountStore.getState().bind(connection);
     useVoiceStore.getState().bind(connection);
+    useThreadGoalsStore.getState().bind(connection);
     activeConnection = connection;
     registerNotificationHandlers(connection, set, get);
     registerServerRequestHandlers(connection);
@@ -355,6 +357,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     // turn fires the push notification. Best-effort — silently no-ops if the
     // bridge doesn't expose this for the active provider.
     void fetchContextWindowSnapshot(threadId, set, get);
+    void useThreadGoalsStore.getState().refresh(threadId);
     await get().loadOlderTurns(threadId);
   },
 
@@ -639,6 +642,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
     while (teardownHandlers.length) teardownHandlers.pop()?.();
     activeConnection = null;
     useStreamingStatsStore.setState({ byThread: {} });
+    useThreadGoalsStore.getState().reset();
     set({
       threads: [],
       archivedThreads: [],

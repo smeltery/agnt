@@ -18,6 +18,7 @@ import { ClockArrowCirclepath, Eye, EyeSlash, Paperclip } from "../shared/Icon";
 import { useVoiceStore } from "../../state/voice-store";
 import { draftsStore } from "../../storage/drafts-store";
 import { VoiceButton } from "./VoiceButton";
+import { ThreadGoalControl } from "./ThreadGoalControl";
 
 const DRAFT_SAVE_DEBOUNCE_MS = 400;
 
@@ -807,6 +808,7 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
           <Paperclip />
         </button>
         <VoiceButton />
+        <ThreadGoalControl threadId={selectedThreadId} />
         <PromptHistoryDropdown
           open={historyOpen}
           history={userPromptHistory}

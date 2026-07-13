@@ -230,6 +230,7 @@
   justify-content: flex-end;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 /* Mirror iOS send button: small filled circle with the active foreground
    on the system background. The Send affordance lives inside the actions
@@ -249,6 +250,94 @@
   border-radius: 999px;
   padding: 8px 14px;
   font-weight: 600;
+}
+
+.agnt-goal-control {
+  position: relative;
+  display: inline-flex;
+}
+.agnt-goal-pill {
+  height: 32px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--agnt-fg-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: min(220px, 56vw);
+}
+.agnt-goal-pill:hover { background: var(--agnt-bg-elev); color: var(--agnt-fg); }
+.agnt-goal-pill-active {
+  border-color: color-mix(in srgb, var(--agnt-accent) 42%, var(--agnt-border));
+  color: var(--agnt-fg);
+  background: color-mix(in srgb, var(--agnt-accent) 9%, transparent);
+}
+.agnt-goal-pill-attention {
+  border-color: color-mix(in srgb, var(--agnt-warn) 58%, var(--agnt-border));
+  background: color-mix(in srgb, var(--agnt-warn) 10%, transparent);
+}
+.agnt-goal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+.agnt-goal-budget {
+  color: var(--agnt-fg-tertiary);
+  white-space: nowrap;
+}
+.agnt-goal-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: min(340px, calc(100vw - 32px));
+  z-index: 20;
+  border: 1px solid var(--agnt-border);
+  border-radius: var(--agnt-radius-card);
+  background: var(--agnt-bg-elev);
+  box-shadow: 0 16px 42px color-mix(in srgb, black 18%, transparent);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+.agnt-goal-popover label {
+  display: grid;
+  gap: 5px;
+  color: var(--agnt-fg-dim);
+  font-size: 11px;
+}
+.agnt-goal-popover textarea,
+.agnt-goal-popover input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px;
+}
+.agnt-goal-popover textarea { resize: vertical; min-height: 72px; }
+.agnt-goal-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+.agnt-goal-popover-actions .agnt-button-primary,
+.agnt-goal-popover-actions .agnt-button-ghost {
+  width: auto;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
 }
 
 .agnt-row-pending .agnt-row-bubble { opacity: 0.7; }
