@@ -1,26 +1,51 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::Mutex;
-use std::process::{Child, Command, Stdio};
+use std::fs;
 use std::io::{BufRead, BufReader};
 use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
 use std::time::Duration;
-use std::fs;
-use std::path::{Path, PathBuf};
-use tauri::Manager;
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Emitter;
+use tauri::Manager;
 use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
 mod provider_bridge;
+mod diagnostics;
+mod runtime_bundle;
+
+use diagnostics::{
+    diagnostic_action,
+    diagnostic_check,
+    is_private_ipv4,
+    is_tailscale_ipv4,
+    pairing_payload_expiry,
+    pairing_payload_relay,
+    recommended_lan_network,
+    recommended_tailscale_network,
+    relay_url_policy,
+    selected_network,
+    DiagnosticsSnapshot,
+    SetupPreset,
+};
+#[cfg(test)]
+use runtime_bundle::{
+    bundle_manifests_match, copy_fixture_runtime_from_bundle, read_bundle_manifest, BundleManifest,
+    BUNDLE_MANIFEST,
+};
+use runtime_bundle::{
+    bundled_root_from_exe, refresh_runtime_from_bundle, runtime_bundle_status, runtime_root,
+    seed_runtime_from_bundle, RuntimeBundleStatus,
+};
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const PET_WINDOW_SIZE: f64 = 80.0;
-const BUNDLE_MANIFEST: &str = "agnt-bundle.json";
 
 // ─── Data types ──────────────────────────────────────────────
 
@@ -59,76 +84,6 @@ pub struct UpdateInfo {
     pub current_version: String,
     pub date: Option<String>,
     pub body: Option<String>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct BundlePackageMetadata {
-    pub name: Option<String>,
-    pub version: Option<String>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct BundleComponentManifest {
-    pub package: Option<BundlePackageMetadata>,
-    pub hash: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct BundleManifest {
-    #[serde(rename = "schemaVersion")]
-    pub schema_version: u32,
-    #[serde(rename = "generatedAt")]
-    pub generated_at: String,
-    pub relay: BundleComponentManifest,
-    pub bridge: BundleComponentManifest,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct RuntimeBundleStatus {
-    pub bundled_manifest: Option<BundleManifest>,
-    pub runtime_manifest: Option<BundleManifest>,
-    pub runtime_current: bool,
-    pub refresh_available: bool,
-    pub refresh_deferred: bool,
-    pub bundled_path: String,
-    pub runtime_path: String,
-    pub message: String,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct DiagnosticAction {
-    pub kind: String,
-    pub label: String,
-    pub value: Option<String>,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct DiagnosticCheck {
-    pub id: String,
-    pub title: String,
-    pub status: String,
-    pub detail: String,
-    pub action: Option<DiagnosticAction>,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct SetupPreset {
-    pub id: String,
-    pub title: String,
-    pub detail: String,
-    pub status: String,
-    pub action: Option<DiagnosticAction>,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct DiagnosticsSnapshot {
-    pub generated_at: String,
-    pub summary: String,
-    pub checks: Vec<DiagnosticCheck>,
-    pub presets: Vec<SetupPreset>,
-    pub recommended_actions: Vec<DiagnosticAction>,
-    pub runtime: RuntimeBundleStatus,
-    pub debug: DebugInfo,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -174,9 +129,15 @@ pub struct AppConfig {
     pub provider_bridge: provider_bridge::config::ProviderBridgeConfig,
 }
 
-fn default_relay_mode() -> String { "local".to_string() }
-fn default_free_message_limit() -> u32 { 5 }
-fn default_log_level() -> String { "info".to_string() }
+fn default_relay_mode() -> String {
+    "local".to_string()
+}
+fn default_free_message_limit() -> u32 {
+    5
+}
+fn default_log_level() -> String {
+    "info".to_string()
+}
 
 impl Default for AppConfig {
     fn default() -> Self {
@@ -218,201 +179,6 @@ pub struct AppState {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-fn runtime_root() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("agnt-host")
-        .join("runtime")
-}
-
-fn bundled_root_from_exe() -> Option<PathBuf> {
-    let exe_path = std::env::current_exe().ok()?;
-    let exe_dir = exe_path.parent()?;
-    let bundled_root = exe_dir.join("bundled");
-    let bundled_relay = bundled_root.join("relay").join("server.js");
-    let bundled_bridge = bundled_root.join("agnt-bridge").join("bin").join("agnt.js");
-    if bundled_relay.exists() && bundled_bridge.exists() {
-        Some(bundled_root)
-    } else {
-        None
-    }
-}
-
-fn read_bundle_manifest(path: &Path) -> Option<BundleManifest> {
-    let raw = fs::read_to_string(path.join(BUNDLE_MANIFEST)).ok()?;
-    serde_json::from_str::<BundleManifest>(&raw).ok()
-}
-
-fn bundle_manifests_match(bundled: &BundleManifest, runtime: &BundleManifest) -> bool {
-    bundled.schema_version == runtime.schema_version &&
-        bundled.relay.hash == runtime.relay.hash &&
-        bundled.bridge.hash == runtime.bridge.hash &&
-        bundled.relay.package == runtime.relay.package &&
-        bundled.bridge.package == runtime.bridge.package
-}
-
-fn runtime_bundle_status(processes_running: bool) -> RuntimeBundleStatus {
-    let bundled_root = bundled_root_from_exe();
-    let runtime = runtime_root();
-    let bundled_manifest = bundled_root.as_ref().and_then(|p| read_bundle_manifest(p));
-    let runtime_manifest = read_bundle_manifest(&runtime);
-    let runtime_current = match (&bundled_manifest, &runtime_manifest) {
-        (Some(bundled), Some(runtime)) => bundle_manifests_match(bundled, runtime),
-        _ => false,
-    };
-    let refresh_available = bundled_manifest.is_some() && !runtime_current;
-    let refresh_deferred = refresh_available && processes_running;
-    let message = if bundled_manifest.is_none() {
-        "No packaged bundle manifest was found. This is expected in development mode.".to_string()
-    } else if runtime_current {
-        "Runtime bridge and relay match the packaged bundle.".to_string()
-    } else if refresh_deferred {
-        "Restart Host to apply the packaged bridge and relay update.".to_string()
-    } else {
-        "Runtime bridge and relay can be refreshed from the packaged bundle.".to_string()
-    };
-
-    RuntimeBundleStatus {
-        bundled_manifest,
-        runtime_manifest,
-        runtime_current,
-        refresh_available,
-        refresh_deferred,
-        bundled_path: bundled_root
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "(development mode)".to_string()),
-        runtime_path: runtime.display().to_string(),
-        message,
-    }
-}
-
-fn copy_file_if_exists(src: &Path, dest: &Path) -> std::io::Result<()> {
-    if src.exists() {
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::copy(src, dest)?;
-    }
-    Ok(())
-}
-
-fn validate_runtime_tree(root: &Path) -> Result<(), String> {
-    let relay_server = root.join("relay").join("server.js");
-    let bridge_bin = root.join("agnt-bridge").join("bin").join("agnt.js");
-    if !relay_server.exists() {
-        return Err(format!("missing {}", relay_server.display()));
-    }
-    if !bridge_bin.exists() {
-        return Err(format!("missing {}", bridge_bin.display()));
-    }
-    if !root.join(BUNDLE_MANIFEST).exists() {
-        return Err(format!("missing {}", root.join(BUNDLE_MANIFEST).display()));
-    }
-    Ok(())
-}
-
-fn seed_runtime_from_bundle(bundled_root: &Path, runtime: &Path) {
-    let relay_dest = runtime.join("relay");
-    if !relay_dest.join("server.js").exists() {
-        let relay_src = bundled_root.join("relay");
-        if let Err(e) = copy_dir_recursive(&relay_src, &relay_dest) {
-            log::warn!("Failed to copy relay to runtime dir: {e}");
-        }
-    }
-
-    let bridge_dest = runtime.join("agnt-bridge");
-    if !bridge_dest.join("bin").join("agnt.js").exists() {
-        let bridge_src = bundled_root.join("agnt-bridge");
-        if let Err(e) = copy_dir_recursive(&bridge_src, &bridge_dest) {
-            log::warn!("Failed to copy bridge to runtime dir: {e}");
-        }
-    }
-
-    let _ = copy_file_if_exists(&bundled_root.join(BUNDLE_MANIFEST), &runtime.join(BUNDLE_MANIFEST));
-}
-
-fn refresh_runtime_from_bundle(processes_running: bool) -> Result<RuntimeBundleStatus, String> {
-    let bundled_root = match bundled_root_from_exe() {
-        Some(path) => path,
-        None => return Ok(runtime_bundle_status(processes_running)),
-    };
-    let status = runtime_bundle_status(processes_running);
-    if !status.refresh_available || status.runtime_current {
-        return Ok(status);
-    }
-    if processes_running {
-        return Ok(status);
-    }
-
-    let runtime = runtime_root();
-    let parent = runtime
-        .parent()
-        .ok_or_else(|| "Runtime directory has no parent".to_string())?
-        .to_path_buf();
-    fs::create_dir_all(&parent).map_err(|e| format!("runtime parent create failed: {e}"))?;
-
-    let tmp = parent.join("runtime-refresh-tmp");
-    let backup = parent.join("runtime-refresh-backup");
-    let _ = fs::remove_dir_all(&tmp);
-    let _ = fs::remove_dir_all(&backup);
-    fs::create_dir_all(&tmp).map_err(|e| format!("runtime temp create failed: {e}"))?;
-
-    copy_dir_recursive(&bundled_root.join("relay"), &tmp.join("relay"))
-        .map_err(|e| format!("relay copy failed: {e}"))?;
-    copy_dir_recursive(&bundled_root.join("agnt-bridge"), &tmp.join("agnt-bridge"))
-        .map_err(|e| format!("bridge copy failed: {e}"))?;
-    copy_file_if_exists(&bundled_root.join(BUNDLE_MANIFEST), &tmp.join(BUNDLE_MANIFEST))
-        .map_err(|e| format!("manifest copy failed: {e}"))?;
-    validate_runtime_tree(&tmp)?;
-
-    if runtime.exists() {
-        fs::rename(&runtime, &backup).map_err(|e| format!("runtime backup failed: {e}"))?;
-    }
-    if let Err(error) = fs::rename(&tmp, &runtime) {
-        if backup.exists() {
-            let _ = fs::rename(&backup, &runtime);
-        }
-        return Err(format!("runtime replace failed: {error}"));
-    }
-    let _ = fs::remove_dir_all(&backup);
-
-    Ok(runtime_bundle_status(false))
-}
-
-#[cfg(test)]
-fn copy_fixture_runtime_from_bundle(bundled_root: &Path, runtime: &Path) -> Result<(), String> {
-    let parent = runtime
-        .parent()
-        .ok_or_else(|| "Runtime directory has no parent".to_string())?
-        .to_path_buf();
-    fs::create_dir_all(&parent).map_err(|e| format!("runtime parent create failed: {e}"))?;
-
-    let tmp = parent.join("runtime-refresh-tmp");
-    let backup = parent.join("runtime-refresh-backup");
-    let _ = fs::remove_dir_all(&tmp);
-    let _ = fs::remove_dir_all(&backup);
-    fs::create_dir_all(&tmp).map_err(|e| format!("runtime temp create failed: {e}"))?;
-    copy_dir_recursive(&bundled_root.join("relay"), &tmp.join("relay"))
-        .map_err(|e| format!("relay copy failed: {e}"))?;
-    copy_dir_recursive(&bundled_root.join("agnt-bridge"), &tmp.join("agnt-bridge"))
-        .map_err(|e| format!("bridge copy failed: {e}"))?;
-    copy_file_if_exists(&bundled_root.join(BUNDLE_MANIFEST), &tmp.join(BUNDLE_MANIFEST))
-        .map_err(|e| format!("manifest copy failed: {e}"))?;
-    validate_runtime_tree(&tmp)?;
-
-    if runtime.exists() {
-        fs::rename(runtime, &backup).map_err(|e| format!("runtime backup failed: {e}"))?;
-    }
-    if let Err(error) = fs::rename(&tmp, runtime) {
-        if backup.exists() {
-            let _ = fs::rename(&backup, runtime);
-        }
-        return Err(format!("runtime replace failed: {error}"));
-    }
-    let _ = fs::remove_dir_all(&backup);
-    Ok(())
-}
-
 fn processes_are_running(app_handle: &tauri::AppHandle) -> bool {
     let state = app_handle.state::<AppState>();
     let relay_running = state
@@ -434,27 +200,54 @@ fn current_app_status(app_handle: &tauri::AppHandle) -> Result<AppStatus, String
     let state = app_handle.state::<AppState>();
 
     let bridge = {
-        state.bridge_process.lock().map_err(|e| e.to_string())?
-            .as_ref().map_or("stopped", |_| "running").to_string()
+        state
+            .bridge_process
+            .lock()
+            .map_err(|e| e.to_string())?
+            .as_ref()
+            .map_or("stopped", |_| "running")
+            .to_string()
     };
     let network = state.selected_ip.lock().map_err(|e| e.to_string())?.clone();
     let relay_url = state.relay_url.lock().map_err(|e| e.to_string())?.clone();
-    let pairing_payload = state.pairing_payload.lock().map_err(|e| e.to_string())?.clone();
-    let pairing_code = state.pairing_code.lock().map_err(|e| e.to_string())?.clone();
+    let pairing_payload = state
+        .pairing_payload
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let pairing_code = state
+        .pairing_code
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
     let phone_connected = *state.phone_connected.lock().map_err(|e| e.to_string())?;
-    let relay_mode = state.config.lock().map_err(|e| e.to_string())?.relay_mode.clone();
+    let relay_mode = state
+        .config
+        .lock()
+        .map_err(|e| e.to_string())?
+        .relay_mode
+        .clone();
 
     let relay_status = if relay_mode == "remote" {
         "external".to_string()
     } else {
-        state.relay_process.lock().map_err(|e| e.to_string())?
-            .as_ref().map_or("stopped", |_| "running").to_string()
+        state
+            .relay_process
+            .lock()
+            .map_err(|e| e.to_string())?
+            .as_ref()
+            .map_or("stopped", |_| "running")
+            .to_string()
     };
 
     let state_str = if phone_connected && bridge == "running" {
         "connected"
     } else if relay_status == "running" && bridge == "running" && pairing_payload.is_some() {
-        if relay_mode == "remote" { "remote_placeholder_ready" } else { "local_ready" }
+        if relay_mode == "remote" {
+            "remote_placeholder_ready"
+        } else {
+            "local_ready"
+        }
     } else if bridge == "running" {
         "waiting_for_pairing"
     } else if relay_status == "running" {
@@ -499,7 +292,11 @@ fn get_repo_root() -> PathBuf {
     let mut current = cwd.clone();
     for _ in 0..5 {
         if current.join("relay").join("server.js").exists()
-            && current.join("agnt-bridge").join("bin").join("agnt.js").exists()
+            && current
+                .join("agnt-bridge")
+                .join("bin")
+                .join("agnt.js")
+                .exists()
         {
             return current;
         }
@@ -517,26 +314,6 @@ fn get_repo_root() -> PathBuf {
         }
     }
     current
-}
-
-fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
-    if !src.exists() {
-        return Ok(());
-    }
-    fs::create_dir_all(dest)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
-        let dest_path = dest.join(entry.file_name());
-        if file_type.is_dir() {
-            if entry.file_name() != "node_modules" && entry.file_name() != ".git" {
-                copy_dir_recursive(&entry.path(), &dest_path)?;
-            }
-        } else {
-            let _ = fs::copy(entry.path(), &dest_path);
-        }
-    }
-    Ok(())
 }
 
 fn config_path() -> std::path::PathBuf {
@@ -557,9 +334,7 @@ fn config_path() -> std::path::PathBuf {
 
 fn provider_bridge_secret_path() -> std::path::PathBuf {
     if let Some(dir) = dirs::config_dir() {
-        let p = dir
-            .join("agnt-host")
-            .join("provider-bridge-secrets.json");
+        let p = dir.join("agnt-host").join("provider-bridge-secrets.json");
         if let Some(parent) = p.parent() {
             let _ = fs::create_dir_all(parent);
         }
@@ -683,18 +458,26 @@ fn set_launch_at_startup(enable: bool) {
             .map(|p| p.display().to_string())
             .unwrap_or_default();
         let key = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-    let name = "AgntHost";
-    if enable {
-        let mut cmd = Command::new("reg");
-        cmd.args(["add", key, "/v", name, "/t", "REG_SZ", "/d", &exe_path, "/f"]);
-        #[cfg(target_os = "windows")] { cmd.creation_flags(CREATE_NO_WINDOW); }
-        let _ = cmd.output();
-    } else {
-        let mut cmd = Command::new("reg");
-        cmd.args(["delete", key, "/v", name, "/f"]);
-        #[cfg(target_os = "windows")] { cmd.creation_flags(CREATE_NO_WINDOW); }
-        let _ = cmd.output();
-    }
+        let name = "AgntHost";
+        if enable {
+            let mut cmd = Command::new("reg");
+            cmd.args([
+                "add", key, "/v", name, "/t", "REG_SZ", "/d", &exe_path, "/f",
+            ]);
+            #[cfg(target_os = "windows")]
+            {
+                cmd.creation_flags(CREATE_NO_WINDOW);
+            }
+            let _ = cmd.output();
+        } else {
+            let mut cmd = Command::new("reg");
+            cmd.args(["delete", key, "/v", name, "/f"]);
+            #[cfg(target_os = "windows")]
+            {
+                cmd.creation_flags(CREATE_NO_WINDOW);
+            }
+            let _ = cmd.output();
+        }
     }
 }
 
@@ -702,25 +485,33 @@ fn fire_wall_warning(app_handle: &tauri::AppHandle, ip: &str, port: u16) {
     if ip == "127.0.0.1" || ip == "localhost" || ip.is_empty() {
         return;
     }
-    add_log(app_handle, "app", "warning", &format!(
+    add_log(
+        app_handle,
+        "app",
+        "warning",
+        &format!(
         "Relay is on {ip}:{port}. Windows Firewall may block incoming connections from your phone."
-    ));
+    ),
+    );
     let _ = app_handle.emit("firewall-warning", serde_json::json!({
         "ip": ip,
         "port": port,
         "message": "Windows Firewall could be blocking the port. Make sure your phone can reach this PC.",
     }));
-    let _ = app_handle.emit("status-changed", AppStatus {
-        state: "warning".to_string(),
-        relay_mode: "local".to_string(),
-        relay: "running".to_string(),
-        bridge: "stopped".to_string(),
-        network: ip.to_string(),
-        relay_url: format!("ws://{ip}:{port}/relay"),
-        pairing_payload: None,
-        pairing_code: None,
-        phone_connected: false,
-    });
+    let _ = app_handle.emit(
+        "status-changed",
+        AppStatus {
+            state: "warning".to_string(),
+            relay_mode: "local".to_string(),
+            relay: "running".to_string(),
+            bridge: "stopped".to_string(),
+            network: ip.to_string(),
+            relay_url: format!("ws://{ip}:{port}/relay"),
+            pairing_payload: None,
+            pairing_code: None,
+            phone_connected: false,
+        },
+    );
 }
 
 fn show_notification(title: &str, body: &str) {
@@ -737,7 +528,10 @@ fn show_notification(title: &str, body: &str) {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = Command::new("osascript")
-            .args(["-e", &format!(r#"display notification "{}" with title "{}""#, body, title)])
+            .args([
+                "-e",
+                &format!(r#"display notification "{}" with title "{}""#, body, title),
+            ])
             .spawn();
     }
 }
@@ -761,7 +555,12 @@ fn ensure_deps(dir: &std::path::Path, app_handle: &tauri::AppHandle) -> bool {
         return true;
     }
 
-    add_log(app_handle, "app", "info", &format!("Installing dependencies in {}...", dir.display()));
+    add_log(
+        app_handle,
+        "app",
+        "info",
+        &format!("Installing dependencies in {}...", dir.display()),
+    );
 
     let output = if cfg!(windows) {
         let cmd = format!(
@@ -785,17 +584,32 @@ fn ensure_deps(dir: &std::path::Path, app_handle: &tauri::AppHandle) -> bool {
 
     match output {
         Ok(out) if out.status.success() => {
-            add_log(app_handle, "app", "info", &format!("Dependencies installed in {}", dir.display()));
+            add_log(
+                app_handle,
+                "app",
+                "info",
+                &format!("Dependencies installed in {}", dir.display()),
+            );
             true
         }
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();
             let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-            add_log(app_handle, "app", "error", &format!("npm install failed: {}{}", stderr, stdout));
+            add_log(
+                app_handle,
+                "app",
+                "error",
+                &format!("npm install failed: {}{}", stderr, stdout),
+            );
             false
         }
         Err(e) => {
-            add_log(app_handle, "app", "error", &format!("Failed to run npm install: {}", e));
+            add_log(
+                app_handle,
+                "app",
+                "error",
+                &format!("Failed to run npm install: {}", e),
+            );
             false
         }
     }
@@ -808,7 +622,9 @@ fn is_port_available(port: u16) -> bool {
 }
 
 fn find_available_port(start: u16) -> u16 {
-    (start..start + 100).find(|&p| is_port_available(p)).unwrap_or(9000)
+    (start..start + 100)
+        .find(|&p| is_port_available(p))
+        .unwrap_or(9000)
 }
 
 fn wait_for_port(port: u16, timeout_secs: u32) -> bool {
@@ -842,108 +658,6 @@ fn save_config(config: &AppConfig) {
 }
 
 // ─── Network detection ──────────────────────────────────────
-
-fn is_private_ipv4(addr: &str) -> bool {
-    let parts: Vec<&str> = addr.split('.').collect();
-    if parts.len() != 4 {
-        return false;
-    }
-    if let (Ok(a), Ok(b)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
-        match a {
-            10 => true,
-            172 => (16..=31).contains(&b),
-            192 => b == 168,
-            _ => false,
-        }
-    } else {
-        false
-    }
-}
-
-fn is_tailscale_ipv4(addr: &str) -> bool {
-    let parts: Vec<&str> = addr.split('.').collect();
-    if parts.len() != 4 {
-        return false;
-    }
-    if let (Ok(a), Ok(b)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
-        a == 100 && (64..=127).contains(&b)
-    } else {
-        false
-    }
-}
-
-fn is_local_relay_host(host: &str) -> bool {
-    let h = host.trim().trim_matches(['[', ']']).to_lowercase();
-    if h.is_empty() {
-        return false;
-    }
-    if h == "localhost" || h == "::1" || h.ends_with(".local") || h.ends_with(".ts.net") {
-        return true;
-    }
-    if !h.contains('.') && !h.contains(':') {
-        return true;
-    }
-    if is_private_ipv4(&h) || is_tailscale_ipv4(&h) || h.starts_with("127.") || h.starts_with("169.254.") {
-        return true;
-    }
-    if !h.contains(':') {
-        return false;
-    }
-    h.starts_with("fc") ||
-        h.starts_with("fd") ||
-        h.starts_with("fe8") ||
-        h.starts_with("fe9") ||
-        h.starts_with("fea") ||
-        h.starts_with("feb")
-}
-
-fn relay_url_parts(raw: &str) -> Option<(String, String, String)> {
-    let trimmed = raw.trim().trim_end_matches('/');
-    let scheme_end = trimmed.find("://")?;
-    let scheme = trimmed[..scheme_end].to_lowercase();
-    if !matches!(scheme.as_str(), "ws" | "wss" | "http" | "https") {
-        return None;
-    }
-    let rest = &trimmed[(scheme_end + 3)..];
-    let authority_end = rest.find('/').unwrap_or(rest.len());
-    let authority = &rest[..authority_end];
-    if authority.contains('@') {
-        return None;
-    }
-    let path = if authority_end < rest.len() { &rest[authority_end..] } else { "/" };
-    let host = if authority.starts_with('[') {
-        authority
-            .find(']')
-            .map(|end| authority[1..end].to_string())?
-    } else {
-        authority.split(':').next().unwrap_or("").to_string()
-    };
-    if host.trim().is_empty() {
-        return None;
-    }
-    Some((scheme, host, path.to_string()))
-}
-
-fn relay_url_policy(raw: &str) -> (String, String) {
-    let Some((scheme, host, _path)) = relay_url_parts(raw) else {
-        return ("fail".to_string(), "Relay URL is invalid or contains unsupported credentials.".to_string());
-    };
-    let host_lower = host.to_lowercase();
-    let cleartext = scheme == "ws" || scheme == "http";
-    if cleartext && !is_local_relay_host(&host) {
-        return ("fail".to_string(), "Public ws:// relay URLs are not allowed. Use local/Tailscale ws:// or secure wss://.".to_string());
-    }
-    if host_lower == "localhost" || host_lower == "127.0.0.1" {
-        return ("warn".to_string(), "Loopback relay URLs only work on this PC, not from a phone.".to_string());
-    }
-    if cleartext && (is_tailscale_ipv4(&host_lower) || host_lower.ends_with(".ts.net")) {
-        return ("pass".to_string(), "Tailscale relay URL is accepted as private transport.".to_string());
-    }
-    if cleartext {
-        return ("pass".to_string(), "Local relay URL is accepted.".to_string());
-    }
-    ("pass".to_string(), "Secure relay URL is accepted.".to_string())
-}
 
 fn is_virtual_interface(name: &str) -> bool {
     let lower = name.to_lowercase();
@@ -982,13 +696,15 @@ fn detect_network_interfaces() -> Vec<NetworkInterface> {
             "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.AddressState -eq 'Preferred' } | Select-Object IPAddress, InterfaceAlias | ConvertTo-Json -Compress"
         ]);
         hide_console(&mut cmd);
-        if let Ok(output) = cmd.output()
-        {
+        if let Ok(output) = cmd.output() {
             if let Ok(stdout) = String::from_utf8(output.stdout) {
                 // Try to parse the JSON array
                 if let Ok(values) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
                     for v in values {
-                        let name = v["InterfaceAlias"].as_str().unwrap_or("unknown").to_string();
+                        let name = v["InterfaceAlias"]
+                            .as_str()
+                            .unwrap_or("unknown")
+                            .to_string();
                         let address = v["IPAddress"].as_str().unwrap_or("").to_string();
                         if !address.is_empty() {
                             let is_virt = is_virtual_interface(&name);
@@ -998,7 +714,9 @@ fn detect_network_interfaces() -> Vec<NetworkInterface> {
                                 "vpn"
                             } else if is_virt {
                                 "virtual"
-                            } else if name.to_lowercase().contains("wi-fi") || name.to_lowercase().contains("wifi") {
+                            } else if name.to_lowercase().contains("wi-fi")
+                                || name.to_lowercase().contains("wifi")
+                            {
                                 "wifi"
                             } else if name.to_lowercase().contains("ethernet") {
                                 "ethernet"
@@ -1017,8 +735,16 @@ fn detect_network_interfaces() -> Vec<NetworkInterface> {
                     // Try single object
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&stdout) {
                         if let Some(obj) = v.as_object() {
-                            let name = obj.get("InterfaceAlias").and_then(|s| s.as_str()).unwrap_or("unknown").to_string();
-                            let address = obj.get("IPAddress").and_then(|s| s.as_str()).unwrap_or("").to_string();
+                            let name = obj
+                                .get("InterfaceAlias")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("unknown")
+                                .to_string();
+                            let address = obj
+                                .get("IPAddress")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("")
+                                .to_string();
                             let is_priv = is_private_ipv4(&address) || is_tailscale_ipv4(&address);
                             if !address.is_empty() {
                                 interfaces.push(NetworkInterface {
@@ -1062,7 +788,8 @@ fn detect_network_interfaces() -> Vec<NetworkInterface> {
 
     // Sort: private interfaces first, non-virtual first, wifi first
     interfaces.sort_by(|a, b| {
-        b.is_private.cmp(&a.is_private)
+        b.is_private
+            .cmp(&a.is_private)
             .then(a.kind.cmp(&b.kind))
             .then(a.address.cmp(&b.address))
     });
@@ -1113,61 +840,6 @@ fn detect_networks() -> Result<Vec<NetworkInterface>, String> {
     Ok(detect_network_interfaces())
 }
 
-fn diagnostic_action(kind: &str, label: &str, value: Option<String>) -> DiagnosticAction {
-    DiagnosticAction {
-        kind: kind.to_string(),
-        label: label.to_string(),
-        value,
-    }
-}
-
-fn diagnostic_check(
-    id: &str,
-    title: &str,
-    status: &str,
-    detail: String,
-    action: Option<DiagnosticAction>,
-) -> DiagnosticCheck {
-    DiagnosticCheck {
-        id: id.to_string(),
-        title: title.to_string(),
-        status: status.to_string(),
-        detail,
-        action,
-    }
-}
-
-fn selected_network<'a>(networks: &'a [NetworkInterface], selected_ip: &str) -> Option<&'a NetworkInterface> {
-    networks.iter().find(|nic| nic.address == selected_ip)
-}
-
-fn recommended_lan_network(networks: &[NetworkInterface]) -> Option<&NetworkInterface> {
-    networks
-        .iter()
-        .find(|nic| nic.is_private && (nic.kind == "wifi" || nic.kind == "ethernet"))
-        .or_else(|| networks.iter().find(|nic| nic.is_private && nic.kind != "virtual"))
-}
-
-fn recommended_tailscale_network(networks: &[NetworkInterface]) -> Option<&NetworkInterface> {
-    networks
-        .iter()
-        .find(|nic| nic.kind == "vpn" && is_tailscale_ipv4(&nic.address))
-        .or_else(|| networks.iter().find(|nic| is_tailscale_ipv4(&nic.address)))
-        .or_else(|| networks.iter().find(|nic| nic.kind == "vpn"))
-}
-
-fn pairing_payload_relay(payload: &Option<String>) -> Option<String> {
-    let raw = payload.as_ref()?;
-    let parsed = serde_json::from_str::<serde_json::Value>(raw).ok()?;
-    parsed.get("relay").and_then(|relay| relay.as_str()).map(|s| s.to_string())
-}
-
-fn pairing_payload_expiry(payload: &Option<String>) -> Option<i64> {
-    let raw = payload.as_ref()?;
-    let parsed = serde_json::from_str::<serde_json::Value>(raw).ok()?;
-    parsed.get("expiresAt").and_then(|expires| expires.as_i64())
-}
-
 fn runtime_process_status(app_handle: &tauri::AppHandle) -> (bool, bool) {
     let state = app_handle.state::<AppState>();
     let relay_running = state
@@ -1190,9 +862,19 @@ fn refresh_bundled_runtime(app_handle: tauri::AppHandle) -> Result<RuntimeBundle
     let running = processes_are_running(&app_handle);
     let status = refresh_runtime_from_bundle(running)?;
     if status.runtime_current {
-        add_log(&app_handle, "app", "info", "Runtime bridge and relay are current");
+        add_log(
+            &app_handle,
+            "app",
+            "info",
+            "Runtime bridge and relay are current",
+        );
     } else if status.refresh_deferred {
-        add_log(&app_handle, "app", "warning", "Runtime refresh deferred until bridge and relay stop");
+        add_log(
+            &app_handle,
+            "app",
+            "warning",
+            "Runtime refresh deferred until bridge and relay stop",
+        );
     } else if status.refresh_available {
         add_log(&app_handle, "app", "warning", &status.message);
     }
@@ -1205,8 +887,16 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
     let config = state.config.lock().map_err(|e| e.to_string())?.clone();
     let selected_ip = state.selected_ip.lock().map_err(|e| e.to_string())?.clone();
     let relay_url = state.relay_url.lock().map_err(|e| e.to_string())?.clone();
-    let pairing_payload = state.pairing_payload.lock().map_err(|e| e.to_string())?.clone();
-    let pairing_code = state.pairing_code.lock().map_err(|e| e.to_string())?.clone();
+    let pairing_payload = state
+        .pairing_payload
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let pairing_code = state
+        .pairing_code
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
     let phone_connected = *state.phone_connected.lock().map_err(|e| e.to_string())?;
     let logs = state.logs.lock().map_err(|e| e.to_string())?.clone();
     let (relay_running, bridge_running) = runtime_process_status(&app_handle);
@@ -1227,7 +917,13 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
     checks.push(diagnostic_check(
         "runtime-current",
         "Bundled bridge and relay",
-        if runtime.runtime_current || runtime.bundled_manifest.is_none() { "pass" } else if runtime.refresh_deferred { "warn" } else { "fail" },
+        if runtime.runtime_current || runtime.bundled_manifest.is_none() {
+            "pass"
+        } else if runtime.refresh_deferred {
+            "warn"
+        } else {
+            "fail"
+        },
         runtime.message.clone(),
         runtime_action,
     ));
@@ -1237,27 +933,51 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
         "node",
         "Node.js",
         if node_ok { "pass" } else { "fail" },
-        if node_ok { format!("Detected {}", debug.node_version) } else { "Node.js was not detected on PATH.".to_string() },
+        if node_ok {
+            format!("Detected {}", debug.node_version)
+        } else {
+            "Node.js was not detected on PATH.".to_string()
+        },
         None,
     ));
 
     checks.push(diagnostic_check(
         "runtime-paths",
         "Runtime files",
-        if debug.relay_server_exists && debug.bridge_bin_exists { "pass" } else { "fail" },
+        if debug.relay_server_exists && debug.bridge_bin_exists {
+            "pass"
+        } else {
+            "fail"
+        },
         format!(
             "Relay server: {}. Bridge binary: {}.",
-            if debug.relay_server_exists { "found" } else { "missing" },
-            if debug.bridge_bin_exists { "found" } else { "missing" },
+            if debug.relay_server_exists {
+                "found"
+            } else {
+                "missing"
+            },
+            if debug.bridge_bin_exists {
+                "found"
+            } else {
+                "missing"
+            },
         ),
         None,
     ));
 
     let port_available = is_port_available(config.relay_port);
-    let port_status = if relay_running || port_available { "pass" } else { "fail" };
+    let port_status = if relay_running || port_available {
+        "pass"
+    } else {
+        "fail"
+    };
     let port_action = if !relay_running && !port_available {
         let suggested = find_available_port(config.relay_port);
-        let action = diagnostic_action("applyPort", &format!("Use port {suggested}"), Some(suggested.to_string()));
+        let action = diagnostic_action(
+            "applyPort",
+            &format!("Use port {suggested}"),
+            Some(suggested.to_string()),
+        );
         recommended_actions.push(action.clone());
         Some(action)
     } else {
@@ -1278,8 +998,13 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
     ));
 
     let network_check = if selected_ip.is_empty() {
-        let action = recommended_lan_network(&networks)
-            .map(|nic| diagnostic_action("selectNetwork", &format!("Use {}", nic.address), Some(nic.address.clone())));
+        let action = recommended_lan_network(&networks).map(|nic| {
+            diagnostic_action(
+                "selectNetwork",
+                &format!("Use {}", nic.address),
+                Some(nic.address.clone()),
+            )
+        });
         if let Some(action) = action.clone() {
             recommended_actions.push(action);
         }
@@ -1296,8 +1021,13 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
             "Selected network",
             "fail",
             "Loopback points back to this PC and cannot be reached from the phone.".to_string(),
-            recommended_lan_network(&networks)
-                .map(|nic| diagnostic_action("selectNetwork", &format!("Use {}", nic.address), Some(nic.address.clone()))),
+            recommended_lan_network(&networks).map(|nic| {
+                diagnostic_action(
+                    "selectNetwork",
+                    &format!("Use {}", nic.address),
+                    Some(nic.address.clone()),
+                )
+            }),
         )
     } else if let Some(nic) = selected_network(&networks, &selected_ip) {
         diagnostic_check(
@@ -1313,8 +1043,13 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
             "Selected network",
             "warn",
             format!("{selected_ip} is saved but was not found in detected interfaces."),
-            recommended_lan_network(&networks)
-                .map(|nic| diagnostic_action("selectNetwork", &format!("Use {}", nic.address), Some(nic.address.clone()))),
+            recommended_lan_network(&networks).map(|nic| {
+                diagnostic_action(
+                    "selectNetwork",
+                    &format!("Use {}", nic.address),
+                    Some(nic.address.clone()),
+                )
+            }),
         )
     };
     if let Some(action) = network_check.action.clone() {
@@ -1343,13 +1078,14 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
     ));
 
     let qr_relay = pairing_payload_relay(&pairing_payload);
-    let qr_status = if pairing_payload.is_some() && qr_relay.as_deref() == Some(active_relay_url.as_str()) {
-        "pass"
-    } else if pairing_payload.is_some() {
-        "warn"
-    } else {
-        "warn"
-    };
+    let qr_status =
+        if pairing_payload.is_some() && qr_relay.as_deref() == Some(active_relay_url.as_str()) {
+            "pass"
+        } else if pairing_payload.is_some() {
+            "warn"
+        } else {
+            "warn"
+        };
     let expiry_detail = pairing_payload_expiry(&pairing_payload)
         .map(|expires| format!(" Expires at epoch ms {expires}."))
         .unwrap_or_default();
@@ -1374,13 +1110,27 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
     checks.push(diagnostic_check(
         "processes",
         "Processes",
-        if relay_running && bridge_running { "pass" } else if relay_running || bridge_running { "warn" } else { "warn" },
+        if relay_running && bridge_running {
+            "pass"
+        } else if relay_running || bridge_running {
+            "warn"
+        } else {
+            "warn"
+        },
         format!(
             "Relay: {}. Bridge: {}. Pairing code: {}. Phone: {}.",
             if relay_running { "running" } else { "stopped" },
             if bridge_running { "running" } else { "stopped" },
-            if pairing_code.is_some() { "ready" } else { "not ready" },
-            if phone_connected { "connected" } else { "not connected" },
+            if pairing_code.is_some() {
+                "ready"
+            } else {
+                "not ready"
+            },
+            if phone_connected {
+                "connected"
+            } else {
+                "not connected"
+            },
         ),
         None,
     ));
@@ -1440,17 +1190,34 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
         checks.push(check);
     }
 
-    let lan_action = recommended_lan_network(&networks)
-        .map(|nic| diagnostic_action("selectNetwork", &format!("Use {}", nic.address), Some(nic.address.clone())));
-    let tailscale_action = recommended_tailscale_network(&networks)
-        .map(|nic| diagnostic_action("selectNetwork", &format!("Use {}", nic.address), Some(nic.address.clone())));
+    let lan_action = recommended_lan_network(&networks).map(|nic| {
+        diagnostic_action(
+            "selectNetwork",
+            &format!("Use {}", nic.address),
+            Some(nic.address.clone()),
+        )
+    });
+    let tailscale_action = recommended_tailscale_network(&networks).map(|nic| {
+        diagnostic_action(
+            "selectNetwork",
+            &format!("Use {}", nic.address),
+            Some(nic.address.clone()),
+        )
+    });
     let presets = vec![
         SetupPreset {
             id: "same-wifi".to_string(),
             title: "Same Wi-Fi".to_string(),
             detail: recommended_lan_network(&networks)
-                .map(|nic| format!("Use {} ({}) for phones on the same network.", nic.address, nic.name))
-                .unwrap_or_else(|| "No Wi-Fi or Ethernet private address was detected.".to_string()),
+                .map(|nic| {
+                    format!(
+                        "Use {} ({}) for phones on the same network.",
+                        nic.address, nic.name
+                    )
+                })
+                .unwrap_or_else(|| {
+                    "No Wi-Fi or Ethernet private address was detected.".to_string()
+                }),
             status: if lan_action.is_some() { "pass" } else { "warn" }.to_string(),
             action: lan_action,
         },
@@ -1460,14 +1227,24 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
             detail: recommended_tailscale_network(&networks)
                 .map(|nic| format!("Use {} ({}) for Tailscale pairing.", nic.address, nic.name))
                 .unwrap_or_else(|| "No Tailscale-style address was detected.".to_string()),
-            status: if tailscale_action.is_some() { "pass" } else { "warn" }.to_string(),
+            status: if tailscale_action.is_some() {
+                "pass"
+            } else {
+                "warn"
+            }
+            .to_string(),
             action: tailscale_action,
         },
         SetupPreset {
             id: "custom-relay".to_string(),
             title: "Custom Relay".to_string(),
             detail: "Use a relay URL you control. Public relays should use wss://.".to_string(),
-            status: if config.remote_relay_url.starts_with("wss://") { "pass" } else { "warn" }.to_string(),
+            status: if config.remote_relay_url.starts_with("wss://") {
+                "pass"
+            } else {
+                "warn"
+            }
+            .to_string(),
             action: Some(diagnostic_action("openSettings", "Edit custom relay", None)),
         },
     ];
@@ -1475,9 +1252,15 @@ async fn get_diagnostics(app_handle: tauri::AppHandle) -> Result<DiagnosticsSnap
     let fail_count = checks.iter().filter(|check| check.status == "fail").count();
     let warn_count = checks.iter().filter(|check| check.status == "warn").count();
     let summary = if fail_count > 0 {
-        format!("{fail_count} issue{} need attention before pairing.", if fail_count == 1 { "" } else { "s" })
+        format!(
+            "{fail_count} issue{} need attention before pairing.",
+            if fail_count == 1 { "" } else { "s" }
+        )
     } else if warn_count > 0 {
-        format!("{warn_count} warning{} found. Pairing may still work.", if warn_count == 1 { "" } else { "s" })
+        format!(
+            "{warn_count} warning{} found. Pairing may still work.",
+            if warn_count == 1 { "" } else { "s" }
+        )
     } else {
         "Local setup looks ready.".to_string()
     };
@@ -1505,7 +1288,12 @@ fn select_network(app_handle: tauri::AppHandle, ip: String) -> Result<(), String
         config.selected_ip = ip.clone();
         save_config(&config);
     }
-    add_log(&app_handle, "app", "info", &format!("Selected network: {ip}"));
+    add_log(
+        &app_handle,
+        "app",
+        "info",
+        &format!("Selected network: {ip}"),
+    );
     Ok(())
 }
 
@@ -1558,7 +1346,9 @@ fn start_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
             "relay/server.js not found at {}\nRepo root: {}\nCWD: {}",
             server_js.display(),
             repo_root.display(),
-            std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_else(|_| "?".to_string())
+            std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "?".to_string())
         ));
     }
 
@@ -1567,7 +1357,12 @@ fn start_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
         return Err("Failed to install relay dependencies. Check logs for details.".to_string());
     }
 
-    add_log(&app_handle, "app", "info", &format!("Starting relay on port {port}..."));
+    add_log(
+        &app_handle,
+        "app",
+        "info",
+        &format!("Starting relay on port {port}..."),
+    );
 
     let mut relay_cmd = Command::new("node");
     relay_cmd
@@ -1596,17 +1391,30 @@ fn start_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
         let mut guard = state.relay_process.lock().map_err(|e| e.to_string())?;
         *guard = Some(child);
     }
-    let _ = app_handle.emit("status-changed", AppStatus {
-        state: "starting".to_string(),
-        relay_mode: "local".to_string(),
-        relay: "starting".to_string(),
-        bridge: "stopped".to_string(),
-        network: state.selected_ip.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-        relay_url: state.relay_url.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-        pairing_payload: None,
-        pairing_code: None,
-        phone_connected: false,
-    });
+    let _ = app_handle.emit(
+        "status-changed",
+        AppStatus {
+            state: "starting".to_string(),
+            relay_mode: "local".to_string(),
+            relay: "starting".to_string(),
+            bridge: "stopped".to_string(),
+            network: state
+                .selected_ip
+                .lock()
+                .ok()
+                .map(|s| s.clone())
+                .unwrap_or_default(),
+            relay_url: state
+                .relay_url
+                .lock()
+                .ok()
+                .map(|s| s.clone())
+                .unwrap_or_default(),
+            pairing_payload: None,
+            pairing_code: None,
+            phone_connected: false,
+        },
+    );
 
     // Wait for relay to be ready
     let ah_wait = app_handle.clone();
@@ -1615,22 +1423,53 @@ fn start_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
         let ready = wait_for_port(wait_port, 15);
         let state = ah_wait.state::<AppState>();
         if ready {
-            add_log(&ah_wait, "app", "info", &format!("Relay ready on port {wait_port}"));
+            add_log(
+                &ah_wait,
+                "app",
+                "info",
+                &format!("Relay ready on port {wait_port}"),
+            );
         } else {
-            add_log(&ah_wait, "app", "error", "Relay did not become ready in time");
+            add_log(
+                &ah_wait,
+                "app",
+                "error",
+                "Relay did not become ready in time",
+            );
         }
         // Emit status update
-        let _ = ah_wait.emit("status-changed", AppStatus {
-            state: if ready { "relay_running".to_string() } else { "error".to_string() },
-            relay_mode: "local".to_string(),
-            relay: if ready { "running".to_string() } else { "error".to_string() },
-            bridge: "stopped".to_string(),
-            network: state.selected_ip.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-            relay_url: state.relay_url.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-            pairing_payload: None,
-            pairing_code: None,
-            phone_connected: false,
-        });
+        let _ = ah_wait.emit(
+            "status-changed",
+            AppStatus {
+                state: if ready {
+                    "relay_running".to_string()
+                } else {
+                    "error".to_string()
+                },
+                relay_mode: "local".to_string(),
+                relay: if ready {
+                    "running".to_string()
+                } else {
+                    "error".to_string()
+                },
+                bridge: "stopped".to_string(),
+                network: state
+                    .selected_ip
+                    .lock()
+                    .ok()
+                    .map(|s| s.clone())
+                    .unwrap_or_default(),
+                relay_url: state
+                    .relay_url
+                    .lock()
+                    .ok()
+                    .map(|s| s.clone())
+                    .unwrap_or_default(),
+                pairing_payload: None,
+                pairing_code: None,
+                phone_connected: false,
+            },
+        );
     });
 
     // Build relay URL
@@ -1645,8 +1484,18 @@ fn start_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
         *url_guard = relay_url.clone();
     }
 
-    add_log(&app_handle, "app", "info", &format!("Relay started (PID: {pid})"));
-    add_log(&app_handle, "app", "info", &format!("Relay URL: {relay_url}"));
+    add_log(
+        &app_handle,
+        "app",
+        "info",
+        &format!("Relay started (PID: {pid})"),
+    );
+    add_log(
+        &app_handle,
+        "app",
+        "info",
+        &format!("Relay URL: {relay_url}"),
+    );
 
     // Firewall warning for LAN IPs
     fire_wall_warning(&app_handle, &selected_ip, port);
@@ -1673,35 +1522,68 @@ fn start_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
             };
 
             if let Some(status) = exited {
-                let intentional = state.relay_intentional.lock().ok().map(|i| *i).unwrap_or(true);
+                let intentional = state
+                    .relay_intentional
+                    .lock()
+                    .ok()
+                    .map(|i| *i)
+                    .unwrap_or(true);
                 if let Ok(mut guard) = state.relay_process.lock() {
                     *guard = None;
                 }
                 if intentional {
                     // reset flag
-                    if let Ok(mut i) = state.relay_intentional.lock() { *i = false; }
+                    if let Ok(mut i) = state.relay_intentional.lock() {
+                        *i = false;
+                    }
                     return;
                 }
                 let code = status.code().unwrap_or(-1);
-                add_log(&ah_watch, "app", "error", &format!("Relay crashed (exit code: {code})"));
-                let _ = ah_watch.emit("process-crashed", serde_json::json!({
-                    "process": "relay",
-                    "exit_code": code,
-                }));
-                let _ = ah_watch.emit("status-changed", AppStatus {
-                    state: "error".to_string(),
-                    relay_mode: "local".to_string(),
-                    relay: "error".to_string(),
-                    bridge: "stopped".to_string(),
-                    network: state.selected_ip.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-                    relay_url: state.relay_url.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-                    pairing_payload: None,
-                    pairing_code: None,
-                    phone_connected: false,
-                });
+                add_log(
+                    &ah_watch,
+                    "app",
+                    "error",
+                    &format!("Relay crashed (exit code: {code})"),
+                );
+                let _ = ah_watch.emit(
+                    "process-crashed",
+                    serde_json::json!({
+                        "process": "relay",
+                        "exit_code": code,
+                    }),
+                );
+                let _ = ah_watch.emit(
+                    "status-changed",
+                    AppStatus {
+                        state: "error".to_string(),
+                        relay_mode: "local".to_string(),
+                        relay: "error".to_string(),
+                        bridge: "stopped".to_string(),
+                        network: state
+                            .selected_ip
+                            .lock()
+                            .ok()
+                            .map(|s| s.clone())
+                            .unwrap_or_default(),
+                        relay_url: state
+                            .relay_url
+                            .lock()
+                            .ok()
+                            .map(|s| s.clone())
+                            .unwrap_or_default(),
+                        pairing_payload: None,
+                        pairing_code: None,
+                        phone_connected: false,
+                    },
+                );
 
                 // Auto-restart
-                let auto_restart = state.config.lock().ok().map(|c| c.auto_restart).unwrap_or(false);
+                let auto_restart = state
+                    .config
+                    .lock()
+                    .ok()
+                    .map(|c| c.auto_restart)
+                    .unwrap_or(false);
                 if auto_restart {
                     add_log(&ah_watch, "app", "info", "Auto-restarting relay...");
                     let _ = start_relay(ah_watch.clone());
@@ -1718,12 +1600,18 @@ fn start_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
 fn stop_relay(app_handle: tauri::AppHandle) -> Result<String, String> {
     let state = app_handle.state::<AppState>();
     // Mark as intentional stop so crash watcher doesn't report
-    if let Ok(mut i) = state.relay_intentional.lock() { *i = true; }
+    if let Ok(mut i) = state.relay_intentional.lock() {
+        *i = true;
+    }
     let mut guard = state.relay_process.lock().map_err(|e| e.to_string())?;
     if let Some(ref mut child) = *guard {
         add_log(&app_handle, "app", "info", "Stopping relay...");
-        child.kill().map_err(|e| format!("Failed to kill relay: {e}"))?;
-        child.wait().map_err(|e| format!("Failed to wait relay: {e}"))?;
+        child
+            .kill()
+            .map_err(|e| format!("Failed to kill relay: {e}"))?;
+        child
+            .wait()
+            .map_err(|e| format!("Failed to wait relay: {e}"))?;
         *guard = None;
         add_log(&app_handle, "app", "info", "Relay stopped");
         Ok("Relay stopped".to_string())
@@ -1757,7 +1645,9 @@ fn start_bridge(app_handle: tauri::AppHandle) -> Result<String, String> {
             "agnt-bridge/bin/agnt.js not found at {}\nRepo root: {}\nCWD: {}",
             bridge_bin.display(),
             repo_root.display(),
-            std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_else(|_| "?".to_string())
+            std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "?".to_string())
         ));
     }
 
@@ -1766,7 +1656,12 @@ fn start_bridge(app_handle: tauri::AppHandle) -> Result<String, String> {
         return Err("Failed to install bridge dependencies. Check logs for details.".to_string());
     }
 
-    add_log(&app_handle, "app", "info", &format!("Starting bridge with relay: {relay_url}"));
+    add_log(
+        &app_handle,
+        "app",
+        "info",
+        &format!("Starting bridge with relay: {relay_url}"),
+    );
     {
         if let Ok(mut pp) = state.pairing_payload.lock() {
             *pp = None;
@@ -1831,7 +1726,8 @@ fn start_bridge(app_handle: tauri::AppHandle) -> Result<String, String> {
 
                     if capturing_pairing_json {
                         if let Ok(payload) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                            if payload.get("relay").is_some() && payload.get("sessionId").is_some() {
+                            if payload.get("relay").is_some() && payload.get("sessionId").is_some()
+                            {
                                 let state = ah_pairing.state::<AppState>();
                                 if let Ok(mut pp) = state.pairing_payload.lock() {
                                     *pp = Some(trimmed.to_string());
@@ -1843,7 +1739,12 @@ fn start_bridge(app_handle: tauri::AppHandle) -> Result<String, String> {
                                 continue;
                             }
                         }
-                        add_log(&ah_pairing, "app", "warning", "Failed to parse pairing payload");
+                        add_log(
+                            &ah_pairing,
+                            "app",
+                            "warning",
+                            "Failed to parse pairing payload",
+                        );
                         capturing_pairing_json = false;
                         continue;
                     }
@@ -1863,76 +1764,137 @@ fn start_bridge(app_handle: tauri::AppHandle) -> Result<String, String> {
 
     // Emit status update
     let ah_status = app_handle.clone();
-    let relay_mode = app_handle.state::<AppState>().config.lock().ok().map(|c| c.relay_mode.clone()).unwrap_or_else(|| "local".to_string());
-    let _ = ah_status.emit("status-changed", AppStatus {
-        state: "starting".to_string(),
-        relay_mode,
-        relay: "running".to_string(),
-        bridge: "starting".to_string(),
-        network: app_handle.state::<AppState>().selected_ip.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-        relay_url: relay_url.clone(),
-        pairing_payload: None,
-        pairing_code: None,
-        phone_connected: false,
-    });
+    let relay_mode = app_handle
+        .state::<AppState>()
+        .config
+        .lock()
+        .ok()
+        .map(|c| c.relay_mode.clone())
+        .unwrap_or_else(|| "local".to_string());
+    let _ = ah_status.emit(
+        "status-changed",
+        AppStatus {
+            state: "starting".to_string(),
+            relay_mode,
+            relay: "running".to_string(),
+            bridge: "starting".to_string(),
+            network: app_handle
+                .state::<AppState>()
+                .selected_ip
+                .lock()
+                .ok()
+                .map(|s| s.clone())
+                .unwrap_or_default(),
+            relay_url: relay_url.clone(),
+            pairing_payload: None,
+            pairing_code: None,
+            phone_connected: false,
+        },
+    );
 
-    add_log(&app_handle, "app", "info", &format!("Bridge started (PID: {pid})"));
+    add_log(
+        &app_handle,
+        "app",
+        "info",
+        &format!("Bridge started (PID: {pid})"),
+    );
 
     // Crash watcher
     let ah_watch = app_handle.clone();
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(Duration::from_millis(500));
-            let state = ah_watch.state::<AppState>();
-            let exited = {
-                if let Ok(mut guard) = state.bridge_process.lock() {
-                    if let Some(ref mut child) = *guard {
-                        match child.try_wait() {
-                            Ok(Some(status)) => Some(status),
-                            _ => None,
-                        }
-                    } else {
-                        return;
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(500));
+        let state = ah_watch.state::<AppState>();
+        let exited = {
+            if let Ok(mut guard) = state.bridge_process.lock() {
+                if let Some(ref mut child) = *guard {
+                    match child.try_wait() {
+                        Ok(Some(status)) => Some(status),
+                        _ => None,
                     }
                 } else {
                     return;
                 }
-            };
+            } else {
+                return;
+            }
+        };
 
-            if let Some(status) = exited {
-                let intentional = state.bridge_intentional.lock().ok().map(|i| *i).unwrap_or(true);
-                if let Ok(mut guard) = state.bridge_process.lock() {
-                    *guard = None;
-                }
-                if intentional {
-                    if let Ok(mut i) = state.bridge_intentional.lock() { *i = false; }
-                    return;
-                }
-                let code = status.code().unwrap_or(-1);
-                add_log(&ah_watch, "app", "error", &format!("Bridge crashed (exit code: {code})"));
-                let _ = ah_watch.emit("process-crashed", serde_json::json!({
-                    "process": "bridge",
-                    "exit_code": code,
-                }));
-                let _ = ah_watch.emit("status-changed", AppStatus {
-                    state: "error".to_string(),
-                    relay_mode: state.config.lock().ok().map(|c| c.relay_mode.clone()).unwrap_or_else(|| "local".to_string()),
-                    relay: state.relay_process.lock().ok().and_then(|p| p.as_ref().map(|_| "running".to_string())).unwrap_or_else(|| "stopped".to_string()),
-                    bridge: "error".to_string(),
-                    network: state.selected_ip.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-                    relay_url: state.relay_url.lock().ok().map(|s| s.clone()).unwrap_or_default(),
-                    pairing_payload: None,
-                    pairing_code: None,
-                    phone_connected: false,
-                });
-
-                let auto_restart = state.config.lock().ok().map(|c| c.auto_restart).unwrap_or(false);
-                if auto_restart {
-                    add_log(&ah_watch, "app", "info", "Auto-restarting bridge...");
-                    let _ = start_bridge(ah_watch.clone());
+        if let Some(status) = exited {
+            let intentional = state
+                .bridge_intentional
+                .lock()
+                .ok()
+                .map(|i| *i)
+                .unwrap_or(true);
+            if let Ok(mut guard) = state.bridge_process.lock() {
+                *guard = None;
+            }
+            if intentional {
+                if let Ok(mut i) = state.bridge_intentional.lock() {
+                    *i = false;
                 }
                 return;
             }
+            let code = status.code().unwrap_or(-1);
+            add_log(
+                &ah_watch,
+                "app",
+                "error",
+                &format!("Bridge crashed (exit code: {code})"),
+            );
+            let _ = ah_watch.emit(
+                "process-crashed",
+                serde_json::json!({
+                    "process": "bridge",
+                    "exit_code": code,
+                }),
+            );
+            let _ = ah_watch.emit(
+                "status-changed",
+                AppStatus {
+                    state: "error".to_string(),
+                    relay_mode: state
+                        .config
+                        .lock()
+                        .ok()
+                        .map(|c| c.relay_mode.clone())
+                        .unwrap_or_else(|| "local".to_string()),
+                    relay: state
+                        .relay_process
+                        .lock()
+                        .ok()
+                        .and_then(|p| p.as_ref().map(|_| "running".to_string()))
+                        .unwrap_or_else(|| "stopped".to_string()),
+                    bridge: "error".to_string(),
+                    network: state
+                        .selected_ip
+                        .lock()
+                        .ok()
+                        .map(|s| s.clone())
+                        .unwrap_or_default(),
+                    relay_url: state
+                        .relay_url
+                        .lock()
+                        .ok()
+                        .map(|s| s.clone())
+                        .unwrap_or_default(),
+                    pairing_payload: None,
+                    pairing_code: None,
+                    phone_connected: false,
+                },
+            );
+
+            let auto_restart = state
+                .config
+                .lock()
+                .ok()
+                .map(|c| c.auto_restart)
+                .unwrap_or(false);
+            if auto_restart {
+                add_log(&ah_watch, "app", "info", "Auto-restarting bridge...");
+                let _ = start_bridge(ah_watch.clone());
+            }
+            return;
         }
     });
 
@@ -1942,12 +1904,18 @@ fn start_bridge(app_handle: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 fn stop_bridge(app_handle: tauri::AppHandle) -> Result<String, String> {
     let state = app_handle.state::<AppState>();
-    if let Ok(mut i) = state.bridge_intentional.lock() { *i = true; }
+    if let Ok(mut i) = state.bridge_intentional.lock() {
+        *i = true;
+    }
     let mut guard = state.bridge_process.lock().map_err(|e| e.to_string())?;
     if let Some(ref mut child) = *guard {
         add_log(&app_handle, "app", "info", "Stopping bridge...");
-        child.kill().map_err(|e| format!("Failed to kill bridge: {e}"))?;
-        child.wait().map_err(|e| format!("Failed to wait bridge: {e}"))?;
+        child
+            .kill()
+            .map_err(|e| format!("Failed to kill bridge: {e}"))?;
+        child
+            .wait()
+            .map_err(|e| format!("Failed to wait bridge: {e}"))?;
         *guard = None;
         add_log(&app_handle, "app", "info", "Bridge stopped");
         Ok("Bridge stopped".to_string())
@@ -1976,7 +1944,12 @@ fn start_all(app_handle: tauri::AppHandle) -> Result<String, String> {
     add_log(&app_handle, "app", "info", "Starting all processes...");
 
     if is_remote {
-        add_log(&app_handle, "app", "info", "Remote mode: skipping local relay");
+        add_log(
+            &app_handle,
+            "app",
+            "info",
+            "Remote mode: skipping local relay",
+        );
         let remote_url = {
             let state = app_handle.state::<AppState>();
             let config = state.config.lock().map_err(|e| e.to_string())?;
@@ -2026,7 +1999,12 @@ fn set_relay_mode(app_handle: tauri::AppHandle, mode: String) -> Result<(), Stri
     let mut config = state.config.lock().map_err(|e| e.to_string())?;
     config.relay_mode = mode.clone();
     save_config(&config);
-    add_log(&app_handle, "app", "info", &format!("Relay mode set to: {mode}"));
+    add_log(
+        &app_handle,
+        "app",
+        "info",
+        &format!("Relay mode set to: {mode}"),
+    );
     Ok(())
 }
 
@@ -2087,7 +2065,11 @@ fn show_main_window(app_handle: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn show_pet_popup(app_handle: tauri::AppHandle) -> Result<(), String> {
     let state = app_handle.state::<AppState>();
-    let pairing_payload = state.pairing_payload.lock().map_err(|e| e.to_string())?.clone();
+    let pairing_payload = state
+        .pairing_payload
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
     if pairing_payload.is_none() {
         if let Some(w) = app_handle.get_webview_window("pet-popup") {
             let _ = w.hide();
@@ -2098,16 +2080,14 @@ fn show_pet_popup(app_handle: tauri::AppHandle) -> Result<(), String> {
     let pet_pos = app_handle
         .get_webview_window("pet")
         .and_then(|pet| pet.outer_position().ok());
-    let popup_x = pet_pos
-        .map(|pos| (pos.x - 90).max(0))
-        .unwrap_or(0);
-    let popup_y = pet_pos
-        .map(|pos| (pos.y - 222).max(0))
-        .unwrap_or(0);
+    let popup_x = pet_pos.map(|pos| (pos.x - 90).max(0)).unwrap_or(0);
+    let popup_y = pet_pos.map(|pos| (pos.y - 222).max(0)).unwrap_or(0);
 
     if let Some(w) = app_handle.get_webview_window("pet-popup") {
-        w.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(popup_x, popup_y)))
-            .map_err(|e| format!("popup position failed: {e}"))?;
+        w.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            popup_x, popup_y,
+        )))
+        .map_err(|e| format!("popup position failed: {e}"))?;
         w.show().map_err(|e| format!("popup show failed: {e}"))?;
         return Ok(());
     }
@@ -2145,7 +2125,9 @@ fn hide_pet_popup(app_handle: tauri::AppHandle) -> Result<(), String> {
 fn move_pet_window(app_handle: tauri::AppHandle, x: f64, y: f64) -> Result<(), String> {
     if let Some(window) = app_handle.get_webview_window("pet") {
         window
-            .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x as i32, y as i32)))
+            .set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+                x as i32, y as i32,
+            )))
             .map_err(|e| e.to_string())?;
         return Ok(());
     }
@@ -2404,14 +2386,24 @@ pub fn run() {
 
             match refresh_runtime_from_bundle(false) {
                 Ok(status) if status.runtime_current => {
-                    add_log(app.handle(), "app", "info", "Runtime bridge and relay are current");
+                    add_log(
+                        app.handle(),
+                        "app",
+                        "info",
+                        "Runtime bridge and relay are current",
+                    );
                 }
                 Ok(status) if status.refresh_available => {
                     add_log(app.handle(), "app", "warning", &status.message);
                 }
                 Ok(_) => {}
                 Err(error) => {
-                    add_log(app.handle(), "app", "error", &format!("Runtime refresh failed: {error}"));
+                    add_log(
+                        app.handle(),
+                        "app",
+                        "error",
+                        &format!("Runtime refresh failed: {error}"),
+                    );
                 }
             }
 
@@ -2434,8 +2426,10 @@ pub fn run() {
             }
 
             // Pet overlay window
-            let screen_width = app.primary_monitor()
-                .ok().flatten()
+            let screen_width = app
+                .primary_monitor()
+                .ok()
+                .flatten()
                 .map(|m| m.size().width as f64)
                 .unwrap_or(1920.0);
             let _pet = tauri::WebviewWindowBuilder::new(
@@ -2485,8 +2479,10 @@ pub fn run() {
             let show_qr = MenuItemBuilder::with_id("show_qr", "Show QR").build(app)?;
             let start = MenuItemBuilder::with_id("start", "Start All").build(app)?;
             let stop = MenuItemBuilder::with_id("stop", "Stop All").build(app)?;
-            let restart_bridge = MenuItemBuilder::with_id("restart_bridge", "Restart Bridge").build(app)?;
-            let restart_relay = MenuItemBuilder::with_id("restart_relay", "Restart Relay").build(app)?;
+            let restart_bridge =
+                MenuItemBuilder::with_id("restart_bridge", "Restart Bridge").build(app)?;
+            let restart_relay =
+                MenuItemBuilder::with_id("restart_relay", "Restart Relay").build(app)?;
             let sep1 = tauri::menu::PredefinedMenuItem::separator(app)?;
             let logs = MenuItemBuilder::with_id("open_logs", "Open Logs").build(app)?;
             let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
@@ -2566,7 +2562,8 @@ pub fn run() {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
-                    } = event {
+                    } = event
+                    {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
@@ -2622,6 +2619,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn temp_dir(name: &str) -> PathBuf {
         let nanos = std::time::SystemTime::now()
@@ -2649,29 +2647,47 @@ mod tests {
 
     fn create_bundle(root: &Path, bridge_hash: &str, relay_hash: &str) {
         write_file(&root.join("relay").join("server.js"), "relay");
-        write_file(&root.join("agnt-bridge").join("bin").join("agnt.js"), "bridge");
-        write_file(&root.join(BUNDLE_MANIFEST), &fixture_manifest(bridge_hash, relay_hash));
+        write_file(
+            &root.join("agnt-bridge").join("bin").join("agnt.js"),
+            "bridge",
+        );
+        write_file(
+            &root.join(BUNDLE_MANIFEST),
+            &fixture_manifest(bridge_hash, relay_hash),
+        );
     }
 
     #[test]
     fn relay_url_policy_accepts_lan_tailscale_and_secure_public() {
         assert_eq!(relay_url_policy("ws://192.168.1.5:9000/relay").0, "pass");
-        assert_eq!(relay_url_policy("ws://100.100.100.100:9000/relay").0, "pass");
-        assert_eq!(relay_url_policy("ws://macbook.tailnet.ts.net:9000/relay").0, "pass");
+        assert_eq!(
+            relay_url_policy("ws://100.100.100.100:9000/relay").0,
+            "pass"
+        );
+        assert_eq!(
+            relay_url_policy("ws://macbook.tailnet.ts.net:9000/relay").0,
+            "pass"
+        );
         assert_eq!(relay_url_policy("wss://relay.example.com/relay").0, "pass");
     }
 
     #[test]
     fn relay_url_policy_rejects_public_cleartext_and_credentials() {
         assert_eq!(relay_url_policy("ws://relay.example.com/relay").0, "fail");
-        assert_eq!(relay_url_policy("wss://user:pass@relay.example.com/relay").0, "fail");
+        assert_eq!(
+            relay_url_policy("wss://user:pass@relay.example.com/relay").0,
+            "fail"
+        );
     }
 
     #[test]
     fn bundle_manifests_match_when_hashes_and_versions_match() {
-        let a = serde_json::from_str::<BundleManifest>(&fixture_manifest("bridge-a", "relay-a")).unwrap();
-        let b = serde_json::from_str::<BundleManifest>(&fixture_manifest("bridge-a", "relay-a")).unwrap();
-        let c = serde_json::from_str::<BundleManifest>(&fixture_manifest("bridge-b", "relay-a")).unwrap();
+        let a = serde_json::from_str::<BundleManifest>(&fixture_manifest("bridge-a", "relay-a"))
+            .unwrap();
+        let b = serde_json::from_str::<BundleManifest>(&fixture_manifest("bridge-a", "relay-a"))
+            .unwrap();
+        let c = serde_json::from_str::<BundleManifest>(&fixture_manifest("bridge-b", "relay-a"))
+            .unwrap();
         assert!(bundle_manifests_match(&a, &b));
         assert!(!bundle_manifests_match(&a, &c));
     }
@@ -2686,7 +2702,11 @@ mod tests {
         copy_fixture_runtime_from_bundle(&bundle, &runtime).unwrap();
 
         assert!(runtime.join("relay").join("server.js").exists());
-        assert!(runtime.join("agnt-bridge").join("bin").join("agnt.js").exists());
+        assert!(runtime
+            .join("agnt-bridge")
+            .join("bin")
+            .join("agnt.js")
+            .exists());
         assert_eq!(
             read_bundle_manifest(&runtime).unwrap().bridge.hash,
             "bridge-a",
