@@ -24,6 +24,14 @@ struct AgntActivityConversation: Codable, Hashable, Identifiable {
     var detail: String
     var phase: AgntActivityConversationPhase
     var runningStartedAt: Date?
+
+    var threadURL: URL? {
+        var components = URLComponents()
+        components.scheme = "agnt"
+        components.host = "thread"
+        components.percentEncodedPath = "/" + (id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id)
+        return components.url
+    }
 }
 
 struct AgntActivityAttributes: ActivityAttributes {
@@ -37,6 +45,12 @@ struct AgntActivityAttributes: ActivityAttributes {
             runningConversations.isEmpty
                 && completedConversations.isEmpty
                 && failedConversations.isEmpty
+        }
+
+        var primaryThreadURL: URL? {
+            runningConversations.first?.threadURL
+                ?? failedConversations.first?.threadURL
+                ?? completedConversations.first?.threadURL
         }
     }
 

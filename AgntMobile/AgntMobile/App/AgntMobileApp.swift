@@ -30,6 +30,9 @@ struct AgntMobileApp: App {
                 .environment(petCompanionStatusStore)
                 .onOpenURL { url in
                     Task { @MainActor in
+                        if handleAppURL(url, codexService: codexService) {
+                            return
+                        }
                         guard CodexService.legacyGPTLoginCallbackEnabled else {
                             return
                         }
@@ -56,6 +59,29 @@ struct AgntMobileApp: App {
                         break
                     }
                 }
+        }
+    }
+
+    private func handleAppURL(_ url: URL, codexService: CodexService) -> Bool {
+        guard url.scheme == "agnt" else {
+            return false
+        }
+
+        switch url.host {
+        case "home":
+            return true
+        case "thread":
+            let threadId = url.path
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                .removingPercentEncoding?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !threadId.isEmpty else {
+                return true
+            }
+            codexService.handleNotificationOpen(threadId: threadId, turnId: nil)
+            return true
+        default:
+            return false
         }
     }
 }

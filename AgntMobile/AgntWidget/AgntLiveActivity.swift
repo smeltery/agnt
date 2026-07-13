@@ -14,7 +14,7 @@ struct AgntLiveActivity: Widget {
             AgntLiveActivityLockScreenView(state: context.state, isStale: context.isStale)
                 .activityBackgroundTint(Color.black.opacity(0.35))
                 .activitySystemActionForegroundColor(.primary)
-                .widgetURL(URL(string: "agnt://home"))
+                .widgetURL(context.state.primaryThreadURL ?? URL(string: "agnt://home"))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -54,7 +54,7 @@ struct AgntLiveActivity: Widget {
                     .padding(.vertical, 2)
             }
             .keylineTint(context.isStale ? .gray : .accentColor)
-            .widgetURL(URL(string: "agnt://home"))
+            .widgetURL(context.state.primaryThreadURL ?? URL(string: "agnt://home"))
         }
     }
 

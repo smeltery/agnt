@@ -20,6 +20,7 @@ on:
           - web
           - host
           - loc-budgets
+          - ios
           - android
           - links
   schedule:
@@ -174,6 +175,22 @@ jobs:
       - name: Check LOC budgets
         run: flox activate -d "$GITHUB_WORKSPACE" -- node scripts/check-loc-budgets.mjs
 
+  ios_preflight:
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    name: iOS preflight checks
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Flox
+        uses: ./.github/actions/setup-flox
+
+      - name: Test performance script usage
+        run: flox activate -d "$GITHUB_WORKSPACE" -- AgntMobile/scripts/test-performance-script-usage.sh
+
   android:
     needs: changes
     if: needs.changes.outputs.android == 'true'
@@ -226,6 +243,7 @@ jobs:
       - web
       - host
       - loc_budgets
+      - ios_preflight
       - android
       - links
     if: always()
@@ -243,6 +261,7 @@ jobs:
             "${{ needs.web.result }}" \
             "${{ needs.host.result }}" \
             "${{ needs.loc_budgets.result }}" \
+            "${{ needs.ios_preflight.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.links.result }}"
           do
