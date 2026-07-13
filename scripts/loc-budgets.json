@@ -9,7 +9,7 @@
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 2000,
       "agnt-host/src-tauri/src/lib.rs": 1825,
       "agnt-bridge/src/desktop/desktop-ipc-action-follower.js": 1425,
-      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 2075,
+      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 1925,
       "AgntMobile/AgntMobile/Features/Chat/TurnView.swift": 2075,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineView.swift": 2000,
       "AgntMobile/AgntMobile/App/ContentView.swift": 1850,

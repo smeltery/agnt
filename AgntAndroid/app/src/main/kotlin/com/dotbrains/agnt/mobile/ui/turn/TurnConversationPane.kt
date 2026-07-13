@@ -48,8 +48,6 @@ import com.dotbrains.agnt.mobile.core.error.AgentServiceError
 import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
-import com.dotbrains.agnt.mobile.core.model.CodexFileAttachment
-import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
@@ -61,8 +59,6 @@ import com.dotbrains.agnt.mobile.core.voice.BridgeVoiceRecorder
 import com.dotbrains.agnt.mobile.core.voice.VoiceDraftAppend
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
-import com.dotbrains.agnt.mobile.data.TurnAttachmentCodec
-import com.dotbrains.agnt.mobile.data.TurnFileAttachmentCodec
 import com.dotbrains.agnt.mobile.data.TurnWorktreePathRouting
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
@@ -79,10 +75,6 @@ import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachment
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachmentState
 import com.dotbrains.agnt.mobile.ui.turn.attachments.appendFileAttachmentsToDraft
-import com.dotbrains.agnt.mobile.ui.turn.attachments.toJpegByteArray
-import com.dotbrains.agnt.mobile.ui.turn.attachments.withFileAttachmentResult
-import com.dotbrains.agnt.mobile.ui.turn.attachments.withImageAttachmentResult
-import com.dotbrains.agnt.mobile.ui.turn.attachments.withLoadingAttachment
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.SkillAutocompleteSuggestion
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.buildComposerAutocompleteState
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.extractThreadFileAutocompleteCandidates
@@ -134,7 +126,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
-import java.util.UUID
 
 private const val MAX_COMPOSER_ATTACHMENTS = 4
 private const val MAX_NON_IMAGE_ATTACHMENT_BYTES = 256 * 1024
@@ -521,142 +512,27 @@ fun TurnConversationPane(
             }
         }
 
-    fun remainingAttachmentSlots(): Int = (MAX_COMPOSER_ATTACHMENTS - composerAttachments.size).coerceAtLeast(0)
-
-    fun appendLoadingAttachment(): String =
-        UUID.randomUUID().toString().also { attachmentId ->
-            composerAttachments = composerAttachments.withLoadingAttachment(attachmentId)
-        }
-
-    fun updateImageAttachmentResult(
-        attachmentId: String,
-        attachment: CodexImageAttachment?,
-    ) {
-        composerAttachments =
-            composerAttachments.withImageAttachmentResult(
-                attachmentId = attachmentId,
-                attachment = attachment,
-                failedMessage = attachmentLoadFailedMessage,
-            )
-        if (attachment == null) {
-            lastError = attachmentLoadFailedMessage
-        }
-    }
-
-    fun updateFileAttachmentResult(
-        attachmentId: String,
-        attachment: CodexFileAttachment?,
-        errorMessage: String?,
-    ) {
-        val resolvedErrorMessage = errorMessage ?: attachmentLoadFailedMessage
-        composerAttachments =
-            composerAttachments.withFileAttachmentResult(
-                attachmentId = attachmentId,
-                attachment = attachment,
-                failedMessage = resolvedErrorMessage,
-            )
-        if (attachment == null) {
-            lastError = resolvedErrorMessage
-        }
-    }
-
-    val photoPickerLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-            if (uris.isEmpty()) return@rememberLauncherForActivityResult
-            val remainingSlots = remainingAttachmentSlots()
-            if (remainingSlots <= 0) {
-                lastError = attachmentLimitMessage
-                return@rememberLauncherForActivityResult
-            }
-            val acceptedUris = uris.take(remainingSlots)
-            if (acceptedUris.size < uris.size) {
-                lastError = attachmentOverflowMessage
-            }
-            acceptedUris.forEach { uri ->
-                val attachmentId = appendLoadingAttachment()
-                scope.launch {
-                    val attachment =
-                        withContext(Dispatchers.IO) {
-                            TurnAttachmentCodec.makeAttachment(context, uri)
-                        }
-                    updateImageAttachmentResult(attachmentId, attachment)
-                }
-            }
-        }
-
-    val filePickerLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            if (uris.isEmpty()) return@rememberLauncherForActivityResult
-            val remainingSlots = remainingAttachmentSlots()
-            if (remainingSlots <= 0) {
-                lastError = attachmentLimitMessage
-                return@rememberLauncherForActivityResult
-            }
-            val acceptedUris = uris.take(remainingSlots)
-            if (acceptedUris.size < uris.size) {
-                lastError = attachmentOverflowMessage
-            }
-            acceptedUris.forEach { uri ->
-                val attachmentId = appendLoadingAttachment()
-                scope.launch {
-                    val contentType = context.contentResolver.getType(uri).orEmpty()
-                    if (contentType.startsWith("image/")) {
-                        val attachment =
-                            withContext(Dispatchers.IO) {
-                                TurnAttachmentCodec.makeAttachment(context, uri)
-                            }
-                        updateImageAttachmentResult(attachmentId, attachment)
-                        return@launch
-                    }
-                    val decoded =
-                        withContext(Dispatchers.IO) {
-                            TurnFileAttachmentCodec.makeAttachment(
-                                context = context,
-                                uri = uri,
-                                maxBytes = MAX_NON_IMAGE_ATTACHMENT_BYTES,
-                                maxTextChars = MAX_NON_IMAGE_ATTACHMENT_TEXT_CHARS,
-                                tooLargeMessage = { fileName, _ ->
-                                    "$fileName: $attachmentFileTooLargeMessage"
-                                },
-                                loadFailedMessage = { fileName ->
-                                    "$fileName: $attachmentLoadFailedMessage"
-                                },
-                            )
-                        }
-                    updateFileAttachmentResult(
-                        attachmentId = attachmentId,
-                        attachment = decoded.attachment,
-                        errorMessage = decoded.errorMessage,
-                    )
-                }
-            }
-        }
-
-    val cameraPreviewLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-            if (bitmap == null) return@rememberLauncherForActivityResult
-            if (remainingAttachmentSlots() <= 0) {
-                lastError = attachmentLimitMessage
-                return@rememberLauncherForActivityResult
-            }
-            val attachmentId = appendLoadingAttachment()
-            scope.launch {
-                val attachment =
-                    withContext(Dispatchers.IO) {
-                        TurnAttachmentCodec.makeAttachment(bitmap.toJpegByteArray() ?: return@withContext null)
-                    }
-                updateImageAttachmentResult(attachmentId, attachment)
-            }
-        }
-
-    val cameraPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                cameraPreviewLauncher.launch(null)
-            } else {
-                lastError = attachmentCameraPermissionDeniedMessage
-            }
-        }
+    val attachmentLaunchActions =
+        rememberTurnAttachmentLaunchActions(
+            context = context,
+            scope = scope,
+            attachments = composerAttachments,
+            updateAttachments = { transform ->
+                composerAttachments = transform(composerAttachments)
+            },
+            setLastError = { message -> lastError = message },
+            attachmentsAllowed = reviewTarget == null,
+            attachmentsBlockedMessage = reviewNoAttachmentsMessage,
+            maxAttachments = MAX_COMPOSER_ATTACHMENTS,
+            maxNonImageAttachmentBytes = MAX_NON_IMAGE_ATTACHMENT_BYTES,
+            maxNonImageAttachmentTextChars = MAX_NON_IMAGE_ATTACHMENT_TEXT_CHARS,
+            attachmentLimitMessage = attachmentLimitMessage,
+            attachmentOverflowMessage = attachmentOverflowMessage,
+            attachmentLoadFailedMessage = attachmentLoadFailedMessage,
+            attachmentFileTooLargeMessage = attachmentFileTooLargeMessage,
+            attachmentCameraUnavailableMessage = attachmentCameraUnavailableMessage,
+            attachmentCameraPermissionDeniedMessage = attachmentCameraPermissionDeniedMessage,
+        )
 
     val audioPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -1648,52 +1524,9 @@ fun TurnConversationPane(
                         clearReviewTarget()
                     }
                 },
-                onPickImages = {
-                    if (reviewTarget != null) {
-                        lastError = reviewNoAttachmentsMessage
-                        return@TurnComposerBar
-                    }
-                    if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
-                        lastError = attachmentLimitMessage
-                    } else {
-                        photoPickerLauncher.launch("image/*")
-                    }
-                },
-                onPickFiles = {
-                    if (reviewTarget != null) {
-                        lastError = reviewNoAttachmentsMessage
-                        return@TurnComposerBar
-                    }
-                    if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
-                        lastError = attachmentLimitMessage
-                    } else {
-                        filePickerLauncher.launch(arrayOf("*/*"))
-                    }
-                },
-                onTakePhoto = {
-                    if (reviewTarget != null) {
-                        lastError = reviewNoAttachmentsMessage
-                        return@TurnComposerBar
-                    }
-                    if (composerAttachments.size >= MAX_COMPOSER_ATTACHMENTS) {
-                        lastError = attachmentLimitMessage
-                        return@TurnComposerBar
-                    }
-                    val hasCamera =
-                        context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
-                    if (!hasCamera) {
-                        lastError = attachmentCameraUnavailableMessage
-                        return@TurnComposerBar
-                    }
-                    val hasPermission =
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                            PackageManager.PERMISSION_GRANTED
-                    if (hasPermission) {
-                        cameraPreviewLauncher.launch(null)
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                },
+                onPickImages = attachmentLaunchActions.pickImages,
+                onPickFiles = attachmentLaunchActions.pickFiles,
+                onTakePhoto = attachmentLaunchActions.takePhoto,
                 onSetPlanModeEnabled = { isPlanModeEnabled = it },
                 onSelectModel = { option ->
                     scope.launch { runCatching { repository.setSelectedModelId(option.id) } }
