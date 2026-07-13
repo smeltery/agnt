@@ -2,7 +2,7 @@
   "file_sizes": {
     "default_lines": 1200,
     "files": {
-      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 2500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 2175,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 2125,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 2325,
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+Incoming.swift": 2475,
