@@ -9,8 +9,6 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.CodexPlanState
 import com.dotbrains.agnt.mobile.core.model.CodexPlanStep
 import com.dotbrains.agnt.mobile.core.model.CodexSubagentAction
-import com.dotbrains.agnt.mobile.core.model.CodexSubagentRef
-import com.dotbrains.agnt.mobile.core.model.CodexSubagentState
 import com.dotbrains.agnt.mobile.core.persistence.CodexMessagePersistence
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,19 +25,8 @@ internal class MessageTimelineStore(
     initialMessages: Map<String, List<CodexMessage>>,
     private val saveMessages: (Map<String, List<CodexMessage>>) -> Unit,
 ) {
-    private data class SubagentIdentityEntry(
-        val threadId: String? = null,
-        val agentId: String? = null,
-        val nickname: String? = null,
-        val role: String? = null,
-    ) {
-        val hasMetadata: Boolean
-            get() = threadId != null || agentId != null || nickname != null || role != null
-    }
-
     private val mutex = Mutex()
-    private val subagentIdentityByThreadId = mutableMapOf<String, SubagentIdentityEntry>()
-    private val subagentIdentityByAgentId = mutableMapOf<String, SubagentIdentityEntry>()
+    private val subagentDirectory = MessageTimelineSubagentDirectory()
 
     private val _messagesByThread = MutableStateFlow<Map<String, List<CodexMessage>>>(emptyMap())
     val messagesByThread: StateFlow<Map<String, List<CodexMessage>>> = _messagesByThread.asStateFlow()
@@ -50,10 +37,10 @@ internal class MessageTimelineStore(
                 HistoryMessageMerge.normalize(messages)
             }
         CodexMessageOrderCounter.seedFrom(normalizedInitialMessages)
-        rebuildSubagentIdentityDirectory(normalizedInitialMessages.values.flatten())
+        subagentDirectory.rebuild(normalizedInitialMessages.values.flatten())
         _messagesByThread.value =
             normalizedInitialMessages.mapValues { (_, messages) ->
-                messages.map(::resolveSubagentMessageIdentities)
+                messages.map(subagentDirectory::resolveMessage)
             }
     }
 
@@ -81,7 +68,7 @@ internal class MessageTimelineStore(
     private fun publishResolvedMessages(map: MutableMap<String, List<CodexMessage>>) {
         publishMessages(
             map.mapValues { (_, messages) ->
-                messages.map(::resolveSubagentMessageIdentities)
+                messages.map(subagentDirectory::resolveMessage)
             },
         )
     }
@@ -94,11 +81,11 @@ internal class MessageTimelineStore(
         mutex.withLock {
             val map = _messagesByThread.value.toMutableMap()
             val existing = map[threadId].orEmpty()
-            rebuildSubagentIdentityDirectory(existing + incoming)
+            subagentDirectory.rebuild(existing + incoming)
             map[threadId] =
                 HistoryMessageMerge
                     .merge(existing, incoming)
-                    .map(::resolveSubagentMessageIdentities)
+                    .map(subagentDirectory::resolveMessage)
             publishMessages(map)
         }
     }
@@ -506,12 +493,12 @@ internal class MessageTimelineStore(
         mutex.withLock {
             val map = _messagesByThread.value.toMutableMap()
             val list = map[threadId].orEmpty().toMutableList()
-            val summaryRefs = subagentSummaryRefsForTurn(list, turnId)
+            val summaryRefs = subagentDirectory.summaryRefsForTurn(list, turnId)
             summaryRefs.forEach { ref ->
-                upsertSubagentIdentity(ref.threadId, ref.agentId, ref.nickname, ref.role)
+                subagentDirectory.upsert(ref.threadId, ref.agentId, ref.nickname, ref.role)
             }
-            val incomingAction = resolveSubagentActionIdentities(enrichSubagentAction(action, summaryRefs))
-            removeAssistantSubagentSummaries(list, turnId)
+            val incomingAction = subagentDirectory.resolveAction(subagentDirectory.enrichAction(action, summaryRefs))
+            subagentDirectory.removeAssistantSummaries(list, turnId)
             val idx =
                 list.indexOfLast { message ->
                     message.role == CodexMessageRole.system &&
@@ -529,7 +516,8 @@ internal class MessageTimelineStore(
 
             if (idx >= 0) {
                 val current = list[idx]
-                val mergedAction = resolveSubagentActionIdentities(mergeSubagentActions(current.subagentAction, incomingAction))
+                val mergedAction =
+                    subagentDirectory.resolveAction(subagentDirectory.mergeActions(current.subagentAction, incomingAction))
                 list[idx] =
                     current.copy(
                         text = mergedAction.summaryText,
@@ -663,7 +651,7 @@ internal class MessageTimelineStore(
 
             val map = _messagesByThread.value.toMutableMap()
             val list = map[threadId].orEmpty().toMutableList()
-            if (absorbAssistantSubagentSummary(list, resolvedTurnId, finalText)) {
+            if (subagentDirectory.absorbAssistantSummary(list, resolvedTurnId, finalText)) {
                 map[threadId] = list
                 publishMessages(map)
                 return@withLock
@@ -1036,324 +1024,6 @@ internal class MessageTimelineStore(
         if (incoming.length > existing.length && incoming.startsWith(existing)) return incoming
         if (existing.length > incoming.length && existing.startsWith(incoming)) return existing
         return incoming
-    }
-
-    private fun mergeSubagentActions(
-        existing: CodexSubagentAction?,
-        incoming: CodexSubagentAction,
-    ): CodexSubagentAction {
-        if (existing == null || existing.normalizedTool != incoming.normalizedTool) return incoming
-        val receiverThreadIds = linkedSetOf<String>()
-        receiverThreadIds.addAll(existing.receiverThreadIds)
-        receiverThreadIds.addAll(incoming.receiverThreadIds)
-
-        val receiverAgentsByThread = LinkedHashMap<String, CodexSubagentRef>()
-
-        fun addAgent(agent: CodexSubagentRef) {
-            val key = agent.threadId.trim()
-            if (key.isEmpty()) return
-            val current = receiverAgentsByThread[key]
-            receiverAgentsByThread[key] =
-                if (current == null) {
-                    agent
-                } else {
-                    current.copy(
-                        agentId = current.agentId ?: agent.agentId,
-                        nickname = current.nickname ?: agent.nickname,
-                        role = current.role ?: agent.role,
-                        model = current.model ?: agent.model,
-                        prompt = current.prompt ?: agent.prompt,
-                    )
-                }
-        }
-        existing.receiverAgents.forEach(::addAgent)
-        incoming.receiverAgents.forEach(::addAgent)
-
-        val agentStates = LinkedHashMap<String, CodexSubagentState>()
-        agentStates.putAll(existing.agentStates)
-        agentStates.putAll(incoming.agentStates)
-
-        return incoming.copy(
-            prompt = incoming.prompt ?: existing.prompt,
-            model = incoming.model ?: existing.model,
-            receiverThreadIds = receiverThreadIds.toList(),
-            receiverAgents = receiverAgentsByThread.values.toList(),
-            agentStates = agentStates,
-        )
-    }
-
-    private fun rebuildSubagentIdentityDirectory(messages: List<CodexMessage>) {
-        subagentIdentityByThreadId.clear()
-        subagentIdentityByAgentId.clear()
-        messages.forEach { message ->
-            message.subagentAction?.let(::ingestSubagentIdentity)
-            parseAssistantSubagentSummaryRefs(message.text).forEach { ref ->
-                upsertSubagentIdentity(
-                    threadId = ref.threadId,
-                    agentId = ref.agentId,
-                    nickname = ref.nickname,
-                    role = ref.role,
-                )
-            }
-        }
-    }
-
-    private fun ingestSubagentIdentity(action: CodexSubagentAction) {
-        action.agentRows.forEach { agent ->
-            upsertSubagentIdentity(
-                threadId = agent.threadId,
-                agentId = agent.agentId,
-                nickname = agent.nickname,
-                role = agent.role,
-            )
-        }
-        action.receiverAgents.forEach { agent ->
-            upsertSubagentIdentity(
-                threadId = agent.threadId,
-                agentId = agent.agentId,
-                nickname = agent.nickname,
-                role = agent.role,
-            )
-        }
-        action.agentStates.values.forEach { state ->
-            upsertSubagentIdentity(threadId = state.threadId, agentId = null, nickname = null, role = null)
-        }
-    }
-
-    private fun upsertSubagentIdentity(
-        threadId: String?,
-        agentId: String?,
-        nickname: String?,
-        role: String?,
-    ) {
-        val normalizedThreadId = normalizedSubagentIdentifier(threadId)
-        val normalizedAgentId = normalizedSubagentIdentifier(agentId)
-        val normalizedNickname = normalizedSubagentIdentifier(nickname)
-        val normalizedRole = normalizedSubagentIdentifier(role)
-        if (normalizedThreadId == null && normalizedAgentId == null && normalizedNickname == null && normalizedRole == null) {
-            return
-        }
-        val threadEntry = normalizedThreadId?.let { subagentIdentityByThreadId[it] }
-        val agentEntry = normalizedAgentId?.let { subagentIdentityByAgentId[it] }
-        val merged =
-            SubagentIdentityEntry(
-                threadId = normalizedThreadId ?: threadEntry?.threadId ?: agentEntry?.threadId,
-                agentId = normalizedAgentId ?: threadEntry?.agentId ?: agentEntry?.agentId,
-                nickname = normalizedNickname ?: threadEntry?.nickname ?: agentEntry?.nickname,
-                role = normalizedRole ?: threadEntry?.role ?: agentEntry?.role,
-            )
-        if (!merged.hasMetadata) return
-        normalizedThreadId?.let { subagentIdentityByThreadId[it] = merged }
-        normalizedAgentId?.let { subagentIdentityByAgentId[it] = merged }
-        merged.threadId?.let { tid ->
-            merged.agentId?.let { aid ->
-                subagentIdentityByThreadId[tid] = merged
-                subagentIdentityByAgentId[aid] = merged
-            }
-        }
-    }
-
-    private fun resolveSubagentMessageIdentities(message: CodexMessage): CodexMessage {
-        val action = message.subagentAction ?: return message
-        val resolvedAction = resolveSubagentActionIdentities(action)
-        return if (resolvedAction == action) message else message.copy(text = resolvedAction.summaryText, subagentAction = resolvedAction)
-    }
-
-    private fun resolveSubagentActionIdentities(action: CodexSubagentAction): CodexSubagentAction {
-        ingestSubagentIdentity(action)
-        val resolvedAgents =
-            action.agentRows.map { agent ->
-                val identity = resolvedSubagentIdentity(agent.threadId, agent.agentId)
-                CodexSubagentRef(
-                    threadId = identity?.threadId ?: agent.threadId,
-                    agentId = identity?.agentId ?: agent.agentId,
-                    nickname = identity?.nickname ?: agent.nickname,
-                    role = identity?.role ?: agent.role,
-                    model = agent.model,
-                    prompt = agent.prompt,
-                )
-            }
-        return action.copy(
-            receiverThreadIds = (action.receiverThreadIds + resolvedAgents.map { it.threadId }).distinct(),
-            receiverAgents = resolvedAgents,
-        )
-    }
-
-    private fun resolvedSubagentIdentity(
-        threadId: String?,
-        agentId: String?,
-    ): SubagentIdentityEntry? {
-        val threadEntry = normalizedSubagentIdentifier(threadId)?.let { subagentIdentityByThreadId[it] }
-        val agentEntry = normalizedSubagentIdentifier(agentId)?.let { subagentIdentityByAgentId[it] }
-        val merged =
-            SubagentIdentityEntry(
-                threadId = threadEntry?.threadId ?: agentEntry?.threadId,
-                agentId = threadEntry?.agentId ?: agentEntry?.agentId,
-                nickname = threadEntry?.nickname ?: agentEntry?.nickname,
-                role = threadEntry?.role ?: agentEntry?.role,
-            )
-        return merged.takeIf { it.hasMetadata }
-    }
-
-    private fun normalizedSubagentIdentifier(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
-
-    private fun absorbAssistantSubagentSummary(
-        list: MutableList<CodexMessage>,
-        turnId: String?,
-        text: String,
-    ): Boolean {
-        val refs = parseAssistantSubagentSummaryRefs(text)
-        if (refs.isEmpty()) return false
-        refs.forEach { ref ->
-            upsertSubagentIdentity(
-                threadId = ref.threadId,
-                agentId = ref.agentId,
-                nickname = ref.nickname,
-                role = ref.role,
-            )
-        }
-        var changed = false
-        for (index in list.indices) {
-            val current = list[index]
-            val action = current.subagentAction ?: continue
-            val sameTurn = turnId != null && current.turnId == turnId
-            val matchesThread =
-                action.agentRows.any { agent -> refs.any { it.threadId == agent.threadId || it.agentId == agent.agentId } }
-            if (!sameTurn && !matchesThread) continue
-            val enriched = resolveSubagentActionIdentities(enrichSubagentAction(action, refs))
-            list[index] =
-                current.copy(
-                    text = enriched.summaryText,
-                    subagentAction = enriched,
-                )
-            changed = true
-        }
-        return changed
-    }
-
-    private fun subagentSummaryRefsForTurn(
-        list: List<CodexMessage>,
-        turnId: String?,
-    ): List<CodexSubagentRef> {
-        if (turnId.isNullOrBlank()) return emptyList()
-        return list
-            .asReversed()
-            .firstOrNull { message ->
-                message.role == CodexMessageRole.assistant &&
-                    message.kind == CodexMessageKind.chat &&
-                    message.turnId == turnId &&
-                    parseAssistantSubagentSummaryRefs(message.text).isNotEmpty()
-            }?.let { parseAssistantSubagentSummaryRefs(it.text) }
-            .orEmpty()
-    }
-
-    private fun removeAssistantSubagentSummaries(
-        list: MutableList<CodexMessage>,
-        turnId: String?,
-    ) {
-        if (turnId.isNullOrBlank()) return
-        list.removeAll { message ->
-            message.role == CodexMessageRole.assistant &&
-                message.kind == CodexMessageKind.chat &&
-                message.turnId == turnId &&
-                parseAssistantSubagentSummaryRefs(message.text).isNotEmpty()
-        }
-    }
-
-    private fun latestSubagentActionIndexForTurn(
-        list: List<CodexMessage>,
-        turnId: String?,
-    ): Int {
-        if (turnId.isNullOrBlank()) return -1
-        return list.indexOfLast { message ->
-            message.role == CodexMessageRole.system &&
-                message.kind == CodexMessageKind.subagentAction &&
-                message.turnId == turnId &&
-                message.subagentAction != null
-        }
-    }
-
-    private fun enrichSubagentAction(
-        action: CodexSubagentAction,
-        summaryRefs: List<CodexSubagentRef>,
-    ): CodexSubagentAction {
-        if (summaryRefs.isEmpty()) return action
-        val refsByThread = summaryRefs.associateBy { it.threadId }
-        val enrichedAgents =
-            action.agentRows.map { row ->
-                val summary = refsByThread[row.threadId]
-                if (summary == null) {
-                    CodexSubagentRef(
-                        threadId = row.threadId,
-                        agentId = row.agentId,
-                        nickname = row.nickname,
-                        role = row.role,
-                        model = row.model,
-                        prompt = row.prompt,
-                    )
-                } else {
-                    CodexSubagentRef(
-                        threadId = row.threadId,
-                        agentId = row.agentId,
-                        nickname = row.nickname ?: summary.nickname,
-                        role = row.role ?: summary.role,
-                        model = row.model,
-                        prompt = row.prompt,
-                    )
-                }
-            }
-        val existingThreads = enrichedAgents.mapTo(linkedSetOf()) { it.threadId }
-        val extraRefs = summaryRefs.filterNot { it.threadId in existingThreads }
-        return action.copy(
-            receiverThreadIds = (action.receiverThreadIds + summaryRefs.map { it.threadId }).distinct(),
-            receiverAgents = enrichedAgents + extraRefs,
-        )
-    }
-
-    private fun parseAssistantSubagentSummaryRefs(text: String): List<CodexSubagentRef> {
-        if (!text.contains("subagent", ignoreCase = true)) return emptyList()
-        val refs = ArrayList<CodexSubagentRef>()
-        val inlinePairRegex =
-            Regex("""[-*]?\s*`?([A-Za-z][A-Za-z0-9_-]{1,40})`?\s*\(\s*`?([0-9a-fA-F]{8}-[0-9a-fA-F-]{12,})`?\s*\)""")
-        inlinePairRegex.findAll(text.replace('\n', ' ')).forEach { match ->
-            refs +=
-                CodexSubagentRef(
-                    threadId = match.groupValues[2].trim(),
-                    nickname = match.groupValues[1].trim(),
-                )
-        }
-        val lines = text.lines()
-        var pendingName: String? = null
-        val bulletRegex = Regex("""^\s*[-*]\s*`?([^`(\n]+?)`?\s*$""")
-        val inlineRegex = Regex("""^\s*[-*]\s*`?([^`(\n]+?)`?\s*\(?`?([0-9a-fA-F]{8}-[0-9a-fA-F-]{12,})`?\)?\s*$""")
-        val idRegex = Regex("""`?([0-9a-fA-F]{8}-[0-9a-fA-F-]{12,})`?""")
-        for (line in lines) {
-            val inline = inlineRegex.find(line)
-            if (inline != null) {
-                val name = inline.groupValues[1].trim().takeIf { it.isNotEmpty() }
-                val threadId = inline.groupValues[2].trim()
-                if (name != null) refs += CodexSubagentRef(threadId = threadId, nickname = name)
-                pendingName = null
-                continue
-            }
-            val bullet = bulletRegex.find(line)
-            if (bullet != null) {
-                pendingName = bullet.groupValues[1].trim().takeIf { it.isNotEmpty() }
-                continue
-            }
-            val name = pendingName
-            val id =
-                idRegex
-                    .find(line)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?.trim()
-            if (name != null && !id.isNullOrBlank()) {
-                refs += CodexSubagentRef(threadId = id, nickname = name)
-                pendingName = null
-            }
-        }
-        return refs.distinctBy { it.threadId }
     }
 
     private fun matchesCompletedMessageCandidate(
