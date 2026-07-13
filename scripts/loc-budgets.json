@@ -11,7 +11,7 @@
       "AgntMobile/AgntMobileTests/CodexServiceIncomingCommandExecutionTests.swift": 1800,
       "AgntMobile/AgntMobileTests/CodexServiceIncomingRunIndicatorTests.swift": 1800,
       "agnt-bridge/src/desktop/desktop-ipc-action-follower.js": 1900,
-      "agnt-bridge/test/desktop/rollout-live-mirror.test.js": 1850,
+      "agnt-bridge/test/desktop/rollout-live-mirror.test.js": 1700,
       "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 2075,
       "AgntMobile/AgntMobile/Features/Chat/TurnView.swift": 2075,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineView.swift": 2000,
