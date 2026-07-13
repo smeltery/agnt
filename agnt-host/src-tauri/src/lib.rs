@@ -1,8 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::{BufRead, BufReader};
-use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -21,6 +19,7 @@ mod app_types;
 mod diagnostics;
 mod host_config;
 mod network;
+mod process_helpers;
 mod provider_bridge;
 mod runtime_bundle;
 
@@ -32,15 +31,16 @@ use host_config::{
 };
 use network::detect_network_interfaces;
 pub use network::NetworkInterface;
+use process_helpers::{
+    ensure_deps, find_available_port, get_repo_root, hide_console, is_port_available,
+    pipe_stderr_to_logs, pipe_stdout_to_logs, wait_for_port,
+};
 #[cfg(test)]
 use runtime_bundle::{
     bundle_manifests_match, copy_fixture_runtime_from_bundle, read_bundle_manifest, BundleManifest,
     BUNDLE_MANIFEST,
 };
-use runtime_bundle::{
-    bundled_root_from_exe, refresh_runtime_from_bundle, runtime_root, seed_runtime_from_bundle,
-    RuntimeBundleStatus,
-};
+use runtime_bundle::{refresh_runtime_from_bundle, RuntimeBundleStatus};
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -142,47 +142,6 @@ fn emit_current_status(app_handle: &tauri::AppHandle) {
     if let Ok(status) = current_app_status(app_handle) {
         let _ = app_handle.emit("status-changed", status);
     }
-}
-
-fn get_repo_root() -> PathBuf {
-    // Bundled production mode: copy to writable app data dir
-    if let Some(bundled_root) = bundled_root_from_exe() {
-        let runtime = runtime_root();
-        seed_runtime_from_bundle(&bundled_root, &runtime);
-        return runtime;
-    }
-
-    // Dev mode: walk up from cwd
-    let cwd = match std::env::current_dir() {
-        Ok(p) => p,
-        Err(_) => return PathBuf::from("."),
-    };
-
-    let mut current = cwd.clone();
-    for _ in 0..5 {
-        if current.join("relay").join("server.js").exists()
-            && current
-                .join("agnt-bridge")
-                .join("bin")
-                .join("agnt.js")
-                .exists()
-        {
-            return current;
-        }
-        if let Some(parent) = current.parent() {
-            current = parent.to_path_buf();
-        } else {
-            break;
-        }
-    }
-
-    current = cwd.clone();
-    for _ in 0..2 {
-        if let Some(parent) = current.parent() {
-            current = parent.to_path_buf();
-        }
-    }
-    current
 }
 
 fn add_log(app_handle: &tauri::AppHandle, source: &str, level: &str, message: &str) {
@@ -312,147 +271,6 @@ fn show_notification(title: &str, body: &str) {
             ])
             .spawn();
     }
-}
-
-fn hide_console(cmd: &mut Command) {
-    #[cfg(not(target_os = "windows"))]
-    let _ = cmd;
-
-    #[cfg(target_os = "windows")]
-    {
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-}
-
-fn ensure_deps(dir: &std::path::Path, app_handle: &tauri::AppHandle) -> bool {
-    let node_modules = dir.join("node_modules");
-    let package_json = dir.join("package.json");
-
-    if !package_json.exists() {
-        return true;
-    }
-
-    if node_modules.exists() {
-        return true;
-    }
-
-    add_log(
-        app_handle,
-        "app",
-        "info",
-        &format!("Installing dependencies in {}...", dir.display()),
-    );
-
-    let output = if cfg!(windows) {
-        let cmd = format!(
-            "cd /d {} && npm install --no-audit --no-fund --silent",
-            dir.display()
-        );
-        let mut c = Command::new("cmd");
-        c.args(["/C", &cmd])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        hide_console(&mut c);
-        c.output()
-    } else {
-        Command::new("npm")
-            .args(["install", "--no-audit", "--no-fund", "--silent"])
-            .current_dir(dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-    };
-
-    match output {
-        Ok(out) if out.status.success() => {
-            add_log(
-                app_handle,
-                "app",
-                "info",
-                &format!("Dependencies installed in {}", dir.display()),
-            );
-            true
-        }
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-            add_log(
-                app_handle,
-                "app",
-                "error",
-                &format!("npm install failed: {}{}", stderr, stdout),
-            );
-            false
-        }
-        Err(e) => {
-            add_log(
-                app_handle,
-                "app",
-                "error",
-                &format!("Failed to run npm install: {}", e),
-            );
-            false
-        }
-    }
-}
-
-// Removed find_npm — now unused
-
-pub(crate) fn is_port_available(port: u16) -> bool {
-    TcpListener::bind(("127.0.0.1", port)).is_ok()
-}
-
-pub(crate) fn find_available_port(start: u16) -> u16 {
-    (start..start + 100)
-        .find(|&p| is_port_available(p))
-        .unwrap_or(9000)
-}
-
-fn wait_for_port(port: u16, timeout_secs: u32) -> bool {
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    for _ in 0..(timeout_secs * 10) {
-        if TcpStream::connect_timeout(&addr, Duration::from_millis(100)).is_ok() {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    }
-    false
-}
-
-// ─── Process piping ─────────────────────────────────────────
-
-fn pipe_stdout_to_logs(
-    stdout: std::process::ChildStdout,
-    app_handle: tauri::AppHandle,
-    source: String,
-) {
-    std::thread::spawn(move || {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(text) = line {
-                if !text.trim().is_empty() {
-                    add_log(&app_handle, &source, "info", &text);
-                }
-            }
-        }
-    });
-}
-
-fn pipe_stderr_to_logs(
-    stderr: std::process::ChildStderr,
-    app_handle: tauri::AppHandle,
-    source: String,
-) {
-    std::thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(text) = line {
-                if !text.trim().is_empty() {
-                    add_log(&app_handle, &source, "error", &text);
-                }
-            }
-        }
-    });
 }
 
 // ─── Tauri commands ─────────────────────────────────────────
@@ -1854,7 +1672,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
+    use crate::diagnostics::relay_url_policy;
+    use std::path::{Path, PathBuf};
 
     fn temp_dir(name: &str) -> PathBuf {
         let nanos = std::time::SystemTime::now()
