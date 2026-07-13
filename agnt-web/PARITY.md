@@ -34,7 +34,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Incoming` | ✅ | 2 (item/agentMessage/delta, item/reasoning/textDelta, item/*/outputDelta, item/started, item/completed, turn lifecycle, thread/tokenUsage/updated) |
 | `IncomingAssistant` | ✅ | 2 |
 | `IncomingPlanMode` | ✅ | 3 (turn/plan/updated, item/plan/delta, presentation transitions) |
-| `IncomingSupport` | ✅ | 3 + 9 (context-window + approvals + system/notice + thread/status/changed + turn/diff/updated) |
+| `IncomingSupport` | ✅ | 3 + 9 + desktop mirror (context-window + approvals + system/notice + thread/status/changed + turn/diff/updated + turnless `codex/event/agent_message` completions) |
 | `ThreadsTurns` | ✅ | 2 + 4 + 9 (thread/list, turns/list, turn/start/interrupt, fork, name/set, archive, unarchive, generateTitle, contextWindow/read) |
 | `ThreadHistoryPagination` | ✅ | 2 |
 | `ThreadFork` + `ThreadForkCompatibility` | ✅ | 4 (no per-target-project routing yet) |

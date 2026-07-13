@@ -62,6 +62,20 @@ describe("turn-reducer assistant streaming", () => {
     expect(state.messages[0].isStreaming).toBe(false);
   });
 
+  it("renders turnless desktop mirror agent_message completions", () => {
+    let state = emptyThreadState();
+    state = applyItemCompleted(state, {
+      threadId: "t1",
+      type: "agentmessage",
+      text: "Mirrored from Codex Desktop.",
+    });
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0].role).toBe("assistant");
+    expect(state.messages[0].text).toBe("Mirrored from Codex Desktop.");
+    expect(state.messages[0].turnId).toBeUndefined();
+    expect(state.messages[0].isStreaming).toBe(false);
+  });
+
   it("absorbs a block-replay item/completed that concatenates prior streamed rows", () => {
     let state = emptyThreadState();
     state = applyTurnStarted(state, { threadId: "t1", turnId: "u1" });

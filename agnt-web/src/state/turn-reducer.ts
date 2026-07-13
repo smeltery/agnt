@@ -308,8 +308,21 @@ function findLateReplayTarget(messages: CodexMessage[], event: AgentDeltaEvent):
 // ─── completeAssistantMessage ──────────────────────────────────────────────────
 
 function completeAssistantMessage(state: ThreadReducerState, event: ItemCompletedEvent): ThreadReducerState {
-  if (!event.turnId) return state;
   const text = (event.text ?? "").trim();
+  if (!event.turnId) {
+    if (!text) return state;
+    return appendOrUpdate(state, (messages) => [
+      ...messages,
+      createMessage({
+        threadId: event.threadId,
+        role: "assistant",
+        kind: "chat",
+        text,
+        itemId: event.itemId,
+        assistantPhase: event.assistantPhase,
+      }),
+    ]);
+  }
   if (!text) {
     // Nothing to set, but still close the streaming row.
     return closeStreamingAssistantRow(state, event);

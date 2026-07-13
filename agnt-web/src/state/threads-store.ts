@@ -734,6 +734,11 @@ function registerNotificationHandlers(
       schedulePersist(event.threadId, get);
     })
   );
+  on(connection, "codex/event/agent_message", (params) => withTurnEvent(params, (event) => {
+    const text = readString(params, "message", "text") ?? "";
+    if (text) mutateReducer(event.threadId, set, get, (s) => applyItemCompleted(s, { ...event, type: "agentmessage", text, assistantPhase: readString(params, "phase") }));
+    if (text) schedulePersist(event.threadId, get);
+  }));
   on(connection, "item/reasoning/textDelta", (params) =>
     withTurnEvent(params, (event) => {
       const delta = readString(params, "delta", "textDelta") ?? "";
