@@ -3,28 +3,21 @@ package com.dotbrains.agnt.mobile.ui.shell
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -43,7 +36,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.toClipEntry
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -57,13 +49,11 @@ import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.GitDiffTotals
 import com.dotbrains.agnt.mobile.core.model.GitRepoSyncResult
 import com.dotbrains.agnt.mobile.core.model.GitWorktreeChangeTransferMode
-import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.TurnGitActionKind
 import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightOperation
 import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightPolicy
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlert
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertAction
-import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertButtonRole
 import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutAction
 import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutPublisher
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnAggregator
@@ -254,7 +244,7 @@ fun MainShell(
     val isWorktreeProject = activeThread?.isManagedWorktreeProject == true
     LaunchedEffect(repoStatusSnapshot?.state, gitCwd, showGitControls) {
         val needsInit = repoStatusSnapshot?.state in setOf("not_initialized", "missing_local_repo")
-        if (showGitControls && gitCwd != null && needsInit) {
+        if (showGitControls && needsInit) {
             showGitInitPrompt = true
         } else {
             showGitInitPrompt = false
@@ -1132,36 +1122,16 @@ fun MainShell(
     }
 
     if (showPathDialog) {
-        val fullPath = threadPathFull
-        if (fullPath != null) {
-            AlertDialog(
-                onDismissRequest = { showPathDialog = false },
-                title = { Text(stringResource(R.string.turn_thread_path_dialog_title)) },
-                text = {
-                    SelectionContainer {
-                        Text(
-                            text = fullPath,
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        threadPathFull?.let { fullPath ->
+            ThreadPathDialog(
+                fullPath = fullPath,
+                onDismiss = { showPathDialog = false },
+                onCopy = {
+                    scope.launch {
+                        clipboard.setClipEntry(
+                            ClipData.newPlainText("thread-path", fullPath).toClipEntry(),
                         )
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                clipboard.setClipEntry(
-                                    ClipData.newPlainText("thread-path", fullPath).toClipEntry(),
-                                )
-                                showPathDialog = false
-                            }
-                        },
-                    ) {
-                        Text(stringResource(R.string.turn_thread_path_copy))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showPathDialog = false }) {
-                        Text(stringResource(android.R.string.cancel))
+                        showPathDialog = false
                     }
                 },
             )
@@ -1200,66 +1170,24 @@ fun MainShell(
     )
 
     if (showGitInitPrompt) {
-        AlertDialog(
-            onDismissRequest = {
+        GitInitPromptDialog(
+            isBusy = gitActionBusy,
+            error = gitInitError,
+            onInitialize = { initializeRepositoryForCurrentThread() },
+            onDismiss = {
                 if (!gitActionBusy) {
                     showGitInitPrompt = false
                     gitInitError = null
-                }
-            },
-            title = { Text(stringResource(R.string.git_init_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.git_init_message))
-                    gitInitError?.let { err ->
-                        Text(
-                            text = err,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { initializeRepositoryForCurrentThread() },
-                    enabled = !gitActionBusy,
-                ) {
-                    Text(
-                        text =
-                            if (gitActionBusy) {
-                                stringResource(R.string.git_init_initializing)
-                            } else {
-                                stringResource(R.string.git_init_initialize)
-                            },
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        if (!gitActionBusy) {
-                            showGitInitPrompt = false
-                            gitInitError = null
-                        }
-                    },
-                    enabled = !gitActionBusy,
-                ) {
-                    Text(stringResource(android.R.string.cancel))
                 }
             },
         )
     }
 
     if (showNothingToCommit) {
-        AlertDialog(
-            onDismissRequest = { showNothingToCommit = false },
-            title = { Text(stringResource(R.string.git_action_section_write)) },
-            text = { Text(stringResource(R.string.git_nothing_to_commit)) },
-            confirmButton = {
-                TextButton(onClick = { showNothingToCommit = false }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
+        SimpleMessageDialog(
+            title = stringResource(R.string.git_action_section_write),
+            message = stringResource(R.string.git_nothing_to_commit),
+            onDismiss = { showNothingToCommit = false },
         )
     }
 
@@ -1269,167 +1197,55 @@ fun MainShell(
             pendingGitOperation = null
         }
 
-        AlertDialog(
-            onDismissRequest = { dismissGitAlert() },
-            title = { Text(alert.title) },
-            text = { Text(alert.message) },
-            confirmButton = {
-                Column {
-                    alert.buttons
-                        .filter { it.role != TurnGitSyncAlertButtonRole.cancel }
-                        .forEach { button ->
-                            TextButton(
-                                onClick = {
-                                    when (button.action) {
-                                        TurnGitSyncAlertAction.dismissOnly -> dismissGitAlert()
-                                        TurnGitSyncAlertAction.pullRebase -> pullRebaseForPendingGitOperation()
-                                        TurnGitSyncAlertAction.continuePendingGitOperation,
-                                        TurnGitSyncAlertAction.continueGitBranchOperation,
-                                        -> continuePendingGitOperation()
-                                        TurnGitSyncAlertAction.commitAndContinuePendingGitOperation,
-                                        TurnGitSyncAlertAction.commitAndContinueGitBranchOperation,
-                                        -> continuePendingGitOperation(commitFirst = true)
-                                        TurnGitSyncAlertAction.discardRuntimeChanges ->
-                                            discardRuntimeChangesForPendingGitOperation()
-                                    }
-                                },
-                            ) {
-                                Text(
-                                    text = button.title,
-                                    color =
-                                        if (button.role == TurnGitSyncAlertButtonRole.destructive) {
-                                            MaterialTheme.colorScheme.error
-                                        } else {
-                                            MaterialTheme.colorScheme.primary
-                                        },
-                                )
-                            }
-                        }
-                    if (alert.buttons.none { it.role != TurnGitSyncAlertButtonRole.cancel }) {
-                        TextButton(onClick = { dismissGitAlert() }) {
-                            Text(stringResource(android.R.string.ok))
-                        }
-                    }
-                }
-            },
-            dismissButton = {
-                val cancel = alert.buttons.firstOrNull { it.role == TurnGitSyncAlertButtonRole.cancel }
-                if (cancel != null && alert.buttons.size > 1) {
-                    TextButton(onClick = { dismissGitAlert() }) {
-                        Text(cancel.title)
-                    }
+        GitSyncAlertDialog(
+            alert = alert,
+            onDismiss = { dismissGitAlert() },
+            onAction = { action ->
+                when (action) {
+                    TurnGitSyncAlertAction.dismissOnly -> dismissGitAlert()
+                    TurnGitSyncAlertAction.pullRebase -> pullRebaseForPendingGitOperation()
+                    TurnGitSyncAlertAction.continuePendingGitOperation,
+                    TurnGitSyncAlertAction.continueGitBranchOperation,
+                    -> continuePendingGitOperation()
+                    TurnGitSyncAlertAction.commitAndContinuePendingGitOperation,
+                    TurnGitSyncAlertAction.commitAndContinueGitBranchOperation,
+                    -> continuePendingGitOperation(commitFirst = true)
+                    TurnGitSyncAlertAction.discardRuntimeChanges ->
+                        discardRuntimeChangesForPendingGitOperation()
                 }
             },
         )
     }
 
     gitActionError?.let { err ->
-        AlertDialog(
-            onDismissRequest = { gitActionError = null },
-            title = { Text(stringResource(R.string.git_error_title)) },
-            text = { Text(err) },
-            confirmButton = {
-                TextButton(onClick = { gitActionError = null }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
+        SimpleMessageDialog(
+            title = stringResource(R.string.git_error_title),
+            message = err,
+            onDismiss = { gitActionError = null },
         )
     }
 
     if (desktopHandoffError != null) {
-        AlertDialog(
-            onDismissRequest = { desktopHandoffError = null },
-            title = { Text(stringResource(R.string.turn_open_desktop_error_title)) },
-            text = { Text(desktopHandoffError ?: "") },
-            confirmButton = {
-                TextButton(onClick = { desktopHandoffError = null }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
+        SimpleMessageDialog(
+            title = stringResource(R.string.turn_open_desktop_error_title),
+            message = desktopHandoffError.orEmpty(),
+            onDismiss = { desktopHandoffError = null },
         )
     }
 
     if (worktreeHandoffError != null) {
-        AlertDialog(
-            onDismissRequest = { worktreeHandoffError = null },
-            title = { Text("Worktree handoff failed") },
-            text = { Text(worktreeHandoffError ?: "") },
-            confirmButton = {
-                TextButton(onClick = { worktreeHandoffError = null }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
+        SimpleMessageDialog(
+            title = "Worktree handoff failed",
+            message = worktreeHandoffError.orEmpty(),
+            onDismiss = { worktreeHandoffError = null },
         )
     }
 
     pendingApprovalRequest?.let { request ->
-        val supportsSession = PendingRequestPresentation.supportsAcceptForSession(request.method)
-
-        fun resolve(decision: PendingApprovalDecision) {
-            scope.launch { runCatching { repository.resolvePendingApproval(request.id, decision) } }
-        }
-        AlertDialog(
-            onDismissRequest = { resolve(PendingApprovalDecision.Decline) },
-            title = { Text(stringResource(R.string.approval_dialog_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val cmdLine =
-                        request.command
-                            ?.trim()
-                            ?.takeIf { it.isNotEmpty() }
-                            ?.let { c -> stringResource(R.string.approval_command_line, c) }
-                    val message =
-                        PendingRequestPresentation.approvalMessageOrNull(
-                            request.reason,
-                            cmdLine,
-                        )
-                    Text(
-                        text = message ?: stringResource(R.string.approval_default_body),
-                    )
-                    Text(
-                        text = stringResource(PendingRequestPresentation.approvalKindTitleRes(request.method)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-            confirmButton = {
-                if (supportsSession) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        TextButton(
-                            onClick = { resolve(PendingApprovalDecision.Accept) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.approval_approve))
-                        }
-                        TextButton(
-                            onClick = { resolve(PendingApprovalDecision.AcceptForSession) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.approval_approve_for_session))
-                        }
-                        TextButton(
-                            onClick = { resolve(PendingApprovalDecision.Decline) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.approval_decline))
-                        }
-                    }
-                } else {
-                    TextButton(onClick = { resolve(PendingApprovalDecision.Accept) }) {
-                        Text(stringResource(R.string.approval_approve))
-                    }
-                }
-            },
-            dismissButton = {
-                if (!supportsSession) {
-                    TextButton(onClick = { resolve(PendingApprovalDecision.Decline) }) {
-                        Text(stringResource(R.string.approval_decline))
-                    }
-                }
+        PendingApprovalDialog(
+            request = request,
+            onResolve = { decision ->
+                scope.launch { runCatching { repository.resolvePendingApproval(request.id, decision) } }
             },
         )
     }
