@@ -6,7 +6,7 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 2125,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 2110,
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+Incoming.swift": 2025,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 2250,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 2000,
       "agnt-host/src-tauri/src/lib.rs": 2625,
       "AgntMobile/AgntMobileTests/CodexServiceIncomingCommandExecutionTests.swift": 2700,
       "AgntMobile/AgntMobileTests/CodexServiceIncomingRunIndicatorTests.swift": 2700,
