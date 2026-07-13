@@ -11,7 +11,10 @@ const path = require("path");
 const { startBridge } = require("../bridge/bridge");
 const { readBridgeConfig } = require("../bridge/bridge-config");
 const { printQR } = require("../transport/qr");
-const { resetBridgeDeviceState } = require("../transport/secure-device-state");
+const {
+  readBridgeDeviceState,
+  resetBridgeDeviceState,
+} = require("../transport/secure-device-state");
 const {
   clearBridgeStatus,
   clearPairingSession,
@@ -27,7 +30,11 @@ const {
   writeDaemonConfig,
   writePairingSession,
 } = require("../daemon-state");
-const { mergeBridgeStatusForDaemon } = require("./macos-launch-agent");
+const {
+  buildTrustedDeviceSummary,
+  formatDeviceKind,
+  mergeBridgeStatusForDaemon,
+} = require("./macos-launch-agent");
 
 const SERVICE_LABEL = "com.dotbrains.agnt.bridge";
 const SERVICE_UNIT_NAME = `${SERVICE_LABEL}.service`;
@@ -223,6 +230,7 @@ function getLinuxBridgeServiceStatus({
     daemonConfig: readDaemonConfig({ env, fsImpl }),
     bridgeStatus: readBridgeStatus({ env, fsImpl }),
     pairingSession: readPairingSession({ env, fsImpl }),
+    trustedDevice: buildTrustedDeviceSummary(readBridgeDeviceState()),
     stdoutLogPath: resolveBridgeStdoutLogPath({ env }),
     stderrLogPath: resolveBridgeStderrLogPath({ env }),
   };
@@ -233,6 +241,10 @@ function printLinuxBridgeServiceStatus(options = {}) {
   const bridgeState = status.bridgeStatus?.state || "unknown";
   const connectionStatus = status.bridgeStatus?.connectionStatus || "unknown";
   const pairingCreatedAt = status.pairingSession?.createdAt || "none";
+  const activeDevice = status.bridgeStatus?.activeDevice || status.bridgeStatus?.activePhone;
+  const trustedPhoneCount = status.trustedDevice?.trustedPhoneCount || 0;
+  const activeDeviceName = formatDeviceKind(activeDevice?.deviceKind) || "device";
+  const trustedDeviceName = formatDeviceKind(status.trustedDevice?.lastSeenDeviceKind) || "device";
   console.log(`[agnt] Service label: ${status.label}`);
   console.log(`[agnt] Installed: ${status.installed ? "yes" : "no"}`);
   console.log(`[agnt] Systemd loaded: ${status.systemdLoaded ? "yes" : "no"}`);
@@ -240,6 +252,8 @@ function printLinuxBridgeServiceStatus(options = {}) {
   console.log(`[agnt] PID: ${status.systemdPid || status.bridgeStatus?.pid || "unknown"}`);
   console.log(`[agnt] Bridge state: ${bridgeState}`);
   console.log(`[agnt] Connection: ${connectionStatus}`);
+  console.log(`[agnt] Active ${activeDeviceName}: ${activeDevice?.connected ? activeDevice.phoneFingerprint || "yes" : "no"}`);
+  console.log(`[agnt] Trusted ${trustedDeviceName}: ${trustedPhoneCount > 0 ? "yes" : "no"}`);
   console.log(`[agnt] Pairing payload: ${pairingCreatedAt}`);
   console.log(`[agnt] Stdout log: ${status.stdoutLogPath}`);
   console.log(`[agnt] Stderr log: ${status.stderrLogPath}`);

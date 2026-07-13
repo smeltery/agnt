@@ -98,6 +98,53 @@ test("APNs session errors reject the notification request", async () => {
   );
 });
 
+test("APNs notification settles only once when session and request errors both fire", async () => {
+  const { privateKey } = crypto.generateKeyPairSync("ec", {
+    namedCurve: "prime256v1",
+  });
+  let closeCount = 0;
+
+  const client = createAPNsClient({
+    teamId: "TEAM123456",
+    keyId: "KEY1234567",
+    bundleId: "com.example.agnt",
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }),
+    http2Connect() {
+      const session = new EventEmitter();
+      session.request = () => {
+        const request = new EventEmitter();
+        request.setEncoding = () => {};
+        request.end = () => {
+          process.nextTick(() => {
+            session.emit("error", new Error("session failed"));
+            request.emit("error", new Error("request failed"));
+          });
+        };
+        return request;
+      };
+      session.close = () => {
+        closeCount += 1;
+      };
+      return session;
+    },
+  });
+
+  await assert.rejects(
+    client.sendNotification({
+      deviceToken: "aa bb cc",
+      apnsEnvironment: "development",
+      title: "Ready",
+      body: "Response ready",
+    }),
+    {
+      code: "apns_session_error",
+      status: 502,
+      message: /session failed/,
+    }
+  );
+  assert.equal(closeCount, 1);
+});
+
 function decodeBase64URL(value) {
   const normalized = String(value || "")
     .replace(/-/g, "+")

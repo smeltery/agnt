@@ -878,6 +878,10 @@ function close(server, wss) {
     wss.close();
     server.closeAllConnections?.();
     server.close((error) => {
+      if (error?.code === "ERR_SERVER_NOT_RUNNING") {
+        resolve();
+        return;
+      }
       if (error) {
         reject(error);
         return;

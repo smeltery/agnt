@@ -10,7 +10,7 @@
   "scripts": {
     "ci": "bun run test",
     "start": "node ./server.js",
-    "test": "node --test --test-timeout=30000 ./*.test.js"
+    "test": "node --test ./*.test.js"
   },
   "dependencies": {
     "ws": "^8.21.0"

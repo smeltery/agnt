@@ -11,7 +11,10 @@ const path = require("path");
 const { startBridge } = require("../bridge/bridge");
 const { readBridgeConfig } = require("../bridge/bridge-config");
 const { printQR } = require("../transport/qr");
-const { resetBridgeDeviceState } = require("../transport/secure-device-state");
+const {
+  readBridgeDeviceState,
+  resetBridgeDeviceState,
+} = require("../transport/secure-device-state");
 const {
   clearBridgeStatus,
   clearPairingSession,
@@ -221,6 +224,7 @@ function getMacOSBridgeServiceStatus({
     daemonConfig: readDaemonConfig({ env, fsImpl }),
     bridgeStatus: readBridgeStatus({ env, fsImpl }),
     pairingSession: readPairingSession({ env, fsImpl }),
+    trustedDevice: buildTrustedDeviceSummary(readBridgeDeviceState()),
     stdoutLogPath: resolveBridgeStdoutLogPath({ env }),
     stderrLogPath: resolveBridgeStderrLogPath({ env }),
   };
@@ -231,12 +235,18 @@ function printMacOSBridgeServiceStatus(options = {}) {
   const bridgeState = status.bridgeStatus?.state || "unknown";
   const connectionStatus = status.bridgeStatus?.connectionStatus || "unknown";
   const pairingCreatedAt = status.pairingSession?.createdAt || "none";
+  const activeDevice = status.bridgeStatus?.activeDevice || status.bridgeStatus?.activePhone;
+  const trustedPhoneCount = status.trustedDevice?.trustedPhoneCount || 0;
+  const activeDeviceName = formatDeviceKind(activeDevice?.deviceKind) || "device";
+  const trustedDeviceName = formatDeviceKind(status.trustedDevice?.lastSeenDeviceKind) || "device";
   console.log(`[agnt] Service label: ${status.label}`);
   console.log(`[agnt] Installed: ${status.installed ? "yes" : "no"}`);
   console.log(`[agnt] Launchd loaded: ${status.launchdLoaded ? "yes" : "no"}`);
   console.log(`[agnt] PID: ${status.launchdPid || status.bridgeStatus?.pid || "unknown"}`);
   console.log(`[agnt] Bridge state: ${bridgeState}`);
   console.log(`[agnt] Connection: ${connectionStatus}`);
+  console.log(`[agnt] Active ${activeDeviceName}: ${activeDevice?.connected ? activeDevice.phoneFingerprint || "yes" : "no"}`);
+  console.log(`[agnt] Trusted ${trustedDeviceName}: ${trustedPhoneCount > 0 ? "yes" : "no"}`);
   console.log(`[agnt] Pairing payload: ${pairingCreatedAt}`);
   console.log(`[agnt] Stdout log: ${status.stdoutLogPath}`);
   console.log(`[agnt] Stderr log: ${status.stderrLogPath}`);
@@ -530,8 +540,55 @@ function normalizeNonEmptyString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
+function buildTrustedDeviceSummary(deviceState) {
+  const trustedPhoneEntries = Object.entries(deviceState?.trustedPhones || {})
+    .filter(([phoneDeviceId, publicKey]) => (
+      normalizeNonEmptyString(phoneDeviceId) && normalizeNonEmptyString(publicKey)
+    ));
+  const firstTrustedPhoneId = trustedPhoneEntries[0]?.[0] || "";
+  const lastSeenPhoneAppVersion = normalizeNonEmptyString(deviceState?.lastSeenPhoneAppVersion) || null;
+  return {
+    macDeviceFingerprint: shortFingerprint(deviceState?.macDeviceId),
+    trustedPhoneCount: trustedPhoneEntries.length,
+    trustedPhoneFingerprint: shortFingerprint(firstTrustedPhoneId),
+    lastSeenDeviceKind: normalizeNonEmptyString(deviceState?.lastSeenDeviceKind)
+      || (lastSeenPhoneAppVersion ? "iphone" : null),
+    lastSeenPhoneAppVersion,
+  };
+}
+
+function formatDeviceKind(deviceKind) {
+  const normalized = normalizeNonEmptyString(deviceKind).toLowerCase();
+  if (normalized === "iphone") {
+    return "iPhone";
+  }
+  if (normalized === "android") {
+    return "Android";
+  }
+  if (normalized === "browser") {
+    return "Browser";
+  }
+  if (normalized === "mac") {
+    return "Mac";
+  }
+  return "";
+}
+
+function shortFingerprint(value) {
+  const normalized = normalizeNonEmptyString(value);
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= 12) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
+}
+
 module.exports = {
   buildLaunchAgentPlist,
+  buildTrustedDeviceSummary,
+  formatDeviceKind,
   getMacOSBridgeServiceStatus,
   mergeBridgeStatusForDaemon,
   printMacOSBridgePairingQr,
