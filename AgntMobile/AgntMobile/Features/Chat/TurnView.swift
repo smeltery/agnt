@@ -24,6 +24,9 @@ struct TurnView: View {
     @State private var isInputFocused = false
     @State private var isShowingThreadPathSheet = false
     @State private var isShowingStatusSheet = false
+    @State private var isShowingGoalSheet = false
+    @State private var goalSheetObjectivePrefill: String?
+    @State private var goalSheetComposerConsumedInput: String?
     @State private var isLoadingRepositoryDiff = false
     @State private var repositoryDiffPresentation: TurnDiffPresentation?
     @State private var assistantRevertSheetState: AssistantRevertSheetState?
@@ -496,6 +499,12 @@ struct TurnView: View {
                 rateLimitsErrorMessage: codex.rateLimitsErrorMessage
             )
         }
+        .sheet(isPresented: $isShowingGoalSheet, onDismiss: clearGoalSheetState) {
+            GoalStatusSheet(threadId: thread.id, initialObjectiveDraft: goalSheetObjectivePrefill) { _ in
+                consumeComposerDraftAfterGoalSubmission()
+            }
+            .environment(codex)
+        }
         .sheet(isPresented: $isShowingVoiceSetupSheet) {
             GPTVoiceSetupSheet()
         }
@@ -745,6 +754,29 @@ struct TurnView: View {
         }
     }
 
+    private func presentGoalSheet(objectivePrefill: String?) {
+        let cleanedPrefill = objectivePrefill?.trimmingCharacters(in: .whitespacesAndNewlines)
+        goalSheetObjectivePrefill = cleanedPrefill?.isEmpty == false ? cleanedPrefill : nil
+        goalSheetComposerConsumedInput = goalSheetObjectivePrefill == nil ? nil : viewModel.input
+        isShowingGoalSheet = true
+    }
+
+    private func clearGoalSheetState() {
+        goalSheetObjectivePrefill = nil
+        goalSheetComposerConsumedInput = nil
+    }
+
+    private func consumeComposerDraftAfterGoalSubmission() {
+        guard let consumedInput = goalSheetComposerConsumedInput,
+              viewModel.input == consumedInput else {
+            goalSheetComposerConsumedInput = nil
+            return
+        }
+
+        viewModel.input = ""
+        goalSheetComposerConsumedInput = nil
+    }
+
     private func continueOnDesktopApp() {
         guard !isHandingOffToMac else { return }
         isHandingOffToMac = true
@@ -845,6 +877,16 @@ struct TurnView: View {
     }
 
     private func handleSend() {
+        let goalCommand = GoalCommandParser.parse(viewModel.input)
+        if goalCommand.isGoalCommand {
+            presentGoalSheet(objectivePrefill: goalCommand.objective)
+            if goalCommand.objective == nil {
+                viewModel.input = ""
+            }
+            isInputFocused = false
+            return
+        }
+
         viewModel.clearComposerAutocomplete()
         viewModel.sendTurn(codex: codex, threadID: thread.id)
         isInputFocused = false
@@ -1564,6 +1606,9 @@ struct TurnView: View {
                     ))
                 },
                 onShowStatus: presentStatusSheet,
+                onShowGoal: { objectivePrefill in
+                    presentGoalSheet(objectivePrefill: objectivePrefill)
+                },
                 onCompactThread: {
                     Task { try? await codex.compactThread(currentThread.id) }
                 },

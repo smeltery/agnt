@@ -588,6 +588,7 @@ struct NewChatDraftView: View {
             onOpenWorktreeHandoff: {},
             onOpenFeedbackMail: {},
             onShowStatus: {},
+            onShowGoal: { _ in },
             onCompactThread: {},
             voiceButtonPresentation: voiceButtonPresentation,
             isVoiceRecording: false,

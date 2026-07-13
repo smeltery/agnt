@@ -15,6 +15,7 @@ struct TurnComposerSecondaryBar: View {
     var activeFileChangeStatus: FileChangeStatusSnapshot? = nil
     var threadGoal: CodexThreadGoal? = nil
     var isThreadRunning = false
+    var onEditGoal: () -> Void = {}
     var onResumeGoal: () -> Void = {}
     var onPauseGoal: () -> Void = {}
     var onRemoveGoal: () -> Void = {}
@@ -103,6 +104,7 @@ struct TurnComposerSecondaryBar: View {
                                 GoalStatusChip(
                                     goal: threadGoal,
                                     isThreadRunning: isThreadRunning,
+                                    onEdit: onEditGoal,
                                     onResume: onResumeGoal,
                                     onPause: onPauseGoal,
                                     onRemove: onRemoveGoal

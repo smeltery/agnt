@@ -66,6 +66,8 @@ struct TurnMentionChipStyle: Equatable {
             return .pink
         case .fork:
             return .blue
+        case .goal:
+            return .green
         case .status:
             return .secondary
         }

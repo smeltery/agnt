@@ -33,6 +33,7 @@ struct TurnComposerHostView: View {
     let onOpenWorktreeHandoff: () -> Void
     let onOpenFeedbackMail: () -> Void
     let onShowStatus: () -> Void
+    let onShowGoal: (String?) -> Void
     let onCompactThread: () -> Void
     let voiceButtonPresentation: TurnComposerVoiceButtonPresentation
     let isVoiceRecording: Bool
@@ -168,6 +169,9 @@ struct TurnComposerHostView: View {
             onRefreshUsageStatus: {
                 await codex.refreshUsageStatus(threadId: thread.id)
             },
+            onEditGoal: {
+                onShowGoal(nil)
+            },
             onResumeGoal: {
                 Task {
                     do {
@@ -271,6 +275,9 @@ struct TurnComposerHostView: View {
                 case .status:
                     viewModel.onSelectSlashCommand(command)
                     onShowStatus()
+                case .goal:
+                    viewModel.onSelectSlashCommand(command)
+                    onShowGoal(nil)
                 case .subagents:
                     viewModel.onSelectSlashCommand(command)
                 case .compact:

@@ -9,6 +9,7 @@ import SwiftUI
 struct GoalStatusChip: View {
     let goal: CodexThreadGoal
     let isThreadRunning: Bool
+    var onEdit: () -> Void = {}
     var onResume: () -> Void = {}
     var onPause: () -> Void = {}
     var onRemove: () -> Void = {}
@@ -80,6 +81,7 @@ struct GoalStatusChip: View {
                     detailAction(systemName: "pause.circle", label: "Pause goal", action: onPause)
                 }
 
+                detailAction(systemName: "pencil", label: "Edit goal", action: onEdit)
                 detailAction(systemName: "trash.circle", label: "Remove goal") {
                     isShowingRemoveConfirmation = true
                 }

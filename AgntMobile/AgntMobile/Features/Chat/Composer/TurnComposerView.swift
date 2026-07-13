@@ -61,6 +61,7 @@ struct TurnComposerView: View {
     let onSelectGitBaseBranch: (String) -> Void
     let onRefreshGitBranches: () -> Void
     let onRefreshUsageStatus: () async -> Void
+    let onEditGoal: () -> Void
     let onResumeGoal: () -> Void
     let onPauseGoal: () -> Void
     let onRemoveGoal: () -> Void
@@ -144,6 +145,7 @@ struct TurnComposerView: View {
                     activeFileChangeStatus: activeFileChangeStatus,
                     threadGoal: threadGoal,
                     isThreadRunning: isThreadRunning,
+                    onEditGoal: onEditGoal,
                     onResumeGoal: onResumeGoal,
                     onPauseGoal: onPauseGoal,
                     onRemoveGoal: onRemoveGoal,
@@ -877,6 +879,7 @@ private struct ComposerPreviewContent: View {
             onSelectGitBaseBranch: { _ in },
             onRefreshGitBranches: {},
             onRefreshUsageStatus: {},
+            onEditGoal: {},
             onResumeGoal: {},
             onPauseGoal: {},
             onRemoveGoal: {},
