@@ -11,7 +11,6 @@ import { makeLogger } from "../lib/log";
 import { showNotification, shouldNotify } from "../lib/notifications";
 import { playTurnCue } from "../lib/sound-cue";
 import {
-  type CodexMessage,
   type CodexThread,
   type ContextWindowUsage,
   createMessage,
@@ -55,6 +54,22 @@ import { messagesStore } from "../storage/messages-store";
 import { prefsStore, type ThreadColor, type ThreadOverride } from "../storage/prefs-store";
 import { buildTurnInput } from "./turn-input";
 import type { ImageAttachment } from "../models";
+import {
+  buildReviewStartParams,
+  effectiveServiceTier,
+  prependSystemPrompt,
+  reviewPromptText,
+} from "./thread-selectors";
+import { bumpVisitIfActive } from "./thread-visits";
+
+export {
+  buildReviewStartParams,
+  effectiveServiceTier,
+  isThreadUnread,
+  prependSystemPrompt,
+  selectActiveMessages,
+  selectActiveTurnRunning,
+} from "./thread-selectors";
 
 const log = makeLogger("threads");
 const PERSIST_DEBOUNCE_MS = 250;
@@ -1177,92 +1192,4 @@ function applyHistoryEvent(state: ThreadReducerState, event: SyntheticEvent): Th
     type: event.params.type as string | undefined,
     text: event.params.text as string | undefined,
   });
-}
-
-// Public read selector: get the (sorted) message list for the currently-selected thread.
-export function selectActiveMessages(state: ThreadsState): CodexMessage[] {
-  if (!state.selectedThreadId) return [];
-  return state.reducerStates[state.selectedThreadId]?.messages ?? [];
-}
-
-export function selectActiveTurnRunning(state: ThreadsState): boolean {
-  if (!state.selectedThreadId) return false;
-  return Boolean(state.reducerStates[state.selectedThreadId]?.activeTurnId);
-}
-
-/** Pure: a thread is unread when its server-side updatedAt outpaces the
- *  recorded visit. Returns false if either timestamp is missing. */
-export function isThreadUnread(thread: CodexThread, lastVisited: Record<string, number>): boolean {
-  const updated = thread.updatedAt;
-  if (typeof updated !== "number") return false;
-  const visited = lastVisited[thread.id];
-  if (typeof visited !== "number") return updated > 0;
-  return updated > visited;
-}
-
-export function effectiveServiceTier(flags: TurnFlags, models: ModelOption[]): ServiceTier | undefined {
-  if (flags.serviceTier !== "fast") return undefined;
-  const selectedModel = flags.model
-    ? models.find((model) => model.id === flags.model || model.model === flags.model)
-    : models.find((model) => model.isDefault);
-  return selectedModel?.supportsFastMode ? "fast" : undefined;
-}
-
-export function buildReviewStartParams(
-  threadId: string,
-  options: { target?: ReviewTarget; baseBranch?: string } = {}
-): Record<string, unknown> | null {
-  const target = options.target ?? "uncommittedChanges";
-  if (target === "baseBranch") {
-    const branch = options.baseBranch?.trim();
-    if (!branch) return null;
-    return {
-      threadId,
-      delivery: "inline",
-      target: {
-        type: "baseBranch",
-        branch,
-      },
-    };
-  }
-  return {
-    threadId,
-    delivery: "inline",
-    target: {
-      type: "uncommittedChanges",
-    },
-  };
-}
-
-function reviewPromptText(options: { target?: ReviewTarget; baseBranch?: string } = {}): string {
-  if (options.target === "baseBranch") {
-    const branch = options.baseBranch?.trim();
-    return branch ? `Review against base branch ${branch}` : "Review against base branch";
-  }
-  return "Review current changes";
-}
-
-// When a turn completes (or fails) on the *currently selected* thread, the
-// user is already looking at it — re-stamp last-visited so the dot doesn't
-// pop on for a moment between updatedAt landing and a future click.
-function bumpVisitIfActive(
-  threadId: string,
-  set: (partial: Partial<ThreadsState>) => void,
-  get: () => ThreadsState
-): void {
-  if (get().selectedThreadId !== threadId) return;
-  const next = { ...get().lastVisitedByThread, [threadId]: Date.now() };
-  set({ lastVisitedByThread: next });
-  void prefsStore.saveLastVisited(next);
-}
-
-/** Compose the per-thread system prompt with the user's typed turn. We
- *  send it as a single text item rather than two so providers without an
- *  explicit "system" channel still receive the preface. The blank line
- *  separator keeps the user's prose visually distinct in the bridge log. */
-export function prependSystemPrompt(content: string, systemPrompt: string): string {
-  const prompt = systemPrompt.trim();
-  if (!prompt) return content;
-  if (!content.trim()) return prompt;
-  return `${prompt}\n\n${content}`;
 }
