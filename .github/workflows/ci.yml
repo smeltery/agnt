@@ -19,6 +19,7 @@ on:
           - relay
           - web
           - host
+          - loc-budgets
           - android
           - ios
           - links
@@ -45,6 +46,7 @@ jobs:
       host: ${{ steps.filter.outputs.host }}
       ios: ${{ steps.filter.outputs.ios }}
       links: ${{ steps.filter.outputs.links }}
+      loc_budgets: ${{ steps.filter.outputs.loc_budgets }}
       lint_workflows: ${{ steps.filter.outputs.lint_workflows }}
       relay: ${{ steps.filter.outputs.relay }}
       web: ${{ steps.filter.outputs.web }}
@@ -157,6 +159,22 @@ jobs:
           frozen-lockfile: "false"
           audit: "false"
 
+  loc_budgets:
+    needs: changes
+    if: needs.changes.outputs.loc_budgets == 'true'
+    name: LOC budget checks
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Flox
+        uses: ./.github/actions/setup-flox
+
+      - name: Check LOC budgets
+        run: flox activate -d "$GITHUB_WORKSPACE" -- node scripts/check-loc-budgets.mjs
+
   android:
     needs: changes
     if: needs.changes.outputs.android == 'true'
@@ -232,6 +250,7 @@ jobs:
       - relay
       - web
       - host
+      - loc_budgets
       - android
       - ios
       - links
@@ -249,6 +268,7 @@ jobs:
             "${{ needs.relay.result }}" \
             "${{ needs.web.result }}" \
             "${{ needs.host.result }}" \
+            "${{ needs.loc_budgets.result }}" \
             "${{ needs.android.result }}" \
             "${{ needs.ios.result }}" \
             "${{ needs.links.result }}"

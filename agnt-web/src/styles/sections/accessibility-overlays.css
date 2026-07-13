@@ -1,0 +1,600 @@
+/* Session 35 — accessibility floor + sheet presentation alert variant. */
+
+/* Global focus ring. We use `:focus-visible` (not `:focus`) so the ring
+   only paints for keyboard navigation, never for click/tap focus. The
+   2px outline + 2px offset keeps it visually distinct from any inner
+   element (radio dots, hover backgrounds). */
+:where(button, a, input, textarea, select, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--agnt-accent);
+  outline-offset: 2px;
+  border-radius: var(--agnt-radius-small);
+}
+/* Inputs already have their own focus shadow; suppress the global outline
+   so we don't render two competing rings. */
+.agnt-composer-input:focus-visible,
+.agnt-sidebar-search-input:focus-visible,
+.agnt-settings-input:focus-visible {
+  outline: none;
+}
+
+/* prefers-reduced-motion: drop transitions + animations across the board.
+   We keep the visual changes (color swaps, layout shifts) but the user
+   doesn't get the implied motion they explicitly asked us to suppress. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Alert-mode variant of the Sheet: centered card, fades in instead of
+   sliding up. Skips the grabber + drag handlers. Used for Approval +
+   Revert dialogs where an accidental drag or backdrop click would do the
+   wrong thing. */
+.agnt-sheet-backdrop-alert {
+  align-items: center;
+  padding: 24px;
+}
+.agnt-sheet-alert {
+  border-radius: var(--agnt-radius-sheet);
+  max-height: calc(100vh - 80px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+[data-theme="light"] .agnt-sheet-alert { box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18); }
+.agnt-sheet-alert .agnt-sheet-body { padding: 20px; }
+@media (min-width: 768px) {
+  .agnt-sheet-backdrop-alert { padding: 0 24px; }
+}
+
+/* Loading skeletons: subtle shimmer using a moving linear-gradient. We
+   keep the animation cheap (a 1.5s linear loop) and disable it entirely
+   under prefers-reduced-motion via the rule above. */
+.agnt-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--agnt-bg-elev-2) 0%,
+    color-mix(in srgb, var(--agnt-bg-elev-2) 70%, var(--agnt-bg-elev) 30%) 50%,
+    var(--agnt-bg-elev-2) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--agnt-radius-small);
+  animation: agnt-skeleton-shimmer 1.5s linear infinite;
+}
+@keyframes agnt-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.agnt-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--agnt-radius-control);
+}
+.agnt-skeleton-line { height: 11px; }
+.agnt-skeleton-line-short { width: 60%; }
+.agnt-skeleton-line-medium { width: 80%; }
+.agnt-skeleton-line-full { width: 100%; }
+
+/* Empty-state container: centers an icon + copy, gives the chrome a
+   moment to breathe, and makes the icon read as a soft visual rather than
+   a button. */
+.agnt-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--agnt-fg-dim);
+}
+.agnt-empty-state-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--agnt-bg-elev-2);
+  border-radius: 999px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-empty-state-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--agnt-fg);
+}
+.agnt-empty-state-message {
+  margin: 0;
+  font-size: 14px;
+  max-width: 320px;
+}
+
+/* Session 34 — SVG icon polish + iOS-style sheet presentation. */
+
+/* SVGs render aligned to the surrounding text baseline; vertical-align
+   helps when an icon is mixed inline with a label (e.g. `<Plus /> New`). */
+.agnt-button-ghost svg,
+.agnt-button-primary svg,
+.agnt-button-danger svg,
+.agnt-row-action svg,
+.agnt-row-action-meta svg,
+.agnt-sidebar-new svg,
+.agnt-sidebar-density-toggle svg,
+.agnt-thread-menu-trigger svg,
+.agnt-sidebar-pinned svg,
+.agnt-undo-toast-dismiss svg {
+  vertical-align: -2px;
+}
+.agnt-sidebar-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* iOS sheet presentation. Backdrop handles the dim; sheet anchors to the
+   bottom edge with rounded top corners only, slides in from below, and
+   exposes a small grabber handle at the top center. */
+.agnt-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* `background` is applied dynamically by the component so we can
+     animate the dim with the drag progress. */
+}
+.agnt-sheet {
+  background: var(--agnt-bg-elev);
+  border-radius: var(--agnt-radius-sheet) var(--agnt-radius-sheet) 0 0;
+  width: 100%;
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+  /* `transform` + `transition` are set inline by the component so it can
+     swap them in/out during a drag. */
+}
+[data-theme="light"] .agnt-sheet { box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.18); }
+.agnt-sheet-grabber-area {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.agnt-sheet-grabber-area:active { cursor: grabbing; }
+.agnt-sheet-grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--agnt-fg-tertiary);
+}
+.agnt-sheet-body {
+  padding: 4px 20px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  /* Wide viewports: float the sheet near the bottom but with breathing
+     room on the sides so it reads as a card instead of a phone tray. */
+  .agnt-sheet-backdrop {
+    align-items: center;
+    padding: 0 24px 24px;
+  }
+  .agnt-sheet {
+    border-radius: var(--agnt-radius-sheet);
+    max-height: calc(100vh - 80px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+  }
+}
+
+/* Phone-viewport sweep. Targets: dialog-shaped modals (Settings, NewChat,
+   ThreadOverridesSheet, RevertSheet) need viewport-fit + internal scroll;
+   chat-header overflow on narrow widths; row-action chips need bigger
+   touch targets. */
+@media (max-width: 600px) {
+  .agnt-modal-backdrop { padding: 12px; }
+  .agnt-modal {
+    /* 87vh keeps a thumb-reach gap below the dialog so iOS Safari's
+       bottom toolbar doesn't overlap the footer buttons. The flex
+       column already gives `.agnt-modal-body` the leftover height; the
+       `min-height: 0` is the standard fix that lets it actually scroll. */
+    max-height: 87vh;
+    padding: 16px;
+  }
+  .agnt-modal-body {
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  .agnt-modal-footer {
+    /* Footer buttons stack instead of wrapping mid-row — easier to tap
+       and avoids two half-cut rows on Pixel-class viewports. */
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .agnt-modal-footer > button { width: 100%; }
+  /* Row actions: the 11px chip text + ~6px vertical padding is fine on
+     desktop but below Apple HIG / Material on touch. Bump them. */
+  .agnt-row-action {
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+  /* Chat header is a horizontal toolbar of model/effort/permission
+     pills — let it scroll horizontally instead of wrapping into a
+     three-row stack that eats the chat column. */
+  .agnt-chat-header {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .agnt-chat-header::-webkit-scrollbar { display: none; }
+  .agnt-chat-header > * { flex-shrink: 0; width: auto; }
+  /* Composer: composing on a phone is painful when the textarea is
+     squished by the row of attachment / send buttons. Stack vertically
+     so the textarea gets full-width and the actions land below it. */
+  .agnt-composer-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+/* ── High contrast overrides ────────────────────────────────────────────
+   Layered on top of the active light/dark palette via
+   `[data-contrast="high"]` (set by `applyHighContrastToDocument` in
+   prefs-store). The variables here bump border weight and dim-text
+   contrast without changing the palette identity, so a user on dark +
+   high-contrast still sees a dark UI — just with sharper edges and
+   readable secondary text. */
+:root[data-contrast="high"] {
+  --agnt-border: var(--agnt-fg);
+  --agnt-fg-dim: var(--agnt-fg);
+  --agnt-fg-tertiary: var(--agnt-fg);
+  --agnt-bg-elev-2: var(--agnt-bg);
+}
+:root[data-contrast="high"] .agnt-row,
+:root[data-contrast="high"] .agnt-button-ghost,
+:root[data-contrast="high"] .agnt-row-action,
+:root[data-contrast="high"] .agnt-sidebar-thread,
+:root[data-contrast="high"] .agnt-row-tag {
+  border-width: 2px;
+}
+/* Focus rings are already accent-colored; bump their weight too so
+   keyboard users tracking focus through a dialog see them clearly. */
+:root[data-contrast="high"] :focus-visible {
+  outline-width: 3px;
+  outline-offset: 2px;
+}
+
+/* ── Mermaid diagrams ───────────────────────────────────────────────────
+   The library inlines its own SVG with neutral colors that mostly use
+   currentColor. Wrap it in a card so the diagram doesn't visually
+   collide with the surrounding chat bubble; keep horizontal scrolling
+   for diagrams wider than the viewport instead of stretching them. */
+.agnt-md-mermaid {
+  margin: 8px 0;
+  padding: 12px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  overflow-x: auto;
+  text-align: center;
+  color: var(--agnt-fg);
+}
+.agnt-md-mermaid-pending {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--agnt-fg-dim);
+  font-size: 12px;
+}
+.agnt-md-mermaid-pending::before {
+  content: "Rendering diagram…";
+}
+.agnt-md-mermaid-error {
+  text-align: left;
+  border-color: var(--agnt-error, #b35c00);
+}
+.agnt-md-mermaid-error-message {
+  color: var(--agnt-error, #b35c00);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.agnt-md-mermaid-source {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--agnt-bg);
+  border-radius: 4px;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+/* ── Math (KaTeX) ───────────────────────────────────────────────────────
+   KaTeX ships its own stylesheet (loaded lazily alongside the lib), so
+   the structural styles here are just our chrome around it. Block math
+   gets a card treatment matching mermaid for visual consistency; inline
+   math sits flush in the paragraph. */
+.agnt-md-math {
+  margin: 8px 0;
+  padding: 12px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.agnt-md-math-inline {
+  /* Inline `$x^2$` should sit on the same line as surrounding text;
+     KaTeX's own CSS handles vertical alignment. */
+  display: inline;
+}
+.agnt-md-math-pending,
+.agnt-md-math-inline-pending {
+  display: inline-block;
+  background: var(--agnt-bg-elev-2);
+  border: 1px dashed var(--agnt-border);
+  border-radius: 4px;
+  min-width: 32px;
+  min-height: 1em;
+  vertical-align: middle;
+}
+.agnt-md-math-pending {
+  display: block;
+  min-height: 48px;
+}
+.agnt-md-math-error {
+  border-color: var(--agnt-error, #b35c00);
+}
+.agnt-md-math-error-message {
+  color: var(--agnt-error, #b35c00);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.agnt-md-math-source {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--agnt-bg);
+  border-radius: 4px;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+.agnt-md-math-inline-error {
+  background: rgba(248, 81, 73, 0.12);
+  color: var(--agnt-error, #b35c00);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+/* ── Composer expanded (fullscreen) editor ─────────────────────────────
+   Triggered by the ⤢ button. Renders a viewport-tall textarea in an
+   overlay so the user can draft a long prompt without the 3-row
+   composer cramping them. Save / send still happens via Cmd/Ctrl+Enter;
+   Esc closes the overlay without sending. */
+.agnt-composer-expanded-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: saturate(160%) blur(2px);
+}
+.agnt-composer-expanded {
+  background: var(--agnt-bg-elev);
+  border: 1px solid var(--agnt-border);
+  border-radius: var(--agnt-radius-sheet);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  width: 100%;
+  max-width: 960px;
+  height: 100%;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.agnt-composer-expanded-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--agnt-border);
+  color: var(--agnt-fg-dim);
+  font-size: 12px;
+}
+.agnt-composer-expanded-input {
+  flex: 1;
+  width: 100%;
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  border: 0;
+  padding: 16px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+}
+
+/* ── Reading / focus mode ──────────────────────────────────────────────
+   Toggled via the Read button in the header or `z` shortcut. We collapse
+   away the sidebar grid column and hide the composer; the chat scroller
+   takes the full width. We don't hide the header entirely — the user
+   needs a way back to Settings / Help / the Read button itself. */
+.agnt-workspace-reading .agnt-sidebar,
+.agnt-workspace-reading .agnt-sidebar-backdrop,
+.agnt-workspace-reading .agnt-composer {
+  display: none;
+}
+.agnt-workspace-reading .agnt-workspace-body {
+  grid-template-columns: 1fr;
+}
+.agnt-workspace-reading .agnt-chat-scroller {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* ── "New since you were last here" divider ────────────────────────────
+   Anchored on the first message id newer than the user's prior visit
+   so it stays put while they read. Subtle accent stripe — strong enough
+   to spot when skimming, quiet enough to ignore once acknowledged. */
+.agnt-chat-new-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  color: var(--agnt-accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agnt-chat-new-divider::before,
+.agnt-chat-new-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--agnt-accent);
+  opacity: 0.5;
+}
+
+
+/* ── Bridge-PTY terminal route ───────────────────────────────────
+   Full-screen overlay similar to the Settings/About modals but with
+   no max-width so the xterm.js surface gets all the available room. */
+.agnt-terminal-route {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 80;
+  background: var(--agnt-surface);
+  color: var(--agnt-fg);
+}
+.agnt-terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+}
+.agnt-terminal-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  flex: 1;
+}
+.agnt-terminal-title small {
+  color: var(--agnt-muted-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+.agnt-terminal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.agnt-terminal-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.agnt-terminal-status-running { color: #34d399; }
+.agnt-terminal-status-starting { color: #f59e0b; }
+.agnt-terminal-status-error { color: #ef4444; }
+.agnt-terminal-status-closed,
+.agnt-terminal-status-exited,
+.agnt-terminal-status-idle { color: #a3a3a3; }
+.agnt-terminal-error {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-bottom: 1px solid var(--agnt-border);
+}
+.agnt-terminal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  text-align: center;
+  padding: 32px;
+  gap: 12px;
+  color: var(--agnt-muted-fg);
+}
+.agnt-terminal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 12px 12px;
+}
+.agnt-terminal-surface { display: block; }
+
+/* ── First-use shell-access confirmation overlay ─────────────────
+   Defense-in-depth on top of the bridge gate. Even if the user has
+   enabled the web terminal, the bridge rejects the first open per
+   process so a long-running paired tab can't silently spawn a shell. */
+.agnt-terminal-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.agnt-terminal-confirm-card {
+  background: var(--agnt-surface);
+  color: var(--agnt-fg);
+  padding: 20px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--agnt-border);
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.agnt-terminal-confirm-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.agnt-terminal-confirm-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--agnt-muted-fg);
+  line-height: 1.45;
+}
+.agnt-terminal-confirm-card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.agnt-terminal-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

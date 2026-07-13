@@ -1,0 +1,80 @@
+{
+  "file_sizes": {
+    "default_lines": 1200,
+    "files": {
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+Messages.swift": 5700,
+      "agnt-bridge/test/desktop/desktop-ipc-action-follower.test.js": 5100,
+      "AgntMobile/AgntMobileTests/TurnTimelineReducerTests.swift": 4200,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 3700,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 3600,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 3400,
+      "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+Incoming.swift": 3400,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 3200,
+      "agnt-host/src-tauri/src/lib.rs": 2800,
+      "AgntMobile/AgntMobileTests/CodexServiceIncomingCommandExecutionTests.swift": 2700,
+      "AgntMobile/AgntMobileTests/CodexServiceIncomingRunIndicatorTests.swift": 2700,
+      "agnt-bridge/src/desktop/desktop-ipc-action-follower.js": 2350,
+      "agnt-bridge/test/desktop/rollout-live-mirror.test.js": 2350,
+      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 2200,
+      "AgntMobile/AgntMobile/Features/Chat/TurnView.swift": 2150,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineView.swift": 2150,
+      "agnt-host/src/App.tsx": 2100,
+      "AgntMobile/AgntMobileTests/CodexPlanModeTests.swift": 1850,
+      "AgntMobile/AgntMobile/App/ContentView.swift": 1850,
+      "agnt-bridge/test/git/git-handler.test.js": 1800,
+      "agnt-bridge/src/desktop/desktop-ipc-live-owner.js": 1700,
+      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/data/MessageTimelineStore.kt": 1700,
+      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView.swift": 1600,
+      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt": 1550,
+      "agnt-bridge/src/desktop/rollout-live-mirror.js": 1550,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer.swift": 1400,
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+Account.swift": 1350,
+      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/data/IncomingEventRouter.kt": 1350,
+      "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 1350,
+      "agnt-bridge/src/handlers/workspace-handler.js": 1350,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
+      "agnt-web/src/state/threads-store.ts": 1300,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches.swift": 1250,
+      "agnt-bridge/src/providers/claude/translate.js": 1220,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150
+    }
+  },
+  "flat_directories": {
+    "default_files": 25,
+    "directories": {
+      "agnt-web/test": {
+        "limit": 90,
+        "reason": "Vitest files are intentionally grouped by browser-client behavior."
+      },
+      "AgntMobile/AgntMobileTests": {
+        "limit": 70,
+        "reason": "Xcode test target keeps many top-level XCTest files in one group."
+      },
+      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model": {
+        "limit": 50,
+        "reason": "Protocol DTOs are kept together for Android serialization parity."
+      },
+      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/data": {
+        "limit": 45,
+        "reason": "Android data adapters are grouped by app data surface."
+      },
+      "agnt-web/src/state": {
+        "limit": 40,
+        "reason": "Browser state stores are intentionally one file per store."
+      },
+      "agnt-web/src/lib": {
+        "limit": 40,
+        "reason": "Browser utility modules are intentionally flat and import-light."
+      },
+      "agnt-bridge/test/contracts": {
+        "limit": 40,
+        "reason": "Bridge contract tests are grouped by shared wire contract."
+      },
+      "AgntAndroid/app/src/test/kotlin/com/dotbrains/agnt/mobile/data": {
+        "limit": 40,
+        "reason": "Android data tests mirror the main data package."
+      }
+    }
+  }
+}

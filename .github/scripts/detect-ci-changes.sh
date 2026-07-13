@@ -53,6 +53,8 @@ set_output() {
 }
 
 ci_config='^(\.github/workflows/|\.github/actions/|\.github/scripts/|\.github/actionlint\.ya?ml)'
+loc_budget_config='^scripts/(check-loc-budgets\.mjs|loc-budgets\.json)'
+loc_budget_files='^(\.github/|scripts/|docs/|agnt-bridge/|agnt-web/|relay/|agnt-host/|AgntAndroid/|AgntMobile/|[^/]+\.(md|json|toml|ya?ml|sh))'
 link_check_action='^\.github/actions/run-link-check/'
 setup_flox_action='^\.github/actions/setup-flox/'
 bun_ci_action='^\.github/actions/run-bun-package-ci/'
@@ -95,6 +97,12 @@ surface_enabled() {
 }
 
 if matches "$ci_config"; then set_output lint_workflows true; else set_output lint_workflows false; fi
+
+if should_run loc-budgets "$loc_budget_config|$loc_budget_files"; then
+  set_output loc_budgets true
+else
+  set_output loc_budgets false
+fi
 
 for surface in "${platform_surfaces[@]}"; do
   if surface_enabled "$surface"; then set_output "$surface" true; else set_output "$surface" false; fi

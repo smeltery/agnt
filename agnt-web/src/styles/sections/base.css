@@ -1,0 +1,158 @@
+/* Theme tokens — Session 33 retunes these to mirror UIKit semantic colors so
+   the web client reads as a continuation of AgntMobile's visual language.
+   Mapping (UIKit -> CSS var):
+     systemBackground          -> --agnt-bg
+     secondarySystemBackground -> --agnt-bg-elev (cards, modals, panels)
+     tertiarySystemFill (×0.8) -> --agnt-bg-elev-2 (selection, search field, user bubble)
+     separator                 -> --agnt-border
+     label                     -> --agnt-fg
+     secondaryLabel            -> --agnt-fg-dim
+     systemBlue                -> --agnt-accent
+     systemRed                 -> --agnt-danger
+     systemOrange              -> --agnt-warn
+     systemGreen               -> --agnt-ok
+   The radius scale matches iOS conventions: 22 (chat bubble), 18 (sheet/banner),
+   14 (sidebar selection + search field), 12 (card), 8 (small button). All use
+   the smoother continuous corner via the `--agnt-radius-*` family. */
+
+:root {
+  /* Dark palette (iOS dark mode UIKit colors). */
+  --agnt-bg: #000000;
+  --agnt-bg-elev: #1c1c1e;
+  --agnt-bg-elev-2: rgba(118, 118, 128, 0.24);
+  --agnt-border: rgba(84, 84, 88, 0.65);
+  --agnt-fg: #ffffff;
+  --agnt-fg-dim: rgba(235, 235, 245, 0.60);
+  --agnt-fg-tertiary: rgba(235, 235, 245, 0.30);
+  --agnt-accent: #0a84ff;
+  --agnt-danger: #ff453a;
+  --agnt-warn: #ff9f0a;
+  --agnt-ok: #30d158;
+  --agnt-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Spacing on a 4pt grid (iOS conventional). */
+  --agnt-space-1: 4px;
+  --agnt-space-2: 8px;
+  --agnt-space-3: 12px;
+  --agnt-space-4: 16px;
+  /* Radius scale — iOS bubble (22), sheet (18), card (12), control (14), small (8). */
+  --agnt-radius-bubble: 22px;
+  --agnt-radius-sheet: 18px;
+  --agnt-radius-control: 14px;
+  --agnt-radius-card: 12px;
+  --agnt-radius-small: 8px;
+  /* Legacy alias kept so existing rules keep working; points at the
+     mid-tier control radius which most pre-Session-33 surfaces meant. */
+  --agnt-radius: var(--agnt-radius-small);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --agnt-bg: #ffffff;
+  --agnt-bg-elev: #f2f2f7;
+  --agnt-bg-elev-2: rgba(118, 118, 128, 0.12);
+  --agnt-border: rgba(60, 60, 67, 0.29);
+  --agnt-fg: #000000;
+  --agnt-fg-dim: rgba(60, 60, 67, 0.60);
+  --agnt-fg-tertiary: rgba(60, 60, 67, 0.30);
+  --agnt-accent: #007aff;
+  --agnt-danger: #ff3b30;
+  --agnt-warn: #ff9500;
+  --agnt-ok: #34c759;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --agnt-bg: #ffffff;
+    --agnt-bg-elev: #f2f2f7;
+    --agnt-bg-elev-2: rgba(118, 118, 128, 0.12);
+    --agnt-border: rgba(60, 60, 67, 0.29);
+    --agnt-fg: #000000;
+    --agnt-fg-dim: rgba(60, 60, 67, 0.60);
+    --agnt-fg-tertiary: rgba(60, 60, 67, 0.30);
+    --agnt-accent: #007aff;
+    --agnt-danger: #ff3b30;
+    --agnt-warn: #ff9500;
+    --agnt-ok: #34c759;
+    color-scheme: light;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  /* Match iOS body type: SF Pro Text 15pt, regular weight. The system stack
+     resolves to SF on Apple platforms, Segoe UI on Windows, Roboto on
+     Android — same fallback chain as Apple's Web HIG. */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro",
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--agnt-radius-small);
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  background: transparent;
+}
+
+/* iOS `.borderedProminent`: solid accent bg, white text, no visible border. */
+.agnt-button-primary {
+  background: var(--agnt-accent);
+  color: #ffffff;
+  border-color: transparent;
+  font-weight: 600;
+  border-radius: var(--agnt-radius-control);
+  padding: 8px 14px;
+  transition: opacity 120ms ease;
+}
+.agnt-button-primary:hover { opacity: 0.92; }
+.agnt-button-primary:active { opacity: 0.78; }
+.agnt-button-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+/* iOS `.bordered`: tinted accent text on a subtle fill, no hard border. */
+.agnt-button-ghost {
+  border-color: transparent;
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border-radius: var(--agnt-radius-control);
+  padding: 6px 12px;
+  transition: background 120ms ease;
+}
+.agnt-button-ghost:hover { background: var(--agnt-bg-elev); }
+.agnt-button-danger {
+  color: var(--agnt-danger);
+  border-color: transparent;
+  background: var(--agnt-bg-elev-2);
+  border-radius: var(--agnt-radius-control);
+  padding: 6px 12px;
+}
+.agnt-button-danger:hover { background: var(--agnt-bg-elev); }
+
+.agnt-loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  color: var(--agnt-fg-dim);
+}
+.agnt-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--agnt-border);
+  border-top-color: var(--agnt-accent);
+  border-radius: 50%;
+  animation: agnt-spin 0.8s linear infinite;
+}
+@keyframes agnt-spin { to { transform: rotate(360deg); } }
