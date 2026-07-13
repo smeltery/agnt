@@ -286,6 +286,75 @@ func testTimelineRenderProjectionCollapsesCompletedTurnBeforeFinalAnswer() {
     )
 }
 
+func testTimelineRenderProjectionMovesCompletedCommandsIntoPreviousMessages() {
+    let now = Date()
+    let messages = [
+        makeTimelineTestMessage(
+            id: "user",
+            threadID: "thread",
+            role: .user,
+            text: "Run the checks",
+            createdAt: now,
+            turnID: "turn-1",
+            orderIndex: 1
+        ),
+        makeTimelineTestMessage(
+            id: "command-1",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed npm test",
+            createdAt: now.addingTimeInterval(1),
+            turnID: "turn-1",
+            itemID: "command-1",
+            orderIndex: 2
+        ),
+        makeTimelineTestMessage(
+            id: "reasoning",
+            threadID: "thread",
+            role: .system,
+            kind: .thinking,
+            text: "Reasoning summary after the command",
+            createdAt: now.addingTimeInterval(2),
+            turnID: "turn-1",
+            itemID: "reasoning",
+            orderIndex: 3
+        ),
+        makeTimelineTestMessage(
+            id: "command-2",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed git diff --check",
+            createdAt: now.addingTimeInterval(3),
+            turnID: "turn-1",
+            itemID: "command-2",
+            orderIndex: 4
+        ),
+        makeTimelineTestMessage(
+            id: "final",
+            threadID: "thread",
+            role: .assistant,
+            text: "Checks passed.",
+            createdAt: now.addingTimeInterval(4),
+            turnID: "turn-1",
+            itemID: "final-item",
+            orderIndex: 5
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(
+        messages: messages,
+        completedTurnIDs: ["turn-1"]
+    )
+
+    XCTAssertEqual(items.map(\.id), ["user", "previous-messages:final", "final"])
+    guard case .previousMessages(let previousGroup) = items[1] else {
+        return XCTFail("Expected completed command trace inside previous messages")
+    }
+    XCTAssertEqual(previousGroup.messages.map(\.id), ["command-1", "reasoning", "command-2"])
+}
+
 func testTimelineProjectionKeepsPreviousMessagesChronologicalForMultiAssistantTurns() {
     let now = Date()
     let rawMessages = [
