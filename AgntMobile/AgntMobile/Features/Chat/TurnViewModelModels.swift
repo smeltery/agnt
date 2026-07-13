@@ -179,3 +179,86 @@ enum QueuePauseState: Equatable {
     case active
     case paused(errorMessage: String)
 }
+
+struct TurnComposerMentionedFile: Identifiable, Codable, Equatable, Sendable {
+    let id: String
+    let fileName: String
+    let path: String
+
+    init(id: String = UUID().uuidString, fileName: String, path: String) {
+        self.id = id
+        self.fileName = fileName
+        self.path = path
+    }
+}
+
+struct TurnComposerMentionedSkill: Identifiable, Codable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let path: String?
+    let description: String?
+
+    init(id: String = UUID().uuidString, name: String, path: String?, description: String?) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.description = description
+    }
+}
+
+struct TurnComposerMentionedPlugin: Identifiable, Codable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let path: String
+    let displayName: String?
+
+    init(id: String = UUID().uuidString, name: String, path: String, displayName: String?) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.displayName = displayName
+    }
+}
+
+struct TurnSkillSearchIndexEntry: Equatable {
+    let skill: CodexSkillMetadata
+    let name: String
+    let displayName: String
+    let description: String
+
+    init(skill: CodexSkillMetadata) {
+        self.skill = skill
+        self.name = skill.name.lowercased()
+        self.displayName = SkillDisplayNameFormatter.displayName(for: skill.name).lowercased()
+        self.description = skill.description?.lowercased() ?? ""
+    }
+
+    func matchScore(for needle: String) -> Int? {
+        if name == needle || displayName == needle {
+            return 0
+        }
+        if name.hasPrefix(needle) || displayName.hasPrefix(needle) {
+            return 1
+        }
+        if name.contains(needle) || displayName.contains(needle) {
+            return 2
+        }
+        if description.hasPrefix(needle) {
+            return 3
+        }
+        if description.contains(needle) {
+            return 4
+        }
+        return nil
+    }
+}
+
+struct TurnPluginSearchIndexEntry: Equatable {
+    let plugin: CodexPluginMetadata
+    let searchBlob: String
+
+    init(plugin: CodexPluginMetadata) {
+        self.plugin = plugin
+        self.searchBlob = plugin.searchBlob
+    }
+}
