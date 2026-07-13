@@ -11,6 +11,12 @@ const CHATGPT_TRANSCRIPTIONS_URL = "https://chatgpt.com/backend-api/transcribe";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 150;
 const MAX_DURATION_MS = MAX_DURATION_SECONDS * 1_000;
+const AUTH_CACHE_TTL_MS = 60_000;
+const PRECONNECT_MIN_INTERVAL_MS = 2_000;
+const PRECONNECT_TIMEOUT_MS = 10_000;
+const SUPPORTED_AUDIO_FORMATS = ["wav", "m4a"];
+const WAV_MIME_TYPE = "audio/wav";
+const M4A_MIME_TYPE = "audio/mp4";
 
 function createVoiceHandler({
   sendCodexRequest,
@@ -19,13 +25,39 @@ function createVoiceHandler({
   BlobImpl = globalThis.Blob,
   logPrefix = "[agnt]",
 } = {}) {
+  const warmState = {
+    authPromise: null,
+    authLoadedAt: 0,
+    lastPreconnectAt: 0,
+  };
+
+  const cacheAuthPromise = (promise) => {
+    warmState.authPromise = promise;
+    warmState.authLoadedAt = Date.now();
+    promise.catch(() => {
+      if (warmState.authPromise === promise) {
+        warmState.authPromise = null;
+      }
+    });
+    return promise;
+  };
+  const loadAuth = ({ refreshToken = true } = {}) => {
+    if (warmState.authPromise && Date.now() - warmState.authLoadedAt < AUTH_CACHE_TTL_MS) {
+      return warmState.authPromise;
+    }
+    return cacheAuthPromise(loadAuthContext(sendCodexRequest, { refreshToken }));
+  };
+  const refreshAuth = () => cacheAuthPromise(loadAuthContext(sendCodexRequest, { refreshToken: true }));
+
   const handleVoiceRequest = createJsonRpcRequestHandler({
-    match: (method) => method === "voice/transcribe",
+    match: (method) => method === "voice/transcribe" || method === "voice/prewarm",
     dispatch: (_method, params) => transcribeVoice(params, {
       sendCodexRequest,
       fetchImpl,
       FormDataImpl,
       BlobImpl,
+      loadAuth,
+      refreshAuth,
     }),
     defaultErrorCode: "voice_transcription_failed",
     defaultErrorMessage: "Voice transcription failed.",
@@ -35,7 +67,25 @@ function createVoiceHandler({
   });
 
   return {
-    handleVoiceRequest,
+    handleVoiceRequest(rawMessage, sendResponse, parsedMessage = null) {
+      const parsed = parsedMessage || parseJsonMessage(rawMessage);
+      if (!parsed || parsed.method !== "voice/prewarm") {
+        return handleVoiceRequest(rawMessage, sendResponse, parsedMessage);
+      }
+
+      preconnectTranscriptionOrigin(fetchImpl, warmState);
+      loadAuth({ refreshToken: false }).catch(() => {});
+      if (parsed.id != null) {
+        sendResponse(JSON.stringify({
+          id: parsed.id,
+          result: {
+            ok: true,
+            formats: SUPPORTED_AUDIO_FORMATS,
+          },
+        }));
+      }
+      return true;
+    },
   };
 }
 
@@ -44,7 +94,14 @@ function createVoiceHandler({
 // Validates iPhone-owned audio input and proxies it to the official transcription endpoint.
 async function transcribeVoice(
   params,
-  { sendCodexRequest, fetchImpl, FormDataImpl, BlobImpl }
+  {
+    sendCodexRequest,
+    fetchImpl,
+    FormDataImpl,
+    BlobImpl,
+    loadAuth = () => loadAuthContext(sendCodexRequest, { refreshToken: false }),
+    refreshAuth = () => loadAuthContext(sendCodexRequest, { refreshToken: true }),
+  }
 ) {
   if (typeof sendCodexRequest !== "function") {
     throw voiceError("bridge_not_ready", "Voice transcription is not available right now.");
@@ -54,8 +111,8 @@ async function transcribeVoice(
   }
 
   const mimeType = readString(params.mimeType);
-  if (mimeType !== "audio/wav") {
-    throw voiceError("unsupported_mime_type", "Only WAV audio is supported for voice transcription.");
+  if (mimeType !== WAV_MIME_TYPE && mimeType !== M4A_MIME_TYPE) {
+    throw voiceError("unsupported_mime_type", "Only WAV or M4A audio is supported for voice transcription.");
   }
 
   const sampleRateHz = readPositiveNumber(params.sampleRateHz);
@@ -71,20 +128,21 @@ async function transcribeVoice(
     throw voiceError("duration_too_long", `Voice messages are limited to ${MAX_DURATION_SECONDS} seconds.`);
   }
 
-  const audioBuffer = decodeAudioBase64(params.audioBase64);
+  const audioBuffer = decodeAudioBase64(params.audioBase64, mimeType);
   if (audioBuffer.length > MAX_AUDIO_BYTES) {
     throw voiceError("audio_too_large", "Voice messages are limited to 10 MB.");
   }
 
-  const authContext = await loadAuthContext(sendCodexRequest);
+  const authContext = await loadAuth();
   return requestTranscription({
     authContext,
     audioBuffer,
     mimeType,
+    filename: mimeType === M4A_MIME_TYPE ? "voice.m4a" : "voice.wav",
     fetchImpl,
     FormDataImpl,
     BlobImpl,
-    sendCodexRequest,
+    refreshAuth,
   });
 }
 
@@ -92,14 +150,15 @@ async function requestTranscription({
   authContext,
   audioBuffer,
   mimeType,
+  filename,
   fetchImpl,
   FormDataImpl,
   BlobImpl,
-  sendCodexRequest,
+  refreshAuth,
 }) {
   const makeAttempt = async (activeAuthContext) => {
     const formData = new FormDataImpl();
-    formData.append("file", new BlobImpl([audioBuffer], { type: mimeType }), "voice.wav");
+    formData.append("file", new BlobImpl([audioBuffer], { type: mimeType }), filename);
 
     const headers = {
       Authorization: `Bearer ${activeAuthContext.token}`,
@@ -113,8 +172,8 @@ async function requestTranscription({
   };
 
   let response = await makeAttempt(authContext);
-  if (response.status === 401) {
-    const refreshedAuthContext = await loadAuthContext(sendCodexRequest);
+  if (response.status === 401 || response.status === 403) {
+    const refreshedAuthContext = await refreshAuth();
     response = await makeAttempt(refreshedAuthContext);
   }
 
@@ -147,10 +206,10 @@ async function requestTranscription({
 }
 
 // Reads the current bridge-owned auth state from the local codex app-server and refreshes if needed.
-async function loadAuthContext(sendCodexRequest) {
+async function loadAuthContext(sendCodexRequest, { refreshToken = true } = {}) {
   const authStatus = await sendCodexRequest("getAuthStatus", {
     includeToken: true,
-    refreshToken: true,
+    refreshToken,
   });
 
   const authMethod = readString(authStatus?.authMethod);
@@ -173,7 +232,7 @@ async function loadAuthContext(sendCodexRequest) {
   };
 }
 
-function decodeAudioBase64(value) {
+function decodeAudioBase64(value, mimeType) {
   const normalized = normalizeBase64(value);
   if (!normalized) {
     throw voiceError("missing_audio", "The voice request did not include any audio.");
@@ -192,11 +251,23 @@ function decodeAudioBase64(value) {
     throw voiceError("invalid_audio", "The recorded audio could not be decoded.");
   }
 
-  if (!isLikelyWavBuffer(audioBuffer)) {
+  if (mimeType === WAV_MIME_TYPE && !isLikelyWavBuffer(audioBuffer)) {
     throw voiceError("invalid_audio", "The recorded audio is not a valid WAV file.");
   }
 
+  if (mimeType === M4A_MIME_TYPE && !isLikelyM4ABuffer(audioBuffer)) {
+    throw voiceError("invalid_audio", "The recorded audio is not a valid M4A file.");
+  }
+
   return audioBuffer;
+}
+
+function parseJsonMessage(rawMessage) {
+  try {
+    return JSON.parse(rawMessage);
+  } catch {
+    return null;
+  }
 }
 
 // Keeps the bridge strict about the payload shape so malformed uploads fail before fetch().
@@ -241,6 +312,59 @@ function isLikelyWavBuffer(buffer) {
   return buffer.length >= 44
     && buffer.toString("ascii", 0, 4) === "RIFF"
     && buffer.toString("ascii", 8, 12) === "WAVE";
+}
+
+function isLikelyM4ABuffer(buffer) {
+  if (buffer.length < 16 || buffer.toString("ascii", 4, 8) !== "ftyp") {
+    return false;
+  }
+
+  const brands = new Set();
+  for (let offset = 8; offset + 4 <= Math.min(buffer.length, 64); offset += 4) {
+    const brand = buffer.toString("ascii", offset, offset + 4);
+    if (/^[\x20-\x7E]{4}$/.test(brand)) {
+      brands.add(brand);
+    }
+  }
+
+  return brands.has("M4A ")
+    || brands.has("M4B ")
+    || brands.has("mp42")
+    || brands.has("isom")
+    || brands.has("iso2");
+}
+
+function preconnectTranscriptionOrigin(fetchImpl, warmState) {
+  if (typeof fetchImpl !== "function") {
+    return;
+  }
+
+  const now = Date.now();
+  if (now - warmState.lastPreconnectAt < PRECONNECT_MIN_INTERVAL_MS) {
+    return;
+  }
+  warmState.lastPreconnectAt = now;
+
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timeoutID = controller
+    ? setTimeout(() => controller.abort(new Error("voice preconnect timed out")), PRECONNECT_TIMEOUT_MS)
+    : null;
+  timeoutID?.unref?.();
+
+  Promise.resolve()
+    .then(() => fetchImpl(new URL("/", CHATGPT_TRANSCRIPTIONS_URL).toString(), {
+      method: "HEAD",
+      signal: controller?.signal,
+    }))
+    .then((response) => {
+      response?.body?.cancel?.()?.catch?.(() => {});
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (timeoutID) {
+        clearTimeout(timeoutID);
+      }
+    });
 }
 
 function readChatGPTAccountIdFromToken(token) {
