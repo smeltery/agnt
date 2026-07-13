@@ -35,6 +35,14 @@ const {
 const {
   createDesktopOwnerIpcClient,
 } = require("./desktop-ipc-owner-transport");
+const {
+  normalizeInputEntriesForDesktop,
+  readConversationIdFromFollowerParams,
+  readThreadFromPayload,
+  readThreadFromResponse,
+  readTurnIdFromResult,
+  sanitizeTurnStartParams,
+} = require("./desktop-ipc-live-owner-utils");
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_RECONNECT_MS = 1_500;
@@ -85,22 +93,6 @@ const OWNER_INBOUND_METHODS = new Set([
 ]);
 
 const THREAD_READ_METHODS = new Set(["thread/read", "thread/resume"]);
-
-const ALLOWED_TURN_START_PARAM_KEYS = new Set([
-  "threadId",
-  "input",
-  "cwd",
-  "approvalPolicy",
-  "approvalsReviewer",
-  "sandboxPolicy",
-  "model",
-  "serviceTier",
-  "effort",
-  "summary",
-  "personality",
-  "outputSchema",
-  "collaborationMode",
-]);
 
 function createDesktopIpcLiveOwner({
   enabled = true,
@@ -1633,94 +1625,6 @@ function createDisabledDesktopIpcLiveOwner() {
       return false;
     },
   };
-}
-
-// Attaches the cached turn/start prompt to a just-started turn as
-// turn.params.input. Desktop builds the user bubble from params.input and
-// treats any userMessage item that does not dedupe against it as a mid-turn
-// steer ("Steered conversation"), so the prompt must live ONLY in params.
-// Pending prompts are consumed FIFO so rapid consecutive starts stay matched.
-// Desktop's composer reads the followed thread's model/effort from the
-// conversation-level fields; without them it falls back to showing "Custom".
-// Desktop's prompt dedupe allows only these item types to precede the initial
-// user message; anything else makes a userMessage item render as a steer.
-// Joins the human-readable text of user input/content entries so the initial
-// prompt can be matched by meaning instead of exact entry shape (the phone
-// sends input_text entries while the app-server echoes text entries).
-// Desktop renders the turn's user bubble from turn.params.input and labels any
-// userMessage item that fails its dedupe as "Steered conversation". Keep the
-// initial prompt ONLY in params: drop the first user item that duplicates it,
-// or adopt it into params.input for hydrated turns that arrived item-only.
-// Later userMessage items are genuine mid-turn steers and stay untouched.
-// Replays just-emitted patches onto the retained broadcast baseline. The
-// baseline is a private copy and patch values are already private clones, so
-// in-place mutation is safe and avoids re-cloning the whole state per flush.
-// Desktop's user-bubble renderer extracts images from input entries shaped
-// {type: "image", url}; runtimes sometimes fall back to the image_url shape,
-// which Desktop would silently skip.
-function normalizeInputEntriesForDesktop(input) {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-  return input.map((entry) => {
-    if (!entry || typeof entry !== "object") {
-      return entry;
-    }
-    if (normalizeToken(entry.type) === "imageurl") {
-      const url = readString(entry.url)
-        || readString(entry.image_url?.url)
-        || readString(entry.imageUrl?.url)
-        || readString(entry.image_url)
-        || readString(entry.imageUrl);
-      if (url) {
-        return { type: "image", url };
-      }
-    }
-    return entry;
-  });
-}
-
-function sanitizeTurnStartParams(params) {
-  const sanitized = {};
-  for (const [key, value] of Object.entries(params || {})) {
-    if (ALLOWED_TURN_START_PARAM_KEYS.has(key)) {
-      sanitized[key] = value;
-    }
-  }
-  if (!Array.isArray(sanitized.input)) {
-    sanitized.input = [];
-  }
-  return sanitized;
-}
-
-function readThreadFromResponse(message) {
-  const result = message?.result || message?.payload || {};
-  return readThreadFromPayload(result);
-}
-
-function readThreadFromPayload(result) {
-  if (!result || typeof result !== "object") {
-    return null;
-  }
-  return result.thread && typeof result.thread === "object"
-    ? result.thread
-    : result;
-}
-
-function readTurnIdFromResult(result) {
-  return readString(result?.turn?.id)
-    || readString(result?.turnId)
-    || readString(result?.turn_id)
-    || readString(result?.id);
-}
-
-function readConversationIdFromFollowerParams(params) {
-  return readString(params?.conversationId)
-    || readString(params?.conversation_id)
-    || readString(params?.threadId)
-    || readString(params?.thread_id)
-    || readString(params?.turnStartParams?.threadId)
-    || readString(params?.turn_start_params?.threadId);
 }
 
 module.exports = {

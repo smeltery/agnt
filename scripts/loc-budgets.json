@@ -17,7 +17,7 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineView.swift": 2150,
       "AgntMobile/AgntMobileTests/CodexPlanModeTests.swift": 1850,
       "AgntMobile/AgntMobile/App/ContentView.swift": 1850,
-      "agnt-bridge/src/desktop/desktop-ipc-live-owner.js": 1750,
+      "agnt-bridge/src/desktop/desktop-ipc-live-owner.js": 1650,
       "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/data/MessageTimelineStore.kt": 1700,
       "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView.swift": 1600,
       "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt": 1550,
