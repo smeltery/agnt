@@ -15,6 +15,10 @@ const {
 const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
 const { hasVisiblePlanUpdate } = require("./desktop-ipc-shared");
 const {
+  bootstrapFromExistingRollout,
+  terminalEventClosesTrackedTurn,
+} = require("./rollout-live-mirror-bootstrap");
+const {
   agentMessageDedupeKey,
   buildAgentMessageItemId,
   buildSyntheticItemId,
@@ -50,11 +54,6 @@ const DEFAULT_ACTIVITY_HEARTBEAT_MS = 5_000;
 const DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS = 10 * 60_000;
 const DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS = 1_000;
 const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
-const TERMINAL_TASK_EVENT_TYPES = new Set(["task_complete", "turn_aborted", "error"]);
-
-function terminalEventClosesTrackedTurn(eventTurnId, trackedTurnId) {
-  return !eventTurnId || !trackedTurnId || eventTurnId === trackedTurnId;
-}
 
 // Observes desktop-authored rollout files and replays the currently active run as
 // bridge notifications so the phone can render live thinking/tool activity.
@@ -210,6 +209,7 @@ function createThreadRolloutLiveMirror({
           state,
           fsModule,
           sendApplicationResponse,
+          processRolloutLines,
           nowMs: currentTime,
           staleActiveRunMaxAgeMs,
         });
@@ -316,155 +316,6 @@ function createThreadRolloutLiveMirror({
     bump,
     stop,
   };
-}
-
-function bootstrapFromExistingRollout({
-  rolloutPath,
-  fileSize,
-  state,
-  fsModule,
-  sendApplicationResponse,
-  nowMs = Date.now(),
-  staleActiveRunMaxAgeMs = DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS,
-}) {
-  const initialContents = readFileSlice(rolloutPath, 0, fileSize, fsModule);
-  if (!initialContents) {
-    return;
-  }
-
-  const lines = initialContents.split("\n");
-  const activeRunLines = [];
-  let insideActiveRun = false;
-  let activeTurnId = null;
-  let latestTerminalRun = null;
-  let pendingUserPreludeLine = null;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      continue;
-    }
-
-    const parsed = safeParseJSON(line);
-    if (!parsed) {
-      continue;
-    }
-
-    if (parsed.type === "session_meta") {
-      populateSessionMetaState(state, parsed.payload);
-    }
-
-    const taskEventType = parsed?.type === "event_msg"
-      ? readString(parsed?.payload?.type)
-      : "";
-    if (taskEventType === "user_message") {
-      pendingUserPreludeLine = line;
-    }
-    if (taskEventType === "task_started") {
-      insideActiveRun = true;
-      activeTurnId = readString(parsed?.payload?.turn_id)
-        || readString(parsed?.payload?.turnId)
-        || "";
-      latestTerminalRun = null;
-      activeRunLines.length = 0;
-      if (pendingUserPreludeLine) {
-        activeRunLines.push(pendingUserPreludeLine);
-      }
-      activeRunLines.push(line);
-      continue;
-    }
-
-    if (!insideActiveRun) {
-      continue;
-    }
-
-    activeRunLines.push(line);
-    if (TERMINAL_TASK_EVENT_TYPES.has(taskEventType)) {
-      const terminalTurnId = readString(parsed?.payload?.turn_id)
-        || readString(parsed?.payload?.turnId);
-      if (terminalEventClosesTrackedTurn(terminalTurnId, activeTurnId)) {
-        latestTerminalRun = terminalRunFromEvent(parsed, activeTurnId);
-        insideActiveRun = false;
-        activeTurnId = "";
-        activeRunLines.length = 0;
-        pendingUserPreludeLine = null;
-      }
-    }
-  }
-
-  if (!isDesktopRolloutOrigin(state.sessionMeta)) {
-    state.isDesktopOrigin = false;
-    return;
-  }
-
-  state.isDesktopOrigin = true;
-  if (activeRunLines.length === 0 && latestTerminalRun) {
-    sendApplicationResponse(JSON.stringify(terminalCatchUpNotification(state.threadId, latestTerminalRun)));
-    return;
-  }
-
-  if (activeTurnId) {
-    state.activeTurnId = activeTurnId;
-  }
-
-  if (
-    activeRunLines.length > 0
-    && isRolloutFileStale(rolloutPath, fsModule, nowMs, staleActiveRunMaxAgeMs)
-  ) {
-    state.suppressLiveActivityUntilGrowth = true;
-    processRolloutLines(activeRunLines, state, () => {});
-    return;
-  }
-
-  processRolloutLines(activeRunLines, state, sendApplicationResponse);
-}
-
-function isRolloutFileStale(rolloutPath, fsModule, nowMs, staleActiveRunMaxAgeMs) {
-  try {
-    const modifiedAtMs = fsModule.statSync(rolloutPath).mtimeMs;
-    return Number.isFinite(modifiedAtMs) && nowMs - modifiedAtMs >= staleActiveRunMaxAgeMs;
-  } catch {
-    return false;
-  }
-}
-
-function terminalRunFromEvent(entry, fallbackTurnId = "") {
-  const payload = entry?.payload || {};
-  const eventType = readString(payload.type);
-  if (!TERMINAL_TASK_EVENT_TYPES.has(eventType)) {
-    return null;
-  }
-
-  const turnId = readString(payload.turn_id)
-    || readString(payload.turnId)
-    || readString(fallbackTurnId);
-  if (!turnId) {
-    return null;
-  }
-
-  return {
-    eventType,
-    turnId,
-    message: readString(payload.message),
-  };
-}
-
-function terminalCatchUpNotification(threadId, terminalRun) {
-  const params = {
-    threadId,
-    turnId: terminalRun.turnId,
-    id: terminalRun.turnId,
-    agntRolloutTerminalCatchUp: true,
-  };
-  if (terminalRun.eventType === "turn_aborted") {
-    params.status = "aborted";
-  } else if (terminalRun.eventType === "error") {
-    params.status = "failed";
-    if (terminalRun.message) {
-      params.error = { message: terminalRun.message };
-    }
-  }
-  return createNotification("turn/completed", params);
 }
 
 function processRolloutLines(lines, state, sendApplicationResponse, options = {}) {
