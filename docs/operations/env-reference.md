@@ -48,6 +48,12 @@ Provider-specific env that sit alongside agnt's:
 | `AGNT_REFRESH_COMMAND` | (built-in) | Override the AppleScript / shell command used to refresh Codex.app. |
 | `AGNT_CODEX_BUNDLE_ID` | `com.openai.codex` | Override Codex.app bundle id (advanced — for non-default Codex builds). |
 
+## Voice transcription (Codex only)
+
+| Var | Default | Purpose |
+|---|---|---|
+| `AGNT_VOICE_UPLOAD_USER_AGENT` | Safari-like macOS UA | Override the User-Agent used for bridge-proxied ChatGPT transcription uploads. Useful if ChatGPT rejects Node's default fetch identity. |
+
 ## Wake / service supervision
 
 | Var | Default | Purpose |

@@ -61,6 +61,7 @@ test("voice/transcribe returns transcribed text without exposing auth tokens", a
   assert.equal(fetchCalls[0].url, "https://chatgpt.com/backend-api/transcribe");
   assert.equal(fetchCalls[0].options.method, "POST");
   assert.equal(fetchCalls[0].options.headers.Authorization.startsWith("Bearer "), true);
+  assert.match(fetchCalls[0].options.headers["User-Agent"], /Safari/);
   assert.equal(fetchCalls[0].options.headers["ChatGPT-Account-Id"], undefined);
   assert.deepEqual(responses, [{
     id: "voice-1",
@@ -372,6 +373,7 @@ test("voice/prewarm preconnects to the provider and preloads auth", async () => 
   assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].url, "https://chatgpt.com/");
   assert.equal(fetchCalls[0].options.method, "HEAD");
+  assert.match(fetchCalls[0].options.headers["User-Agent"], /Safari/);
 });
 
 test("voice/transcribe accepts M4A clips and uploads them as audio/mp4", async () => {
@@ -408,7 +410,7 @@ test("voice/transcribe accepts M4A clips and uploads them as audio/mp4", async (
     method: "voice/transcribe",
     params: {
       mimeType: "audio/mp4",
-      audioBase64: makeTestM4ABase64(),
+      audioBase64: makeTestM4ABase64({ durationSeconds: 1 }),
       sampleRateHz: 24_000,
       durationMs: 1_000,
     },
@@ -423,6 +425,46 @@ test("voice/transcribe accepts M4A clips and uploads them as audio/mp4", async (
   assert.equal(formAppends[0][0], "file");
   assert.equal(formAppends[0][1].type, "audio/mp4");
   assert.equal(formAppends[0][2], "voice.m4a");
+});
+
+test("voice/transcribe accepts CoreAudio M4A clips that report two channels", async () => {
+  const responses = [];
+  let fetchCalls = 0;
+  const handler = createVoiceHandler({
+    sendCodexRequest: async () => ({
+      authMethod: "chatgpt",
+      authToken: "chatgpt-token",
+      requiresOpenaiAuth: false,
+    }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { text: "coreaudio m4a transcript" };
+        },
+      };
+    },
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-m4a-coreaudio",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/mp4",
+      audioBase64: makeTestM4ABase64({ durationSeconds: 1, channelCount: 2 }),
+      sampleRateHz: 24_000,
+      durationMs: 1_000,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await tick();
+
+  assert.equal(fetchCalls, 1);
+  assert.equal(responses[0].result?.text, "coreaudio m4a transcript");
 });
 
 test("voice/transcribe rejects malformed M4A before contacting auth", async () => {
@@ -446,6 +488,42 @@ test("voice/transcribe rejects malformed M4A before contacting auth", async () =
     params: {
       mimeType: "audio/mp4",
       audioBase64: Buffer.from("not an mp4 container").toString("base64"),
+      sampleRateHz: 24_000,
+      durationMs: 1_000,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await tick();
+
+  assert.equal(authRequests, 0);
+  assert.equal(fetchCalls, 0);
+  assert.equal(responses[0].error?.data?.errorCode, "invalid_audio");
+  assert.match(responses[0].error?.message || "", /M4A/);
+});
+
+test("voice/transcribe rejects forged M4A containers before contacting auth", async () => {
+  const responses = [];
+  let authRequests = 0;
+  let fetchCalls = 0;
+  const handler = createVoiceHandler({
+    sendCodexRequest: async () => {
+      authRequests += 1;
+      throw new Error("auth should not be requested for invalid m4a");
+    },
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error("fetch should not run for invalid m4a");
+    },
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-forged-m4a",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/mp4",
+      audioBase64: makeTestM4ABase64({ brand: "mp42", compatibleBrand: "mp42" }),
       sampleRateHz: 24_000,
       durationMs: 1_000,
     },
@@ -505,6 +583,76 @@ test("voice/transcribe reuses auth loaded by voice/prewarm", async () => {
 
   assert.equal(authRequestCount, 1);
   assert.equal(responses[0].result?.text, "prewarmed transcript");
+});
+
+test("voice/transcribe rejects audio whose actual duration exceeds the request", async () => {
+  const responses = [];
+  let authRequests = 0;
+  let fetchCalls = 0;
+  const handler = createVoiceHandler({
+    sendCodexRequest: async () => {
+      authRequests += 1;
+      throw new Error("auth should not be requested for duration mismatch");
+    },
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error("fetch should not run for duration mismatch");
+    },
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-duration-mismatch",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/wav",
+      audioBase64: makeTestWavBase64({ durationSeconds: 4 }),
+      sampleRateHz: 24_000,
+      durationMs: 1_000,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await tick();
+
+  assert.equal(authRequests, 0);
+  assert.equal(fetchCalls, 0);
+  assert.equal(responses[0].error?.data?.errorCode, "duration_mismatch");
+});
+
+test("voice/transcribe rejects M4A whose actual duration exceeds the limit", async () => {
+  const responses = [];
+  let authRequests = 0;
+  let fetchCalls = 0;
+  const handler = createVoiceHandler({
+    sendCodexRequest: async () => {
+      authRequests += 1;
+      throw new Error("auth should not be requested for overlong m4a");
+    },
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error("fetch should not run for overlong m4a");
+    },
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-m4a-too-long",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/mp4",
+      audioBase64: makeTestM4ABase64({ durationSeconds: 151 }),
+      sampleRateHz: 24_000,
+      durationMs: 150_000,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await tick();
+
+  assert.equal(authRequests, 0);
+  assert.equal(fetchCalls, 0);
+  assert.equal(responses[0].error?.data?.errorCode, "duration_too_long");
 });
 
 test("voice/transcribe rejects clips longer than 150 seconds before contacting the provider", async () => {
@@ -627,9 +775,53 @@ function makeTestWavBase64({ sampleRateHz = 24_000, durationSeconds = null } = {
   return wav.toString("base64");
 }
 
-function makeTestM4ABase64() {
+function makeTestM4ABase64({
+  durationSeconds = 1,
+  mediaDurationSeconds = durationSeconds,
+  brand = "M4A ",
+  compatibleBrand = "M4A ",
+  channelCount = 1,
+  sampleRateHz = 24_000,
+} = {}) {
+  const mvhdPayload = Buffer.alloc(100);
+  mvhdPayload.writeUInt8(0, 0);
+  mvhdPayload.writeUInt32BE(1_000, 12);
+  mvhdPayload.writeUInt32BE(Math.max(1, Math.round(durationSeconds * 1_000)), 16);
+
+  const mdhdPayload = Buffer.alloc(20);
+  mdhdPayload.writeUInt8(0, 0);
+  mdhdPayload.writeUInt32BE(sampleRateHz, 12);
+  mdhdPayload.writeUInt32BE(Math.max(1, Math.round(mediaDurationSeconds * sampleRateHz)), 16);
+
+  const hdlrPayload = Buffer.alloc(24);
+  hdlrPayload.write("soun", 8, "ascii");
+
+  const mp4aPayload = Buffer.alloc(28);
+  mp4aPayload.writeUInt16BE(1, 6);
+  mp4aPayload.writeUInt16BE(channelCount, 16);
+  mp4aPayload.writeUInt16BE(16, 18);
+  mp4aPayload.writeUInt32BE(sampleRateHz << 16, 24);
+
+  const stsdPayload = Buffer.concat([
+    Buffer.from([0, 0, 0, 0, 0, 0, 0, 1]),
+    mp4Box("mp4a", mp4aPayload),
+  ]);
+  const stbl = mp4Box("stbl", mp4Box("stsd", stsdPayload));
+  const minf = mp4Box("minf", stbl);
+  const mdia = mp4Box("mdia", Buffer.concat([
+    mp4Box("mdhd", mdhdPayload),
+    mp4Box("hdlr", hdlrPayload),
+    minf,
+  ]));
+  const trak = mp4Box("trak", mdia);
+  const moov = mp4Box("moov", Buffer.concat([
+    mp4Box("mvhd", mvhdPayload),
+    trak,
+  ]));
+
   return Buffer.concat([
-    mp4Box("ftyp", Buffer.from("M4A \0\0\0\0M4A mp42isom", "ascii")),
+    mp4Box("ftyp", Buffer.from(`${brand}\0\0\0\0${compatibleBrand}mp42isom`, "ascii")),
+    moov,
     mp4Box("mdat", Buffer.from([0, 1, 2, 3])),
   ]).toString("base64");
 }

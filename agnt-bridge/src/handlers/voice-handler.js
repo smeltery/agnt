@@ -6,17 +6,21 @@
 
 const { isChatGPTAuthMethod } = require("./account-status");
 const { createJsonRpcRequestHandler } = require("./handler-utils");
+const { readVoiceAudioInfo } = require("./voice-audio");
 
 const CHATGPT_TRANSCRIPTIONS_URL = "https://chatgpt.com/backend-api/transcribe";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 150;
 const MAX_DURATION_MS = MAX_DURATION_SECONDS * 1_000;
+const MAX_DURATION_DRIFT_MS = 2_000;
 const AUTH_CACHE_TTL_MS = 60_000;
 const PRECONNECT_MIN_INTERVAL_MS = 2_000;
 const PRECONNECT_TIMEOUT_MS = 10_000;
 const SUPPORTED_AUDIO_FORMATS = ["wav", "m4a"];
 const WAV_MIME_TYPE = "audio/wav";
 const M4A_MIME_TYPE = "audio/mp4";
+const VOICE_UPLOAD_USER_AGENT = process.env.AGNT_VOICE_UPLOAD_USER_AGENT
+  || "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
 
 function createVoiceHandler({
   sendCodexRequest,
@@ -128,9 +132,20 @@ async function transcribeVoice(
     throw voiceError("duration_too_long", `Voice messages are limited to ${MAX_DURATION_SECONDS} seconds.`);
   }
 
-  const audioBuffer = decodeAudioBase64(params.audioBase64, mimeType);
+  const audioBuffer = decodeAudioBase64(params.audioBase64);
   if (audioBuffer.length > MAX_AUDIO_BYTES) {
     throw voiceError("audio_too_large", "Voice messages are limited to 10 MB.");
+  }
+  const audioInfo = readVoiceAudioInfo(audioBuffer, mimeType);
+  if (!audioInfo) {
+    const formatName = mimeType === M4A_MIME_TYPE ? "M4A" : "WAV";
+    throw voiceError("invalid_audio", `The recorded audio is not a valid ${formatName} file.`);
+  }
+  if (audioInfo.durationMs > MAX_DURATION_MS) {
+    throw voiceError("duration_too_long", `Voice messages are limited to ${MAX_DURATION_SECONDS} seconds.`);
+  }
+  if (audioInfo.durationMs > durationMs + MAX_DURATION_DRIFT_MS) {
+    throw voiceError("duration_mismatch", "The recorded audio duration did not match the voice request.");
   }
 
   const authContext = await loadAuth();
@@ -138,7 +153,7 @@ async function transcribeVoice(
     authContext,
     audioBuffer,
     mimeType,
-    filename: mimeType === M4A_MIME_TYPE ? "voice.m4a" : "voice.wav",
+    filename: audioInfo.filename,
     fetchImpl,
     FormDataImpl,
     BlobImpl,
@@ -162,6 +177,7 @@ async function requestTranscription({
 
     const headers = {
       Authorization: `Bearer ${activeAuthContext.token}`,
+      "User-Agent": VOICE_UPLOAD_USER_AGENT,
     };
 
     return fetchImpl(activeAuthContext.transcriptionURL, {
@@ -232,7 +248,7 @@ async function loadAuthContext(sendCodexRequest, { refreshToken = true } = {}) {
   };
 }
 
-function decodeAudioBase64(value, mimeType) {
+function decodeAudioBase64(value) {
   const normalized = normalizeBase64(value);
   if (!normalized) {
     throw voiceError("missing_audio", "The voice request did not include any audio.");
@@ -249,14 +265,6 @@ function decodeAudioBase64(value, mimeType) {
 
   if (audioBuffer.toString("base64") !== normalized) {
     throw voiceError("invalid_audio", "The recorded audio could not be decoded.");
-  }
-
-  if (mimeType === WAV_MIME_TYPE && !isLikelyWavBuffer(audioBuffer)) {
-    throw voiceError("invalid_audio", "The recorded audio is not a valid WAV file.");
-  }
-
-  if (mimeType === M4A_MIME_TYPE && !isLikelyM4ABuffer(audioBuffer)) {
-    throw voiceError("invalid_audio", "The recorded audio is not a valid M4A file.");
   }
 
   return audioBuffer;
@@ -314,26 +322,6 @@ function isLikelyWavBuffer(buffer) {
     && buffer.toString("ascii", 8, 12) === "WAVE";
 }
 
-function isLikelyM4ABuffer(buffer) {
-  if (buffer.length < 16 || buffer.toString("ascii", 4, 8) !== "ftyp") {
-    return false;
-  }
-
-  const brands = new Set();
-  for (let offset = 8; offset + 4 <= Math.min(buffer.length, 64); offset += 4) {
-    const brand = buffer.toString("ascii", offset, offset + 4);
-    if (/^[\x20-\x7E]{4}$/.test(brand)) {
-      brands.add(brand);
-    }
-  }
-
-  return brands.has("M4A ")
-    || brands.has("M4B ")
-    || brands.has("mp42")
-    || brands.has("isom")
-    || brands.has("iso2");
-}
-
 function preconnectTranscriptionOrigin(fetchImpl, warmState) {
   if (typeof fetchImpl !== "function") {
     return;
@@ -354,6 +342,7 @@ function preconnectTranscriptionOrigin(fetchImpl, warmState) {
   Promise.resolve()
     .then(() => fetchImpl(new URL("/", CHATGPT_TRANSCRIPTIONS_URL).toString(), {
       method: "HEAD",
+      headers: { "User-Agent": VOICE_UPLOAD_USER_AGENT },
       signal: controller?.signal,
     }))
     .then((response) => {
