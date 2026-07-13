@@ -26,11 +26,12 @@ const {
 } = require("./desktop-action-projection");
 const {
   DESKTOP_IPC_ACTION_SOURCE,
+  activeCanonicalTurnsById,
   applyConversationStateChange,
-  backgroundHistoryTurns,
   backgroundRawTurn,
   backgroundRawTurnById,
   backgroundTurnLifecycleNotification,
+  canonicalTurnById,
   createEmptyConversationState,
   desktopFollowerPayloadForResponse,
   desktopLiveStateForProjection,
@@ -40,7 +41,6 @@ const {
   isSnapshotChange,
   isagntLiveOwnerBroadcast,
   latestActiveBackgroundTurn,
-  normalizeBoundedTurnsForRuntime,
   projectedResolvedNotification,
   readThreadId,
   seedConversationStateFromThreadRead,
@@ -974,31 +974,6 @@ function createDesktopIpcActionFollower({
     } else {
       canonicalActiveTurnsByThreadId.delete(threadId);
     }
-  }
-
-  function activeCanonicalTurnsById(liveState) {
-    const activeTurns = new Map();
-    for (const turn of canonicalTurns(liveState)) {
-      if (turn.status === "inProgress") {
-        activeTurns.set(turn.id, turn);
-      }
-    }
-    return activeTurns;
-  }
-
-  function canonicalTurnById(liveState, turnId) {
-    for (const turn of canonicalTurns(liveState)) {
-      if (turn.id === turnId) {
-        return turn;
-      }
-    }
-    return null;
-  }
-
-  function canonicalTurns(liveState) {
-    return normalizeBoundedTurnsForRuntime(backgroundHistoryTurns(liveState), liveState)
-      .map((turn, index) => backgroundRawTurn(turn, index))
-      .filter((turn) => readString(turn.id));
   }
 
   function syncBackgroundThreadLifecycle(threadId, nextState) {

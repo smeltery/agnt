@@ -361,6 +361,31 @@ function backgroundTurnLifecycleNotification(method, threadId, turn) {
   return { method, params };
 }
 
+function activeCanonicalTurnsById(liveState) {
+  const activeTurns = new Map();
+  for (const turn of canonicalTurns(liveState)) {
+    if (turn.status === "inProgress") {
+      activeTurns.set(turn.id, turn);
+    }
+  }
+  return activeTurns;
+}
+
+function canonicalTurnById(liveState, turnId) {
+  for (const turn of canonicalTurns(liveState)) {
+    if (turn.id === turnId) {
+      return turn;
+    }
+  }
+  return null;
+}
+
+function canonicalTurns(liveState) {
+  return normalizeBoundedTurnsForRuntime(backgroundHistoryTurns(liveState), liveState)
+    .map((turn, index) => backgroundRawTurn(turn, index))
+    .filter((turn) => readString(turn.id));
+}
+
 function isagntLiveOwnerBroadcast(params) {
   return readString(params?.agntOwnerSource) === AGNT_LIVE_OWNER_SOURCE;
 }
@@ -479,11 +504,13 @@ function readThreadId(params) {
 
 module.exports = {
   DESKTOP_IPC_ACTION_SOURCE,
+  activeCanonicalTurnsById,
   applyConversationStateChange,
   backgroundHistoryTurns,
   backgroundRawTurn,
   backgroundRawTurnById,
   backgroundTurnLifecycleNotification,
+  canonicalTurnById,
   createEmptyConversationState,
   desktopFollowerPayloadForResponse,
   desktopLiveStateForProjection,
