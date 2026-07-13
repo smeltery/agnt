@@ -3,7 +3,7 @@
 use std::io::{BufRead, BufReader};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -17,12 +17,14 @@ use std::fs;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
+mod app_types;
 mod diagnostics;
 mod host_config;
 mod network;
 mod provider_bridge;
 mod runtime_bundle;
 
+use app_types::{AppState, AppStatus, DebugInfo, LogEntry, UpdateInfo};
 use diagnostics::{
     diagnostic_action, diagnostic_check, pairing_payload_expiry, pairing_payload_relay,
     recommended_lan_network, recommended_tailscale_network, relay_url_policy, selected_network,
@@ -47,66 +49,6 @@ use runtime_bundle::{
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const PET_WINDOW_SIZE: f64 = 80.0;
-
-// ─── Data types ──────────────────────────────────────────────
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct LogEntry {
-    pub timestamp: String,
-    pub source: String,
-    pub level: String,
-    pub message: String,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct DebugInfo {
-    pub cwd: String,
-    pub repo_root: String,
-    pub relay_dir: String,
-    pub relay_server_exists: bool,
-    pub bridge_dir: String,
-    pub bridge_bin_exists: bool,
-    pub config_path: String,
-    pub config_exists: bool,
-    pub node_version: String,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct UpdateInfo {
-    pub version: String,
-    pub current_version: String,
-    pub date: Option<String>,
-    pub body: Option<String>,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct AppStatus {
-    pub state: String,
-    pub relay_mode: String,
-    pub relay: String,
-    pub bridge: String,
-    pub network: String,
-    pub relay_url: String,
-    pub pairing_payload: Option<String>,
-    pub pairing_code: Option<String>,
-    pub phone_connected: bool,
-}
-
-// ─── State ───────────────────────────────────────────────────
-
-pub struct AppState {
-    pub relay_process: Mutex<Option<Child>>,
-    pub bridge_process: Mutex<Option<Child>>,
-    pub logs: Mutex<Vec<LogEntry>>,
-    pub config: Mutex<AppConfig>,
-    pub pairing_payload: Mutex<Option<String>>,
-    pub selected_ip: Mutex<String>,
-    pub relay_url: Mutex<String>,
-    pub phone_connected: Mutex<bool>,
-    pub pairing_code: Mutex<Option<String>>,
-    pub relay_intentional: Mutex<bool>,
-    pub bridge_intentional: Mutex<bool>,
-}
 
 // ─── Helpers ─────────────────────────────────────────────────
 

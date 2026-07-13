@@ -33,7 +33,7 @@ pub struct DiagnosticsSnapshot {
     pub presets: Vec<SetupPreset>,
     pub recommended_actions: Vec<DiagnosticAction>,
     pub runtime: crate::runtime_bundle::RuntimeBundleStatus,
-    pub debug: crate::DebugInfo,
+    pub debug: crate::app_types::DebugInfo,
 }
 
 pub(crate) fn is_private_ipv4(addr: &str) -> bool {
