@@ -19,7 +19,6 @@
       "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt": 1375,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer.swift": 1400,
       "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+Account.swift": 1350,
-      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/data/IncomingEventRouter.kt": 1275,
       "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 1350,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,

@@ -24,12 +24,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.ConcurrentHashMap
 
-private enum class ServerRequestKind {
-    StructuredInput,
-    Approval,
-    Unsupported,
-}
-
 /**
  * Routes Mac→phone JSON-RPC notifications and server-initiated requests.
  * Parity with [AgentService.handleNotification] / [AgentService.handleServerRequest] (iOS).
@@ -303,7 +297,7 @@ internal class IncomingEventRouter(
         val m = method.trim()
         scope.launch(Dispatchers.IO) {
             val nm = normalizeMethod(m)
-            when (serverRequestKind(m, nm)) {
+            when (classifyServerRequest(m, nm)) {
                 ServerRequestKind.StructuredInput -> {
                     val request = buildStructuredInputRequest(requestId, params)
                     appendStructuredInputTimelineMarker(request)
@@ -328,7 +322,8 @@ internal class IncomingEventRouter(
                         )
                         return@launch
                     }
-                    val request = buildApprovalRequest(m, requestId, params)
+                    val paramsObject = params?.objectValue
+                    val request = buildApprovalRequest(m, requestId, paramsObject, resolveThreadId(paramsObject))
                     appendPendingApprovalTimelineMarker(request)
                     onApprovalRequest(request) { decision ->
                         val rpc =
@@ -363,15 +358,10 @@ internal class IncomingEventRouter(
         }
     }
 
-    private fun serverRequestKind(
+    private fun classifyServerRequest(
         method: String,
         normalizedMethod: String,
-    ): ServerRequestKind =
-        when {
-            isStructuredInputServerRequestMethod(method) -> ServerRequestKind.StructuredInput
-            isApprovalServerRequestMethod(normalizedMethod) -> ServerRequestKind.Approval
-            else -> ServerRequestKind.Unsupported
-        }
+    ): ServerRequestKind = serverRequestKind(method, normalizedMethod)
 
     private fun recordTurnThread(
         turnId: String?,
@@ -1107,30 +1097,6 @@ internal class IncomingEventRouter(
         }
     }
 
-    private fun approvalDecisionResult(decision: String): JSONValue = JSONValue.Obj(mapOf("decision" to JSONValue.Str(decision)))
-
-    private fun structuredUserInputResult(answersByQuestionId: Map<String, List<String>>): JSONValue =
-        JSONValue.Obj(
-            mapOf(
-                "answers" to
-                    JSONValue.Obj(
-                        answersByQuestionId.mapValues { (_, answers) ->
-                            JSONValue.Obj(
-                                mapOf(
-                                    "answers" to
-                                        JSONValue.Arr(
-                                            answers
-                                                .map { it.trim() }
-                                                .filter { it.isNotEmpty() }
-                                                .map { JSONValue.Str(it) },
-                                        ),
-                                ),
-                            )
-                        },
-                    ),
-            ),
-        )
-
     private suspend fun appendStructuredInputTimelineMarker(request: PendingStructuredInputRequest) {
         val threadId = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
         messageTimeline.appendStructuredInputPromptMarker(
@@ -1157,37 +1123,13 @@ internal class IncomingEventRouter(
         )
     }
 
-    private fun buildApprovalRequest(
-        method: String,
-        requestId: JSONValue,
-        params: JSONValue?,
-    ): PendingApprovalRequest {
-        val obj = params?.objectValue
-        return PendingApprovalRequest(
-            id = requestKey(requestId),
-            method = method,
-            threadId = resolveThreadId(obj),
-            turnId = IncomingNotificationParsers.extractTurnId(obj),
-            itemId = IncomingNotificationParsers.extractItemId(obj),
-            command = obj?.get("command")?.stringValue,
-            reason = obj?.get("reason")?.stringValue,
-        )
-    }
-
     private fun buildStructuredInputRequest(
         requestId: JSONValue,
         params: JSONValue?,
-    ): PendingStructuredInputRequest {
-        val obj = params?.objectValue
-        return PendingStructuredInputRequest(
-            id = requestKey(requestId),
-            threadId = resolveThreadId(obj),
-            turnId = IncomingNotificationParsers.extractTurnId(obj),
-            questions = parseStructuredInputQuestions(obj),
-        )
-    }
-
-    private fun requestKey(requestId: JSONValue): String = JSONValue.toJsonElement(requestId).toString()
+    ): PendingStructuredInputRequest =
+        params
+            ?.objectValue
+            .let { obj -> buildStructuredInputRequest(requestId, obj, resolveThreadId(obj)) }
 
     private fun extractThreadId(params: Map<String, JSONValue>): String? {
         fun norm(s: String?) = CodexThread.normalizeIdentifier(s)
