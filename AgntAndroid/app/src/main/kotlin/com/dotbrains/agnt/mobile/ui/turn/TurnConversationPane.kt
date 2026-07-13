@@ -19,13 +19,8 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -50,7 +45,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotbrains.agnt.mobile.BuildConfig
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.error.AgentServiceError
-import com.dotbrains.agnt.mobile.core.model.AIChangeSet
 import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
@@ -118,7 +112,6 @@ import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoveryCard
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnFeedbackDialog
 import com.dotbrains.agnt.mobile.ui.turn.timeline.SmartScrollNavigationCta
-import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnRichMarkdownBody
 import com.dotbrains.agnt.mobile.ui.turn.timeline.buildChatAnchors
 import com.dotbrains.agnt.mobile.ui.turn.timeline.buildSmartScrollNavigationState
 import com.dotbrains.agnt.mobile.ui.turn.timeline.shouldFollowTimelineBottom
@@ -2071,78 +2064,4 @@ fun TurnConversationPane(
         message = fullTimelineMessage,
         onDismiss = { fullTimelineMessage = null },
     )
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun FullTimelineMessageSheet(
-    message: com.dotbrains.agnt.mobile.core.model.CodexMessage?,
-    onDismiss: () -> Unit,
-) {
-    if (message == null) return
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement =
-                androidx.compose.foundation.layout.Arrangement
-                    .spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.turn_message_full_sheet_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            TurnRichMarkdownBody(
-                markdown = message.text.trim(),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.fillMaxWidth(),
-                keyPrefix = "full-${message.id}",
-            )
-        }
-    }
-}
-
-private fun assistantUndoChangeSetsByMessageId(
-    messages: List<com.dotbrains.agnt.mobile.core.model.CodexMessage>,
-    changeSets: List<AIChangeSet>,
-): Map<String, AIChangeSet> {
-    if (messages.isEmpty() || changeSets.isEmpty()) return emptyMap()
-    val readyChangeSets =
-        changeSets.filter { TurnUsageSheetLogic.revertPrimaryEnabled(it, runtimeRevertRpcAvailable = true) }
-    val byAssistantMessageId =
-        readyChangeSets
-            .mapNotNull { changeSet ->
-                changeSet.assistantMessageId
-                    ?.trim()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { it to changeSet }
-            }.toMap()
-    val byTurnId = readyChangeSets.associateBy { it.turnId }
-    val mapped =
-        messages
-            .asSequence()
-            .filter { it.role == com.dotbrains.agnt.mobile.core.model.CodexMessageRole.assistant }
-            .mapNotNull { message ->
-                val changeSet =
-                    byAssistantMessageId[message.id]
-                        ?: message.itemId?.let { byAssistantMessageId[it] }
-                        ?: message.turnId?.let { byTurnId[it] }
-                changeSet?.let { message.id to it }
-            }.toMap()
-    if (mapped.isNotEmpty()) return mapped
-    val latestAssistant = messages.lastOrNull { it.role == com.dotbrains.agnt.mobile.core.model.CodexMessageRole.assistant }
-    val latestReady = readyChangeSets.maxByOrNull { it.createdAt }
-    return if (latestAssistant != null && latestReady != null) {
-        mapOf(latestAssistant.id to latestReady)
-    } else {
-        emptyMap()
-    }
 }
