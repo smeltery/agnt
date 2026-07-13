@@ -867,6 +867,12 @@ struct MessageRow: View, Equatable {
                 onDismiss: { previewImage = nil }
             )
         }
+        .modifier(UserBubbleSendAppearance(isEnabled: isFreshLocalSend))
+    }
+
+    private var isFreshLocalSend: Bool {
+        message.deliveryState == .pending
+            && Date().timeIntervalSince(message.createdAt) < 3
     }
 
     @ViewBuilder
