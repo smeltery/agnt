@@ -4,7 +4,7 @@
     "files": {
       "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 3225,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 2600,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 3400,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 3300,
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+Incoming.swift": 3000,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 3200,
       "agnt-host/src-tauri/src/lib.rs": 2800,
