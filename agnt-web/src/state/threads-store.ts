@@ -53,6 +53,7 @@ import { useTurnTokenUsageStore } from "./turn-token-usage-store";
 import { messagesStore } from "../storage/messages-store";
 import { prefsStore, type ThreadColor, type ThreadOverride } from "../storage/prefs-store";
 import { buildTurnInput } from "./turn-input";
+import { applyHistoryEvent, flattenTurnsToEvents } from "./thread-history-events";
 import type { ImageAttachment } from "../models";
 import {
   buildReviewStartParams,
@@ -1137,64 +1138,4 @@ function readString(params: unknown, ...keys: string[]): string | undefined {
     if (typeof value === "string" && value.trim()) return value;
   }
   return undefined;
-}
-
-// ─── History → reducer-event adapter ──────────────────────────────────────────
-//
-// thread/turns/list returns whole turns. We replay them through the same reducer
-// the live-streaming path uses by emitting synthetic item/started + item/completed
-// events. This guarantees the on-disk timeline shape is identical to what's
-// rendered live — there is no separate "history merge" code path to keep in sync.
-
-interface SyntheticEvent {
-  kind: "started" | "completed";
-  params: Record<string, unknown>;
-}
-
-function flattenTurnsToEvents(turns: unknown[], threadId: string): SyntheticEvent[] {
-  const events: SyntheticEvent[] = [];
-  // Bridge sends turns newest-first; replay them oldest-first so orderIndex
-  // is monotonic. Items inside a turn keep their natural order.
-  const ordered = [...turns].reverse();
-  for (const turnUnknown of ordered) {
-    const turn = turnUnknown as Record<string, unknown>;
-    const turnId = (turn.id as string | undefined) ?? (turn.turnId as string | undefined);
-    const items = (turn.items as unknown[]) ?? (turn.events as unknown[]) ?? [];
-    for (const itemUnknown of items) {
-      const item = itemUnknown as Record<string, unknown>;
-      const baseParams: Record<string, unknown> = {
-        threadId,
-        turnId,
-        itemId: item.id ?? item.itemId,
-        type: item.type,
-        role: item.role,
-      };
-      events.push({ kind: "started", params: baseParams });
-      events.push({
-        kind: "completed",
-        params: { ...baseParams, text: item.text ?? item.message },
-      });
-    }
-  }
-  return events;
-}
-
-function applyHistoryEvent(state: ThreadReducerState, event: SyntheticEvent): ThreadReducerState {
-  const baseEvent = {
-    threadId: event.params.threadId as string,
-    turnId: event.params.turnId as string | undefined,
-    itemId: event.params.itemId as string | undefined,
-  };
-  if (event.kind === "started") {
-    return applyItemStarted(state, {
-      ...baseEvent,
-      type: event.params.type as string | undefined,
-      role: event.params.role as string | undefined,
-    });
-  }
-  return applyItemCompleted(state, {
-    ...baseEvent,
-    type: event.params.type as string | undefined,
-    text: event.params.text as string | undefined,
-  });
 }
