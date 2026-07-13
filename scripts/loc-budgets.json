@@ -9,7 +9,7 @@
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 2000,
       "agnt-host/src-tauri/src/lib.rs": 2400,
       "AgntMobile/AgntMobileTests/CodexServiceIncomingCommandExecutionTests.swift": 2300,
-      "AgntMobile/AgntMobileTests/CodexServiceIncomingRunIndicatorTests.swift": 2550,
+      "AgntMobile/AgntMobileTests/CodexServiceIncomingRunIndicatorTests.swift": 2125,
       "agnt-bridge/src/desktop/desktop-ipc-action-follower.js": 1900,
       "agnt-bridge/test/desktop/rollout-live-mirror.test.js": 2050,
       "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 2075,
