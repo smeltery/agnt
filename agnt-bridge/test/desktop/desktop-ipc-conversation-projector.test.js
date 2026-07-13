@@ -12,6 +12,58 @@ const {
   projectDesktopConversationStateToThread,
 } = require("../../src/desktop/desktop-ipc-conversation-projector");
 
+test("desktop conversation projector applies persisted runtime settings", () => {
+  const thread = projectDesktopConversationStateToThread("thread-runtime", {
+    latestModel: "fallback-model",
+    agntRuntimeSettings: {
+      model: "gpt-5.2",
+      reasoningEffort: "high",
+      serviceTier: "fast",
+      revision: 4,
+      updatedAt: 123,
+      source: "phone",
+    },
+    turns: [],
+  });
+
+  assert.equal(thread.model, "gpt-5.2");
+  assert.equal(thread.reasoningEffort, "high");
+  assert.equal(thread.serviceTier, "fast");
+  assert.equal(thread.runtimeSettingsRevision, 4);
+  assert.equal(thread.runtimeSettingsUpdatedAt, 123);
+  assert.equal(thread.runtimeSettingsSource, "phone");
+});
+
+test("desktop conversation projector refreshes thread metadata when runtime settings change", () => {
+  const projector = createDesktopConversationProjector({ now: () => 100 });
+  projector.project("thread-runtime-refresh", {
+    agntRuntimeSettings: {
+      model: "gpt-5.1",
+      reasoningEffort: "medium",
+      revision: 1,
+      updatedAt: 100,
+      source: "phone",
+    },
+    turns: [],
+  });
+
+  const output = projector.project("thread-runtime-refresh", {
+    agntRuntimeSettings: {
+      model: "gpt-5.2",
+      reasoningEffort: "high",
+      revision: 2,
+      updatedAt: 200,
+      source: "phone",
+    },
+    turns: [],
+  });
+
+  const threadStarted = output.notifications.find((notification) => notification.method === "thread/started");
+  assert.equal(threadStarted?.params.thread.model, "gpt-5.2");
+  assert.equal(threadStarted?.params.thread.runtimeSettingsRevision, 2);
+  assert.equal(threadStarted?.params.thread.runtimeSettingsSource, "phone");
+});
+
 test("desktop identity repair pairs synthetic turns independently of parallel active turns", () => {
   const sharedTurn = {
     status: "inProgress",

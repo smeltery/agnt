@@ -130,6 +130,9 @@ const {
 const {
   createDesktopIpcLiveOwner,
 } = require("../desktop/desktop-ipc-live-owner");
+const {
+  createThreadRuntimeSettingsStore,
+} = require("../desktop/thread-runtime-settings-store");
 const { version: bridgePackageVersion = "" } = require("../../package.json");
 const { buildCachedIOSAppCompatibilityWarning } = require("./ios-app-compatibility");
 const { createShortPairingCode, SHORT_PAIRING_CODE_LENGTH } = require("../transport/qr");
@@ -265,6 +268,7 @@ function startBridge({
     live.send(wireMessage);
     return true;
   }
+  const threadRuntimeSettingsStore = createThreadRuntimeSettingsStore();
   const desktopIpcLiveOwner = !config.codexEndpoint && activeProvider.id === "codex"
     ? createDesktopIpcLiveOwner({
       sendApplicationResponse,
@@ -277,6 +281,7 @@ function startBridge({
       },
       socketPath: config.desktopIpcSocketPath || undefined,
       snapshotDebounceMs: config.desktopIpcSnapshotDebounceMs,
+      runtimeSettingsStore: threadRuntimeSettingsStore,
     })
     : null;
   const desktopIpcActionFollower = !config.codexEndpoint

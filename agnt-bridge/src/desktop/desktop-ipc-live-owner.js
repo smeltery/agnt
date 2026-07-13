@@ -118,6 +118,7 @@ function createDesktopIpcLiveOwner({
   reconnectMs = DEFAULT_RECONNECT_MS,
   initialHistoryRetryMs = DEFAULT_INITIAL_HISTORY_RETRY_MS,
   initialHistoryMaxAttempts = DEFAULT_INITIAL_HISTORY_MAX_ATTEMPTS,
+  runtimeSettingsStore = null,
   netModule = net,
   now = () => Date.now(),
   logPrefix = "[agnt]",
@@ -805,6 +806,7 @@ function createDesktopIpcLiveOwner({
       hostId,
       now,
     });
+    runtimeSettingsStore?.attachToConversation?.(threadId, next);
     conversations.set(threadId, next);
     stopAwaitingInitialHistory(threadId);
     return next;
@@ -824,6 +826,7 @@ function createDesktopIpcLiveOwner({
       });
       conversations.set(normalizedThreadId, conversation);
     }
+    runtimeSettingsStore?.attachToConversation?.(normalizedThreadId, conversation);
     return conversation;
   }
 
@@ -1011,6 +1014,7 @@ function createDesktopIpcLiveOwner({
     if (!conversationState || !ownedThreadIds.has(threadId)) {
       return true;
     }
+    runtimeSettingsStore?.attachToConversation?.(threadId, conversationState);
     if (shouldDelayInitialSnapshotForHistory(threadId)) {
       return false;
     }
@@ -1228,6 +1232,12 @@ function createDesktopIpcLiveOwner({
     }
     try {
       const turnStartResult = await sendCodexRequest("turn/start", nextCodexParams);
+      commitAcceptedRuntimeSettings(
+        conversationId,
+        nextCodexParams,
+        isKnownHeldPhoneStart ? "phone" : "desktop",
+        readTurnIdFromResult(turnStartResult)
+      );
       if (!isKnownHeldPhoneStart) {
         mirrorFollowerUserPromptToPhone(conversationId, nextCodexParams, turnStartResult);
       }
@@ -1485,12 +1495,14 @@ function createDesktopIpcLiveOwner({
       input: [{ type: "text", text }],
       cwd: readString(entry?.cwd) || readString(conversation?.cwd) || undefined,
     }));
+    let queuedTurnParams = null;
     Promise.resolve()
       .then(() => normalizeTurnStartParams(cloneJSON(startParams)))
       .then((normalized) => {
         const params = normalized && typeof normalized === "object" && !Array.isArray(normalized)
           ? normalized
           : startParams;
+        queuedTurnParams = params;
         const pendingEntry = rememberPendingTurnStart(threadId, params);
         if (pendingEntry) {
           insertOptimisticPendingTurn(threadId, pendingEntry);
@@ -1498,7 +1510,8 @@ function createDesktopIpcLiveOwner({
         }
         return sendCodexRequest("turn/start", params);
       })
-      .then(() => {
+      .then((turnStartResult) => {
+        commitAcceptedRuntimeSettings(threadId, queuedTurnParams, "desktop", readTurnIdFromResult(turnStartResult));
         queue.shift();
         if (queue.length === 0) {
           queuedFollowUpsByThreadId.delete(threadId);
@@ -1516,7 +1529,18 @@ function createDesktopIpcLiveOwner({
   // Fills follower turn-start params with Desktop-selected runtime overrides when
   // the request itself does not specify them. Phone-origin turns are untouched.
   function mergeFollowerRuntimeOverrides(conversationId, params) {
-    const overrides = followerRuntimeOverridesByThreadId.get(conversationId);
+    const persistedSettings = runtimeSettingsStore?.get?.(conversationId) || null;
+    const persistedOverrides = persistedSettings
+      ? {
+        model: persistedSettings.model,
+        effort: persistedSettings.reasoningEffort,
+        serviceTier: persistedSettings.serviceTier,
+      }
+      : null;
+    const liveOverrides = followerRuntimeOverridesByThreadId.get(conversationId) || null;
+    const overrides = persistedOverrides || liveOverrides
+      ? { ...(persistedOverrides || {}), ...(liveOverrides || {}) }
+      : null;
     if (!overrides) {
       return params;
     }
@@ -1527,10 +1551,28 @@ function createDesktopIpcLiveOwner({
     if (overrides.effort != null && merged.effort == null) {
       merged.effort = overrides.effort;
     }
+    if (overrides.serviceTier && !readString(merged.serviceTier)) {
+      merged.serviceTier = overrides.serviceTier;
+    }
     if (overrides.collaborationMode && merged.collaborationMode == null) {
       merged.collaborationMode = cloneJSON(overrides.collaborationMode);
     }
     return merged;
+  }
+
+  function commitAcceptedRuntimeSettings(threadId, params, source, turnId) {
+    try {
+      const settings = runtimeSettingsStore?.commit?.(threadId, params, { source, turnId });
+      const conversation = conversations.get(threadId);
+      if (settings && conversation) {
+        runtimeSettingsStore.attachToConversation(threadId, conversation);
+        scheduleSnapshot(threadId);
+      }
+      return settings || null;
+    } catch (error) {
+      console.warn(`${logPrefix} runtime settings persistence failed: ${error?.message || "unknown error"}`);
+      return null;
+    }
   }
 
   // True while the bridge's app-server is executing a turn for this thread, or
@@ -1663,6 +1705,13 @@ function readThreadFromPayload(result) {
   return result.thread && typeof result.thread === "object"
     ? result.thread
     : result;
+}
+
+function readTurnIdFromResult(result) {
+  return readString(result?.turn?.id)
+    || readString(result?.turnId)
+    || readString(result?.turn_id)
+    || readString(result?.id);
 }
 
 function readConversationIdFromFollowerParams(params) {
