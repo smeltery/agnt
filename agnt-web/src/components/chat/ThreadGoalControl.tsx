@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { type ThreadGoal, threadGoalNeedsAttention } from "../../models";
-import { useThreadGoalsStore } from "../../state/thread-goals-store";
+import { useThreadGoalsStore } from "../../state/thread-goals";
 
 interface ThreadGoalControlProps {
   threadId: string | null;

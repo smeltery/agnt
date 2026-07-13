@@ -55,7 +55,7 @@ import { prefsStore, type ThreadColor, type ThreadOverride } from "../storage/pr
 import { buildTurnInput } from "./turn-input";
 import { applyHistoryEvent, flattenTurnsToEvents } from "./thread-history-events";
 import type { ImageAttachment } from "../models";
-import { useThreadGoalsStore } from "./thread-goals-store";
+import { useThreadGoalsStore } from "./thread-goals";
 import {
   buildReviewStartParams,
   effectiveServiceTier,
