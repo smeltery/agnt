@@ -12,22 +12,35 @@
 import ActivityKit
 import Foundation
 
+enum AgntActivityConversationPhase: String, Codable, Hashable {
+    case running
+    case completed
+    case failed
+}
+
+struct AgntActivityConversation: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String
+    var detail: String
+    var phase: AgntActivityConversationPhase
+    var runningStartedAt: Date?
+}
+
 struct AgntActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
-        enum Phase: String, Codable, Hashable {
-            case running
-            case completed
-            case failed
-        }
-
-        var phase: Phase
-        // Short status line, e.g. "Working…" / "Done" / "Stopped". Never a prompt
-        // or model name — keep it generic so no provider detail surfaces.
-        var detail: String
+        var runningConversations: [AgntActivityConversation]
+        var completedConversations: [AgntActivityConversation]
+        var failedConversations: [AgntActivityConversation]
         var updatedAt: Date
+
+        var isEmpty: Bool {
+            runningConversations.isEmpty
+                && completedConversations.isEmpty
+                && failedConversations.isEmpty
+        }
     }
 
     // Immutable for the life of the activity.
-    var threadTitle: String
+    var title: String
     var startedAt: Date
 }

@@ -30,8 +30,9 @@ The target ships three things:
 
 ## How the Live Activity is driven (app side)
 
-- `AgntMobile/Services/LiveActivity/LiveActivityCoordinator.swift` owns at most
-  one `Activity<AgntActivityAttributes>` and starts / updates / ends it.
+- `AgntMobile/Services/LiveActivity/LiveActivityCoordinator.swift` owns one
+  aggregate `Activity<AgntActivityAttributes>` and updates it with multiple
+  off-screen running / reviewable conversations.
 - `AgntMobile/Services/LiveActivity/CodexService+LiveActivity.swift` maps a
   thread's "turn active" edge to the coordinator and resolves a display title.
 - `CodexService.setActiveTurnID(_:for:)` calls `syncLiveActivity(...)` only on the
