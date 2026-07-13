@@ -16,24 +16,18 @@ use tauri_plugin_updater::UpdaterExt;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
-mod provider_bridge;
 mod diagnostics;
+mod network;
+mod provider_bridge;
 mod runtime_bundle;
 
 use diagnostics::{
-    diagnostic_action,
-    diagnostic_check,
-    is_private_ipv4,
-    is_tailscale_ipv4,
-    pairing_payload_expiry,
-    pairing_payload_relay,
-    recommended_lan_network,
-    recommended_tailscale_network,
-    relay_url_policy,
-    selected_network,
-    DiagnosticsSnapshot,
-    SetupPreset,
+    diagnostic_action, diagnostic_check, pairing_payload_expiry, pairing_payload_relay,
+    recommended_lan_network, recommended_tailscale_network, relay_url_policy, selected_network,
+    DiagnosticsSnapshot, SetupPreset,
 };
+use network::detect_network_interfaces;
+pub use network::NetworkInterface;
 #[cfg(test)]
 use runtime_bundle::{
     bundle_manifests_match, copy_fixture_runtime_from_bundle, read_bundle_manifest, BundleManifest,
@@ -44,6 +38,7 @@ use runtime_bundle::{
     seed_runtime_from_bundle, RuntimeBundleStatus,
 };
 
+#[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const PET_WINDOW_SIZE: f64 = 80.0;
 
@@ -55,14 +50,6 @@ pub struct LogEntry {
     pub source: String,
     pub level: String,
     pub message: String,
-}
-
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct NetworkInterface {
-    pub name: String,
-    pub address: String,
-    pub kind: String,
-    pub is_private: bool,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -451,6 +438,9 @@ fn add_log(app_handle: &tauri::AppHandle, source: &str, level: &str, message: &s
 // ─── Registry helpers (Windows) ──────────────────────────────
 
 fn set_launch_at_startup(enable: bool) {
+    #[cfg(not(target_os = "windows"))]
+    let _ = enable;
+
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
@@ -537,6 +527,9 @@ fn show_notification(title: &str, body: &str) {
 }
 
 fn hide_console(cmd: &mut Command) {
+    #[cfg(not(target_os = "windows"))]
+    let _ = cmd;
+
     #[cfg(target_os = "windows")]
     {
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -655,146 +648,6 @@ fn save_config(config: &AppConfig) {
     if let Ok(json) = serde_json::to_string_pretty(config) {
         let _ = fs::write(path, json);
     }
-}
-
-// ─── Network detection ──────────────────────────────────────
-
-fn is_virtual_interface(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    lower.contains("hyper-v")
-        || lower.contains("virtual")
-        || lower.contains("docker")
-        || lower.contains("vswitch")
-        || lower.contains("vmware")
-        || lower.contains("virtualbox")
-        || lower.contains("wsl")
-        || lower.contains("bluetooth")
-        || lower.contains("loopback")
-        || lower.contains("pseudo")
-}
-
-fn is_vpn_interface(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    lower.contains("vpn")
-        || lower.contains("tailscale")
-        || lower.contains("zerotier")
-        || lower.contains("wireguard")
-        || lower.contains("openvpn")
-        || lower.contains("nord")
-        || lower.contains("proton")
-}
-
-fn detect_network_interfaces() -> Vec<NetworkInterface> {
-    let mut interfaces = Vec::new();
-
-    // Use netsh on Windows, ip on Linux/Mac
-    #[cfg(target_os = "windows")]
-    {
-        let mut cmd = Command::new("powershell");
-        cmd.args([
-            "-NoProfile", "-Command",
-            "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.AddressState -eq 'Preferred' } | Select-Object IPAddress, InterfaceAlias | ConvertTo-Json -Compress"
-        ]);
-        hide_console(&mut cmd);
-        if let Ok(output) = cmd.output() {
-            if let Ok(stdout) = String::from_utf8(output.stdout) {
-                // Try to parse the JSON array
-                if let Ok(values) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
-                    for v in values {
-                        let name = v["InterfaceAlias"]
-                            .as_str()
-                            .unwrap_or("unknown")
-                            .to_string();
-                        let address = v["IPAddress"].as_str().unwrap_or("").to_string();
-                        if !address.is_empty() {
-                            let is_virt = is_virtual_interface(&name);
-                            let is_vpn = is_vpn_interface(&name);
-                            let is_priv = is_private_ipv4(&address) || is_tailscale_ipv4(&address);
-                            let kind = if is_vpn {
-                                "vpn"
-                            } else if is_virt {
-                                "virtual"
-                            } else if name.to_lowercase().contains("wi-fi")
-                                || name.to_lowercase().contains("wifi")
-                            {
-                                "wifi"
-                            } else if name.to_lowercase().contains("ethernet") {
-                                "ethernet"
-                            } else {
-                                "other"
-                            };
-                            interfaces.push(NetworkInterface {
-                                name,
-                                address,
-                                kind: kind.to_string(),
-                                is_private: is_priv && !is_virt,
-                            });
-                        }
-                    }
-                } else {
-                    // Try single object
-                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&stdout) {
-                        if let Some(obj) = v.as_object() {
-                            let name = obj
-                                .get("InterfaceAlias")
-                                .and_then(|s| s.as_str())
-                                .unwrap_or("unknown")
-                                .to_string();
-                            let address = obj
-                                .get("IPAddress")
-                                .and_then(|s| s.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let is_priv = is_private_ipv4(&address) || is_tailscale_ipv4(&address);
-                            if !address.is_empty() {
-                                interfaces.push(NetworkInterface {
-                                    name,
-                                    address,
-                                    kind: "other".to_string(),
-                                    is_private: is_priv,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let output = Command::new("sh")
-            .args(["-c", "ifconfig | grep 'inet ' | grep -v 127.0.0.1"])
-            .output();
-        if let Ok(out) = output {
-            if let Ok(stdout) = String::from_utf8(out.stdout) {
-                for line in stdout.lines() {
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() >= 2 {
-                        let addr = parts[1];
-                        if is_private_ipv4(addr) || is_tailscale_ipv4(addr) {
-                            interfaces.push(NetworkInterface {
-                                name: "en0".to_string(),
-                                address: addr.to_string(),
-                                kind: "other".to_string(),
-                                is_private: true,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Sort: private interfaces first, non-virtual first, wifi first
-    interfaces.sort_by(|a, b| {
-        b.is_private
-            .cmp(&a.is_private)
-            .then(a.kind.cmp(&b.kind))
-            .then(a.address.cmp(&b.address))
-    });
-
-    interfaces
 }
 
 // ─── Process piping ─────────────────────────────────────────

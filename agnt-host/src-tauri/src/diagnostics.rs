@@ -165,7 +165,11 @@ pub(crate) fn relay_url_policy(raw: &str) -> (String, String) {
     )
 }
 
-pub(crate) fn diagnostic_action(kind: &str, label: &str, value: Option<String>) -> DiagnosticAction {
+pub(crate) fn diagnostic_action(
+    kind: &str,
+    label: &str,
+    value: Option<String>,
+) -> DiagnosticAction {
     DiagnosticAction {
         kind: kind.to_string(),
         label: label.to_string(),
@@ -207,7 +211,9 @@ pub(crate) fn recommended_lan_network(networks: &[NetworkInterface]) -> Option<&
         })
 }
 
-pub(crate) fn recommended_tailscale_network(networks: &[NetworkInterface]) -> Option<&NetworkInterface> {
+pub(crate) fn recommended_tailscale_network(
+    networks: &[NetworkInterface],
+) -> Option<&NetworkInterface> {
     networks
         .iter()
         .find(|nic| nic.kind == "vpn" && is_tailscale_ipv4(&nic.address))
