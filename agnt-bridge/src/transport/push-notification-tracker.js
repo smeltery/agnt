@@ -8,7 +8,20 @@ const {
   createPushNotificationCompletionDedupe,
 } = require("./push-notification-completion-dedupe");
 
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const DEFAULT_GOAL_PUSH_STATE_PATH = path.join(os.homedir(), ".agnt", "goal-push-state.json");
 const DEFAULT_PREVIEW_MAX_CHARS = 160;
+const MAX_GOAL_STATUS_ENTRIES = 500;
+
+const GOAL_PUSH_BODIES = new Map([
+  ["complete", "Goal complete"],
+  ["blocked", "Goal blocked - agnt needs your input"],
+  ["usageLimited", "Goal stopped - usage limit reached"],
+  ["budgetLimited", "Goal stopped - token budget reached"],
+]);
 
 function createPushNotificationTracker({
   sessionId,
@@ -16,10 +29,12 @@ function createPushNotificationTracker({
   previewMaxChars = DEFAULT_PREVIEW_MAX_CHARS,
   logPrefix = "[agnt]",
   now = () => Date.now(),
+  goalPushStatePath = DEFAULT_GOAL_PUSH_STATE_PATH,
 } = {}) {
   const threadTitleById = new Map();
   const threadIdByTurnId = new Map();
   const turnStateByKey = new Map();
+  const goalStatusByThreadId = loadGoalPushState(goalPushStatePath, logPrefix);
   const completionDedupe = createPushNotificationCompletionDedupe({ now });
 
   // ─── ENTRY POINT ─────────────────────────────────────────────
@@ -27,6 +42,18 @@ function createPushNotificationTracker({
   function handleOutbound(rawMessage) {
     const message = parseOutboundMessage(rawMessage);
     if (!message) {
+      return;
+    }
+
+    if (message.method === "thread/goal/updated") {
+      void handleGoalUpdated(message);
+      return;
+    }
+
+    if (message.method === "thread/goal/cleared") {
+      if (message.threadId && goalStatusByThreadId.delete(message.threadId)) {
+        saveGoalPushState(goalPushStatePath, goalStatusByThreadId, logPrefix);
+      }
       return;
     }
 
@@ -68,6 +95,55 @@ function createPushNotificationTracker({
     if (method === "turn/completed") {
       void notifyCompletion(threadId, turnId, params, eventObject);
     }
+  }
+
+  async function handleGoalUpdated({ threadId, params }) {
+    const goal = objectValue(params?.goal);
+    const status = readString(goal?.status);
+    const resolvedThreadId = threadId || readString(goal?.threadId);
+    if (!resolvedThreadId || !status) {
+      return;
+    }
+
+    const previousSnapshot = normalizeGoalPushSnapshot(goalStatusByThreadId.get(resolvedThreadId));
+    const nextSnapshot = {
+      status,
+      updatedAt: goal?.updatedAt ?? goal?.updated_at ?? null,
+    };
+    const isFirstObservation = previousSnapshot == null;
+    const isDuplicate = previousSnapshot?.status === nextSnapshot.status
+      && previousSnapshot?.updatedAt === nextSnapshot.updatedAt;
+    const body = GOAL_PUSH_BODIES.get(status);
+    if (isFirstObservation || isDuplicate || !body || !pushServiceClient?.hasConfiguredBaseUrl) {
+      if (!isDuplicate) {
+        rememberGoalSnapshot(resolvedThreadId, nextSnapshot);
+      }
+      return;
+    }
+
+    const title = normalizePreviewText(threadTitleById.get(resolvedThreadId)) || "New Thread";
+    try {
+      await pushServiceClient.notifyCompletion({
+        threadId: resolvedThreadId,
+        turnId: null,
+        result: status === "complete" ? "completed" : "failed",
+        title,
+        body,
+        dedupeKey: [sessionId || "", resolvedThreadId, "goal", status, nextSnapshot.updatedAt ?? ""].join("|"),
+      });
+      rememberGoalSnapshot(resolvedThreadId, nextSnapshot);
+    } catch (error) {
+      console.error(`${logPrefix} goal push notify failed: ${error.message}`);
+    }
+  }
+
+  function rememberGoalSnapshot(threadId, snapshot) {
+    if (!goalStatusByThreadId.has(threadId) && goalStatusByThreadId.size >= MAX_GOAL_STATUS_ENTRIES) {
+      const oldest = goalStatusByThreadId.keys().next().value;
+      goalStatusByThreadId.delete(oldest);
+    }
+    goalStatusByThreadId.set(threadId, snapshot);
+    saveGoalPushState(goalPushStatePath, goalStatusByThreadId, logPrefix);
   }
 
   // Remembers thread/turn linkage before the terminal event arrives on a different payload shape.
@@ -256,6 +332,55 @@ function createPushNotificationTracker({
   return {
     handleOutbound,
   };
+}
+
+function loadGoalPushState(filePath, logPrefix) {
+  if (!filePath) {
+    return new Map();
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return new Map();
+    }
+    const entries = Object.entries(parsed)
+      .map(([threadId, snapshot]) => [threadId, normalizeGoalPushSnapshot(snapshot)])
+      .filter(([threadId, snapshot]) => typeof threadId === "string" && snapshot != null)
+      .slice(-MAX_GOAL_STATUS_ENTRIES);
+    return new Map(entries);
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.error(`${logPrefix} failed to load goal push state: ${error.message}`);
+    }
+    return new Map();
+  }
+}
+
+function normalizeGoalPushSnapshot(value) {
+  if (typeof value === "string") {
+    return { status: value, updatedAt: null };
+  }
+  if (!value || typeof value !== "object" || typeof value.status !== "string") {
+    return null;
+  }
+  return {
+    status: value.status,
+    updatedAt: value.updatedAt ?? null,
+  };
+}
+
+function saveGoalPushState(filePath, goalStatusByThreadId, logPrefix) {
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(Object.fromEntries(goalStatusByThreadId)));
+  } catch (error) {
+    console.error(`${logPrefix} failed to save goal push state: ${error.message}`);
+  }
 }
 
 // Normalizes the message envelope once so downstream helpers can share the same parsed view.
