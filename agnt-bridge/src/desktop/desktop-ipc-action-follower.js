@@ -27,10 +27,12 @@ const {
 const {
   DESKTOP_IPC_ACTION_SOURCE,
   activeCanonicalTurnsById,
+  appServerResultForFollowerRequest,
   applyConversationStateChange,
   backgroundRawTurn,
   backgroundRawTurnById,
   backgroundTurnLifecycleNotification,
+  buildDesktopFollowerRoute,
   canonicalTurnById,
   createEmptyConversationState,
   desktopFollowerPayloadForResponse,
@@ -1123,65 +1125,6 @@ function createDesktopIpcActionFollower({
       });
   }
 
-  function buildDesktopFollowerRoute(message) {
-    const requestId = requestIdKey(message?.id);
-    if (!requestId) {
-      return null;
-    }
-    const method = readString(message?.method);
-    const params = message?.params && typeof message.params === "object" && !Array.isArray(message.params)
-      ? message.params
-      : {};
-    const threadId = readThreadId(params);
-    if (!threadId) {
-      return null;
-    }
-
-    if (method === "turn/start") {
-      return {
-        threadId,
-        method: "thread-follower-start-turn",
-        params: {
-          conversationId: threadId,
-          senderRequestId: requestId,
-          turnStartParams: params,
-        },
-      };
-    }
-    if (method === "turn/steer") {
-      return {
-        threadId,
-        method: "thread-follower-steer-turn",
-        params: {
-          conversationId: threadId,
-          input: Array.isArray(params.input) ? params.input : [],
-          expectedTurnId: readString(params.expectedTurnId) || readString(params.expected_turn_id),
-        },
-      };
-    }
-    if (method === "turn/interrupt") {
-      return {
-        threadId,
-        method: "thread-follower-interrupt-turn",
-        params: {
-          conversationId: threadId,
-          turnId: readString(params.turnId) || readString(params.turn_id),
-        },
-      };
-    }
-    if (method === "thread/compact/start") {
-      return {
-        threadId,
-        method: "thread-follower-compact-thread",
-        params: {
-          conversationId: threadId,
-        },
-      };
-    }
-
-    return null;
-  }
-
   function submitDesktopFollowerRequest(route, originalMessage) {
     Promise.resolve()
       .then(() => resolveFollowerRequestParams(route))
@@ -1219,17 +1162,6 @@ function createDesktopIpcActionFollower({
           },
         }));
       });
-  }
-
-  function appServerResultForFollowerRequest(method, result) {
-    if (method === "thread-follower-start-turn"
-      && result
-      && typeof result === "object"
-      && !Array.isArray(result)
-      && Object.prototype.hasOwnProperty.call(result, "result")) {
-      return result.result ?? null;
-    }
-    return result ?? null;
   }
 
   async function syncDesktopOwnerRuntimeSettings(threadId, turnStartParams) {
