@@ -8,6 +8,7 @@ const net = require("net");
 
 const {
   createDesktopConversationProjector,
+  projectDesktopConversationStateToGoal,
   projectDesktopConversationStateToThread,
 } = require("./desktop-ipc-conversation-projector");
 const {
@@ -66,7 +67,12 @@ const MAX_QUEUED_CHANGES_PER_THREAD = 300;
 // Phone interest survives per-thread release by design, so cap the set to keep a
 // marathon single Desktop connection from accumulating every thread id forever.
 const MAX_ACTIVE_THREAD_IDS = 512;
-const DESKTOP_STATE_READ_METHODS = new Set(["thread/read", "thread/resume", "thread/turns/list"]);
+const DESKTOP_STATE_READ_METHODS = new Set([
+  "thread/read",
+  "thread/resume",
+  "thread/turns/list",
+  "thread/goal/get",
+]);
 const DESKTOP_BACKGROUND_DISCOVERY_METHODS = new Set(["thread/list"]);
 // A cached Desktop state that claims an active turn is only trustworthy while
 // Desktop keeps streaming updates for it. Live runs broadcast deltas far more
@@ -795,6 +801,13 @@ function createDesktopIpcActionFollower({
     }
 
     rememberActiveThread(threadId);
+    if (method === "thread/goal/get") {
+      sendApplicationResponse(JSON.stringify({
+        id: message.id,
+        result: { goal: projectDesktopConversationStateToGoal(threadId, rawState) },
+      }));
+      return true;
+    }
     if (hasNormalizedHistoryOutsideRawTurns(rawState)) {
       canonicalHistoryThreadIds.add(threadId);
     }

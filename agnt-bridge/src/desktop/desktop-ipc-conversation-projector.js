@@ -1,7 +1,7 @@
 // FILE: desktop-ipc-conversation-projector.js
 // Purpose: Projects Codex Desktop IPC conversation snapshots into app-server-style live notifications.
 // Layer: CLI helper
-// Exports: createDesktopConversationProjector, projectDesktopConversationStateToThread
+// Exports: createDesktopConversationProjector, projectDesktopConversationStateToGoal, projectDesktopConversationStateToThread
 // Depends on: ./desktop-ipc-shared
 
 const {
@@ -170,6 +170,10 @@ function createDesktopConversationProjector({
 // Converts Desktop's raw conversationState JSON into the thread shape mobile history already parses.
 function projectDesktopConversationStateToThread(threadId, rawState, { now = () => Date.now() } = {}) {
   return projectConversationState(threadId, rawState, { now }).thread;
+}
+
+function projectDesktopConversationStateToGoal(threadId, rawState) {
+  return latestThreadGoal(rawState, threadId);
 }
 
 function projectConversationState(threadId, rawState, {
@@ -1143,9 +1147,42 @@ function normalizeTimestamp(value) {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 }
 
+function latestThreadGoal(rawState, threadId) {
+  const candidates = [rawState?.threadGoal, rawState?.completedThreadGoal]
+    .map((goal) => normalizeProjectedThreadGoal(goal, threadId))
+    .filter(Boolean);
+  return candidates.sort((left, right) => right.updatedAt - left.updatedAt)[0] || null;
+}
+
+function normalizeProjectedThreadGoal(value, fallbackThreadId) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const statusByToken = {
+    active: "active",
+    paused: "paused",
+    blocked: "blocked",
+    usagelimited: "usageLimited",
+    budgetlimited: "budgetLimited",
+    complete: "complete",
+  };
+  const goal = {
+    threadId: readString(value.threadId) || readString(value.thread_id) || fallbackThreadId,
+    objective: readString(value.objective),
+    status: statusByToken[normalizeToken(value.status)] || "",
+    tokenBudget: value.tokenBudget ?? value.token_budget ?? null,
+    tokensUsed: Number(value.tokensUsed ?? value.tokens_used) || 0,
+    timeUsedSeconds: Number(value.timeUsedSeconds ?? value.time_used_seconds) || 0,
+    createdAt: Number(value.createdAt ?? value.created_at) || 0,
+    updatedAt: Number(value.updatedAt ?? value.updated_at) || 0,
+  };
+  return goal.threadId && goal.objective && goal.status ? goal : null;
+}
+
 module.exports = {
   createDesktopConversationProjector,
   desktopTurnsShareLogicalIdentity,
   matchDesktopTurnIdentityContinuities,
+  projectDesktopConversationStateToGoal,
   projectDesktopConversationStateToThread,
 };

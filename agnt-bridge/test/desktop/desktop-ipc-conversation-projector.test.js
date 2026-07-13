@@ -9,6 +9,7 @@ const assert = require("node:assert/strict");
 const {
   createDesktopConversationProjector,
   matchDesktopTurnIdentityContinuities,
+  projectDesktopConversationStateToGoal,
   projectDesktopConversationStateToThread,
 } = require("../../src/desktop/desktop-ipc-conversation-projector");
 
@@ -32,6 +33,65 @@ test("desktop conversation projector applies persisted runtime settings", () => 
   assert.equal(thread.runtimeSettingsRevision, 4);
   assert.equal(thread.runtimeSettingsUpdatedAt, 123);
   assert.equal(thread.runtimeSettingsSource, "phone");
+});
+
+test("desktop conversation projector exposes latest thread goal", () => {
+  const goal = projectDesktopConversationStateToGoal("thread-goal", {
+    threadGoal: {
+      objective: "Keep CI green",
+      status: "active",
+      tokenBudget: 5000,
+      tokensUsed: 1250,
+      timeUsedSeconds: 90,
+      createdAt: 10,
+      updatedAt: 20,
+    },
+    completedThreadGoal: {
+      objective: "Older goal",
+      status: "complete",
+      updatedAt: 5,
+    },
+  });
+
+  assert.deepEqual(goal, {
+    threadId: "thread-goal",
+    objective: "Keep CI green",
+    status: "active",
+    tokenBudget: 5000,
+    tokensUsed: 1250,
+    timeUsedSeconds: 90,
+    createdAt: 10,
+    updatedAt: 20,
+  });
+});
+
+test("desktop conversation projector returns completed goal when newer", () => {
+  const goal = projectDesktopConversationStateToGoal("thread-goal-done", {
+    threadGoal: {
+      objective: "Stale active",
+      status: "active",
+      updatedAt: 20,
+    },
+    completedThreadGoal: {
+      objective: "Finished work",
+      status: "complete",
+      token_budget: 1000,
+      tokens_used: 1000,
+      time_used_seconds: 45,
+      updated_at: 30,
+    },
+  });
+
+  assert.deepEqual(goal, {
+    threadId: "thread-goal-done",
+    objective: "Finished work",
+    status: "complete",
+    tokenBudget: 1000,
+    tokensUsed: 1000,
+    timeUsedSeconds: 45,
+    createdAt: 0,
+    updatedAt: 30,
+  });
 });
 
 test("desktop conversation projector refreshes thread metadata when runtime settings change", () => {

@@ -1043,3 +1043,97 @@ test("desktop IPC follower routes phone turns to Desktop-owned threads", async (
     });
   }
 });
+
+test("desktop IPC follower serves thread goal reads from Desktop state", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-goal-read-");
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-desktop-goal" },
+  }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 6,
+    params: {
+      conversationId: "thread-desktop-goal",
+      change: {
+        type: "snapshot",
+        conversationState: {
+          title: "Desktop Goal",
+          threadGoal: {
+            objective: "Finish the desktop-owned run",
+            status: "paused",
+            tokenBudget: 8000,
+            tokensUsed: 2000,
+            timeUsedSeconds: 120,
+            createdAt: 10,
+            updatedAt: 30,
+          },
+          turns: [],
+          requests: [],
+        },
+      },
+    },
+  });
+  await wait(25);
+
+  const handled = follower.observeInbound(JSON.stringify({
+    id: "phone-goal-get-1",
+    method: "thread/goal/get",
+    params: { threadId: "thread-desktop-goal" },
+  }));
+
+  assert.equal(handled, true);
+  await waitFor(() => outbound.find((message) => message.id === "phone-goal-get-1"));
+  assert.deepEqual(outbound.find((message) => message.id === "phone-goal-get-1"), {
+    id: "phone-goal-get-1",
+    result: {
+      goal: {
+        threadId: "thread-desktop-goal",
+        objective: "Finish the desktop-owned run",
+        status: "paused",
+        tokenBudget: 8000,
+        tokensUsed: 2000,
+        timeUsedSeconds: 120,
+        createdAt: 10,
+        updatedAt: 30,
+      },
+    },
+  });
+});
