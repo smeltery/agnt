@@ -25,6 +25,9 @@ const {
   projectPendingDesktopActions,
 } = require("./desktop-action-projection");
 const {
+  createActiveThreadCache,
+} = require("./desktop-ipc-action-follower-active-threads");
+const {
   DESKTOP_IPC_ACTION_SOURCE,
   activeCanonicalTurnsById,
   appServerResultForFollowerRequest,
@@ -126,7 +129,6 @@ function createDesktopIpcActionFollower({
   const pendingSnapshotsByThreadId = new Map();
   const conversationProjector = createDesktopConversationProjector({ now });
   const pendingRoutesByRequestId = new Map();
-  const activeThreadIds = new Set();
   const backgroundOnlyThreadIds = new Set();
   const announcedBackgroundTurnsByThreadId = new Map();
   const backgroundDisconnectTimersByThreadId = new Map();
@@ -134,39 +136,18 @@ function createDesktopIpcActionFollower({
   const canonicalHistoryReplacementSentThreadIds = new Set();
   const canonicalActiveTurnsByThreadId = new Map();
   const staleYieldedThreadIds = new Set();
-  // JS Set preserves insertion order; delete-before-add refreshes recency, and
-  // cap eviction skips threads with pending prompts so approvals are not lost.
-  function rememberActiveThread(threadId) {
-    activeThreadIds.delete(threadId);
-    activeThreadIds.add(threadId);
-    while (activeThreadIds.size > MAX_ACTIVE_THREAD_IDS) {
-      const oldest = oldestEvictableActiveThreadId();
-      if (oldest === undefined) {
-        break;
+  const activeThreads = createActiveThreadCache({
+    maxSize: MAX_ACTIVE_THREAD_IDS,
+    isEvictable(threadId) {
+      for (const route of pendingRoutesByRequestId.values()) {
+        if (route.threadId === threadId) {
+          return false;
+        }
       }
-      activeThreadIds.delete(oldest);
-      forgetEvictedThreadState(oldest);
-    }
-  }
-
-  function oldestEvictableActiveThreadId() {
-    for (const threadId of activeThreadIds) {
-      if (!hasPendingProjectedActions(threadId)
-        && !announcedBackgroundTurnsByThreadId.has(threadId)) {
-        return threadId;
-      }
-    }
-    return undefined;
-  }
-
-  function hasPendingProjectedActions(threadId) {
-    for (const route of pendingRoutesByRequestId.values()) {
-      if (route.threadId === threadId) {
-        return true;
-      }
-    }
-    return false;
-  }
+      return !announcedBackgroundTurnsByThreadId.has(threadId);
+    },
+    onEvict: forgetEvictedThreadState,
+  });
 
   // Cleanup for cap-evicted threads only: clears follower caches without touching
   // liveOwnerThreadIds (still-owned local streams must not become hijackable) and
@@ -282,7 +263,7 @@ function createDesktopIpcActionFollower({
       return false;
     }
 
-    rememberActiveThread(threadId);
+    activeThreads.remember(threadId);
     if (!rawStatesByThreadId.has(threadId)
       && !liveOwnerThreadIds.has(threadId)
       && !isLocallyOwnedThread(threadId)) {
@@ -304,7 +285,7 @@ function createDesktopIpcActionFollower({
     staleYieldedThreadIds.clear();
     conversationProjector.reset();
     pendingRoutesByRequestId.clear();
-    activeThreadIds.clear();
+    activeThreads.clear();
     backgroundOnlyThreadIds.clear();
     announcedBackgroundTurnsByThreadId.clear();
     for (const timer of backgroundDisconnectTimersByThreadId.values()) {
@@ -364,11 +345,11 @@ function createDesktopIpcActionFollower({
       // mirror ghost rows the phone already has.
       return;
     }
-    if (!activeThreadIds.has(threadId) && isSnapshotChange(params.change)) {
-      rememberActiveThread(threadId);
+    if (!activeThreads.has(threadId) && isSnapshotChange(params.change)) {
+      activeThreads.remember(threadId);
       backgroundOnlyThreadIds.add(threadId);
     }
-    if (!activeThreadIds.has(threadId)) {
+    if (!activeThreads.has(threadId)) {
       return;
     }
 
@@ -495,9 +476,9 @@ function createDesktopIpcActionFollower({
     for (const threadId of announcedBackgroundTurnsByThreadId.keys()) {
       scheduleBackgroundDisconnectSettlement(threadId);
     }
-    // Keep activeThreadIds: phone interest is phone-scoped, not connection-scoped.
+    // Keep activeThreads: phone interest is phone-scoped, not connection-scoped.
     // Clearing it here would make reconnect snapshots for a thread the phone is
-    // still viewing fail the activeThreadIds.has() guard until the phone happens
+    // still viewing fail the activeThreads.has() guard until the phone happens
     // to issue a fresh read. Growth is bounded by the LRU cap instead.
     // Keep pending approval routes too: a transient disconnect proves nothing
     // about the prompt's outcome, and falsely resolving it would dismiss a
@@ -512,7 +493,7 @@ function createDesktopIpcActionFollower({
   function releaseDesktopThreadState(threadId) {
     settleAnnouncedBackgroundTurn(threadId, "interrupted");
     if (backgroundOnlyThreadIds.delete(threadId)) {
-      activeThreadIds.delete(threadId);
+      activeThreads.delete(threadId);
     }
     liveOwnerThreadIds.add(threadId);
     ownershipProbeDeadlinesByThreadId.delete(threadId);
@@ -534,13 +515,13 @@ function createDesktopIpcActionFollower({
 
   // The live owner is releasing/removing its stream, not claiming it; cancel any
   // speculative phone request instead of routing it to either runtime. Phone
-  // interest (activeThreadIds) deliberately survives the release: if Desktop
+  // interest (activeThreads) deliberately survives the release: if Desktop
   // picks the thread up next, its broadcasts must be processed immediately
   // instead of being dropped until the phone happens to issue another read.
   function removeDesktopThreadState(threadId) {
     settleAnnouncedBackgroundTurn(threadId, "interrupted");
     if (backgroundOnlyThreadIds.delete(threadId)) {
-      activeThreadIds.delete(threadId);
+      activeThreads.delete(threadId);
     }
     liveOwnerThreadIds.delete(threadId);
     ownershipProbeDeadlinesByThreadId.delete(threadId);
@@ -568,7 +549,7 @@ function createDesktopIpcActionFollower({
       return false;
     }
     if (!threadId
-      || !activeThreadIds.has(threadId)
+      || !activeThreads.has(threadId)
       || rawStatesByThreadId.has(threadId)
       || liveOwnerThreadIds.has(threadId)
       || isLocallyOwnedThread(threadId)) {
@@ -802,7 +783,7 @@ function createDesktopIpcActionFollower({
       return ownsDesktopCursor ? rejectDesktopTurnsCursor(message) : false;
     }
 
-    rememberActiveThread(threadId);
+    activeThreads.remember(threadId);
     if (method === "thread/goal/get") {
       sendApplicationResponse(JSON.stringify({
         id: message.id,
@@ -1064,7 +1045,7 @@ function createDesktopIpcActionFollower({
     if (envelope.method === "thread-archived") {
       settleAnnouncedBackgroundTurn(threadId, "interrupted");
       if (backgroundOnlyThreadIds.delete(threadId)) {
-        activeThreadIds.delete(threadId);
+        activeThreads.delete(threadId);
       }
       rawStatesByThreadId.delete(threadId);
       rawStateUpdatedAtByThreadId.delete(threadId);
