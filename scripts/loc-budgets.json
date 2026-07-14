@@ -3,7 +3,11 @@
     "default_lines": 1200,
     "files": {
       "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 1500,
-      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 1050,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/MessageRow+Assistant.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/MessageRow+System.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/MessageRow+TurnActions.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/MessageRow+UserBubble.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/MessageRowAuxiliaryViews.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/UserMessageComponents.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 1500,
