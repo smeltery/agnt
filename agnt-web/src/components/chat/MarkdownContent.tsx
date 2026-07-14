@@ -17,6 +17,7 @@ import { isLocalWorkspaceLink } from "../../lib/workspace-text-preview";
 import { CodeBlock } from "./CodeBlock";
 import { WorkspaceSvgPreview } from "./WorkspaceSvgPreview";
 import { WorkspaceTextFilePreview } from "./WorkspaceTextFilePreview";
+import { tokenizeInline } from "./markdown-inline-tokens";
 
 // Mermaid lives in its own chunk via React.lazy so the mermaid library
 // (~150 KB gzip) only downloads when a diagram actually appears.
@@ -31,21 +32,6 @@ const MathBlock = lazy(() =>
   import("./MathBlock").then((m) => ({ default: m.MathBlock }))
 );
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
-
-const INLINE_CODE_PATTERN = /`([^`\n]+)`/g;
-const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
-const ITALIC_PATTERN = /(?<!\w)\*([^*\n]+)\*(?!\w)/g;
-const IMAGE_PATTERN = /!\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
-const LINK_PATTERN = /(?<!!)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
-// Bare-URL autolinks. Recognises http(s) URLs not already inside a `[](…)`
-// or `![](…)` construct (the explicit-link patterns above run first and
-// consume those positions via the dedup step in the cursor walk). Trailing
-// punctuation (.,;:!?]) ) is excluded from the match so a sentence like
-// "Visit https://example.com." doesn't link the period. We deliberately
-// don't add `(` to the negative lookbehind because URLs frequently appear
-// in parentheses ("see (https://example.com)") and the dedup against
-// LINK_PATTERN already prevents double-wrapping inside `[](…)`.
-const AUTOLINK_PATTERN = /(?<![\w@:/])\bhttps?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?\]\)]/g;
 
 export interface MarkdownContentProps {
   text: string;
@@ -377,145 +363,4 @@ function WorkspaceImage({ cwd, path, label, title }: WorkspaceImageProps) {
       Loading {label || path}…
     </span>
   );
-}
-
-type InlineToken =
-  | { kind: "text"; value: string }
-  | { kind: "code"; value: string }
-  | { kind: "bold"; value: string }
-  | { kind: "italic"; value: string }
-  | { kind: "math"; value: string; displayMode: boolean }
-  | { kind: "link"; label: string; url: string; title?: string }
-  | { kind: "image"; label: string; url: string; title?: string };
-
-interface InlineHit {
-  kind: InlineToken["kind"];
-  start: number;
-  end: number;
-  // Token-shape fields. `value` is used by the simple kinds; richer kinds
-  // populate label/url/title. `displayMode` is math-only.
-  value?: string;
-  label?: string;
-  url?: string;
-  title?: string;
-  displayMode?: boolean;
-}
-
-// Inline math heuristics:
-//   - `$$...$$` mid-paragraph → display-mode math (rare but supported)
-//   - `$...$` → inline math, but ONLY when the body contains a math-like
-//     character (\, ^, _, {, }) so prose like "$5 and $10" doesn't get
-//     pulled into the renderer.
-const DISPLAY_INLINE_MATH = /\$\$([^$\n]+?)\$\$/g;
-const INLINE_MATH = /(?<![\w$])\$([^$\n\s][^$\n]*?[^$\n\s]|[^$\n\s])\$(?![\w$])/g;
-const MATH_HINT = /[\\^_{}]/;
-
-const SAFE_LINK_SCHEMES = /^(https?:|mailto:|#)/i;
-const SAFE_IMAGE_SCHEMES = /^(https?:|data:image\/)/i;
-// Plain paths with no scheme (`screenshot.png`, `.tmp/cap.png`) are accepted
-// and resolved against a thread cwd via workspace/readImage. The render layer
-// double-checks before fetching.
-const HAS_URL_SCHEME = /^[a-z][a-z0-9+\-.]*:/i;
-
-function tokenizeInline(text: string): InlineToken[] {
-  const hits: InlineHit[] = [];
-  // Image first so its leading `!` consumes the position before the link
-  // matcher can — we can't rely on regex alternation since each pattern is
-  // matched independently then deduped by start.
-  IMAGE_PATTERN.lastIndex = 0;
-  for (const match of text.matchAll(IMAGE_PATTERN)) {
-    if (match.index === undefined) continue;
-    const url = match[2];
-    // Either the URL has a safe image scheme, or it has no scheme at all
-    // (= relative/absolute filesystem path → workspace fetch).
-    if (HAS_URL_SCHEME.test(url) && !SAFE_IMAGE_SCHEMES.test(url)) continue;
-    hits.push({
-      kind: "image",
-      start: match.index,
-      end: match.index + match[0].length,
-      label: match[1],
-      url,
-      title: match[3],
-    });
-  }
-  LINK_PATTERN.lastIndex = 0;
-  for (const match of text.matchAll(LINK_PATTERN)) {
-    if (match.index === undefined) continue;
-    const url = match[2];
-    if (HAS_URL_SCHEME.test(url) && !SAFE_LINK_SCHEMES.test(url)) continue;
-    hits.push({
-      kind: "link",
-      start: match.index,
-      end: match.index + match[0].length,
-      label: match[1],
-      url,
-      title: match[3],
-    });
-  }
-  AUTOLINK_PATTERN.lastIndex = 0;
-  for (const match of text.matchAll(AUTOLINK_PATTERN)) {
-    if (match.index === undefined) continue;
-    hits.push({
-      kind: "link",
-      start: match.index,
-      end: match.index + match[0].length,
-      label: match[0],
-      url: match[0],
-    });
-  }
-  for (const [kind, pattern] of [
-    ["code", INLINE_CODE_PATTERN] as const,
-    ["bold", BOLD_PATTERN] as const,
-    ["italic", ITALIC_PATTERN] as const,
-  ]) {
-    pattern.lastIndex = 0;
-    for (const match of text.matchAll(pattern)) {
-      if (match.index === undefined) continue;
-      hits.push({ kind, start: match.index, end: match.index + match[0].length, value: match[1] });
-    }
-  }
-  // Math: display-form first ($$…$$) so its outer $-pair doesn't get
-  // mis-claimed by the inline `$…$` matcher.
-  DISPLAY_INLINE_MATH.lastIndex = 0;
-  for (const match of text.matchAll(DISPLAY_INLINE_MATH)) {
-    if (match.index === undefined) continue;
-    hits.push({
-      kind: "math",
-      start: match.index,
-      end: match.index + match[0].length,
-      value: match[1],
-      displayMode: true,
-    });
-  }
-  INLINE_MATH.lastIndex = 0;
-  for (const match of text.matchAll(INLINE_MATH)) {
-    if (match.index === undefined) continue;
-    // Skip dollar-amount false positives — only emit a math token when
-    // the body looks math-like.
-    if (!MATH_HINT.test(match[1])) continue;
-    hits.push({
-      kind: "math",
-      start: match.index,
-      end: match.index + match[0].length,
-      value: match[1],
-      displayMode: false,
-    });
-  }
-  hits.sort((a, b) => a.start - b.start);
-  const tokens: InlineToken[] = [];
-  let cursor = 0;
-  for (const hit of hits) {
-    if (hit.start < cursor) continue;
-    if (hit.start > cursor) tokens.push({ kind: "text", value: text.slice(cursor, hit.start) });
-    if (hit.kind === "link" || hit.kind === "image") {
-      tokens.push({ kind: hit.kind, label: hit.label ?? "", url: hit.url ?? "", title: hit.title });
-    } else if (hit.kind === "math") {
-      tokens.push({ kind: "math", value: hit.value ?? "", displayMode: hit.displayMode ?? false });
-    } else {
-      tokens.push({ kind: hit.kind, value: hit.value ?? "" } as InlineToken);
-    }
-    cursor = hit.end;
-  }
-  if (cursor < text.length) tokens.push({ kind: "text", value: text.slice(cursor) });
-  return tokens;
 }

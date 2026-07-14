@@ -1,6 +1,6 @@
-import { createMessage, type MessageKind } from "../models";
-import type { ItemCompletedEvent, ItemStartedEvent, ThreadReducerState } from "./turn-reducer";
-import { appendOrUpdate, compositeKey, mutateMessage, removeKey } from "./turn-reducer-helpers";
+import { createMessage, type MessageKind } from "../../models";
+import type { ItemCompletedEvent, ItemStartedEvent, ThreadReducerState } from "../turn-reducer";
+import { appendOrUpdate, compositeKey, mutateMessage, removeKey } from "./helpers";
 
 export function beginStructuredItem(
   state: ThreadReducerState,

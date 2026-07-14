@@ -24,10 +24,10 @@ import {
   inferKindFromType,
   mutateMessage,
   removeKey,
-} from "./turn-reducer-helpers";
-import { beginStructuredItem, completeStructuredItem } from "./turn-reducer-structured";
-export { applyPlanDelta, applyPlanUpdated } from "./turn-reducer-plan";
-export type { PlanDeltaEvent, PlanUpdatedEvent } from "./turn-reducer-plan";
+} from "./turn-reducer/helpers";
+import { beginStructuredItem, completeStructuredItem } from "./turn-reducer/structured";
+export { applyPlanDelta, applyPlanUpdated } from "./turn-reducer/plan";
+export type { PlanDeltaEvent, PlanUpdatedEvent } from "./turn-reducer/plan";
 
 /** Per-thread mutable state the reducer maintains alongside the messages list. */
 export interface ThreadReducerState {

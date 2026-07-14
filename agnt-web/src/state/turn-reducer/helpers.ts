@@ -1,5 +1,5 @@
-import { type CodexMessage, compareMessages, type MessageKind } from "../models";
-import type { ThreadReducerState } from "./turn-reducer";
+import { type CodexMessage, compareMessages, type MessageKind } from "../../models";
+import type { ThreadReducerState } from "../turn-reducer";
 
 export function appendOrUpdate(
   state: ThreadReducerState,
