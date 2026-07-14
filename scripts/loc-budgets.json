@@ -29,7 +29,7 @@
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+IncomingReplay.swift": 100,
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+IncomingThreads.swift": 100,
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+IncomingTurnLifecycle.swift": 300,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 1500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 500,
       "agnt-host/src-tauri/src/lib.rs": 500,
       "agnt-host/src-tauri/src/app_commands.rs": 300,
       "agnt-host/src-tauri/src/app_runtime.rs": 200,
@@ -45,7 +45,12 @@
       "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 1350,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,
-      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexThreadStartProjectBinding.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadListing.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadResume.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+TurnStart.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+TurnSteering.swift": 500
     }
   },
   "flat_directories": {
