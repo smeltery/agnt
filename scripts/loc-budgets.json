@@ -103,7 +103,11 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnMessageRenderModelCaches.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnFileChangeBlockCaches.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnPerFileDiffCaches.swift": 500,
-      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnContentDirectiveCaches.swift": 500
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnContentDirectiveCaches.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageSystemRows.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageSystemRowUpsert.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageSystemRowIdentity.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageSystemStreamingDeltas.swift": 500
     }
   },
   "flat_directories": {
