@@ -6,7 +6,7 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 1825,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+History.swift": 1700,
       "AgntMobile/AgntMobile/Services/CodexService/Incoming/CodexService+Incoming.swift": 1500,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 2000,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadsTurns.swift": 1725,
       "agnt-host/src-tauri/src/lib.rs": 1550,
       "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 1400,
       "AgntMobile/AgntMobile/Features/Chat/TurnView.swift": 1925,
