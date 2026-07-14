@@ -59,6 +59,23 @@ test("parseSessionJsonlTurns marks the turn completed when a task_complete event
   assert.equal(turns[0].status, "completed");
 });
 
+test("parseSessionJsonlTurns treats aborted and error events as terminal statuses", () => {
+  const content = jsonl(
+    { type: "event_msg", payload: { type: "task_started", turn_id: "t-aborted" } },
+    { type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "partial" }], turn_id: "t-aborted" } },
+    { type: "event_msg", payload: { type: "turn_aborted", turn_id: "t-aborted" } },
+    { type: "event_msg", payload: { type: "task_started", turn_id: "t-error" } },
+    { type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "failed" }], turn_id: "t-error" } },
+    { type: "event_msg", payload: { type: "error", turn_id: "t-error" } }
+  );
+
+  const turns = parseSessionJsonlTurns(content);
+
+  assert.equal(turns.length, 2);
+  assert.equal(turns[0].status, "aborted");
+  assert.equal(turns[1].status, "failed");
+});
+
 test("parseSessionJsonlTurns captures user_message events as user-role items", () => {
   const content = jsonl(
     { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },

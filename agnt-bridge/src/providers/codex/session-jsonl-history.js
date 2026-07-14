@@ -323,7 +323,7 @@ function parseSessionJsonlTurns(content, {
         continue;
       }
 
-      if (eventType === "task_complete") {
+      if (eventType === "task_complete" || eventType === "turn_aborted" || eventType === "error") {
         const turn = ensureTurn(
           turns,
           turnsById,
@@ -331,7 +331,7 @@ function parseSessionJsonlTurns(content, {
           sessionThreadId,
           entry.timestamp
         );
-        turn.status = "completed";
+        turn.status = terminalStatusForEventType(eventType);
         continue;
       }
 
@@ -443,6 +443,16 @@ function normalizeHistoryItemType(rawType) {
     return "tool_call_output";
   }
   return rawType;
+}
+
+function terminalStatusForEventType(eventType) {
+  if (eventType === "turn_aborted") {
+    return "aborted";
+  }
+  if (eventType === "error") {
+    return "failed";
+  }
+  return "completed";
 }
 
 // Modern Codex rollouts can attach response-item ownership in metadata
