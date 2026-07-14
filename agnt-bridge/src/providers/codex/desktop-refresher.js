@@ -1,23 +1,27 @@
-// FILE: providers/codex/desktop-refresher.js
-// Purpose: Debounced Mac desktop refresh controller for Codex.app after phone-authored conversation changes.
-// Layer: provider plugin (codex)
-// Exports: CodexDesktopRefresher
-// Depends on: child_process, fs, path, ../../rollout-watch
-
-const { execFile } = require("child_process");
-const path = require("path");
 const { createThreadRolloutActivityWatcher } = require("../../desktop/rollout-watch");
+const {
+  DEFAULT_APP_PATH,
+  DEFAULT_BUNDLE_ID,
+  executeDesktopRefresh,
+} = require("./desktop-refresher-executor");
+const {
+  NEW_THREAD_DEEP_LINK,
+  buildThreadDeepLink,
+  extractErrorMessage,
+  extractTurnId,
+  isDesktopUnavailableError,
+  resolveInboundTarget,
+  resolveOutboundTarget,
+  safeParseJSON,
+} = require("./desktop-refresher-targets");
+const { initializeDesktopRefresherState } = require("./desktop-refresher-state");
 
-const DEFAULT_BUNDLE_ID = "com.openai.codex";
-const DEFAULT_APP_PATH = "/Applications/Codex.app";
 const DEFAULT_DEBOUNCE_MS = 1200;
 const DEFAULT_FALLBACK_NEW_THREAD_MS = 2_000;
 const DEFAULT_MID_RUN_REFRESH_THROTTLE_MS = 3_000;
 const DEFAULT_ROLLOUT_LOOKUP_TIMEOUT_MS = 5_000;
 const DEFAULT_ROLLOUT_IDLE_TIMEOUT_MS = 10_000;
 const DEFAULT_CUSTOM_REFRESH_FAILURE_THRESHOLD = 3;
-const REFRESH_SCRIPT_PATH = path.join(__dirname, "scripts", "codex-refresh.applescript");
-const NEW_THREAD_DEEP_LINK = "codex://threads/new";
 
 class CodexDesktopRefresher {
   constructor({
@@ -56,30 +60,7 @@ class CodexDesktopRefresher {
       || (this.refreshCommand ? "command" : (this.refreshExecutor ? "command" : "applescript"));
     this.customRefreshFailureThreshold = customRefreshFailureThreshold;
 
-    this.mode = "idle";
-    this.pendingNewThread = false;
-    this.pendingRefreshKinds = new Set();
-    this.pendingCompletionRefresh = false;
-    this.pendingCompletionTurnId = null;
-    this.pendingCompletionTargetUrl = "";
-    this.pendingCompletionTargetThreadId = "";
-    this.pendingTargetUrl = "";
-    this.pendingTargetThreadId = "";
-    this.lastRefreshAt = 0;
-    this.lastRefreshSignature = "";
-    this.lastTurnIdRefreshed = null;
-    this.lastMidRunRefreshAt = 0;
-    this.refreshTimer = null;
-    this.refreshRunning = false;
-    this.fallbackTimer = null;
-    this.activeWatcher = null;
-    this.activeWatchedThreadId = null;
-    this.watchStartAt = 0;
-    this.lastRolloutSize = null;
-    this.stopWatcherAfterRefreshThreadId = null;
-    this.runtimeRefreshAvailable = enabled;
-    this.consecutiveRefreshFailures = 0;
-    this.unavailableLogged = false;
+    initializeDesktopRefresherState(this, { enabled });
   }
 
   handleInbound(rawMessage) {
@@ -152,7 +133,6 @@ class CodexDesktopRefresher {
     }
   }
 
-  // Stops volatile watcher/fallback state when transport drops or bridge exits.
   handleTransportReset() {
     this.clearRefreshTimer();
     this.clearPendingState();
@@ -307,21 +287,14 @@ class CodexDesktopRefresher {
   }
 
   executeRefresh(targetUrl) {
-    if (this.refreshExecutor) {
-      return this.refreshExecutor(targetUrl || "");
-    }
-
-    if (this.refreshCommand) {
-      return execFilePromise("/bin/sh", ["-lc", this.refreshCommand]);
-    }
-
-    return execFilePromise("osascript", [
-      REFRESH_SCRIPT_PATH,
-      this.bundleId,
-      this.appPath,
-      targetUrl || "",
-      this.navigationOnly ? "0" : "1",
-    ]);
+    return executeDesktopRefresh({
+      targetUrl,
+      refreshExecutor: this.refreshExecutor,
+      refreshCommand: this.refreshCommand,
+      bundleId: this.bundleId,
+      appPath: this.appPath,
+      navigationOnly: this.navigationOnly,
+    });
   }
 
   clearPendingState() {
@@ -343,7 +316,6 @@ class CodexDesktopRefresher {
     this.refreshTimer = null;
   }
 
-  // Schedules a single low-cost fallback when a brand new thread id is still unknown.
   scheduleNewThreadFallback() {
     if (!this.canRefresh()) {
       return;
@@ -374,7 +346,6 @@ class CodexDesktopRefresher {
     this.fallbackTimer = null;
   }
 
-  // Keeps one lightweight rollout watcher alive for the current agnt-controlled thread.
   ensureWatcher(threadId) {
     if (this.navigationOnly || !this.canRefresh() || !threadId) {
       return;
@@ -427,7 +398,6 @@ class CodexDesktopRefresher {
     this.lastRolloutSize = null;
   }
 
-  // Converts rollout growth into occasional refreshes without spamming the desktop.
   handleWatcherEvent(event) {
     if (!event?.threadId || event.threadId !== this.activeWatchedThreadId) {
       return;
@@ -515,131 +485,9 @@ class CodexDesktopRefresher {
     return this.enabled && this.runtimeRefreshAvailable;
   }
 
-  // Tells the debounce loop whether any phone/completion refresh is still waiting to run.
   hasPendingRefreshWork() {
     return this.pendingCompletionRefresh || this.pendingRefreshKinds.size > 0;
   }
-}
-
-function execFilePromise(command, args) {
-  return new Promise((resolve, reject) => {
-    execFile(command, args, (error, stdout, stderr) => {
-      if (error) {
-        error.stdout = stdout;
-        error.stderr = stderr;
-        reject(error);
-        return;
-      }
-      resolve({ stdout, stderr });
-    });
-  });
-}
-
-function safeParseJSON(value) {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function readString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-function extractTurnId(message) {
-  const params = message?.params;
-  if (!params || typeof params !== "object") {
-    return null;
-  }
-
-  if (typeof params.turnId === "string" && params.turnId) {
-    return params.turnId;
-  }
-
-  if (params.turn && typeof params.turn === "object" && typeof params.turn.id === "string") {
-    return params.turn.id;
-  }
-
-  return null;
-}
-
-function extractThreadId(message) {
-  const params = message?.params;
-  if (!params || typeof params !== "object") {
-    return null;
-  }
-
-  const candidates = [
-    params.threadId,
-    params.conversationId,
-    params.thread?.id,
-    params.thread?.threadId,
-    params.turn?.threadId,
-    params.turn?.conversationId,
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function resolveInboundTarget(method, message) {
-  const threadId = extractThreadId(message);
-  if (threadId) {
-    return { threadId, url: buildThreadDeepLink(threadId) };
-  }
-
-  if (method === "thread/start" || method === "turn/start") {
-    return { threadId: null, url: NEW_THREAD_DEEP_LINK };
-  }
-
-  return null;
-}
-
-function resolveOutboundTarget(method, message) {
-  const threadId = extractThreadId(message);
-  if (threadId) {
-    return { threadId, url: buildThreadDeepLink(threadId) };
-  }
-
-  if (method === "thread/started") {
-    return { threadId: null, url: NEW_THREAD_DEEP_LINK };
-  }
-
-  return null;
-}
-
-function buildThreadDeepLink(threadId) {
-  return `codex://threads/${threadId}`;
-}
-
-function extractErrorMessage(error) {
-  return (
-    error?.stderr?.toString("utf8")
-    || error?.stdout?.toString("utf8")
-    || error?.message
-    || "unknown refresh error"
-  ).trim();
-}
-
-function isDesktopUnavailableError(message) {
-  const normalized = String(message).toLowerCase();
-  return [
-    "unable to find application named",
-    "application isn’t running",
-    "application isn't running",
-    "can’t get application id",
-    "can't get application id",
-    "does not exist",
-    "no application knows how to open",
-    "cannot find app",
-    "could not find application",
-  ].some((snippet) => normalized.includes(snippet));
 }
 
 module.exports = {
