@@ -12,6 +12,7 @@ const CHATGPT_TRANSCRIPTIONS_URL = "https://chatgpt.com/backend-api/transcribe";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 150;
 const MAX_DURATION_MS = MAX_DURATION_SECONDS * 1_000;
+const DEFAULT_TRANSCRIPTION_TIMEOUT_MS = 175_000;
 const MAX_DURATION_DRIFT_MS = 2_000;
 const AUTH_CACHE_TTL_MS = 60_000;
 const PRECONNECT_MIN_INTERVAL_MS = 2_000;
@@ -28,6 +29,7 @@ function createVoiceHandler({
   FormDataImpl = globalThis.FormData,
   BlobImpl = globalThis.Blob,
   logPrefix = "[agnt]",
+  transcriptionTimeoutMs = DEFAULT_TRANSCRIPTION_TIMEOUT_MS,
 } = {}) {
   const warmState = {
     authPromise: null,
@@ -62,6 +64,7 @@ function createVoiceHandler({
       BlobImpl,
       loadAuth,
       refreshAuth,
+      transcriptionTimeoutMs,
     }),
     defaultErrorCode: "voice_transcription_failed",
     defaultErrorMessage: "Voice transcription failed.",
@@ -105,6 +108,7 @@ async function transcribeVoice(
     BlobImpl,
     loadAuth = () => loadAuthContext(sendCodexRequest, { refreshToken: false }),
     refreshAuth = () => loadAuthContext(sendCodexRequest, { refreshToken: true }),
+    transcriptionTimeoutMs = DEFAULT_TRANSCRIPTION_TIMEOUT_MS,
   }
 ) {
   if (typeof sendCodexRequest !== "function") {
@@ -158,6 +162,7 @@ async function transcribeVoice(
     FormDataImpl,
     BlobImpl,
     refreshAuth,
+    transcriptionTimeoutMs,
   });
 }
 
@@ -170,6 +175,7 @@ async function requestTranscription({
   FormDataImpl,
   BlobImpl,
   refreshAuth,
+  transcriptionTimeoutMs = DEFAULT_TRANSCRIPTION_TIMEOUT_MS,
 }) {
   const makeAttempt = async (activeAuthContext) => {
     const formData = new FormDataImpl();
@@ -180,11 +186,40 @@ async function requestTranscription({
       "User-Agent": VOICE_UPLOAD_USER_AGENT,
     };
 
-    return fetchImpl(activeAuthContext.transcriptionURL, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
+    const timeoutMs = Number.isFinite(transcriptionTimeoutMs)
+      ? Math.max(0, Math.floor(transcriptionTimeoutMs))
+      : DEFAULT_TRANSCRIPTION_TIMEOUT_MS;
+    const controller = typeof AbortController === "function" && timeoutMs > 0
+      ? new AbortController()
+      : null;
+    const timeoutID = controller
+      ? setTimeout(() => controller.abort(createTranscriptionTimeoutError(timeoutMs)), timeoutMs)
+      : null;
+    timeoutID?.unref?.();
+
+    try {
+      return await fetchImpl(activeAuthContext.transcriptionURL, {
+        method: "POST",
+        headers,
+        body: formData,
+        signal: controller?.signal,
+      });
+    } catch (error) {
+      if (isAbortError(error, controller)) {
+        throw voiceError(
+          "transcription_timeout",
+          "Voice transcription timed out. Try a shorter clip or retry when the connection is stable."
+        );
+      }
+      throw voiceError(
+        "transcription_network_error",
+        "Voice transcription could not reach the provider."
+      );
+    } finally {
+      if (timeoutID) {
+        clearTimeout(timeoutID);
+      }
+    }
   };
 
   let response = await makeAttempt(authContext);
@@ -320,6 +355,16 @@ function isLikelyWavBuffer(buffer) {
   return buffer.length >= 44
     && buffer.toString("ascii", 0, 4) === "RIFF"
     && buffer.toString("ascii", 8, 12) === "WAVE";
+}
+
+function createTranscriptionTimeoutError(timeoutMs) {
+  const error = new Error(`voice transcription timed out after ${timeoutMs}ms`);
+  error.name = "AbortError";
+  return error;
+}
+
+function isAbortError(error, controller) {
+  return error?.name === "AbortError" || (controller && controller.signal?.aborted);
 }
 
 function preconnectTranscriptionOrigin(fetchImpl, warmState) {

@@ -585,6 +585,71 @@ test("voice/transcribe reuses auth loaded by voice/prewarm", async () => {
   assert.equal(responses[0].result?.text, "prewarmed transcript");
 });
 
+test("voice/transcribe returns a typed timeout when provider upload stalls", async () => {
+  const responses = [];
+  const handler = createVoiceHandler({
+    transcriptionTimeoutMs: 1,
+    sendCodexRequest: async () => ({
+      authMethod: "chatgpt",
+      authToken: "chatgpt-token",
+      requiresOpenaiAuth: false,
+    }),
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(options.signal.reason));
+    }),
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-provider-timeout",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/wav",
+      audioBase64: makeTestWavBase64(),
+      sampleRateHz: 24_000,
+      durationMs: 300,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await waitUntil(() => responses.length === 1);
+
+  assert.equal(responses[0].error?.data?.errorCode, "transcription_timeout");
+  assert.match(responses[0].error?.message || "", /timed out/);
+});
+
+test("voice/transcribe returns a typed network error when provider upload fails", async () => {
+  const responses = [];
+  const handler = createVoiceHandler({
+    sendCodexRequest: async () => ({
+      authMethod: "chatgpt",
+      authToken: "chatgpt-token",
+      requiresOpenaiAuth: false,
+    }),
+    fetchImpl: async () => {
+      throw new Error("socket closed");
+    },
+  });
+
+  handler.handleVoiceRequest(JSON.stringify({
+    id: "voice-provider-network-error",
+    method: "voice/transcribe",
+    params: {
+      mimeType: "audio/wav",
+      audioBase64: makeTestWavBase64(),
+      sampleRateHz: 24_000,
+      durationMs: 300,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await tick();
+
+  assert.equal(responses[0].error?.data?.errorCode, "transcription_network_error");
+  assert.match(responses[0].error?.message || "", /could not reach/);
+});
+
 test("voice/transcribe rejects audio whose actual duration exceeds the request", async () => {
   const responses = [];
   let authRequests = 0;
@@ -844,4 +909,14 @@ function base64UrlEncode(value) {
 
 function tick() {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function waitUntil(predicate) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("condition was not met");
 }
