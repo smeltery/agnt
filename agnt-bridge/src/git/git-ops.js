@@ -18,9 +18,17 @@
 
 const fs = require("fs");
 const path = require("path");
-
-const STATUS_UPSTREAM_FETCH_TTL_MS = 15_000;
-const statusUpstreamFetchCache = new Map();
+const {
+  computeState,
+  gitInitBranchFlagUnsupported,
+  nonRepositoryStatus,
+  normalizeBranchListEntry,
+  parseBranchFromStatus,
+  parseOwnerRepo,
+  parseTrackingFromStatus,
+  trackingRemoteName,
+} = require("./git-ops-parsing");
+const { createGitOpsStatusHelpers } = require("./git-ops-status-helpers");
 
 /**
  * @param {object} deps
@@ -60,6 +68,16 @@ function createGitOps({
   gitDiffAgainstBase,
   diffPatchForUntrackedFiles,
 }) {
+  const {
+    currentBranchFromStatus,
+    detectDefaultBranch,
+    isInsideGitWorkTree,
+    pushRemoteAvailable,
+    refreshStatusUpstreamIfNeeded,
+    remoteBranchExists,
+    revListCounts,
+  } = createGitOpsStatusHelpers({ git });
+
   // ── status / init / diff / commit ─────────────────────────────────────
 
   async function gitStatus(cwd) {
@@ -447,102 +465,6 @@ function createGitOps({
     return { ...branchResult, status: statusResult };
   }
 
-  // ── private helpers (used only inside this module) ─────────────────────
-
-  async function isInsideGitWorkTree(cwd) {
-    try {
-      const output = await git(cwd, "rev-parse", "--is-inside-work-tree");
-      return output.trim() === "true";
-    } catch {
-      return false;
-    }
-  }
-
-  async function revListCounts(cwd) {
-    const output = await git(cwd, "rev-list", "--left-right", "--count", "HEAD...@{u}");
-    const parts = output.trim().split(/\s+/);
-    return {
-      ahead: parseInt(parts[0], 10) || 0,
-      behind: parseInt(parts[1], 10) || 0,
-    };
-  }
-
-  // Keeps Update eligibility based on the current upstream ref, not stale local fetch data.
-  async function refreshStatusUpstreamIfNeeded(cwd, tracking, repoRoot) {
-    const parsedTracking = parseTrackingRef(tracking);
-    if (!parsedTracking) {
-      return false;
-    }
-
-    const cacheKey = `${repoRoot || cwd}\0${parsedTracking.remote}\0${parsedTracking.branch}`;
-    const now = Date.now();
-    const lastFetchAt = statusUpstreamFetchCache.get(cacheKey) || 0;
-    if (now - lastFetchAt < STATUS_UPSTREAM_FETCH_TTL_MS) {
-      return false;
-    }
-
-    statusUpstreamFetchCache.set(cacheKey, now);
-    if (statusUpstreamFetchCache.size > 200) {
-      statusUpstreamFetchCache.clear();
-      statusUpstreamFetchCache.set(cacheKey, now);
-    }
-
-    await git(
-      cwd,
-      "fetch",
-      "--quiet",
-      parsedTracking.remote,
-      `+refs/heads/${parsedTracking.branch}:refs/remotes/${parsedTracking.remote}/${parsedTracking.branch}`
-    );
-    return true;
-  }
-
-  async function currentBranchFromStatus(cwd) {
-    const output = await git(cwd, "status", "--porcelain=v1", "-b");
-    const branchLine = output.trim().split("\n").filter(Boolean)[0] || "";
-    return parseBranchFromStatus(branchLine);
-  }
-
-  async function pushRemoteAvailable(cwd, tracking) {
-    const remoteName = trackingRemoteName(tracking) || "origin";
-    return remoteExists(cwd, remoteName);
-  }
-
-  async function remoteExists(cwd, remoteName) {
-    try {
-      const output = await git(cwd, "config", "--get", `remote.${remoteName}.url`);
-      return output.trim().length > 0;
-    } catch {
-      return false;
-    }
-  }
-
-  async function remoteBranchExists(cwd, branchName) {
-    try {
-      await git(cwd, "show-ref", "--verify", "--quiet", `refs/remotes/origin/${branchName}`);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async function detectDefaultBranch(cwd, branches) {
-    try {
-      const ref = await git(cwd, "symbolic-ref", "refs/remotes/origin/HEAD");
-      const defaultBranch = ref.trim().replace("refs/remotes/origin/", "");
-      if (defaultBranch) return defaultBranch;
-    } catch {
-      // origin/HEAD not recorded — fall through to remote/local probes.
-    }
-
-    if (await remoteBranchExists(cwd, "main")) return "main";
-    if (await remoteBranchExists(cwd, "master")) return "master";
-
-    if (branches.includes("main")) return "main";
-    if (branches.includes("master")) return "master";
-    return branches[0] || null;
-  }
-
   return {
     gitBranches,
     gitBranchesWithStatus,
@@ -560,104 +482,6 @@ function createGitOps({
     gitStashPop,
     gitStatus,
   };
-}
-
-// ── pure helpers (no factory needed) ──────────────────────────────────────
-
-function parseBranchFromStatus(line) {
-  // "## main...origin/main" or "## main" or "## HEAD (no branch)"
-  const match = line.match(/^## (.+?)(?:\.{3}|$)/);
-  if (!match) return null;
-  const branch = match[1].trim();
-  if (branch.startsWith("No commits yet on ")) {
-    return branch.substring("No commits yet on ".length).trim() || null;
-  }
-  if (branch === "HEAD (no branch)" || branch.includes("HEAD detached")) return null;
-  return branch;
-}
-
-function parseTrackingFromStatus(line) {
-  const match = line.match(/\.{3}(.+?)(?:\s|$)/);
-  return match ? match[1].trim() : null;
-}
-
-function computeState(dirty, ahead, behind, detached, noUpstream) {
-  if (detached) return "detached_head";
-  if (noUpstream) return "no_upstream";
-  if (dirty && behind > 0) return "dirty_and_behind";
-  if (dirty) return "dirty";
-  if (ahead > 0 && behind > 0) return "diverged";
-  if (behind > 0) return "behind_only";
-  if (ahead > 0) return "ahead_only";
-  return "up_to_date";
-}
-
-function nonRepositoryStatus(cwd) {
-  return {
-    isRepo: false,
-    repoRoot: null,
-    branch: null,
-    tracking: null,
-    dirty: false,
-    hasHeadCommit: false,
-    hasPushRemote: false,
-    ahead: 0,
-    behind: 0,
-    localOnlyCommitCount: 0,
-    state: "not_initialized",
-    canPush: false,
-    publishedToRemote: false,
-    files: [],
-    diff: { additions: 0, deletions: 0, binaryFiles: 0 },
-  };
-}
-
-function gitInitBranchFlagUnsupported(error) {
-  const message = error?.message || "";
-  return message.includes("unknown switch `b'")
-    || message.includes("unknown option `b'")
-    || message.includes("usage: git init");
-}
-
-function trackingRemoteName(tracking) {
-  const trimmed = typeof tracking === "string" ? tracking.trim() : "";
-  const slashIndex = trimmed.indexOf("/");
-  if (slashIndex <= 0) return null;
-  return trimmed.slice(0, slashIndex);
-}
-
-function parseTrackingRef(tracking) {
-  if (typeof tracking !== "string") {
-    return null;
-  }
-
-  const separatorIndex = tracking.indexOf("/");
-  if (separatorIndex <= 0 || separatorIndex === tracking.length - 1) {
-    return null;
-  }
-
-  return {
-    remote: tracking.slice(0, separatorIndex),
-    branch: tracking.slice(separatorIndex + 1),
-  };
-}
-
-function parseOwnerRepo(remoteUrl) {
-  const match = remoteUrl.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
-  return match ? match[1] : null;
-}
-
-function normalizeBranchListEntry(rawLine) {
-  const trimmed = typeof rawLine === "string" ? rawLine.trim() : "";
-  if (!trimmed) return null;
-
-  const isCurrent = trimmed.startsWith("* ");
-  const isCheckedOutElsewhere = trimmed.startsWith("+ ");
-  const name = trimmed.replace(/^[*+]\s+/, "").trim();
-
-  if (!name) return null;
-
-  return { isCurrent, isCheckedOutElsewhere, name };
 }
 
 module.exports = {
