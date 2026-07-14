@@ -38,7 +38,7 @@
       "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 1400,
       "AgntMobile/AgntMobile/Features/Chat/TurnView.swift": 1450,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineView.swift": 1450,
-      "AgntMobile/AgntMobile/App/ContentView.swift": 1460,
+      "AgntMobile/AgntMobile/App/ContentView.swift": 500,
       "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView.swift": 1400,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer.swift": 1400,
       "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+Account.swift": 1350,
@@ -50,7 +50,14 @@
       "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+ThreadListing.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+ThreadResume.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+TurnStart.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+TurnSteering.swift": 500
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+TurnSteering.swift": 500,
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+Banners.swift": 500,
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+Lifecycle.swift": 500,
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+Navigation.swift": 500,
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+Presentations.swift": 500,
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+Recovery.swift": 500,
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+RootLayout.swift": 500,
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+Sidebar.swift": 500
     }
   },
   "flat_directories": {
