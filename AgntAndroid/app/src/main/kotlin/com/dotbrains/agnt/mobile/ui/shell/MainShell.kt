@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -72,7 +71,6 @@ import com.dotbrains.agnt.mobile.ui.agent.ConversationHeader
 import com.dotbrains.agnt.mobile.ui.agent.SidebarDrawerContent
 import com.dotbrains.agnt.mobile.ui.agent.truncatePathMiddle
 import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftSource
-import com.dotbrains.agnt.mobile.ui.home.BridgeUpdateSheet
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressBannerState
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressPhase
 import com.dotbrains.agnt.mobile.ui.home.RootViewModel
@@ -80,7 +78,6 @@ import com.dotbrains.agnt.mobile.ui.home.ThreadCompletionBanner
 import com.dotbrains.agnt.mobile.ui.navigation.AppNavHost
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
 import com.dotbrains.agnt.mobile.ui.pet.PetCompanionHost
-import com.dotbrains.agnt.mobile.ui.turn.WorkspaceTextFilePreviewDialog
 import com.dotbrains.agnt.mobile.ui.turn.WorkspaceTextFilePreviewRequest
 import com.dotbrains.agnt.mobile.ui.turn.timeline.LocalOpenRepoDiffForMarkdownLink
 import com.dotbrains.agnt.mobile.ui.turn.timeline.RepoMarkdownFileLink
@@ -1121,178 +1118,119 @@ fun MainShell(
         }
     }
 
-    if (showPathDialog) {
-        threadPathFull?.let { fullPath ->
-            ThreadPathDialog(
-                fullPath = fullPath,
-                onDismiss = { showPathDialog = false },
-                onCopy = {
-                    scope.launch {
-                        clipboard.setClipEntry(
-                            ClipData.newPlainText("thread-path", fullPath).toClipEntry(),
-                        )
-                        showPathDialog = false
-                    }
-                },
-            )
-        }
-    }
-
-    GitRepoDiffBottomSheet(
-        visible = showRepoDiffSheet,
-        scope = repoDiffSheetScope,
-        onScopeChange = { repoDiffSheetScope = it },
-        lastTurnRows = repoDiffSheetLastTurnRows,
-        fullTreePatch = repoDiffSheetFullPatch,
-        isFullTreeLoading = repoDiffSheetFullLoading,
-        fullTreeError = repoDiffSheetFullError,
-        gitStatus = repoStatusSnapshot,
-        focusPathQuery = repoDiffMarkdownFocusQuery,
+    MainShellOverlays(
+        showPathDialog = showPathDialog,
+        threadPathFull = threadPathFull,
+        onDismissPathDialog = { showPathDialog = false },
+        onCopyThreadPath = { fullPath ->
+            scope.launch {
+                clipboard.setClipEntry(
+                    ClipData.newPlainText("thread-path", fullPath).toClipEntry(),
+                )
+                showPathDialog = false
+            }
+        },
+        showRepoDiffSheet = showRepoDiffSheet,
+        repoDiffSheetScope = repoDiffSheetScope,
+        onRepoDiffScopeChange = { repoDiffSheetScope = it },
+        repoDiffSheetLastTurnRows = repoDiffSheetLastTurnRows,
+        repoDiffSheetFullPatch = repoDiffSheetFullPatch,
+        repoDiffSheetFullLoading = repoDiffSheetFullLoading,
+        repoDiffSheetFullError = repoDiffSheetFullError,
+        repoStatusSnapshot = repoStatusSnapshot,
+        repoDiffMarkdownFocusQuery = repoDiffMarkdownFocusQuery,
         onFocusPathQueryConsumed = { repoDiffMarkdownFocusQuery = null },
-        onDismiss = {
+        onDismissRepoDiffSheet = {
             showRepoDiffSheet = false
             repoDiffMarkdownFocusQuery = null
         },
-    )
-
-    GitActionBottomSheet(
-        visible = gitActionSheetMode != null,
-        mode = gitActionSheetMode,
-        initialNextStep = gitActionSheetInitialNextStep,
-        status = repoStatusSnapshot,
-        defaultBaseBranch = defaultGitBaseBranch,
-        isBusy = gitActionBusy,
-        onDismiss = {
+        gitActionSheetMode = gitActionSheetMode,
+        gitActionSheetInitialNextStep = gitActionSheetInitialNextStep,
+        defaultGitBaseBranch = defaultGitBaseBranch,
+        gitActionBusy = gitActionBusy,
+        onDismissGitActionSheet = {
             gitActionSheetMode = null
             gitActionSheetInitialNextStep = null
         },
-        onSubmit = { executeGitActionSheet(it) },
-    )
-
-    if (showGitInitPrompt) {
-        GitInitPromptDialog(
-            isBusy = gitActionBusy,
-            error = gitInitError,
-            onInitialize = { initializeRepositoryForCurrentThread() },
-            onDismiss = {
-                if (!gitActionBusy) {
-                    showGitInitPrompt = false
-                    gitInitError = null
-                }
-            },
-        )
-    }
-
-    if (showNothingToCommit) {
-        SimpleMessageDialog(
-            title = stringResource(R.string.git_action_section_write),
-            message = stringResource(R.string.git_nothing_to_commit),
-            onDismiss = { showNothingToCommit = false },
-        )
-    }
-
-    gitSyncAlert?.let { alert ->
-        fun dismissGitAlert() {
+        onSubmitGitActionSheet = { executeGitActionSheet(it) },
+        showGitInitPrompt = showGitInitPrompt,
+        gitInitError = gitInitError,
+        onInitializeRepository = { initializeRepositoryForCurrentThread() },
+        onDismissGitInitPrompt = {
+            if (!gitActionBusy) {
+                showGitInitPrompt = false
+                gitInitError = null
+            }
+        },
+        showNothingToCommit = showNothingToCommit,
+        onDismissNothingToCommit = { showNothingToCommit = false },
+        gitSyncAlert = gitSyncAlert,
+        onDismissGitSyncAlert = {
             gitSyncAlert = null
             pendingGitOperation = null
-        }
-
-        GitSyncAlertDialog(
-            alert = alert,
-            onDismiss = { dismissGitAlert() },
-            onAction = { action ->
-                when (action) {
-                    TurnGitSyncAlertAction.dismissOnly -> dismissGitAlert()
-                    TurnGitSyncAlertAction.pullRebase -> pullRebaseForPendingGitOperation()
-                    TurnGitSyncAlertAction.continuePendingGitOperation,
-                    TurnGitSyncAlertAction.continueGitBranchOperation,
-                    -> continuePendingGitOperation()
-                    TurnGitSyncAlertAction.commitAndContinuePendingGitOperation,
-                    TurnGitSyncAlertAction.commitAndContinueGitBranchOperation,
-                    -> continuePendingGitOperation(commitFirst = true)
-                    TurnGitSyncAlertAction.discardRuntimeChanges ->
-                        discardRuntimeChangesForPendingGitOperation()
+        },
+        onGitSyncAlertAction = { action ->
+            when (action) {
+                TurnGitSyncAlertAction.dismissOnly -> {
+                    gitSyncAlert = null
+                    pendingGitOperation = null
                 }
-            },
-        )
-    }
-
-    gitActionError?.let { err ->
-        SimpleMessageDialog(
-            title = stringResource(R.string.git_error_title),
-            message = err,
-            onDismiss = { gitActionError = null },
-        )
-    }
-
-    if (desktopHandoffError != null) {
-        SimpleMessageDialog(
-            title = stringResource(R.string.turn_open_desktop_error_title),
-            message = desktopHandoffError.orEmpty(),
-            onDismiss = { desktopHandoffError = null },
-        )
-    }
-
-    if (worktreeHandoffError != null) {
-        SimpleMessageDialog(
-            title = "Worktree handoff failed",
-            message = worktreeHandoffError.orEmpty(),
-            onDismiss = { worktreeHandoffError = null },
-        )
-    }
-
-    pendingApprovalRequest?.let { request ->
-        PendingApprovalDialog(
-            request = request,
-            onResolve = { decision ->
-                scope.launch { runCatching { repository.resolvePendingApproval(request.id, decision) } }
-            },
-        )
-    }
-
-    pendingStructuredInputRequest?.let { request ->
-        StructuredInputDialog(
-            request = request,
-            onSubmit = { answers ->
-                repository.resolvePendingStructuredInput(request.id, answers)
-            },
-            onSkip = {
-                repository.resolvePendingStructuredInput(request.id, emptyMap())
-            },
-        )
-    }
-
-    BridgeUpdateSheet(
-        visible = bridgeUpdatePrompt != null,
-        title = bridgeUpdatePrompt?.title.orEmpty(),
-        message = bridgeUpdatePrompt?.message.orEmpty(),
-        installCommand = bridgeUpdatePrompt?.command,
-        canUpdateBridge = ready,
+                TurnGitSyncAlertAction.pullRebase -> pullRebaseForPendingGitOperation()
+                TurnGitSyncAlertAction.continuePendingGitOperation,
+                TurnGitSyncAlertAction.continueGitBranchOperation,
+                -> continuePendingGitOperation()
+                TurnGitSyncAlertAction.commitAndContinuePendingGitOperation,
+                TurnGitSyncAlertAction.commitAndContinueGitBranchOperation,
+                -> continuePendingGitOperation(commitFirst = true)
+                TurnGitSyncAlertAction.discardRuntimeChanges ->
+                    discardRuntimeChangesForPendingGitOperation()
+            }
+        },
+        gitActionError = gitActionError,
+        onDismissGitActionError = { gitActionError = null },
+        desktopHandoffError = desktopHandoffError,
+        onDismissDesktopHandoffError = { desktopHandoffError = null },
+        worktreeHandoffError = worktreeHandoffError,
+        onDismissWorktreeHandoffError = { worktreeHandoffError = null },
+        pendingApprovalRequest = pendingApprovalRequest,
+        onResolvePendingApproval = { request, decision ->
+            scope.launch { runCatching { repository.resolvePendingApproval(request.id, decision) } }
+        },
+        pendingStructuredInputRequest = pendingStructuredInputRequest,
+        onSubmitStructuredInput = { request, answers ->
+            scope.launch { repository.resolvePendingStructuredInput(request.id, answers) }
+        },
+        onSkipStructuredInput = { request ->
+            scope.launch { repository.resolvePendingStructuredInput(request.id, emptyMap()) }
+        },
+        bridgeUpdatePrompt = bridgeUpdatePrompt,
+        ready = ready,
         isUpdatingBridge = isUpdatingBridge,
-        updateBridgeError = bridgeUpdateError,
-        onDismiss = {
+        bridgeUpdateError = bridgeUpdateError,
+        onDismissBridgeUpdate = {
             bridgeUpdateError = null
             repository.dismissBridgeUpdatePrompt()
         },
         onUpdateBridge = {
-            if (isUpdatingBridge) return@BridgeUpdateSheet
-            bridgeUpdateError = null
-            isUpdatingBridge = true
-            scope.launch {
-                try {
-                    repository.updateBridgePackageAndRestart()
-                    repository.dismissBridgeUpdatePrompt()
-                    viewModel.retryBridgeConnectionAfterUpdate()
-                } catch (error: Exception) {
-                    bridgeUpdateError =
-                        error.message?.takeIf { it.isNotBlank() }
-                            ?: bridgeUpdateFailedFallback
-                } finally {
-                    isUpdatingBridge = false
+            if (!isUpdatingBridge) {
+                bridgeUpdateError = null
+                isUpdatingBridge = true
+                scope.launch {
+                    try {
+                        repository.updateBridgePackageAndRestart()
+                        repository.dismissBridgeUpdatePrompt()
+                        viewModel.retryBridgeConnectionAfterUpdate()
+                    } catch (error: Exception) {
+                        bridgeUpdateError =
+                            error.message?.takeIf { it.isNotBlank() }
+                                ?: bridgeUpdateFailedFallback
+                    } finally {
+                        isUpdatingBridge = false
+                    }
                 }
             }
         },
-        onRetry = {
+        onRetryBridgeUpdate = {
             bridgeUpdateError = null
             viewModel.retryBridgeConnectionAfterUpdate()
         },
@@ -1301,29 +1239,12 @@ fun MainShell(
             repository.dismissBridgeUpdatePrompt()
             onOpenPairingScanner()
         },
+        systemNotices = systemNotices,
+        onDismissSystemNotice = { id -> repository.dismissSystemNotice(id) },
+        workspaceTextFilePreview = workspaceTextFilePreview,
+        workspaceTextFileService = workspaceTextFileService,
+        onDismissWorkspaceTextFilePreview = { workspaceTextFilePreview = null },
     )
-
-    // Bottom-aligned toast queue for system/notice events (opencode tui.toast.show,
-    // future MCP-auth warnings). Auto-dismissed by SystemNoticesStore; manual
-    // close kills the timer eagerly.
-    Box(modifier = Modifier.fillMaxSize()) {
-        SystemNoticeHost(
-            notices = systemNotices,
-            onDismiss = { id -> repository.dismissSystemNotice(id) },
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues()),
-        )
-    }
-
-    workspaceTextFilePreview?.let { request ->
-        WorkspaceTextFilePreviewDialog(
-            request = request,
-            service = workspaceTextFileService,
-            onDismiss = { workspaceTextFilePreview = null },
-        )
-    }
 }
 
 private data class PendingGitOperation(
