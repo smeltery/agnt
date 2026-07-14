@@ -52,7 +52,7 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineView/TurnTimelineView+Scroll.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineView/TurnTimelineView+Session.swift": 500,
       "AgntMobile/AgntMobile/App/ContentView.swift": 500,
-      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView.swift": 1400,
+      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+Assistant.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+FileChanges.swift": 500,
@@ -75,7 +75,11 @@
       "AgntMobile/AgntMobile/App/ContentView/ContentView+Presentations.swift": 500,
       "AgntMobile/AgntMobile/App/ContentView/ContentView+Recovery.swift": 500,
       "AgntMobile/AgntMobile/App/ContentView/ContentView+RootLayout.swift": 500,
-      "AgntMobile/AgntMobile/App/ContentView/ContentView+Sidebar.swift": 500
+      "AgntMobile/AgntMobile/App/ContentView/ContentView+Sidebar.swift": 500,
+      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Input.swift": 500,
+      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Selection.swift": 500,
+      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Setup.swift": 500,
+      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Surface.swift": 500
     }
   },
   "flat_directories": {
