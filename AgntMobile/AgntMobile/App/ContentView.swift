@@ -25,9 +25,9 @@ private struct TerminalNavigationRoute: Hashable {
     let preferredWorkingDirectory: String?
 }
 
-private struct MyMacsNavigationRoute: Hashable {}
+struct MyMacsNavigationRoute: Hashable {}
 
-private struct MacContextTransitionSnapshot {
+struct MacContextTransitionSnapshot {
     let selectedThread: CodexThread?
     let activeThreadId: String?
     let suppressAutomaticThreadSelection: Bool
@@ -40,19 +40,19 @@ struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State var viewModel = ContentViewModel()
-    @State private var isSidebarOpen = false
+    @State var isSidebarOpen = false
     @State private var sidebarDragOffset: CGFloat = 0
     @State private var isSidebarPrewarmed = false
-    @State private var selectedThread: CodexThread?
-    @State private var navigationPath = NavigationPath()
+    @State var selectedThread: CodexThread?
+    @State var navigationPath = NavigationPath()
     // Tracks whether the top of `navigationPath` is a terminal route so that
     // re-opening the terminal from a different surface replaces the active page
     // instead of stacking a near-identical one. Kept in sync with `navigationPath`
     // pushes and decreases observed via `onChange(of: navigationPath)`.
-    @State private var topNavigationRouteIsTerminal = false
+    @State var topNavigationRouteIsTerminal = false
     @State private var showSettings = false
     @State var isShowingManualScanner = false
-    @State private var isShowingMyMacsScanner = false
+    @State var isShowingMyMacsScanner = false
     @State var hasDismissedAutomaticScanner = false
     @State var scannerCanReturnToOnboarding = false
     @State var isShowingManualPairingEntry = false
@@ -63,8 +63,8 @@ struct ContentView: View {
     @State var isRetryingBridgeUpdate = false
     @State var isUpdatingBridgePackage = false
     @State private var isPreparingManualScanner = false
-    @State private var macSwitchTask: Task<Void, Never>?
-    @State private var suppressAutomaticThreadSelection = false
+    @State var macSwitchTask: Task<Void, Never>?
+    @State var suppressAutomaticThreadSelection = false
     @State private var isWakingSavedMacDisplay = false
     @State private var hasAttemptedAutomaticWakeSavedMacDisplay = false
     @State private var threadCompletionBannerDismissTask: Task<Void, Never>?
@@ -831,7 +831,7 @@ struct ContentView: View {
         setSidebar(open: shouldOpenSidebar)
     }
 
-    private func closeSidebar() {
+    func closeSidebar() {
         HapticFeedback.shared.triggerImpactFeedback(style: .light)
         setSidebar(open: false)
     }
@@ -1182,7 +1182,7 @@ struct ContentView: View {
     }
 
     // Shows pairing recovery immediately and tears down any stale reconnect in the background.
-    private func presentManualScannerAfterStoppingReconnect() {
+    func presentManualScannerAfterStoppingReconnect() {
         guard !isShowingManualScanner else {
             return
         }
@@ -1394,125 +1394,6 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Mac switching wiring
-
-    private func openMyMacsFromSidebar() {
-        hasDismissedAutomaticScanner = true
-        let route = MyMacsNavigationRoute()
-        closeSidebar()
-        navigationPath.append(route)
-        topNavigationRouteIsTerminal = false
-    }
-
-    private func presentMyMacsScanner() {
-        hasDismissedAutomaticScanner = true
-        isShowingMyMacsScanner = true
-        presentManualScannerAfterStoppingReconnect()
-    }
-
-    private func prepareForMacContextTransition() {
-        hasDismissedAutomaticScanner = true
-        suppressAutomaticThreadSelection = true
-        selectedThread = nil
-        codex.activeThreadId = nil
-        if isSidebarOpen {
-            closeSidebar()
-        }
-    }
-
-    private func captureMacContextTransitionSnapshot() -> MacContextTransitionSnapshot {
-        MacContextTransitionSnapshot(
-            selectedThread: selectedThread,
-            activeThreadId: codex.activeThreadId,
-            suppressAutomaticThreadSelection: suppressAutomaticThreadSelection
-        )
-    }
-
-    // Restores the chat selection only when the service kept an existing Mac alive after a failed saved-device switch.
-    private func restoreMacContextTransitionSnapshotIfStillConnected(_ snapshot: MacContextTransitionSnapshot) {
-        guard codex.isConnected || codex.isInitialized else {
-            return
-        }
-
-        if let selectedThread = snapshot.selectedThread {
-            self.selectedThread = codex.threads.first(where: { $0.id == selectedThread.id }) ?? selectedThread
-        } else {
-            self.selectedThread = nil
-        }
-        codex.activeThreadId = snapshot.activeThreadId
-        suppressAutomaticThreadSelection = snapshot.suppressAutomaticThreadSelection
-    }
-
-    private func switchToTrustedMac(_ deviceId: String) {
-        guard !viewModel.isSwitchingMac else {
-            return
-        }
-        let contextTransitionSnapshot = captureMacContextTransitionSnapshot()
-        prepareForMacContextTransition()
-        macSwitchTask = Task {
-            do {
-                try await viewModel.switchToTrustedMac(deviceId: deviceId, codex: codex)
-                await MainActor.run {
-                    navigationPath = NavigationPath()
-                }
-            } catch {
-                await MainActor.run {
-                    restoreMacContextTransitionSnapshotIfStillConnected(contextTransitionSnapshot)
-                }
-            }
-            await MainActor.run {
-                macSwitchTask = nil
-            }
-        }
-    }
-
-    private func startScannedMacSwitch(_ pairingPayload: CodexPairingQRPayload) {
-        guard !viewModel.isSwitchingMac else {
-            return
-        }
-
-        macSwitchTask = Task {
-            do {
-                try await viewModel.switchToScannedMac(
-                    pairingPayload: pairingPayload,
-                    codex: codex
-                )
-                await MainActor.run {
-                    navigationPath = NavigationPath()
-                }
-            } catch {
-                // Error is already exposed through CodexService state.
-            }
-            await MainActor.run {
-                macSwitchTask = nil
-            }
-        }
-    }
-
-    private func cancelMacSwitch() {
-        guard let macSwitchTask else {
-            return
-        }
-
-        macSwitchTask.cancel()
-        Task {
-            await viewModel.requestMacSwitchCancellation(codex: codex)
-        }
-    }
-
-    private func forgetTrustedMac(_ deviceId: String) {
-        let isCurrentTrustedMac = codex.normalizedCurrentTrustedMacDeviceId == deviceId
-        if isCurrentTrustedMac {
-            prepareForMacContextTransition()
-            Task {
-                await codex.disconnect()
-                codex.forgetTrustedMac(deviceId: deviceId)
-            }
-            return
-        }
-
-        codex.forgetTrustedMac(deviceId: deviceId)
-    }
 }
 
 private struct NewChatOpeningStateView: View {
