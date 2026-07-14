@@ -2,63 +2,26 @@
 // Purpose: Covers managed worktree regressions for the local git bridge.
 // Layer: Unit Test
 // Exports: node:test cases
-// Depends on: node:test, assert, child_process, fs, os, git-handler
+// Depends on: node:test, assert, fs, os, path, git-handler, git-handler-test-helpers
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
-
 const { __test } = require("../../src/git/git-handler");
+const {
+  canonicalPath,
+  git,
+  makeBareRemote,
+  makeTempRepo,
+  pushRemoteOnlyBranch,
+} = require("./git-handler-test-helpers");
 
 test.afterEach(() => {
   __test.resetRunStructuredCodexJsonImplementation();
   __test.resetRunGitHubCliImplementation();
 });
-
-process.env.GIT_CONFIG_GLOBAL = "/dev/null";
-process.env.GIT_CONFIG_SYSTEM = "/dev/null";
-
-function git(cwd, ...args) {
-  return execFileSync("git", args, {
-    cwd,
-    encoding: "utf8",
-  }).trim();
-}
-
-function makeTempRepo() {
-  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-git-handler-"));
-  git(repoDir, "init", "-b", "main");
-  git(repoDir, "config", "user.name", "agnt Tests");
-  git(repoDir, "config", "user.email", "tests@example.com");
-  fs.writeFileSync(path.join(repoDir, "README.md"), "# Test\n");
-  fs.mkdirSync(path.join(repoDir, "agnt-bridge", "src"), { recursive: true });
-  fs.writeFileSync(path.join(repoDir, "agnt-bridge", "src", "index.js"), "export const ready = true;\n");
-  git(repoDir, "add", "README.md");
-  git(repoDir, "add", "agnt-bridge/src/index.js");
-  git(repoDir, "commit", "-m", "Initial commit");
-  git(repoDir, "branch", "feature/clean-switch");
-  return repoDir;
-}
-
-function canonicalPath(candidatePath) {
-  return fs.realpathSync.native(candidatePath);
-}
-
-function makeBareRemote() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "agnt-git-handler-remote-"));
-}
-
-function pushRemoteOnlyBranch(repoDir, remoteDir, branchName) {
-  git(remoteDir, "init", "--bare");
-  git(repoDir, "remote", "add", "origin", remoteDir);
-  git(repoDir, "push", "-u", "origin", "main");
-  git(repoDir, "branch", branchName);
-  git(repoDir, "push", "-u", "origin", branchName);
-  git(repoDir, "branch", "-D", branchName);
-}
 
 test("gitCreateWorktree creates a managed worktree under CODEX_HOME/worktrees", async () => {
   const repoDir = makeTempRepo();
@@ -402,244 +365,6 @@ test("gitCreateWorktree leaves ignored files only in Local when copying changes 
     assert.match(git(repoDir, "status", "--short"), /README\.md/);
 
     git(repoDir, "worktree", "remove", "--force", path.dirname(result.worktreePath));
-  } finally {
-    if (previousCodexHome === undefined) {
-      delete process.env.CODEX_HOME;
-    } else {
-      process.env.CODEX_HOME = previousCodexHome;
-    }
-    fs.rmSync(repoDir, { recursive: true, force: true });
-    fs.rmSync(codexHome, { recursive: true, force: true });
-  }
-});
-
-test("gitCreateManagedWorktree moves tracked changes into the detached worktree and cleans Local", async () => {
-  const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "agnt-bridge");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
-  const previousCodexHome = process.env.CODEX_HOME;
-
-  process.env.CODEX_HOME = codexHome;
-
-  try {
-    fs.writeFileSync(path.join(projectDir, "src", "index.js"), "export const ready = false;\n");
-    fs.writeFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "carry me\n");
-
-    const result = await __test.gitCreateManagedWorktree(projectDir, {
-      baseBranch: "main",
-      changeTransfer: "move",
-    });
-
-    assert.equal(
-      fs.readFileSync(path.join(result.worktreePath, "src", "index.js"), "utf8"),
-      "export const ready = false;\n"
-    );
-    assert.equal(
-      fs.readFileSync(path.join(result.worktreePath, "scratch.txt"), "utf8"),
-      "carry me\n"
-    );
-    assert.equal(git(repoDir, "status", "--short"), "");
-    assert.equal(fs.existsSync(path.join(repoDir, "agnt-bridge", "scratch.txt")), false);
-  } finally {
-    if (previousCodexHome === undefined) {
-      delete process.env.CODEX_HOME;
-    } else {
-      process.env.CODEX_HOME = previousCodexHome;
-    }
-    fs.rmSync(repoDir, { recursive: true, force: true });
-    fs.rmSync(codexHome, { recursive: true, force: true });
-  }
-});
-
-test("gitCreateManagedWorktree copies tracked changes into the detached worktree and keeps Local dirty", async () => {
-  const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "agnt-bridge");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
-  const previousCodexHome = process.env.CODEX_HOME;
-
-  process.env.CODEX_HOME = codexHome;
-
-  try {
-    fs.writeFileSync(path.join(projectDir, "src", "index.js"), "export const ready = 'copied';\n");
-    fs.writeFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "keep me too\n");
-
-    const result = await __test.gitCreateManagedWorktree(projectDir, {
-      baseBranch: "main",
-      changeTransfer: "copy",
-    });
-
-    assert.equal(
-      fs.readFileSync(path.join(result.worktreePath, "src", "index.js"), "utf8"),
-      "export const ready = 'copied';\n"
-    );
-    assert.equal(
-      fs.readFileSync(path.join(result.worktreePath, "scratch.txt"), "utf8"),
-      "keep me too\n"
-    );
-    assert.match(git(repoDir, "status", "--short"), /agnt-bridge\/src\/index\.js/);
-    assert.equal(
-      fs.readFileSync(path.join(repoDir, "agnt-bridge", "scratch.txt"), "utf8"),
-      "keep me too\n"
-    );
-  } finally {
-    if (previousCodexHome === undefined) {
-      delete process.env.CODEX_HOME;
-    } else {
-      process.env.CODEX_HOME = previousCodexHome;
-    }
-    fs.rmSync(repoDir, { recursive: true, force: true });
-    fs.rmSync(codexHome, { recursive: true, force: true });
-  }
-});
-
-test("gitCreateManagedWorktree leaves ignored files only in Local", async () => {
-  const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "agnt-bridge");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
-  const previousCodexHome = process.env.CODEX_HOME;
-
-  process.env.CODEX_HOME = codexHome;
-
-  try {
-    fs.writeFileSync(path.join(repoDir, ".gitignore"), "ignored.log\n");
-    git(repoDir, "add", ".gitignore");
-    git(repoDir, "commit", "-m", "Add ignore rule");
-    fs.writeFileSync(path.join(repoDir, "ignored.log"), "stay local\n");
-    fs.writeFileSync(path.join(repoDir, "README.md"), "# Test\ncopied\n");
-
-    const result = await __test.gitCreateManagedWorktree(projectDir, {
-      baseBranch: "main",
-      changeTransfer: "copy",
-    });
-
-    assert.equal(fs.existsSync(path.join(repoDir, "ignored.log")), true);
-    assert.equal(fs.existsSync(path.join(path.dirname(result.worktreePath), "ignored.log")), false);
-  } finally {
-    if (previousCodexHome === undefined) {
-      delete process.env.CODEX_HOME;
-    } else {
-      process.env.CODEX_HOME = previousCodexHome;
-    }
-    fs.rmSync(repoDir, { recursive: true, force: true });
-    fs.rmSync(codexHome, { recursive: true, force: true });
-  }
-});
-
-test("gitTransferManagedHandoff moves tracked changes from Local into an existing managed worktree", async () => {
-  const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "agnt-bridge");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
-  const previousCodexHome = process.env.CODEX_HOME;
-
-  process.env.CODEX_HOME = codexHome;
-
-  try {
-    const managed = await __test.gitCreateManagedWorktree(projectDir, {
-      baseBranch: "main",
-    });
-
-    fs.writeFileSync(path.join(projectDir, "src", "index.js"), "export const ready = 'handoff';\n");
-    fs.writeFileSync(path.join(projectDir, "scratch.txt"), "from local\n");
-
-    const result = await __test.gitTransferManagedHandoff(projectDir, {
-      targetPath: managed.worktreePath,
-    });
-
-    assert.equal(result.success, true);
-    assert.equal(git(repoDir, "status", "--short"), "");
-    assert.equal(
-      fs.readFileSync(path.join(managed.worktreePath, "src", "index.js"), "utf8"),
-      "export const ready = 'handoff';\n"
-    );
-    assert.equal(
-      fs.readFileSync(path.join(managed.worktreePath, "scratch.txt"), "utf8"),
-      "from local\n"
-    );
-    assert.equal(fs.existsSync(path.join(projectDir, "scratch.txt")), false);
-  } finally {
-    if (previousCodexHome === undefined) {
-      delete process.env.CODEX_HOME;
-    } else {
-      process.env.CODEX_HOME = previousCodexHome;
-    }
-    fs.rmSync(repoDir, { recursive: true, force: true });
-    fs.rmSync(codexHome, { recursive: true, force: true });
-  }
-});
-
-test("gitTransferManagedHandoff moves only the current project scope into the managed worktree", async () => {
-  const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "agnt-bridge");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
-  const previousCodexHome = process.env.CODEX_HOME;
-
-  process.env.CODEX_HOME = codexHome;
-
-  try {
-    const managed = await __test.gitCreateManagedWorktree(projectDir, {
-      baseBranch: "main",
-    });
-
-    fs.writeFileSync(path.join(repoDir, "README.md"), "# Test\nroot stays local\n");
-    fs.writeFileSync(path.join(projectDir, "scratch.txt"), "from local\n");
-
-    const result = await __test.gitTransferManagedHandoff(projectDir, {
-      targetPath: managed.worktreePath,
-    });
-
-    assert.equal(result.success, true);
-    assert.match(git(repoDir, "status", "--short"), /README\.md/);
-    assert.equal(
-      fs.readFileSync(path.join(path.dirname(managed.worktreePath), "README.md"), "utf8"),
-      "# Test\n"
-    );
-    assert.equal(
-      fs.readFileSync(path.join(managed.worktreePath, "scratch.txt"), "utf8"),
-      "from local\n"
-    );
-    assert.equal(fs.existsSync(path.join(projectDir, "scratch.txt")), false);
-  } finally {
-    if (previousCodexHome === undefined) {
-      delete process.env.CODEX_HOME;
-    } else {
-      process.env.CODEX_HOME = previousCodexHome;
-    }
-    fs.rmSync(repoDir, { recursive: true, force: true });
-    fs.rmSync(codexHome, { recursive: true, force: true });
-  }
-});
-
-test("gitTransferManagedHandoff moves tracked changes from a managed worktree back to Local", async () => {
-  const repoDir = makeTempRepo();
-  const projectDir = path.join(repoDir, "agnt-bridge");
-  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
-  const previousCodexHome = process.env.CODEX_HOME;
-
-  process.env.CODEX_HOME = codexHome;
-
-  try {
-    const managed = await __test.gitCreateManagedWorktree(projectDir, {
-      baseBranch: "main",
-    });
-
-    fs.writeFileSync(path.join(managed.worktreePath, "src", "index.js"), "export const ready = 'back';\n");
-    fs.writeFileSync(path.join(managed.worktreePath, "scratch.txt"), "from worktree\n");
-
-    const result = await __test.gitTransferManagedHandoff(managed.worktreePath, {
-      targetPath: projectDir,
-    });
-
-    assert.equal(result.success, true);
-    assert.equal(git(path.join(managed.worktreePath, ".."), "status", "--short"), "");
-    assert.equal(
-      fs.readFileSync(path.join(projectDir, "src", "index.js"), "utf8"),
-      "export const ready = 'back';\n"
-    );
-    assert.equal(
-      fs.readFileSync(path.join(projectDir, "scratch.txt"), "utf8"),
-      "from worktree\n"
-    );
-    assert.equal(fs.existsSync(path.join(managed.worktreePath, "scratch.txt")), false);
   } finally {
     if (previousCodexHome === undefined) {
       delete process.env.CODEX_HOME;
