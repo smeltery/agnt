@@ -72,7 +72,6 @@ import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerBar
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerEvent
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerModel
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerReducer
-import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerReviewModeRules
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerSecondaryBar
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
 import com.dotbrains.agnt.mobile.ui.turn.composer.buildRuntimeControlsState
@@ -318,15 +317,6 @@ fun TurnConversationPane(
     val handoffMissingBaseMessage = stringResource(R.string.turn_worktree_handoff_missing_base)
     val handoffMissingLocalMessage = stringResource(R.string.turn_worktree_handoff_missing_local)
 
-    fun reviewDraftText(
-        target: CodexReviewTarget,
-        baseBranch: String?,
-    ): String =
-        when (target) {
-            CodexReviewTarget.uncommittedChanges -> "Review current changes"
-            CodexReviewTarget.baseBranch -> "Review against base branch ${baseBranch.orEmpty()}"
-        }
-
     fun clearReviewTarget() {
         reviewTargetName = null
         reviewBaseBranch = null
@@ -336,37 +326,24 @@ fun TurnConversationPane(
         target: CodexReviewTarget,
         baseBranch: String? = null,
     ) {
-        if (
-            TurnComposerReviewModeRules.hasComposerContentConflictingWithReview(
-                draftText = draft,
-                mentionChipCount = mentionChips.size,
-                readyAttachmentCount =
-                    composerAttachments.count {
-                        it.state is TurnComposerAttachmentState.ReadyImage ||
-                            it.state is TurnComposerAttachmentState.ReadyFile
-                    },
-                hasBlockingAttachments =
-                    composerAttachments.any {
-                        it.state == TurnComposerAttachmentState.Loading ||
-                            it.state is TurnComposerAttachmentState.Failed
-                    },
-                isPlanModeEnabled = isPlanModeEnabled,
-            )
-        ) {
-            lastError = if (composerAttachments.isNotEmpty()) reviewNoAttachmentsMessage else reviewRequiresEmptyMessage
-            return
-        }
-        reviewTargetName = target.name
-        reviewBaseBranch =
-            resolveReviewBaseBranch(
-                selectedBaseBranch = baseBranch,
-                defaultBranch = defaultReviewBaseBranch,
-                availableBranches = loadedGitBranchSummary?.branches.orEmpty(),
-            )
-        draft = reviewDraftText(target, reviewBaseBranch)
-        mentionChips = emptyList()
-        isPlanModeEnabled = false
-        lastError = null
+        selectTurnReviewTarget(
+            target = target,
+            baseBranch = baseBranch,
+            draft = draft,
+            mentionChips = mentionChips,
+            composerAttachments = composerAttachments,
+            isPlanModeEnabled = isPlanModeEnabled,
+            defaultReviewBaseBranch = defaultReviewBaseBranch,
+            loadedGitBranchSummary = loadedGitBranchSummary,
+            reviewNoAttachmentsMessage = reviewNoAttachmentsMessage,
+            reviewRequiresEmptyMessage = reviewRequiresEmptyMessage,
+            setReviewTargetName = { reviewTargetName = it },
+            setReviewBaseBranch = { reviewBaseBranch = it },
+            setDraft = { draft = it },
+            setMentionChips = { mentionChips = it },
+            setPlanModeEnabled = { isPlanModeEnabled = it },
+            setLastError = { lastError = it },
+        )
     }
 
     fun handoffCurrentThread(selectedBaseBranch: String? = null) {
@@ -392,13 +369,14 @@ fun TurnConversationPane(
     }
 
     fun applyPlanToComposer() {
-        if (hasComposerDraftContent) {
-            lastError = planApplyRequiresEmptyMessage
-        } else {
-            draft = "Implement plan."
-            isPlanModeEnabled = false
-            mentionChips = emptyList()
-        }
+        applyTurnPlanToComposer(
+            hasComposerDraftContent = hasComposerDraftContent,
+            planApplyRequiresEmptyMessage = planApplyRequiresEmptyMessage,
+            setDraft = { draft = it },
+            setPlanModeEnabled = { isPlanModeEnabled = it },
+            setMentionChips = { mentionChips = it },
+            setLastError = { lastError = it },
+        )
     }
 
     val attachmentLaunchActions =
@@ -441,21 +419,15 @@ fun TurnConversationPane(
             transcriptionFailedMessage = voiceTranscriptionFailedMessage,
         )
 
-    // Restore the saved composer draft for this thread/mac.
-    LaunchedEffect(threadId, currentTrustedMacDeviceId) {
-        draft = runCatching { repository.loadComposerDraft(threadId) }.getOrDefault("")
-        loadedDraftKey = "${currentTrustedMacDeviceId.orEmpty()}|$threadId"
-    }
-
-    // Persist edits once the draft for the current key has loaded. The key guard
-    // prevents the freshly-reset draft from overwriting another thread's draft
-    // before its restore completes.
-    LaunchedEffect(threadId, currentTrustedMacDeviceId, draft, loadedDraftKey) {
-        val draftKey = "${currentTrustedMacDeviceId.orEmpty()}|$threadId"
-        if (loadedDraftKey == draftKey) {
-            runCatching { repository.saveComposerDraft(threadId, draft) }
-        }
-    }
+    TurnConversationPaneDraftEffects(
+        threadId = threadId,
+        currentTrustedMacDeviceId = currentTrustedMacDeviceId,
+        draft = draft,
+        loadedDraftKey = loadedDraftKey,
+        repository = repository,
+        setDraft = { draft = it },
+        setLoadedDraftKey = { loadedDraftKey = it },
+    )
 
     LaunchedEffect(threadId, ready) {
         if (ready) {
@@ -1170,7 +1142,7 @@ fun TurnConversationPane(
                 onDraftChange = { next ->
                     draft = next
                     val target = reviewTarget
-                    if (target != null && next.trim() != reviewDraftText(target, reviewBaseBranch)) {
+                    if (target != null && next.trim() != turnReviewDraftText(target, reviewBaseBranch)) {
                         clearReviewTarget()
                     }
                 },
