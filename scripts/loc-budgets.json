@@ -59,7 +59,7 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+Ordering.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+Thinking.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+Users.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+Account.swift": 1350,
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+Account.swift": 500,
       "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 1350,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,
@@ -79,7 +79,12 @@
       "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Input.swift": 500,
       "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Selection.swift": 500,
       "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Setup.swift": 500,
-      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Surface.swift": 500
+      "AgntMobile/AgntMobile/Features/Terminal/GhosttyTerminalView+Surface.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+AccountDecoding.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+AccountExpiration.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+AccountLifecycle.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+AccountStorage.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+BridgeAccountStatus.swift": 500
     }
   },
   "flat_directories": {
