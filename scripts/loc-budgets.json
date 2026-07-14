@@ -63,7 +63,7 @@
       "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexThreadStartProjectBinding.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+ThreadListing.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+ThreadResume.swift": 500,
@@ -111,7 +111,11 @@
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+TrustedSessionResolve.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureControlMessages.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureHandshakeWaiters.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureReplayState.swift": 500
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureReplayState.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+TransportKeepAlive.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+TransportReceive.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+TransportConnection.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ManualWebSocket.swift": 500
     }
   },
   "flat_directories": {
