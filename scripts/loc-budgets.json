@@ -100,10 +100,10 @@
       "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageLookup.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+AssistantStreamingRows.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches.swift": 500,
-      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageRenderModelCaches.swift": 500,
-      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnFileChangeBlockCaches.swift": 500,
-      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnPerFileDiffCaches.swift": 500,
-      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnContentDirectiveCaches.swift": 500
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnMessageRenderModelCaches.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnFileChangeBlockCaches.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnPerFileDiffCaches.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageCaches/TurnContentDirectiveCaches.swift": 500
     }
   },
   "flat_directories": {
