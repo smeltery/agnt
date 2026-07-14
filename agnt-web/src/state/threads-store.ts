@@ -23,8 +23,8 @@ import { useVoiceStore } from "./voice-store";
 import type { ThreadReducerState } from "./turn-reducer";
 import { messagesStore } from "../storage/messages-store";
 import { prefsStore, type ThreadColor, type ThreadOverride } from "../storage/prefs-store";
-import { registerNotificationHandlers, registerServerRequestHandlers } from "./threads-store-routing";
-import { createThreadActions } from "./threads-store-actions";
+import { registerNotificationHandlers, registerServerRequestHandlers } from "./threads/routing";
+import { createThreadActions } from "./threads/actions";
 import type { ImageAttachment } from "../models";
 import { useThreadGoalsStore } from "./thread-goals";
 

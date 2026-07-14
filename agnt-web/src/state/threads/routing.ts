@@ -1,22 +1,22 @@
-import { flashTitle } from "../lib/document-title";
-import { showNotification, shouldNotify } from "../lib/notifications";
-import { playTurnCue } from "../lib/sound-cue";
-import { fireTurnWebhook } from "../lib/turn-webhook";
-import { createMessage, decodePlanSteps, extractContextWindowUsage } from "../models";
-import type { Connection } from "../protocol";
-import { messagesStore } from "../storage/messages-store";
-import { buildApprovalServerRequestHandler } from "./approvals-store";
-import { useNoticesStore } from "./notices-store";
-import { armSlowResponseWatch, cancelSlowResponseWatch } from "./slow-response-watcher";
-import { buildStructuredInputServerRequestHandler } from "./structured-input-store";
-import { extractTurnTokenUsage } from "../lib/token-usage";
-import { applyAgentDelta, applyItemCompleted, applyItemOutputDelta, applyItemStarted, applyPlanDelta, applyPlanUpdated, applyReasoningDelta, applyTurnCompleted, applyTurnFailed, applyTurnStarted, emptyThreadState, type ThreadReducerState } from "./turn-reducer";
-import { useStreamingStatsStore } from "./streaming-stats-store";
-import { useTurnTimingStore } from "./turn-timing-store";
-import { useTurnTokenUsageStore } from "./turn-token-usage-store";
-import { bumpVisitIfActive } from "./thread-visits";
-import type { ThreadsState } from "./threads-store";
-import { useThreadsStore } from "./threads-store";
+import { flashTitle } from "../../lib/document-title";
+import { showNotification, shouldNotify } from "../../lib/notifications";
+import { playTurnCue } from "../../lib/sound-cue";
+import { fireTurnWebhook } from "../../lib/turn-webhook";
+import { createMessage, decodePlanSteps, extractContextWindowUsage } from "../../models";
+import type { Connection } from "../../protocol";
+import { messagesStore } from "../../storage/messages-store";
+import { buildApprovalServerRequestHandler } from "../approvals-store";
+import { useNoticesStore } from "../notices-store";
+import { armSlowResponseWatch, cancelSlowResponseWatch } from "../slow-response-watcher";
+import { buildStructuredInputServerRequestHandler } from "../structured-input-store";
+import { extractTurnTokenUsage } from "../../lib/token-usage";
+import { applyAgentDelta, applyItemCompleted, applyItemOutputDelta, applyItemStarted, applyPlanDelta, applyPlanUpdated, applyReasoningDelta, applyTurnCompleted, applyTurnFailed, applyTurnStarted, emptyThreadState, type ThreadReducerState } from "../turn-reducer";
+import { useStreamingStatsStore } from "../streaming-stats-store";
+import { useTurnTimingStore } from "../turn-timing-store";
+import { useTurnTokenUsageStore } from "../turn-token-usage-store";
+import { bumpVisitIfActive } from "../thread-visits";
+import type { ThreadsState } from "../threads-store";
+import { useThreadsStore } from "../threads-store";
 
 
 export function registerNotificationHandlers(
