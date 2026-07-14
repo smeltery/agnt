@@ -43,6 +43,9 @@
 		8F1A2B3C4D5E6F708192A3B4 /* CodexPushNotificationRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1A2B3C4D5E6F708192A3B5 /* CodexPushNotificationRegistrationTests.swift */; };
 		90120FC72C9B8D0F5F03F14D /* AgntMobileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D523A0A98D6540D0E2EE6131 /* AgntMobileUITests.swift */; };
 		9D7C9A8B7E6D5C4B3A291817 /* TurnViewModelQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7C9A8B7E6D5C4B3A291818 /* TurnViewModelQueueTests.swift */; };
+		9D7C9A8B7E6D5C4B3A291819 /* TurnViewModelQueueTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7C9A8B7E6D5C4B3A29181A /* TurnViewModelQueueTestSupport.swift */; };
+		9D7C9A8B7E6D5C4B3A29181B /* TurnViewModelQueueSteeringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7C9A8B7E6D5C4B3A29181C /* TurnViewModelQueueSteeringTests.swift */; };
+		9D7C9A8B7E6D5C4B3A29181D /* TurnViewModelQueueTurnStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7C9A8B7E6D5C4B3A29181E /* TurnViewModelQueueTurnStateTests.swift */; };
 		A1D2E3F4B5C6D7E8F9001120 /* MyDevicesPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2E3F4B5C6D7E8F9001121 /* MyDevicesPresentationTests.swift */; };
 		A2B3C4D5E6F708192A3B4C6 /* CodexServiceThreadListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F708192A3B4C7 /* CodexServiceThreadListTests.swift */; };
 		A4B0C1D2E3F4051627384A02 /* GhosttyKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A4B0C1D2E3F4051627384A01 /* GhosttyKit.xcframework */; };
@@ -198,6 +201,9 @@
 		92DE4487B55C077AF7694484 /* AgntMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgntMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A37794F4B32C1952A3770E0 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		9D7C9A8B7E6D5C4B3A291818 /* TurnViewModelQueueTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnViewModelQueueTests.swift; sourceTree = "<group>"; };
+		9D7C9A8B7E6D5C4B3A29181A /* TurnViewModelQueueTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnViewModelQueueTestSupport.swift; sourceTree = "<group>"; };
+		9D7C9A8B7E6D5C4B3A29181C /* TurnViewModelQueueSteeringTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnViewModelQueueSteeringTests.swift; sourceTree = "<group>"; };
+		9D7C9A8B7E6D5C4B3A29181E /* TurnViewModelQueueTurnStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnViewModelQueueTurnStateTests.swift; sourceTree = "<group>"; };
 		A1D2E3F4B5C6D7E8F9001121 /* MyDevicesPresentationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MyDevicesPresentationTests.swift; sourceTree = "<group>"; };
 		A2B3C4D5E6F708192A3B4C7 /* CodexServiceThreadListTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceThreadListTests.swift; sourceTree = "<group>"; };
 		A4B0C1D2E3F4051627384A01 /* GhosttyKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = GhosttyKit.xcframework; path = AgntMobile/Terminal/Vendor/GhosttyKit.xcframework; sourceTree = SOURCE_ROOT; };
@@ -379,7 +385,7 @@
 				8B4A2F5E7D1C4B9AA1234568 /* TurnComposerAttachmentIntakePlanTests.swift */,
 				74BE370810CFD7A76DC2A25F /* TurnComposerSendAvailabilityTests.swift */,
 				AB1C2D3E4F5061728394A5B6 /* TurnComposerReviewModeTests.swift */,
-				9D7C9A8B7E6D5C4B3A291818 /* TurnViewModelQueueTests.swift */,
+				9D7C9A8B7E6D5C4B3A29181F /* Queue */,
 				11A2B3C4D5E6F708192A3B4D /* TurnFileAutocompleteTokenTests.swift */,
 				B0C1D2E3F40516273849A5B6 /* TurnSlashCommandTokenTests.swift */,
 				A9F1B2C3D4E5F60718293A41 /* TurnSkillAutocompleteTokenTests.swift */,
@@ -398,6 +404,17 @@
 				FA571E0002000000000000F3 /* WorkspaceSVGPreviewSecurityTests.swift */,
 			);
 			path = AgntMobileTests;
+			sourceTree = "<group>";
+		};
+		9D7C9A8B7E6D5C4B3A29181F /* Queue */ = {
+			isa = PBXGroup;
+			children = (
+				9D7C9A8B7E6D5C4B3A291818 /* TurnViewModelQueueTests.swift */,
+				9D7C9A8B7E6D5C4B3A29181A /* TurnViewModelQueueTestSupport.swift */,
+				9D7C9A8B7E6D5C4B3A29181C /* TurnViewModelQueueSteeringTests.swift */,
+				9D7C9A8B7E6D5C4B3A29181E /* TurnViewModelQueueTurnStateTests.swift */,
+			);
+			path = Queue;
 			sourceTree = "<group>";
 		};
 		4EEB36EBEA2A475AC9B30B2F /* Timeline */ = {
@@ -789,6 +806,9 @@
 				4C0F0D55A5051D8301463C69 /* TurnComposerSendAvailabilityTests.swift in Sources */,
 				AB1C2D3E4F5061728394A5B7 /* TurnComposerReviewModeTests.swift in Sources */,
 				9D7C9A8B7E6D5C4B3A291817 /* TurnViewModelQueueTests.swift in Sources */,
+				9D7C9A8B7E6D5C4B3A291819 /* TurnViewModelQueueTestSupport.swift in Sources */,
+				9D7C9A8B7E6D5C4B3A29181B /* TurnViewModelQueueSteeringTests.swift in Sources */,
+				9D7C9A8B7E6D5C4B3A29181D /* TurnViewModelQueueTurnStateTests.swift in Sources */,
 				11A2B3C4D5E6F708192A3B4C /* TurnFileAutocompleteTokenTests.swift in Sources */,
 				B0C1D2E3F40516273849A5B7 /* TurnSlashCommandTokenTests.swift in Sources */,
 				A9F1B2C3D4E5F60718293A40 /* TurnSkillAutocompleteTokenTests.swift in Sources */,
