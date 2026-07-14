@@ -60,7 +60,7 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+Thinking.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+Users.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+Account.swift": 500,
-      "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 1350,
+      "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150,
@@ -84,7 +84,12 @@
       "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+AccountExpiration.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+AccountLifecycle.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+AccountStorage.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+BridgeAccountStatus.swift": 500
+      "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+BridgeAccountStatus.swift": 500,
+      "AgntMobile/AgntMobile/Features/Settings/SettingsAppearanceUsageCards.swift": 500,
+      "AgntMobile/AgntMobile/Features/Settings/SettingsComponents.swift": 500,
+      "AgntMobile/AgntMobile/Features/Settings/SettingsInfoCards.swift": 500,
+      "AgntMobile/AgntMobile/Features/Settings/SettingsStatusCards.swift": 500,
+      "AgntMobile/AgntMobile/Features/Settings/SettingsTrustedComputerViews.swift": 500
     }
   },
   "flat_directories": {
