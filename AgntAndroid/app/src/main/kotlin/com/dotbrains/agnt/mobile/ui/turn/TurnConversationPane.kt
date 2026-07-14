@@ -45,9 +45,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
-import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
-import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
 import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
 import com.dotbrains.agnt.mobile.services.agent.threads.isPluginListUnsupported
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
@@ -468,35 +466,15 @@ fun TurnConversationPane(
         expandedPlanAccessoryMessageId = null
     }
 
-    LaunchedEffect(threadId, gitCwd, connectionState, ready, gitBranchReloadNonce) {
-        when {
-            gitCwd == null -> {
-                gitBranchPaneState = GitBranchPaneState.UnavailableNoProject
-                return@LaunchedEffect
-            }
-            connectionState !is ConnectionState.Connected -> {
-                gitBranchPaneState = GitBranchPaneState.AwaitingBridge
-                return@LaunchedEffect
-            }
-            !ready -> {
-                gitBranchPaneState = GitBranchPaneState.Loading
-                return@LaunchedEffect
-            }
-            else -> {
-                gitBranchPaneState = GitBranchPaneState.Loading
-                val result = loadGitBranchesWithStatus(repository, gitCwd)
-                gitBranchPaneState =
-                    result.fold(
-                        onSuccess = {
-                            GitBranchPaneState.Loaded(GitBranchDisplayMapper.summaryFrom(it))
-                        },
-                        onFailure = {
-                            GitBranchPaneState.Failed(GitBranchDisplayMapper.userVisibleMessage(it))
-                        },
-                    )
-            }
-        }
-    }
+    TurnConversationPaneGitBranchEffect(
+        threadId = threadId,
+        gitCwd = gitCwd,
+        connectionState = connectionState,
+        ready = ready,
+        gitBranchReloadNonce = gitBranchReloadNonce,
+        repository = repository,
+        setGitBranchPaneState = { gitBranchPaneState = it },
+    )
 
     val messages =
         remember(threadId, messagesByThread) {
