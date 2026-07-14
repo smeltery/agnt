@@ -17,6 +17,8 @@
 		4CCE0926DAD3125719343440 /* TurnTimelineReducerDeduplicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B20 /* TurnTimelineReducerDeduplicationTests.swift */; };
 		4CCE0926DAD3125719343441 /* TurnTimelineReducerOrderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B21 /* TurnTimelineReducerOrderingTests.swift */; };
 		4CCE0926DAD3125719343442 /* TurnTimelineRenderProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B22 /* TurnTimelineRenderProjectionTests.swift */; };
+		4CCE0926DAD3125719343460 /* TurnTimelineCompletedTurnProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B60 /* TurnTimelineCompletedTurnProjectionTests.swift */; };
+		4CCE0926DAD3125719343461 /* TurnTimelineFileChangeProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B61 /* TurnTimelineFileChangeProjectionTests.swift */; };
 		4CCE0926DAD3125719343443 /* TurnScrollStateTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B23 /* TurnScrollStateTrackerTests.swift */; };
 		4CCE0926DAD3125719343444 /* TurnTimelineTestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B24 /* TurnTimelineTestFixtures.swift */; };
 		4CCE0926DAD3125719343445 /* TurnTimelineMarkdownRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B25 /* TurnTimelineMarkdownRenderingTests.swift */; };
@@ -159,6 +161,8 @@
 		4EEB36EBEA2A475AC9B30B20 /* TurnTimelineReducerDeduplicationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineReducerDeduplicationTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B21 /* TurnTimelineReducerOrderingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineReducerOrderingTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B22 /* TurnTimelineRenderProjectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineRenderProjectionTests.swift; sourceTree = "<group>"; };
+		4EEB36EBEA2A475AC9B30B60 /* TurnTimelineCompletedTurnProjectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineCompletedTurnProjectionTests.swift; sourceTree = "<group>"; };
+		4EEB36EBEA2A475AC9B30B61 /* TurnTimelineFileChangeProjectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineFileChangeProjectionTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B23 /* TurnScrollStateTrackerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnScrollStateTrackerTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B24 /* TurnTimelineTestFixtures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineTestFixtures.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B25 /* TurnTimelineMarkdownRenderingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineMarkdownRenderingTests.swift; sourceTree = "<group>"; };
@@ -369,6 +373,8 @@
 				4EEB36EBEA2A475AC9B30B20 /* TurnTimelineReducerDeduplicationTests.swift */,
 				4EEB36EBEA2A475AC9B30B21 /* TurnTimelineReducerOrderingTests.swift */,
 				4EEB36EBEA2A475AC9B30B22 /* TurnTimelineRenderProjectionTests.swift */,
+				4EEB36EBEA2A475AC9B30B60 /* TurnTimelineCompletedTurnProjectionTests.swift */,
+				4EEB36EBEA2A475AC9B30B61 /* TurnTimelineFileChangeProjectionTests.swift */,
 				4EEB36EBEA2A475AC9B30B25 /* TurnTimelineMarkdownRenderingTests.swift */,
 				4EEB36EBEA2A475AC9B30B26 /* TurnTimelineAssistantBlockInfoTests.swift */,
 				4EEB36EBEA2A475AC9B30B23 /* TurnScrollStateTrackerTests.swift */,
@@ -754,6 +760,8 @@
 				4CCE0926DAD3125719343440 /* TurnTimelineReducerDeduplicationTests.swift in Sources */,
 				4CCE0926DAD3125719343441 /* TurnTimelineReducerOrderingTests.swift in Sources */,
 				4CCE0926DAD3125719343442 /* TurnTimelineRenderProjectionTests.swift in Sources */,
+				4CCE0926DAD3125719343460 /* TurnTimelineCompletedTurnProjectionTests.swift in Sources */,
+				4CCE0926DAD3125719343461 /* TurnTimelineFileChangeProjectionTests.swift in Sources */,
 				4CCE0926DAD3125719343445 /* TurnTimelineMarkdownRenderingTests.swift in Sources */,
 				4CCE0926DAD3125719343446 /* TurnTimelineAssistantBlockInfoTests.swift in Sources */,
 				4CCE0926DAD3125719343443 /* TurnScrollStateTrackerTests.swift in Sources */,
