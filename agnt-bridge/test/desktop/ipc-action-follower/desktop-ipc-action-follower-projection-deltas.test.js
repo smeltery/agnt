@@ -18,7 +18,7 @@ const {
   projectDesktopAssistantDeltaNotifications,
   projectPendingDesktopActions,
   seedConversationStateFromThreadRead,
-} = require("../../src/desktop/desktop-ipc-action-follower");
+} = require("../../../src/desktop/desktop-ipc-action-follower");
 
 test("rejects malformed or failed desktop action responses instead of defaulting to accept", () => {
   assert.equal(

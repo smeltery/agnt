@@ -23,12 +23,12 @@ const {
   desktopConversationSnapshot,
   normalizedConversationState,
   useProcessPlatform,
-} = require("./desktop-ipc-action-follower-test-helpers");
+} = require("../desktop-ipc-action-follower-test-helpers");
 
 const {
   createDesktopIpcActionFollower,
   resolveDefaultIpcSocketPath,
-} = require("../../src/desktop/desktop-ipc-action-follower");
+} = require("../../../src/desktop/desktop-ipc-action-follower");
 
 test("desktop IPC follower ignores stale positive discovery after a held turn already expired", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-probe-expired-");

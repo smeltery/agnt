@@ -14,9 +14,9 @@ const {
   writeFrame,
   waitFor,
   createIpcTestSocket,
-} = require("./desktop-ipc-action-follower-test-helpers");
+} = require("../desktop-ipc-action-follower-test-helpers");
 
-const { createDesktopIpcActionFollower } = require("../../src/desktop/desktop-ipc-action-follower");
+const { createDesktopIpcActionFollower } = require("../../../src/desktop/desktop-ipc-action-follower");
 
 test("desktop IPC follower projects first add patch-only action updates without a baseline read", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-recovery-");

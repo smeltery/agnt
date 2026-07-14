@@ -21,12 +21,12 @@ const {
   desktopConversationSnapshot,
   normalizedConversationState,
   useProcessPlatform,
-} = require("./desktop-ipc-action-follower-test-helpers");
+} = require("../desktop-ipc-action-follower-test-helpers");
 
 const {
   createDesktopIpcActionFollower,
   resolveDefaultIpcSocketPath,
-} = require("../../src/desktop/desktop-ipc-action-follower");
+} = require("../../../src/desktop/desktop-ipc-action-follower");
 
 test("desktop IPC background recovery stays lifecycle-only until open", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-recovery-");

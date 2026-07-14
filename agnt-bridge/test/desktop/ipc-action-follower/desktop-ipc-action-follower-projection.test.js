@@ -17,7 +17,7 @@ const {
   projectDesktopAssistantDeltaNotifications,
   projectPendingDesktopActions,
   seedConversationStateFromThreadRead,
-} = require("../../src/desktop/desktop-ipc-action-follower");
+} = require("../../../src/desktop/desktop-ipc-action-follower");
 
 test("desktop turns/list returns newest-first pages without reversing reopen history", () => {
   const chronologicalTurns = [

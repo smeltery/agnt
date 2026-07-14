@@ -22,12 +22,12 @@ const {
   desktopConversationSnapshot,
   normalizedConversationState,
   useProcessPlatform,
-} = require("./desktop-ipc-action-follower-test-helpers");
+} = require("../desktop-ipc-action-follower-test-helpers");
 
 const {
   createDesktopIpcActionFollower,
   resolveDefaultIpcSocketPath,
-} = require("../../src/desktop/desktop-ipc-action-follower");
+} = require("../../../src/desktop/desktop-ipc-action-follower");
 
 test("desktop IPC follower holds quick phone turns until the desktop snapshot arrives", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-hold-turn-");

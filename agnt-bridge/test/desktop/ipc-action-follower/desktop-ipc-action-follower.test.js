@@ -15,12 +15,12 @@ const {
   waitFor,
   createIpcTestSocket,
   useProcessPlatform,
-} = require("./desktop-ipc-action-follower-test-helpers");
+} = require("../desktop-ipc-action-follower-test-helpers");
 
 const {
   createDesktopIpcActionFollower,
   resolveDefaultIpcSocketPath,
-} = require("../../src/desktop/desktop-ipc-action-follower");
+} = require("../../../src/desktop/desktop-ipc-action-follower");
 
 test("desktop IPC follower backs off baseline recovery instead of hot-looping", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-recovery-backoff-");
