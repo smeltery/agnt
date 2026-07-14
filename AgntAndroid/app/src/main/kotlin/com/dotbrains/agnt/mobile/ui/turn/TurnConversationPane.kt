@@ -29,7 +29,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
-import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
@@ -37,30 +36,15 @@ import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
-import com.dotbrains.agnt.mobile.services.agent.threads.isPluginListUnsupported
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachment
-import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachmentState
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.SkillAutocompleteSuggestion
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.buildComposerAutocompleteState
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.extractThreadFileAutocompleteCandidates
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.isPluginAutocompleteQuery
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.loadSkillAutocompleteSuggestions
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToFileMentions
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToSkillMentions
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mergeMentionChipsIntoDraft
 import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionChipPayload
-import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionKind
-import com.dotbrains.agnt.mobile.ui.turn.composer.ReasoningEffortTitleStrings
 import com.dotbrains.agnt.mobile.ui.turn.composer.TURN_COMPOSER_RUNTIME_AUTO_ID
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerBar
-import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerEvent
-import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerModel
-import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerReducer
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerSecondaryBar
-import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
-import com.dotbrains.agnt.mobile.ui.turn.composer.buildRuntimeControlsState
 import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.GitBranchPaneState
@@ -133,14 +117,6 @@ fun TurnConversationPane(
     var expandedPlanAccessoryMessageId by rememberSaveable(threadId) { mutableStateOf<String?>(null) }
     var composerAttachments by remember { mutableStateOf<List<TurnComposerAttachment>>(emptyList()) }
     var mentionChips by remember(threadId) { mutableStateOf<List<ComposerMentionChipPayload>>(emptyList()) }
-    var availableSkills by remember(threadId) { mutableStateOf<List<SkillAutocompleteSuggestion>>(emptyList()) }
-    var availablePlugins by remember(threadId) { mutableStateOf<List<CodexPluginMetadata>>(emptyList()) }
-    var pluginAutocompleteLoading by remember(threadId) { mutableStateOf(false) }
-    var cachedPluginSearchIndexByRoot by remember(repository) { mutableStateOf<Map<String, List<CodexPluginMetadata>>>(emptyMap()) }
-    var unsupportedPluginAutocompleteRoots by remember(repository) { mutableStateOf<Set<String>>(emptySet()) }
-    var availableFileMatches by remember(threadId) {
-        mutableStateOf<List<com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch>>(emptyList())
-    }
     var showForkThreadSheet by remember(threadId) { mutableStateOf(false) }
     var showFeedbackDialog by remember(threadId) { mutableStateOf(false) }
     var showWorktreeHandoffSheet by remember(threadId) { mutableStateOf(false) }
@@ -423,17 +399,6 @@ fun TurnConversationPane(
         }
     }
 
-    LaunchedEffect(threadId, ready, connectionState, activeThread?.cwd) {
-        if (!ready || connectionState !is ConnectionState.Connected) {
-            availableSkills = emptyList()
-            return@LaunchedEffect
-        }
-        availableSkills =
-            runCatching {
-                loadSkillAutocompleteSuggestions(repository, activeThread?.cwd)
-            }.getOrDefault(emptyList())
-    }
-
     LaunchedEffect(threadId) {
         lastError = null
         draft = ""
@@ -488,204 +453,36 @@ fun TurnConversationPane(
     LaunchedEffect(visiblePlanAccessoryMessage?.id) {
         expandedPlanAccessoryMessageId = null
     }
-    val fileAutocompleteCandidates =
-        remember(messages) {
-            extractThreadFileAutocompleteCandidates(messages)
-        }
-    val trailingToken =
-        remember(draft) { TurnComposerTrailingTokens.parseTrailingToken(draft) }
-    LaunchedEffect(
-        threadId,
-        ready,
-        connectionState,
-        activeThread?.cwd,
-        trailingToken?.payload?.kind,
-        trailingToken?.payload?.semanticValue,
-    ) {
-        val parse = trailingToken
-        if (!ready || connectionState !is ConnectionState.Connected || parse?.payload?.kind != ComposerMentionKind.File) {
-            availableFileMatches = emptyList()
-            return@LaunchedEffect
-        }
-        val query = parse.payload.semanticValue.trim()
-        val cwd = activeThread?.cwd?.trim()?.takeIf { it.isNotEmpty() }
-        if (cwd.isNullOrEmpty() || query.isEmpty()) {
-            availableFileMatches = emptyList()
-            return@LaunchedEffect
-        }
-        availableFileMatches =
-            runCatching {
-                lookupService.fuzzyFileSearch(query = query, roots = listOf(cwd))
-            }.getOrDefault(emptyList())
-    }
-    LaunchedEffect(
-        threadId,
-        ready,
-        connectionState,
-        activeThread?.cwd,
-        trailingToken?.payload?.kind,
-        trailingToken?.payload?.semanticValue,
-    ) {
-        val parse = trailingToken
-        val shouldLoadPlugins =
-            parse?.payload?.kind == ComposerMentionKind.Plugin ||
-                (parse?.payload?.kind == ComposerMentionKind.File && isPluginAutocompleteQuery(parse.payload.semanticValue))
-        if (!ready || connectionState !is ConnectionState.Connected || !shouldLoadPlugins) {
-            availablePlugins = emptyList()
-            pluginAutocompleteLoading = false
-            return@LaunchedEffect
-        }
-        val cwd = activeThread?.cwd?.trim()?.takeIf { it.isNotEmpty() }
-        if (cwd.isNullOrEmpty()) {
-            availablePlugins = emptyList()
-            pluginAutocompleteLoading = false
-            return@LaunchedEffect
-        }
-        cachedPluginSearchIndexByRoot[cwd]?.let { cached ->
-            availablePlugins = cached
-            pluginAutocompleteLoading = false
-            return@LaunchedEffect
-        }
-        if (unsupportedPluginAutocompleteRoots.contains(cwd)) {
-            availablePlugins = emptyList()
-            pluginAutocompleteLoading = false
-            return@LaunchedEffect
-        }
-        pluginAutocompleteLoading = true
-        runCatching {
-            lookupService.listPlugins(cwds = listOf(cwd), forceReload = false)
-        }.onSuccess { plugins ->
-            cachedPluginSearchIndexByRoot = cachedPluginSearchIndexByRoot + (cwd to plugins)
-            availablePlugins = plugins
-        }.onFailure { error ->
-            if (isPluginListUnsupported(error)) {
-                unsupportedPluginAutocompleteRoots = unsupportedPluginAutocompleteRoots + cwd
-            }
-            availablePlugins = emptyList()
-        }
-        pluginAutocompleteLoading = false
-    }
-    val autocompleteState =
-        remember(
-            trailingToken,
-            availableSkills,
-            availablePlugins,
-            pluginAutocompleteLoading,
-            fileAutocompleteCandidates,
-            availableFileMatches,
-            isThreadRunning,
-        ) {
-            buildComposerAutocompleteState(
-                parse = trailingToken,
-                skillSuggestions = availableSkills,
-                pluginSuggestions = availablePlugins,
-                fileCandidates = fileAutocompleteCandidates,
-                fileMatches = availableFileMatches,
-                isThreadRunning = isThreadRunning,
-                isPluginLoading = pluginAutocompleteLoading,
-            )
-        }
-    val readyComposerImageAttachments =
-        remember(composerAttachments) {
-            composerAttachments.mapNotNull { attachment ->
-                (attachment.state as? TurnComposerAttachmentState.ReadyImage)?.attachment
-            }
-        }
-    val readyComposerFileAttachments =
-        remember(composerAttachments) {
-            composerAttachments.mapNotNull { attachment ->
-                (attachment.state as? TurnComposerAttachmentState.ReadyFile)?.attachment
-            }
-        }
-    val runtimeLoadingLabel = stringResource(R.string.turn_runtime_loading)
-    val runtimeModelFallbackLabel = stringResource(R.string.turn_runtime_model_fallback)
-    val runtimeNoModelsLabel = stringResource(R.string.turn_runtime_no_models)
-    val runtimeAutoLabel = stringResource(R.string.turn_runtime_auto)
-    val runtimeNormalLabel = stringResource(R.string.turn_runtime_normal)
-    val reasoningEffortTitles =
-        ReasoningEffortTitleStrings(
-            low = stringResource(R.string.turn_runtime_reasoning_title_low),
-            medium = stringResource(R.string.turn_runtime_reasoning_title_medium),
-            high = stringResource(R.string.turn_runtime_reasoning_title_high),
-            xhigh = stringResource(R.string.turn_runtime_reasoning_title_xhigh),
+    val autocomplete =
+        rememberTurnConversationAutocompleteState(
+            threadId = threadId,
+            repository = repository,
+            lookupService = lookupService,
+            ready = ready,
+            connectionState = connectionState,
+            activeThreadCwd = activeThread?.cwd,
+            messages = messages,
+            draft = draft,
+            isThreadRunning = isThreadRunning,
         )
-    val runtimeControls =
-        remember(
-            availableModels,
-            isLoadingModels,
-            selectedModelId,
-            selectedReasoningEffort,
-            selectedAccessMode,
-            selectedServiceTier,
-            runtimeLoadingLabel,
-            runtimeModelFallbackLabel,
-            runtimeNoModelsLabel,
-            runtimeAutoLabel,
-            runtimeNormalLabel,
-            reasoningEffortTitles,
-        ) {
-            buildRuntimeControlsState(
-                models = availableModels,
-                isLoadingModels = isLoadingModels,
-                selectedModelId = selectedModelId,
-                selectedReasoningEffort = selectedReasoningEffort,
-                selectedAccessMode = selectedAccessMode,
-                selectedServiceTier = selectedServiceTier,
-                loadingLabel = runtimeLoadingLabel,
-                modelFallbackLabel = runtimeModelFallbackLabel,
-                noModelsLabel = runtimeNoModelsLabel,
-                autoLabel = runtimeAutoLabel,
-                normalTierLabel = runtimeNormalLabel,
-                reasoningEffortTitles = reasoningEffortTitles,
-            )
-        }
-    val draftWithMentions =
-        remember(draft, mentionChips) {
-            mergeMentionChipsIntoDraft(draft, mentionChips)
-        }
-    val structuredSkillMentions =
-        remember(mentionChips) {
-            mentionChipsToSkillMentions(mentionChips)
-        }
-    val structuredFileMentions =
-        remember(mentionChips) {
-            mentionChipsToFileMentions(mentionChips)
-        }
-    val composerModel =
-        remember(
-            ready,
-            sending,
-            draftWithMentions,
-            composerAttachments,
-            mentionChips,
-            voiceControls.phase,
-            isThreadRunning,
-            voiceControls.isTranscribing,
-        ) {
-            listOf<TurnComposerEvent>(
-                TurnComposerEvent.SetEnabled(ready),
-                TurnComposerEvent.SetSending(sending),
-                TurnComposerEvent.SetDraftText(draftWithMentions),
-                TurnComposerEvent.SetReadyAttachmentCount(
-                    composerAttachments.count {
-                        it.state is TurnComposerAttachmentState.ReadyImage ||
-                            it.state is TurnComposerAttachmentState.ReadyFile
-                    },
-                ),
-                TurnComposerEvent.SetHasBlockingAttachments(
-                    composerAttachments.any {
-                        it.state == TurnComposerAttachmentState.Loading ||
-                            it.state is TurnComposerAttachmentState.Failed
-                    },
-                ),
-                TurnComposerEvent.SetVoicePhase(voiceControls.phase),
-                TurnComposerEvent.SetThreadRunning(isThreadRunning),
-                TurnComposerEvent.SetTranscribing(voiceControls.isTranscribing),
-            ).fold(TurnComposerModel()) { state, evt ->
-                TurnComposerReducer.reduce(state, evt)
-            }
-        }
-    val composerLocks = remember(composerModel) { composerModel.deriveInteractionLocks() }
+    val composerState =
+        rememberTurnConversationComposerModelState(
+            availableModels = availableModels,
+            isLoadingModels = isLoadingModels,
+            selectedModelId = selectedModelId,
+            selectedReasoningEffort = selectedReasoningEffort,
+            selectedAccessMode = selectedAccessMode,
+            selectedServiceTier = selectedServiceTier,
+            draft = draft,
+            composerAttachments = composerAttachments,
+            mentionChips = mentionChips,
+            voicePhase = voiceControls.phase,
+            isThreadRunning = isThreadRunning,
+            isTranscribing = voiceControls.isTranscribing,
+            ready = ready,
+            sending = sending,
+        )
+    val composerLocks = remember(composerState.composerModel) { composerState.composerModel.deriveInteractionLocks() }
 
     fun dispatchTurn(
         text: String,
@@ -910,11 +707,11 @@ fun TurnConversationPane(
             TurnComposerBar(
                 draft = draft,
                 attachments = composerAttachments,
-                model = composerModel,
+                model = composerState.composerModel,
                 isPlanModeEnabled = isPlanModeEnabled,
-                runtimeControls = runtimeControls,
+                runtimeControls = composerState.runtimeControls,
                 mentionChips = mentionChips,
-                autocomplete = autocompleteState,
+                autocomplete = autocomplete.autocompleteState,
                 onDraftChange = { next ->
                     draft = next
                     val target = reviewTarget
@@ -955,7 +752,7 @@ fun TurnConversationPane(
                     handleTurnComposerAutocompleteSelection(
                         item = item,
                         draft = draft,
-                        trailingToken = trailingToken,
+                        trailingToken = autocomplete.trailingToken,
                         mentionChips = mentionChips,
                         defaultReviewBaseBranch = defaultReviewBaseBranch,
                         reviewNoDefaultBranchMessage = reviewNoDefaultBranchMessage,
@@ -994,9 +791,9 @@ fun TurnConversationPane(
                             },
                             selectedAccessMode = selectedAccessMode,
                             accessPickerEnabled =
-                                ready &&
+                                    ready &&
                                     !composerLocks.runtimeControlsLocked &&
-                                    runtimeControls.accessMode.enabled,
+                                    composerState.runtimeControls.accessMode.enabled,
                             onSelectAccessMode = { mode ->
                                 scope.launch { runCatching { repository.setSelectedAccessMode(mode) } }
                             },
@@ -1022,11 +819,11 @@ fun TurnConversationPane(
                         resolvedReviewBaseBranch = resolvedReviewBaseBranch,
                         isThreadRunning = isThreadRunning,
                         composerAttachments = composerAttachments,
-                        draftWithMentions = draftWithMentions,
-                        readyComposerImageAttachments = readyComposerImageAttachments,
-                        readyComposerFileAttachments = readyComposerFileAttachments,
-                        structuredSkillMentions = structuredSkillMentions,
-                        structuredFileMentions = structuredFileMentions,
+                        draftWithMentions = composerState.draftWithMentions,
+                        readyComposerImageAttachments = composerState.readyComposerImageAttachments,
+                        readyComposerFileAttachments = composerState.readyComposerFileAttachments,
+                        structuredSkillMentions = composerState.structuredSkillMentions,
+                        structuredFileMentions = composerState.structuredFileMentions,
                         isPlanModeEnabled = isPlanModeEnabled,
                         attachmentFileBinarySummary = attachmentFileBinarySummary,
                         reviewRunningUnavailableMessage = reviewRunningUnavailableMessage,
