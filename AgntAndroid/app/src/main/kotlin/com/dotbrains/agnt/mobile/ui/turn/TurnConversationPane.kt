@@ -1,11 +1,7 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
-import android.util.Log
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,10 +10,8 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -25,17 +19,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dotbrains.agnt.mobile.BuildConfig
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
@@ -49,11 +39,9 @@ import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
 import com.dotbrains.agnt.mobile.services.agent.threads.isPluginListUnsupported
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
-import com.dotbrains.agnt.mobile.ui.agent.MessageList
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachment
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachmentState
-import com.dotbrains.agnt.mobile.ui.turn.attachments.appendFileAttachmentsToDraft
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.SkillAutocompleteSuggestion
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.buildComposerAutocompleteState
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.extractThreadFileAutocompleteCandidates
@@ -75,10 +63,6 @@ import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
 import com.dotbrains.agnt.mobile.ui.turn.composer.buildRuntimeControlsState
 import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
-import com.dotbrains.agnt.mobile.ui.turn.timeline.SmartScrollNavigationCta
-import com.dotbrains.agnt.mobile.ui.turn.timeline.buildChatAnchors
-import com.dotbrains.agnt.mobile.ui.turn.timeline.buildSmartScrollNavigationState
-import com.dotbrains.agnt.mobile.ui.turn.timeline.shouldFollowTimelineBottom
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.GitBranchPaneState
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnPlanAccessoryCard
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnReviewAccessoryCard
@@ -86,19 +70,11 @@ import com.dotbrains.agnt.mobile.ui.turn.toolbar.resolveReviewBaseBranch
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.reviewSelectableDefaultBranch
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectCompletedPlanAccessoryMessage
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectPinnedPlanAccessoryMessage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 private const val MAX_COMPOSER_ATTACHMENTS = 4
 private const val MAX_NON_IMAGE_ATTACHMENT_BYTES = 256 * 1024
 private const val MAX_NON_IMAGE_ATTACHMENT_TEXT_CHARS = 8_000
-private const val TIMELINE_INITIAL_RENDER_TAIL = 48
-private const val TIMELINE_LOAD_EARLIER_PAGE = 80
-private const val TIMELINE_STAGING_THRESHOLD = 72
-private const val STARTUP_TRACE_TAG = "AgntStartup"
-private const val SMART_SCROLL_FADE_JUMP_DISTANCE_ITEMS = 24
-private val TurnConversationMessageListTopPadding = 112.dp
 
 /**
  * Conversation shell: timeline + composer (text, send, image attachments).
@@ -488,33 +464,16 @@ fun TurnConversationPane(
         remember(messages, threadChangeSets) {
             assistantUndoChangeSetsByMessageId(messages = messages, changeSets = threadChangeSets)
         }
-    var visibleTailCount by rememberSaveable(threadId) { mutableIntStateOf(TIMELINE_INITIAL_RENDER_TAIL) }
-    LaunchedEffect(threadId, messages.size) {
-        if (messages.size <= TIMELINE_STAGING_THRESHOLD) {
-            visibleTailCount = messages.size.coerceAtLeast(TIMELINE_INITIAL_RENDER_TAIL)
-        } else if (visibleTailCount < TIMELINE_INITIAL_RENDER_TAIL) {
-            visibleTailCount = TIMELINE_INITIAL_RENDER_TAIL
-        }
-        if (BuildConfig.DEBUG) {
-            Log.d(
-                STARTUP_TRACE_TAG,
-                "timeline source thread=$threadId messages=${messages.size} visibleTail=$visibleTailCount",
-            )
-        }
-    }
-    val visibleMessages =
-        remember(messages, visibleTailCount) {
-            if (messages.size <= TIMELINE_STAGING_THRESHOLD) {
-                messages
-            } else {
-                messages.takeLast(visibleTailCount.coerceAtMost(messages.size))
-            }
-        }
-    val hiddenEarlierCount = (messages.size - visibleMessages.size).coerceAtLeast(0)
-    val historyPaginationState = historyPaginationByThread[threadId]
-    val canLoadOlderRemoteHistory = historyPaginationState?.canLoadOlder == true
-    val isLoadingOlderHistory = threadId in loadingOlderHistoryThreadIds
-    val olderHistoryError = olderHistoryErrorByThread[threadId]
+    val timelineState =
+        rememberTurnConversationTimelineState(
+            threadId = threadId,
+            repository = repository,
+            scope = scope,
+            messages = messages,
+            historyPaginationByThread = historyPaginationByThread,
+            loadingOlderHistoryThreadIds = loadingOlderHistoryThreadIds,
+            olderHistoryErrorByThread = olderHistoryErrorByThread,
+        )
     val pinnedPlanAccessoryMessage =
         remember(messages) {
             selectPinnedPlanAccessoryMessage(messages)
@@ -626,110 +585,6 @@ fun TurnConversationPane(
                 isPluginLoading = pluginAutocompleteLoading,
             )
         }
-    val listState = rememberLazyListState()
-    val latestMessageId = visibleMessages.lastOrNull()?.id
-    var lastAutoScrollThreadId by remember { mutableStateOf<String?>(null) }
-    var shouldAutoFollowBottom by rememberSaveable(threadId) { mutableStateOf(true) }
-    var timelineContentVisible by remember(threadId) { mutableStateOf(true) }
-    val timelineContentAlpha by animateFloatAsState(
-        targetValue = if (timelineContentVisible) 1f else 0.18f,
-        label = "timeline-content-alpha",
-    )
-    val timelineBlurRadius by animateDpAsState(
-        targetValue = if (timelineContentVisible) 0.dp else 10.dp,
-        label = "timeline-content-blur",
-    )
-    val shouldFollowBottom by remember {
-        derivedStateOf {
-            shouldFollowTimelineBottom(
-                totalItemsCount = listState.layoutInfo.totalItemsCount,
-                lastVisibleItemIndex =
-                    listState.layoutInfo.visibleItemsInfo
-                        .lastOrNull()
-                        ?.index,
-            )
-        }
-    }
-    val firstVisibleListItemIndex by remember {
-        derivedStateOf { listState.firstVisibleItemIndex }
-    }
-    val lastVisibleListItemIndex by remember {
-        derivedStateOf {
-            listState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
-        }
-    }
-    val totalListItemCount by remember {
-        derivedStateOf { listState.layoutInfo.totalItemsCount }
-    }
-    val timelineListItemOffset =
-        if (hiddenEarlierCount > 0 || canLoadOlderRemoteHistory) {
-            1
-        } else {
-            0
-        }
-    val chatAnchors =
-        remember(visibleMessages, timelineListItemOffset) {
-            buildChatAnchors(
-                messages = visibleMessages,
-                listItemOffset = timelineListItemOffset,
-            )
-        }
-    val smartScrollNavigationState =
-        remember(
-            totalListItemCount,
-            firstVisibleListItemIndex,
-            lastVisibleListItemIndex,
-            chatAnchors,
-            shouldFollowBottom,
-            latestMessageId,
-        ) {
-            buildSmartScrollNavigationState(
-                totalItemsCount = totalListItemCount,
-                firstVisibleItemIndex = firstVisibleListItemIndex,
-                lastVisibleItemIndex = lastVisibleListItemIndex,
-                anchors = chatAnchors,
-                isNearBottom = shouldFollowBottom,
-            )
-        }
-    LaunchedEffect(threadId) {
-        lastAutoScrollThreadId = threadId
-        if (visibleMessages.isNotEmpty()) {
-            listState.scrollToItem(visibleMessages.lastIndex)
-            if (BuildConfig.DEBUG) {
-                Log.d(
-                    STARTUP_TRACE_TAG,
-                    "timeline scrolled thread=$threadId visible=${visibleMessages.size} hiddenEarlier=$hiddenEarlierCount reason=thread",
-                )
-            }
-        }
-    }
-    LaunchedEffect(threadId, listState) {
-        snapshotFlow { shouldFollowBottom to listState.isScrollInProgress }
-            .distinctUntilChanged()
-            .collect { (isAtBottom, isScrolling) ->
-                if (isScrolling) {
-                    shouldAutoFollowBottom = isAtBottom
-                }
-            }
-    }
-    LaunchedEffect(latestMessageId, shouldFollowBottom) {
-        if (shouldFollowBottom) {
-            shouldAutoFollowBottom = true
-        }
-    }
-    LaunchedEffect(latestMessageId, visibleMessages.size, shouldAutoFollowBottom) {
-        if (visibleMessages.isNotEmpty() && shouldAutoFollowBottom && lastAutoScrollThreadId == threadId) {
-            listState.animateScrollToItem(visibleMessages.lastIndex)
-            if (BuildConfig.DEBUG) {
-                Log.d(
-                    STARTUP_TRACE_TAG,
-                    "timeline scrolled thread=$threadId visible=${visibleMessages.size} hiddenEarlier=$hiddenEarlierCount reason=followBottom",
-                )
-            }
-        }
-    }
     val readyComposerImageAttachments =
         remember(composerAttachments) {
             composerAttachments.mapNotNull { attachment ->
@@ -907,46 +762,29 @@ fun TurnConversationPane(
                         .weight(1f)
                         .fillMaxWidth(),
             ) {
-                MessageList(
-                    messages = visibleMessages,
-                    listState = listState,
+                TurnConversationTimelinePane(
+                    messages = timelineState.visibleMessages,
+                    listState = timelineState.listState,
                     commandExecutionDetailsByItemId = commandExecutionDetailsByItemId,
-                    onOpenFullMessage = { fullTimelineMessage = it },
                     isAssistantTurnActive = isThreadRunning,
                     activeTurnId = activeTurnId,
-                    hiddenEarlierCount = hiddenEarlierCount,
-                    canLoadOlderRemoteHistory = canLoadOlderRemoteHistory,
-                    isLoadingOlderHistory = isLoadingOlderHistory,
-                    olderHistoryError = olderHistoryError,
-                    contentPadding =
-                        PaddingValues(
-                            top = TurnConversationMessageListTopPadding,
-                            bottom = 18.dp,
-                            start = 2.dp,
-                            end = 2.dp,
-                        ),
-                    onLoadEarlierMessages =
-                        if (hiddenEarlierCount > 0 || canLoadOlderRemoteHistory) {
-                            {
-                                if (canLoadOlderRemoteHistory && hiddenEarlierCount <= TIMELINE_LOAD_EARLIER_PAGE) {
-                                    scope.launch { runCatching { repository.loadOlderThreadHistory(threadId) } }
-                                } else {
-                                    visibleTailCount =
-                                        (visibleTailCount + TIMELINE_LOAD_EARLIER_PAGE)
-                                            .coerceAtMost(messages.size)
-                                    if (BuildConfig.DEBUG) {
-                                        Log.d(
-                                            STARTUP_TRACE_TAG,
-                                            "timeline loadEarlier thread=$threadId visibleTail=$visibleTailCount total=${messages.size}",
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            null
-                        },
+                    hiddenEarlierCount = timelineState.hiddenEarlierCount,
+                    canLoadOlderRemoteHistory = timelineState.canLoadOlderRemoteHistory,
+                    isLoadingOlderHistory = timelineState.isLoadingOlderHistory,
+                    olderHistoryError = timelineState.olderHistoryError,
+                    contentTopPadding = TurnConversationMessageListTopPadding,
+                    timelineBlurRadius = timelineState.timelineBlurRadius,
+                    timelineContentAlpha = timelineState.timelineContentAlpha,
+                    smartScrollNavigationState = timelineState.smartScrollNavigationState,
                     assistantUndoChangeSetsByMessageId = assistantUndoChangeSetsByMessageId,
                     applyingUndoChangeSetIds = applyingUndoChangeSetIds,
+                    forkThreadEnabled =
+                        ready &&
+                            connectionState is ConnectionState.Connected &&
+                            !isThreadRunning &&
+                            !forkingThread,
+                    onOpenFullMessage = { fullTimelineMessage = it },
+                    onLoadEarlierMessages = timelineState.onLoadEarlierMessages,
                     onUndoAssistantChanges = { changeSet ->
                         handleTurnAssistantUndo(
                             changeSet = changeSet,
@@ -973,47 +811,7 @@ fun TurnConversationPane(
                         showForkThreadSheet = true
                         lastError = null
                     },
-                    forkThreadEnabled =
-                        ready &&
-                            connectionState is ConnectionState.Connected &&
-                            !isThreadRunning &&
-                            !forkingThread,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .blur(timelineBlurRadius)
-                            .alpha(timelineContentAlpha),
-                )
-                SmartScrollNavigationCta(
-                    state = smartScrollNavigationState,
-                    onNavigate = { requestedIndex ->
-                        val targetIndex =
-                            requestedIndex.coerceIn(
-                                minimumValue = 0,
-                                maximumValue = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0),
-                            )
-                        scope.launch {
-                            val distanceItems = kotlin.math.abs(targetIndex - listState.firstVisibleItemIndex)
-                            if (distanceItems >= SMART_SCROLL_FADE_JUMP_DISTANCE_ITEMS) {
-                                timelineContentVisible = false
-                                delay(90L)
-                                listState.scrollToItem(targetIndex)
-                                delay(120L)
-                                timelineContentVisible = true
-                            } else {
-                                listState.animateScrollToItem(targetIndex)
-                            }
-                            if (targetIndex >= (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)) {
-                                shouldAutoFollowBottom = true
-                            } else {
-                                shouldAutoFollowBottom = false
-                            }
-                        }
-                    },
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 14.dp),
+                    onSmartScrollNavigate = timelineState.onSmartScrollNavigate,
                 )
             }
             TurnConversationPaneInlineStatus(
@@ -1154,58 +952,20 @@ fun TurnConversationPane(
                     mentionChips = mentionChips.filterNot { it == chip }
                 },
                 onSelectAutocomplete = { item ->
-                    val replaced =
-                        TurnComposerTrailingTokens.replaceTrailingSegment(
-                            text = draft,
-                            replacement = item.replacementText,
-                            parse = trailingToken,
-                        )
-                    draft = replaced.text
-                    when (item.payload.kind) {
-                        ComposerMentionKind.File,
-                        ComposerMentionKind.Skill,
-                        ComposerMentionKind.Plugin,
-                        -> {
-                            if (mentionChips.none { it.kind == item.payload.kind && it.semanticValue == item.payload.semanticValue }) {
-                                mentionChips = mentionChips + item.payload
-                            }
-                        }
-                        ComposerMentionKind.SlashCommand -> {
-                            when {
-                                item.payload.semanticValue.equals("fork", ignoreCase = true) -> {
-                                    draft = replaced.text.removeSuffix("/fork ").trimEnd()
-                                    showForkThreadSheet = true
-                                    lastError = null
-                                }
-                                item.payload.semanticValue.equals("feedback", ignoreCase = true) -> {
-                                    draft = replaced.text.removeSuffix("/feedback ").trimEnd()
-                                    showFeedbackDialog = true
-                                    lastError = null
-                                }
-                                item.payload.semanticValue.equals("compact", ignoreCase = true) -> {
-                                    draft = (replaced.text.trimEnd() + " /compact").trim()
-                                    mentionChips =
-                                        mentionChips.filterNot { chip ->
-                                            chip.kind == ComposerMentionKind.SlashCommand &&
-                                                chip.semanticValue.equals("compact", ignoreCase = true)
-                                        }
-                                    lastError = null
-                                }
-                                item.payload.semanticValue.equals("review", ignoreCase = true) -> {
-                                    selectReviewTarget(CodexReviewTarget.uncommittedChanges)
-                                }
-                                item.payload.semanticValue.equals("review-base", ignoreCase = true) -> {
-                                    val branch = defaultReviewBaseBranch
-                                    if (branch == null) {
-                                        draft = replaced.text.removeSuffix("/review-base ").trimEnd()
-                                        lastError = reviewNoDefaultBranchMessage
-                                    } else {
-                                        selectReviewTarget(CodexReviewTarget.baseBranch, branch)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    handleTurnComposerAutocompleteSelection(
+                        item = item,
+                        draft = draft,
+                        trailingToken = trailingToken,
+                        mentionChips = mentionChips,
+                        defaultReviewBaseBranch = defaultReviewBaseBranch,
+                        reviewNoDefaultBranchMessage = reviewNoDefaultBranchMessage,
+                        selectReviewTarget = { target, baseBranch -> selectReviewTarget(target, baseBranch) },
+                        setDraft = { draft = it },
+                        setMentionChips = { mentionChips = it },
+                        setShowForkThreadSheet = { showForkThreadSheet = it },
+                        setShowFeedbackDialog = { showFeedbackDialog = it },
+                        setLastError = { lastError = it },
+                    )
                 },
                 onStopTurn = { stopActiveTurn() },
                 voiceUiEnabled = voiceControls.isInteractionEnabled,
@@ -1254,64 +1014,31 @@ fun TurnConversationPane(
                     }
                 },
                 onSend = {
-                    voiceControls.cancelActiveWork()
-                    lastError = null
-                    val activeReviewTarget = reviewTarget
-                    if (activeReviewTarget != null) {
-                        if (isThreadRunning) {
-                            lastError = reviewRunningUnavailableMessage
-                            return@TurnComposerBar
-                        }
-                        val activeReviewBaseBranch = resolvedReviewBaseBranch
-                        if (activeReviewTarget.name == "baseBranch" && activeReviewBaseBranch == null) {
-                            lastError = reviewNoBaseBranchAvailableMessage
-                            return@TurnComposerBar
-                        }
-                        if (composerAttachments.isNotEmpty()) {
-                            lastError = reviewNoAttachmentsMessage
-                            return@TurnComposerBar
-                        }
-                        sending = true
-                        scope.launch {
-                            runCatching {
-                                repository.startReview(
-                                    threadId = threadId,
-                                    target = activeReviewTarget,
-                                    baseBranch = activeReviewBaseBranch,
-                                )
-                            }.onSuccess {
-                                sending = false
-                                draft = ""
-                                mentionChips = emptyList()
-                                clearReviewTarget()
-                            }.onFailure { e ->
-                                sending = false
-                                lastError =
-                                    formatTurnSendError(e)
-                            }
-                        }
-                        return@TurnComposerBar
-                    }
-                    val draftText =
-                        appendFileAttachmentsToDraft(
-                            baseText = draftWithMentions,
-                            files = readyComposerFileAttachments,
-                            binarySummary = attachmentFileBinarySummary,
-                        )
-                    val attachmentsToSend = readyComposerImageAttachments
-                    val collaborationMode =
-                        if (isPlanModeEnabled) {
-                            CodexCollaborationModeKind.plan
-                        } else {
-                            null
-                        }
-                    dispatchTurn(
-                        text = draftText,
-                        attachments = attachmentsToSend,
-                        skillMentions = structuredSkillMentions,
-                        fileMentions = structuredFileMentions,
-                        collaborationMode = collaborationMode,
-                        fromQueue = false,
+                    handleTurnComposerSend(
+                        threadId = threadId,
+                        repository = repository,
+                        scope = scope,
+                        reviewTarget = reviewTarget,
+                        resolvedReviewBaseBranch = resolvedReviewBaseBranch,
+                        isThreadRunning = isThreadRunning,
+                        composerAttachments = composerAttachments,
+                        draftWithMentions = draftWithMentions,
+                        readyComposerImageAttachments = readyComposerImageAttachments,
+                        readyComposerFileAttachments = readyComposerFileAttachments,
+                        structuredSkillMentions = structuredSkillMentions,
+                        structuredFileMentions = structuredFileMentions,
+                        isPlanModeEnabled = isPlanModeEnabled,
+                        attachmentFileBinarySummary = attachmentFileBinarySummary,
+                        reviewRunningUnavailableMessage = reviewRunningUnavailableMessage,
+                        reviewNoBaseBranchAvailableMessage = reviewNoBaseBranchAvailableMessage,
+                        reviewNoAttachmentsMessage = reviewNoAttachmentsMessage,
+                        cancelVoiceWork = voiceControls.cancelActiveWork,
+                        clearReviewTarget = { clearReviewTarget() },
+                        setSending = { sending = it },
+                        setDraft = { draft = it },
+                        setMentionChips = { mentionChips = it },
+                        setLastError = { lastError = it },
+                        dispatchTurn = ::dispatchTurn,
                     )
                 },
             )
