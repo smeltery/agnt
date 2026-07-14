@@ -1,10 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.turn
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
@@ -40,12 +36,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotbrains.agnt.mobile.BuildConfig
 import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.core.error.AgentServiceError
-import com.dotbrains.agnt.mobile.core.model.ActiveProvider
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
@@ -53,8 +46,6 @@ import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
-import com.dotbrains.agnt.mobile.core.voice.BridgeVoiceRecorder
-import com.dotbrains.agnt.mobile.core.voice.VoiceDraftAppend
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
@@ -92,7 +83,6 @@ import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerReducer
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerReviewModeRules
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerSecondaryBar
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
-import com.dotbrains.agnt.mobile.ui.turn.composer.TurnVoicePhase
 import com.dotbrains.agnt.mobile.ui.turn.composer.buildRuntimeControlsState
 import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoveryCard
@@ -109,14 +99,9 @@ import com.dotbrains.agnt.mobile.ui.turn.toolbar.resolveReviewBaseBranch
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.reviewSelectableDefaultBranch
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectCompletedPlanAccessoryMessage
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectPinnedPlanAccessoryMessage
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.Instant
 
 private const val MAX_COMPOSER_ATTACHMENTS = 4
@@ -194,9 +179,6 @@ fun TurnConversationPane(
     var availableFileMatches by remember(threadId) {
         mutableStateOf<List<com.dotbrains.agnt.mobile.core.model.CodexFuzzyFileMatch>>(emptyList())
     }
-    var voicePhase by remember(threadId) { mutableStateOf(TurnVoicePhase.Idle) }
-    var voiceAudioLevels by remember(threadId) { mutableStateOf<List<Float>>(emptyList()) }
-    var voiceRecordingDurationSeconds by remember(threadId) { mutableStateOf(0.0) }
     var showForkThreadSheet by remember(threadId) { mutableStateOf(false) }
     var showFeedbackDialog by remember(threadId) { mutableStateOf(false) }
     var showWorktreeHandoffSheet by remember(threadId) { mutableStateOf(false) }
@@ -205,26 +187,12 @@ fun TurnConversationPane(
     var fullTimelineMessage by remember(threadId) { mutableStateOf<com.dotbrains.agnt.mobile.core.model.CodexMessage?>(null) }
     var reviewTargetName by rememberSaveable(threadId) { mutableStateOf<String?>(null) }
     var reviewBaseBranch by rememberSaveable(threadId) { mutableStateOf<String?>(null) }
-    val voiceRecorder = remember(threadId) { BridgeVoiceRecorder() }
     val lookupService = remember(repository) { CodexLookupService(repository) }
-    var transcribeJob by remember(threadId) { mutableStateOf<Job?>(null) }
     var threadChangeSets by remember(threadId) {
         mutableStateOf(TurnUsageSheetLogic.recentChangeSetsForThread(threadId, aiChangeSetPersistence.load(), limit = 50))
     }
     var applyingUndoChangeSetIds by remember(threadId) { mutableStateOf(emptySet<String>()) }
     var inlineUndoError by remember(threadId) { mutableStateOf<String?>(null) }
-
-    fun appendVoiceAudioLevel(level: Float) {
-        scope.launch {
-            if (voicePhase != TurnVoicePhase.Recording) return@launch
-            voiceAudioLevels = (voiceAudioLevels + level.coerceIn(0f, 1f)).takeLast(240)
-        }
-    }
-
-    fun resetVoiceMeteringState() {
-        voiceAudioLevels = emptyList()
-        voiceRecordingDurationSeconds = 0.0
-    }
 
     val activeThread =
         remember(threadId, threads) {
@@ -481,29 +449,6 @@ fun TurnConversationPane(
         }
     }
 
-    // Provider-aware gating:
-    //   • activeProvider == Codex → mic shown immediately on connect.
-    //   • activeProvider in {Claude, Opencode, Cursor} → mic hidden pre-emptively
-    //     (voice/transcribe is a Codex-only RPC).
-    //   • activeProvider == Unknown → fall back to the legacy bridgeSupportsVoiceTranscription
-    //     flag so older bridges (no providerId on initialize) still get the fail-once-then-hide
-    //     behavior that landed before the provider state holder.
-    val voiceInteractionEnabled =
-        remember(ready, connectionState, sending, bridgeSupportsVoiceTranscription, activeProvider) {
-            if (!ready || connectionState !is ConnectionState.Connected || sending) {
-                false
-            } else {
-                when (activeProvider) {
-                    ActiveProvider.Codex -> bridgeSupportsVoiceTranscription
-                    ActiveProvider.Claude,
-                    ActiveProvider.Opencode,
-                    ActiveProvider.Cursor,
-                    -> false
-                    ActiveProvider.Unknown -> bridgeSupportsVoiceTranscription
-                }
-            }
-        }
-
     val attachmentLaunchActions =
         rememberTurnAttachmentLaunchActions(
             context = context,
@@ -526,27 +471,23 @@ fun TurnConversationPane(
             attachmentCameraPermissionDeniedMessage = attachmentCameraPermissionDeniedMessage,
         )
 
-    val audioPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                scope.launch {
-                    if (voicePhase != TurnVoicePhase.Idle) return@launch
-                    resetVoiceMeteringState()
-                    val ok =
-                        withContext(Dispatchers.IO) {
-                            voiceRecorder.start(::appendVoiceAudioLevel)
-                        }
-                    if (ok) {
-                        voicePhase = TurnVoicePhase.Recording
-                    } else {
-                        resetVoiceMeteringState()
-                        lastError = voiceRecorderFailedMessage
-                    }
-                }
-            } else {
-                lastError = voiceMicDeniedMessage
-            }
-        }
+    val voiceControls =
+        rememberTurnVoiceControls(
+            threadId = threadId,
+            repository = repository,
+            ready = ready,
+            connectionState = connectionState,
+            sending = sending,
+            bridgeSupportsVoiceTranscription = bridgeSupportsVoiceTranscription,
+            activeProvider = activeProvider,
+            draft = draft,
+            setDraft = { draft = it },
+            setLastError = { lastError = it },
+            micDeniedMessage = voiceMicDeniedMessage,
+            recorderFailedMessage = voiceRecorderFailedMessage,
+            noAudioMessage = voiceNoAudioMessage,
+            transcriptionFailedMessage = voiceTranscriptionFailedMessage,
+        )
 
     // Restore the saved composer draft for this thread/mac.
     LaunchedEffect(threadId, currentTrustedMacDeviceId) {
@@ -596,25 +537,11 @@ fun TurnConversationPane(
     }
 
     LaunchedEffect(threadId) {
-        transcribeJob?.cancel()
-        transcribeJob = null
-        voiceRecorder.cancel()
-        voicePhase = TurnVoicePhase.Idle
-        resetVoiceMeteringState()
         lastError = null
         draft = ""
         composerAttachments = emptyList()
         mentionChips = emptyList()
         expandedPlanAccessoryMessageId = null
-    }
-
-    LaunchedEffect(threadId, voicePhase) {
-        if (voicePhase != TurnVoicePhase.Recording) return@LaunchedEffect
-        val startedAtNanos = System.nanoTime()
-        while (isActive && voicePhase == TurnVoicePhase.Recording) {
-            voiceRecordingDurationSeconds = (System.nanoTime() - startedAtNanos) / 1_000_000_000.0
-            delay(100)
-        }
     }
 
     LaunchedEffect(threadId, gitCwd, connectionState, ready, gitBranchReloadNonce) {
@@ -974,9 +901,9 @@ fun TurnConversationPane(
             draftWithMentions,
             composerAttachments,
             mentionChips,
-            voicePhase,
+            voiceControls.phase,
             isThreadRunning,
-            transcribeJob,
+            voiceControls.isTranscribing,
         ) {
             listOf<TurnComposerEvent>(
                 TurnComposerEvent.SetEnabled(ready),
@@ -994,11 +921,9 @@ fun TurnConversationPane(
                             it.state is TurnComposerAttachmentState.Failed
                     },
                 ),
-                TurnComposerEvent.SetVoicePhase(voicePhase),
+                TurnComposerEvent.SetVoicePhase(voiceControls.phase),
                 TurnComposerEvent.SetThreadRunning(isThreadRunning),
-                TurnComposerEvent.SetTranscribing(
-                    voicePhase == TurnVoicePhase.Transcribing || transcribeJob != null,
-                ),
+                TurnComposerEvent.SetTranscribing(voiceControls.isTranscribing),
             ).fold(TurnComposerModel()) { state, evt ->
                 TurnComposerReducer.reduce(state, evt)
             }
@@ -1533,100 +1458,11 @@ fun TurnConversationPane(
                     }
                 },
                 onStopTurn = { stopActiveTurn() },
-                voiceUiEnabled = voiceInteractionEnabled,
-                voiceAudioLevels = voiceAudioLevels,
-                voiceRecordingDurationSeconds = voiceRecordingDurationSeconds,
-                onVoiceClick = {
-                    when (voicePhase) {
-                        TurnVoicePhase.Idle -> {
-                            if (voiceInteractionEnabled) {
-                                val hasAudioPermission =
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                                        PackageManager.PERMISSION_GRANTED
-                                if (!hasAudioPermission) {
-                                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                } else {
-                                    scope.launch {
-                                        if (voicePhase != TurnVoicePhase.Idle) return@launch
-                                        resetVoiceMeteringState()
-                                        val ok =
-                                            withContext(Dispatchers.IO) {
-                                                voiceRecorder.start(::appendVoiceAudioLevel)
-                                            }
-                                        if (ok) {
-                                            voicePhase = TurnVoicePhase.Recording
-                                        } else {
-                                            resetVoiceMeteringState()
-                                            lastError = voiceRecorderFailedMessage
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        TurnVoicePhase.Recording -> {
-                            scope.launch {
-                                if (voicePhase != TurnVoicePhase.Recording) return@launch
-                                val encoded =
-                                    withContext(Dispatchers.IO) {
-                                        voiceRecorder.stopAndEncodeWav()
-                                    }
-                                val pair =
-                                    encoded.getOrElse { err ->
-                                        voicePhase = TurnVoicePhase.Idle
-                                        resetVoiceMeteringState()
-                                        if (err.message != "not_recording") {
-                                            lastError =
-                                                when (err.message) {
-                                                    "empty_audio" -> voiceNoAudioMessage
-                                                    else -> voiceRecorderFailedMessage
-                                                }
-                                        }
-                                        return@launch
-                                    }
-                                voicePhase = TurnVoicePhase.Transcribing
-                                resetVoiceMeteringState()
-                                transcribeJob =
-                                    scope.launch {
-                                        try {
-                                            val text =
-                                                repository.transcribeBridgeVoiceWav(
-                                                    pair.first,
-                                                    pair.second,
-                                                )
-                                            if (isActive) {
-                                                draft = VoiceDraftAppend.append(draft, text)
-                                            }
-                                        } catch (e: CancellationException) {
-                                            throw e
-                                        } catch (e: Exception) {
-                                            if (isActive) {
-                                                lastError =
-                                                    when (e) {
-                                                        is AgentServiceError ->
-                                                            e.message ?: voiceTranscriptionFailedMessage
-                                                        else -> e.message ?: voiceTranscriptionFailedMessage
-                                                    }
-                                            }
-                                        } finally {
-                                            transcribeJob = null
-                                            if (isActive) {
-                                                voicePhase = TurnVoicePhase.Idle
-                                            }
-                                        }
-                                    }
-                            }
-                        }
-                        TurnVoicePhase.Transcribing -> Unit
-                    }
-                },
-                onCancelVoiceRecording = {
-                    scope.launch {
-                        if (voicePhase != TurnVoicePhase.Recording) return@launch
-                        withContext(Dispatchers.IO) { voiceRecorder.cancel() }
-                        voicePhase = TurnVoicePhase.Idle
-                        resetVoiceMeteringState()
-                    }
-                },
+                voiceUiEnabled = voiceControls.isInteractionEnabled,
+                voiceAudioLevels = voiceControls.audioLevels,
+                voiceRecordingDurationSeconds = voiceControls.recordingDurationSeconds,
+                onVoiceClick = voiceControls.onVoiceClick,
+                onCancelVoiceRecording = voiceControls.onCancelRecording,
                 composerEnvironment = {
                     if (!isImeVisible || isBranchPickerOpen) {
                         TurnComposerSecondaryBar(
@@ -1668,11 +1504,7 @@ fun TurnConversationPane(
                     }
                 },
                 onSend = {
-                    transcribeJob?.cancel()
-                    transcribeJob = null
-                    voiceRecorder.cancel()
-                    voicePhase = TurnVoicePhase.Idle
-                    resetVoiceMeteringState()
+                    voiceControls.cancelActiveWork()
                     lastError = null
                     val activeReviewTarget = reviewTarget
                     if (activeReviewTarget != null) {
