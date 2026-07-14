@@ -68,6 +68,10 @@
 		B2C3D4E5F60718293A4B5C82 /* CodexPlanStructuredInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C83 /* CodexPlanStructuredInputTests.swift */; };
 		B2C3D4E5F60718293A4B5C80 /* CodexPlanMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C81 /* CodexPlanMessageTests.swift */; };
 		B3C4D5E6F708192A3B4C5D6E /* CodexPlanModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D6F /* CodexPlanModeTests.swift */; };
+		B3C4D5E6F708192A3B4C5D70 /* CodexPlanModeTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D71 /* CodexPlanModeTestSupport.swift */; };
+		B3C4D5E6F708192A3B4C5D72 /* CodexPlanModeResetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D73 /* CodexPlanModeResetTests.swift */; };
+		B3C4D5E6F708192A3B4C5D74 /* CodexPlanModeTimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D75 /* CodexPlanModeTimelineTests.swift */; };
+		B3C4D5E6F708192A3B4C5D76 /* CodexPlanModeQuestionnaireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D77 /* CodexPlanModeQuestionnaireTests.swift */; };
 		B4C5D6E7F8091A2B3C4D5E70 /* CodexServiceIncomingReplayMirrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E7F8091A2B3C4D5E71 /* CodexServiceIncomingReplayMirrorTests.swift */; };
 		B4C5D6E7F8091A2B3C4D5E72 /* CodexServiceIncomingStreamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E7F8091A2B3C4D5E73 /* CodexServiceIncomingStreamingTests.swift */; };
 		B4C5D6E7F8091A2B3C4D5E74 /* CodexServiceIncomingLegacyStreamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C5D6E7F8091A2B3C4D5E75 /* CodexServiceIncomingLegacyStreamingTests.swift */; };
@@ -211,6 +215,10 @@
 		B2C3D4E5F60718293A4B5C83 /* CodexPlanStructuredInputTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexPlanStructuredInputTests.swift; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C81 /* CodexPlanMessageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexPlanMessageTests.swift; sourceTree = "<group>"; };
 		B3C4D5E6F708192A3B4C5D6F /* CodexPlanModeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexPlanModeTests.swift; sourceTree = "<group>"; };
+		B3C4D5E6F708192A3B4C5D71 /* CodexPlanModeTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexPlanModeTestSupport.swift; sourceTree = "<group>"; };
+		B3C4D5E6F708192A3B4C5D73 /* CodexPlanModeResetTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexPlanModeResetTests.swift; sourceTree = "<group>"; };
+		B3C4D5E6F708192A3B4C5D75 /* CodexPlanModeTimelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexPlanModeTimelineTests.swift; sourceTree = "<group>"; };
+		B3C4D5E6F708192A3B4C5D77 /* CodexPlanModeQuestionnaireTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexPlanModeQuestionnaireTests.swift; sourceTree = "<group>"; };
 		B4C5D6E7F8091A2B3C4D5E71 /* CodexServiceIncomingReplayMirrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceIncomingReplayMirrorTests.swift; sourceTree = "<group>"; };
 		B4C5D6E7F8091A2B3C4D5E73 /* CodexServiceIncomingStreamingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingStreamingTests.swift; sourceTree = "<group>"; };
 		B4C5D6E7F8091A2B3C4D5E75 /* CodexServiceIncomingLegacyStreamingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingLegacyStreamingTests.swift; sourceTree = "<group>"; };
@@ -377,6 +385,10 @@
 				B2C3D4E5F60718293A4B5C83 /* CodexPlanStructuredInputTests.swift */,
 				B2C3D4E5F60718293A4B5C81 /* CodexPlanMessageTests.swift */,
 				B3C4D5E6F708192A3B4C5D6F /* CodexPlanModeTests.swift */,
+				B3C4D5E6F708192A3B4C5D71 /* CodexPlanModeTestSupport.swift */,
+				B3C4D5E6F708192A3B4C5D73 /* CodexPlanModeResetTests.swift */,
+				B3C4D5E6F708192A3B4C5D75 /* CodexPlanModeTimelineTests.swift */,
+				B3C4D5E6F708192A3B4C5D77 /* CodexPlanModeQuestionnaireTests.swift */,
 				4EEB36EBEA2A475AC9B30B2F /* Timeline */,
 				FA571E0001000000000000F1 /* WorkspaceFileLinkResolverTests.swift */,
 				FA571E0002000000000000F3 /* WorkspaceSVGPreviewSecurityTests.swift */,
@@ -780,6 +792,10 @@
 				B2C3D4E5F60718293A4B5C82 /* CodexPlanStructuredInputTests.swift in Sources */,
 				B2C3D4E5F60718293A4B5C80 /* CodexPlanMessageTests.swift in Sources */,
 				B3C4D5E6F708192A3B4C5D6E /* CodexPlanModeTests.swift in Sources */,
+				B3C4D5E6F708192A3B4C5D70 /* CodexPlanModeTestSupport.swift in Sources */,
+				B3C4D5E6F708192A3B4C5D72 /* CodexPlanModeResetTests.swift in Sources */,
+				B3C4D5E6F708192A3B4C5D74 /* CodexPlanModeTimelineTests.swift in Sources */,
+				B3C4D5E6F708192A3B4C5D76 /* CodexPlanModeQuestionnaireTests.swift in Sources */,
 				4CCE0926DAD312571934343A /* TurnTimelineReducerTests.swift in Sources */,
 				4CCE0926DAD3125719343440 /* TurnTimelineReducerDeduplicationTests.swift in Sources */,
 				4CCE0926DAD3125719343441 /* TurnTimelineReducerOrderingTests.swift in Sources */,
