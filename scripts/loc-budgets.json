@@ -115,7 +115,10 @@
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+TransportKeepAlive.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+TransportReceive.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+TransportConnection.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ManualWebSocket.swift": 500
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ManualWebSocket.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/CodexService.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/CodexService+Types.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/CodexService+ConnectionState.swift": 500
     }
   },
   "flat_directories": {
