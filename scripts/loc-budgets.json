@@ -61,7 +61,7 @@
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnTimelineReducer/TurnTimelineReducer+Users.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Account/CodexService+Account.swift": 500,
       "AgntMobile/AgntMobile/Features/Settings/SettingsView.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150,
       "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexThreadStartProjectBinding.swift": 500,
@@ -89,7 +89,12 @@
       "AgntMobile/AgntMobile/Features/Settings/SettingsComponents.swift": 500,
       "AgntMobile/AgntMobile/Features/Settings/SettingsInfoCards.swift": 500,
       "AgntMobile/AgntMobile/Features/Settings/SettingsStatusCards.swift": 500,
-      "AgntMobile/AgntMobile/Features/Settings/SettingsTrustedComputerViews.swift": 500
+      "AgntMobile/AgntMobile/Features/Settings/SettingsTrustedComputerViews.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ConnectionErrors.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ConnectionReceive.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ConnectionStateReset.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+PostConnectSync.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+LocalNetwork.swift": 500
     }
   },
   "flat_directories": {
