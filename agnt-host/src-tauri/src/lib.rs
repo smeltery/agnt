@@ -25,10 +25,7 @@ mod runtime_bundle;
 
 use app_types::{AppState, AppStatus, DebugInfo, LogEntry, UpdateInfo};
 use diagnostics::DiagnosticsSnapshot;
-use host_config::{
-    config_path, load_config, provider_bridge_key_status, resolve_provider_bridge_api_key,
-    save_config, store_provider_bridge_api_key, AppConfig,
-};
+use host_config::{config_path, load_config, save_config, AppConfig};
 use network::detect_network_interfaces;
 pub use network::NetworkInterface;
 use process_helpers::{
@@ -1280,133 +1277,6 @@ async fn install_update(app_handle: tauri::AppHandle) -> Result<(), String> {
 // ─── Main ───────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[tauri::command]
-async fn start_provider_bridge(
-    app_handle: tauri::AppHandle,
-    runtime: tauri::State<'_, provider_bridge::state::ProviderBridgeRuntime>,
-) -> Result<provider_bridge::state::ProviderBridgeStatus, String> {
-    let config = app_handle
-        .state::<AppState>()
-        .config
-        .lock()
-        .map_err(|e| e.to_string())?
-        .provider_bridge
-        .clone();
-
-    let api_key = resolve_provider_bridge_api_key()
-        .ok_or(provider_bridge::errors::ProviderBridgeError::MissingApiKey)
-        .map_err(|e| e.to_string())?;
-
-    let status = match runtime.start(config, api_key).await {
-        Ok(status) => status,
-        Err(error) => {
-            add_log(
-                &app_handle,
-                "provider_bridge",
-                "error",
-                &format!("Failed to start provider bridge: {error}"),
-            );
-            return Err(error.to_string());
-        }
-    };
-
-    add_log(
-        &app_handle,
-        "provider_bridge",
-        "info",
-        &format!("Provider bridge listening at {}", status.base_url),
-    );
-    Ok(status)
-}
-
-#[tauri::command]
-async fn stop_provider_bridge(
-    app_handle: tauri::AppHandle,
-    runtime: tauri::State<'_, provider_bridge::state::ProviderBridgeRuntime>,
-) -> Result<provider_bridge::state::ProviderBridgeStatus, String> {
-    let status = match runtime.stop().await {
-        Ok(status) => status,
-        Err(error) => {
-            add_log(
-                &app_handle,
-                "provider_bridge",
-                "error",
-                &format!("Failed to stop provider bridge: {error}"),
-            );
-            return Err(error.to_string());
-        }
-    };
-    add_log(
-        &app_handle,
-        "provider_bridge",
-        "info",
-        "Provider bridge stopped",
-    );
-    Ok(status)
-}
-
-#[tauri::command]
-fn get_provider_bridge_status(
-    runtime: tauri::State<'_, provider_bridge::state::ProviderBridgeRuntime>,
-    app_handle: tauri::AppHandle,
-) -> Result<provider_bridge::state::ProviderBridgeStatus, String> {
-    let config = app_handle
-        .state::<AppState>()
-        .config
-        .lock()
-        .map_err(|e| e.to_string())?
-        .provider_bridge
-        .clone();
-    runtime.status(&config).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn get_provider_bridge_codex_config(
-    app_handle: tauri::AppHandle,
-) -> Result<provider_bridge::config::ProviderBridgeCodexConfig, String> {
-    let config = app_handle
-        .state::<AppState>()
-        .config
-        .lock()
-        .map_err(|e| e.to_string())?
-        .provider_bridge
-        .clone();
-    config.codex_config().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn get_provider_bridge_key_status() -> provider_bridge::config::ProviderKeyStatus {
-    provider_bridge_key_status()
-}
-
-#[tauri::command]
-fn set_provider_bridge_api_key(
-    app_handle: tauri::AppHandle,
-    key: Option<String>,
-) -> provider_bridge::config::ProviderKeyStatus {
-    let normalized = key.and_then(|value| {
-        let trimmed = value.trim().to_string();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed)
-        }
-    });
-    let has_key = normalized.is_some();
-    store_provider_bridge_api_key(normalized);
-    add_log(
-        &app_handle,
-        "provider_bridge",
-        "info",
-        if has_key {
-            "Stored provider bridge API key updated"
-        } else {
-            "Stored provider bridge API key cleared"
-        },
-    );
-    provider_bridge_key_status()
-}
-
 pub fn run() {
     let app_config = load_config();
 
@@ -1658,12 +1528,12 @@ pub fn run() {
             get_diagnostics,
             check_for_update,
             install_update,
-            start_provider_bridge,
-            stop_provider_bridge,
-            get_provider_bridge_status,
-            get_provider_bridge_codex_config,
-            get_provider_bridge_key_status,
-            set_provider_bridge_api_key,
+            provider_bridge::commands::start_provider_bridge,
+            provider_bridge::commands::stop_provider_bridge,
+            provider_bridge::commands::get_provider_bridge_status,
+            provider_bridge::commands::get_provider_bridge_codex_config,
+            provider_bridge::commands::get_provider_bridge_key_status,
+            provider_bridge::commands::set_provider_bridge_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
