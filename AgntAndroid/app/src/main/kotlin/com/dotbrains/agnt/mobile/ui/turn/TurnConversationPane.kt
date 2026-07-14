@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -57,7 +55,6 @@ import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
 import com.dotbrains.agnt.mobile.services.agent.threads.isPluginListUnsupported
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.agent.MessageList
-import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachment
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachmentState
@@ -70,8 +67,6 @@ import com.dotbrains.agnt.mobile.ui.turn.autocomplete.loadSkillAutocompleteSugge
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToFileMentions
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToSkillMentions
 import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mergeMentionChipsIntoDraft
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.restoreMentionChips
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.stripMergedMentionPrefix
 import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionChipPayload
 import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionKind
 import com.dotbrains.agnt.mobile.ui.turn.composer.ReasoningEffortTitleStrings
@@ -85,14 +80,12 @@ import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerSecondaryBar
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerTrailingTokens
 import com.dotbrains.agnt.mobile.ui.turn.composer.buildRuntimeControlsState
 import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
-import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoveryCard
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
 import com.dotbrains.agnt.mobile.ui.turn.timeline.SmartScrollNavigationCta
 import com.dotbrains.agnt.mobile.ui.turn.timeline.buildChatAnchors
 import com.dotbrains.agnt.mobile.ui.turn.timeline.buildSmartScrollNavigationState
 import com.dotbrains.agnt.mobile.ui.turn.timeline.shouldFollowTimelineBottom
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.GitBranchPaneState
-import com.dotbrains.agnt.mobile.ui.turn.toolbar.QueuedDraftsCard
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnPlanAccessoryCard
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnReviewAccessoryCard
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.resolveReviewBaseBranch
@@ -1204,94 +1197,32 @@ fun TurnConversationPane(
                             .padding(bottom = 14.dp),
                 )
             }
-            lastError?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
-            gitBranchCheckoutError?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
-            worktreeHandoffError?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
-            inlineUndoError?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
-            connectionRecoverySnapshot?.let { snapshot ->
-                TurnConnectionRecoveryCard(
-                    snapshot = snapshot,
-                    onTap = {
-                        when {
-                            reconnectUiState.recoveryAction == RootReconnectRecoveryAction.ScanNewQr -> onOpenPairingScanner()
-                            reconnectUiState.wakeDisplayAvailable -> onWakeSavedComputer()
-                            else -> onReconnectSavedPairing()
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-            }
-            if (queuedDraftCount > 0) {
-                QueuedDraftsCard(
-                    previews = queuedDraftPreviews,
-                    totalCount = queuedDraftCount,
-                    canRestore = canRestoreQueuedDrafts,
-                    onRestore = { draftId ->
-                        scope.launch {
-                            if (!canRestoreQueuedDrafts) {
-                                lastError = queuedDraftRestoreBlockedMessage
-                                return@launch
-                            }
-                            val restored = runCatching { repository.removeQueuedTurnDraft(threadId, draftId) }.getOrNull()
-                            if (restored == null) return@launch
-                            mentionChips =
-                                restoreMentionChips(
-                                    skillMentions = restored.skillMentions,
-                                    fileMentions = restored.fileMentions,
-                                )
-                            draft =
-                                stripMergedMentionPrefix(
-                                    text = restored.text,
-                                    skillMentions = restored.skillMentions,
-                                    fileMentions = restored.fileMentions,
-                                )
-                            composerAttachments =
-                                restored.attachments.take(MAX_COMPOSER_ATTACHMENTS).map {
-                                    TurnComposerAttachment(
-                                        state = TurnComposerAttachmentState.ReadyImage(it),
-                                    )
-                                }
-                            if (restored.attachments.size > MAX_COMPOSER_ATTACHMENTS) {
-                                lastError = attachmentOverflowMessage
-                            }
-                        }
-                    },
-                    onRemove = { draftId ->
-                        scope.launch {
-                            runCatching { repository.removeQueuedTurnDraft(threadId, draftId) }
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-            }
+            TurnConversationPaneInlineStatus(
+                lastError = lastError,
+                gitBranchCheckoutError = gitBranchCheckoutError,
+                worktreeHandoffError = worktreeHandoffError,
+                inlineUndoError = inlineUndoError,
+                connectionRecoverySnapshot = connectionRecoverySnapshot,
+                reconnectUiState = reconnectUiState,
+                onOpenPairingScanner = onOpenPairingScanner,
+                onWakeSavedComputer = onWakeSavedComputer,
+                onReconnectSavedPairing = onReconnectSavedPairing,
+            )
+            TurnConversationPaneQueuedDrafts(
+                threadId = threadId,
+                repository = repository,
+                scope = scope,
+                queuedDraftPreviews = queuedDraftPreviews,
+                queuedDraftCount = queuedDraftCount,
+                canRestoreQueuedDrafts = canRestoreQueuedDrafts,
+                maxComposerAttachments = MAX_COMPOSER_ATTACHMENTS,
+                attachmentOverflowMessage = attachmentOverflowMessage,
+                queuedDraftRestoreBlockedMessage = queuedDraftRestoreBlockedMessage,
+                setLastError = { lastError = it },
+                setMentionChips = { mentionChips = it },
+                setDraft = { draft = it },
+                setComposerAttachments = { composerAttachments = it },
+            )
             reviewTarget?.let { target ->
                 TurnReviewAccessoryCard(
                     target = target,
