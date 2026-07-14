@@ -15,6 +15,8 @@ mod app_runtime;
 mod app_types;
 mod bridge_runtime;
 mod diagnostics;
+mod diagnostics_models;
+mod diagnostics_policy;
 mod host_config;
 mod network;
 mod pet_window;
