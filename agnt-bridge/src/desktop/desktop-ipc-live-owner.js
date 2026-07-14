@@ -56,7 +56,7 @@ const {
 } = require("./desktop-ipc-live-owner-pending-turns");
 const {
   createLiveOwnerFollowerRequestHandler,
-} = require("./desktop-ipc-live-owner-follower-requests");
+} = require("./live-owner/follower-requests");
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_RECONNECT_MS = 1_500;

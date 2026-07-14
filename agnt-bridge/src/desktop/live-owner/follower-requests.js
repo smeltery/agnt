@@ -11,20 +11,20 @@ const {
   readString,
   requestIdKey,
   visibleUserPromptFromInputEntries,
-} = require("./desktop-ipc-shared");
+} = require("../desktop-ipc-shared");
 const {
   AGNT_LIVE_OWNER_SOURCE,
   SUPPORTED_FOLLOWER_REQUEST_METHODS,
   THREAD_QUEUED_FOLLOWUPS_CHANGED,
   activeTurnIdFromConversation,
   conversationHasActiveTurn,
-} = require("./desktop-ipc-live-owner-support");
+} = require("../desktop-ipc-live-owner-support");
 const {
   readConversationIdFromFollowerParams,
   readThreadFromPayload,
   readTurnIdFromResult,
   sanitizeTurnStartParams,
-} = require("./desktop-ipc-live-owner-utils");
+} = require("../desktop-ipc-live-owner-utils");
 
 function createLiveOwnerFollowerRequestHandler({
   conversations,
