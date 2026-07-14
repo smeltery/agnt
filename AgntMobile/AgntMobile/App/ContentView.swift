@@ -7,7 +7,7 @@
 import SwiftUI
 import UIKit
 
-private enum RootSheetRoute: Identifiable, Equatable {
+enum RootSheetRoute: Identifiable, Equatable {
     case bridgeUpdate(CodexBridgeUpdatePrompt)
     case whatsNew(version: String)
 
@@ -34,12 +34,12 @@ private struct MacContextTransitionSnapshot {
 }
 
 struct ContentView: View {
-    @Environment(CodexService.self) private var codex
-    @Environment(\.scenePhase) private var scenePhase
+    @Environment(CodexService.self) var codex
+    @Environment(\.scenePhase) var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    @State private var viewModel = ContentViewModel()
+    @State var viewModel = ContentViewModel()
     @State private var isSidebarOpen = false
     @State private var sidebarDragOffset: CGFloat = 0
     @State private var isSidebarPrewarmed = false
@@ -51,27 +51,27 @@ struct ContentView: View {
     // pushes and decreases observed via `onChange(of: navigationPath)`.
     @State private var topNavigationRouteIsTerminal = false
     @State private var showSettings = false
-    @State private var isShowingManualScanner = false
+    @State var isShowingManualScanner = false
     @State private var isShowingMyMacsScanner = false
-    @State private var hasDismissedAutomaticScanner = false
-    @State private var scannerCanReturnToOnboarding = false
-    @State private var isShowingManualPairingEntry = false
+    @State var hasDismissedAutomaticScanner = false
+    @State var scannerCanReturnToOnboarding = false
+    @State var isShowingManualPairingEntry = false
     @State private var manualPairingCode = ""
-    @State private var manualPairingErrorMessage: String?
+    @State var manualPairingErrorMessage: String?
     @State private var isResolvingManualPairingCode = false
     @State private var isSearchActive = false
-    @State private var isRetryingBridgeUpdate = false
-    @State private var isUpdatingBridgePackage = false
+    @State var isRetryingBridgeUpdate = false
+    @State var isUpdatingBridgePackage = false
     @State private var isPreparingManualScanner = false
     @State private var macSwitchTask: Task<Void, Never>?
     @State private var suppressAutomaticThreadSelection = false
     @State private var isWakingSavedMacDisplay = false
     @State private var hasAttemptedAutomaticWakeSavedMacDisplay = false
     @State private var threadCompletionBannerDismissTask: Task<Void, Never>?
-    @State private var whatsNewPresentationTask: Task<Void, Never>?
+    @State var whatsNewPresentationTask: Task<Void, Never>?
     @State private var sidebarPrewarmTask: Task<Void, Never>?
-    @State private var presentedRootSheet: RootSheetRoute?
-    @State private var isWhatsNewPresentationReady = false
+    @State var presentedRootSheet: RootSheetRoute?
+    @State var isWhatsNewPresentationReady = false
     @State private var sidebarGestureDebugSequence = 0
     @State private var activeSidebarGestureDebugID: Int?
     @State private var lastSidebarGestureLogBucket: Int?
@@ -81,18 +81,18 @@ struct ContentView: View {
     @State private var activeNewChatDraftRoute: NewChatDraftRoute?
     @State private var pendingQuickAction: AgntQuickAction?
     @State private var threadIDsPendingInitialAssistantAnchor: Set<String> = []
-    @AppStorage("codex.hasSeenOnboarding") private var hasSeenOnboarding = false
-    @AppStorage("codex.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion = ""
+    @AppStorage("codex.hasSeenOnboarding") var hasSeenOnboarding = false
+    @AppStorage("codex.whatsNew.lastPresentedVersion") var lastPresentedWhatsNewVersion = ""
 
     private let sidebarWidth: CGFloat = 330
     // Lets the drawer gesture start a bit inside the content instead of only on the bezel edge.
     private let sidebarOpenActivationWidth: CGFloat = 80
     private let sidebarPrewarmDelayNanoseconds: UInt64 = 700_000_000
-    private let whatsNewPresentationDelayNanoseconds: UInt64 = 30_000_000_000
+    let whatsNewPresentationDelayNanoseconds: UInt64 = 30_000_000_000
     private let sidebarGestureLogBucketWidth: CGFloat = 40
     private let sidebarSwipeCommitDistance: CGFloat = 30
     private let sidebarSelectionSuppressionDuration: TimeInterval = 0.35
-    private let whatsNewReleaseVersion = "1.1"
+    let whatsNewReleaseVersion = "1.1"
     private static let sidebarSpring = Animation.spring(response: 0.35, dampingFraction: 0.85)
     private static var isSidebarDebugLoggingEnabled: Bool { false }
 
@@ -982,7 +982,7 @@ struct ContentView: View {
     }
 
     // Keeps first-run installs in the scanner by default, while still letting users back out later.
-    private var shouldShowQRScanner: Bool {
+    var shouldShowQRScanner: Bool {
         guard !codex.isConnected else {
             return false
         }
@@ -1154,25 +1154,6 @@ struct ContentView: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    // Keeps SwiftUI's sheet binding in sync with the route we last chose to present.
-    private var presentedRootSheetBinding: Binding<RootSheetRoute?> {
-        Binding(
-            get: { presentedRootSheet },
-            set: { nextValue in
-                guard nextValue?.id != presentedRootSheet?.id else {
-                    presentedRootSheet = nextValue
-                    return
-                }
-
-                if nextValue == nil {
-                    dismissPresentedRootSheet()
-                } else {
-                    presentedRootSheet = nextValue
-                }
-            }
-        )
-    }
-
     private var missingNotificationThreadAlertIsPresented: Binding<Bool> {
         Binding(
             get: { codex.missingNotificationThreadPrompt != nil },
@@ -1184,241 +1165,8 @@ struct ContentView: View {
         )
     }
 
-    // Serializes root-owned sheets under one priority list instead of letting each feature present itself.
-    private func syncRootSheetPresentationIfNeeded() {
-        if case .bridgeUpdate = presentedRootSheet,
-           codex.bridgeUpdatePrompt == nil {
-            dismissPresentedRootSheet()
-            return
-        }
-
-        guard let desiredRoute = desiredRootSheetRoute else {
-            return
-        }
-
-        // Let bridge recovery take over immediately without marking What's New as already seen.
-        if case .whatsNew = presentedRootSheet,
-           case .bridgeUpdate = desiredRoute {
-            presentedRootSheet = desiredRoute
-            return
-        }
-
-        // Refresh an already-visible bridge sheet when the prompt changes underneath it.
-        if case .bridgeUpdate = presentedRootSheet,
-           case .bridgeUpdate = desiredRoute,
-           presentedRootSheet?.id != desiredRoute.id {
-            presentedRootSheet = desiredRoute
-            return
-        }
-
-        guard presentedRootSheet == nil else {
-            return
-        }
-
-        presentedRootSheet = desiredRoute
-    }
-
-    private var desiredRootSheetRoute: RootSheetRoute? {
-        guard canPresentDeferredRootSheet else {
-            return nil
-        }
-
-        if let prompt = codex.bridgeUpdatePrompt {
-            return .bridgeUpdate(prompt)
-        }
-
-        if let whatsNewVersion = pendingWhatsNewVersion {
-            return .whatsNew(version: whatsNewVersion)
-        }
-
-        return nil
-    }
-
-    // Blocks lower-priority sheets while onboarding, pairing, or root alerts own the screen.
-    private var canPresentDeferredRootSheet: Bool {
-        scenePhase == .active
-            && hasSeenOnboarding
-            && !isShowingManualScanner
-            && !shouldShowQRScanner
-            && !isShowingManualPairingEntry
-            && manualPairingErrorMessage == nil
-            && codex.missingNotificationThreadPrompt == nil
-    }
-
-    // Shows What's New only once per version and only after the root has been calm for a while.
-    private var pendingWhatsNewVersion: String? {
-        guard isWhatsNewPresentationReady,
-              lastPresentedWhatsNewVersion != whatsNewReleaseVersion else {
-            return nil
-        }
-
-        return whatsNewReleaseVersion
-    }
-
-    private var whatsNewPresentationScheduleFingerprint: String {
-        [
-            String(scenePhase == .active),
-            String(hasSeenOnboarding),
-            String(isShowingManualScanner),
-            String(shouldShowQRScanner),
-            String(isShowingManualPairingEntry),
-            String(manualPairingErrorMessage != nil),
-            String(codex.missingNotificationThreadPrompt != nil),
-            String(codex.bridgeUpdatePrompt != nil),
-            whatsNewReleaseVersion,
-            lastPresentedWhatsNewVersion,
-        ].joined(separator: "|")
-    }
-
-    private var rootSheetPresentationFingerprint: String {
-        [
-            String(canPresentDeferredRootSheet),
-            codex.bridgeUpdatePrompt?.id.uuidString ?? "nil",
-            pendingWhatsNewVersion ?? "nil",
-            presentedRootSheet?.id ?? "nil",
-        ].joined(separator: "|")
-    }
-
-    private func scheduleWhatsNewPresentationIfNeeded() async {
-        whatsNewPresentationTask?.cancel()
-        whatsNewPresentationTask = nil
-        isWhatsNewPresentationReady = false
-
-        guard shouldScheduleWhatsNewPresentation else {
-            return
-        }
-
-        let task = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: whatsNewPresentationDelayNanoseconds)
-            guard !Task.isCancelled,
-                  shouldScheduleWhatsNewPresentation else {
-                return
-            }
-
-            isWhatsNewPresentationReady = true
-            syncRootSheetPresentationIfNeeded()
-        }
-
-        whatsNewPresentationTask = task
-    }
-
-    private var shouldScheduleWhatsNewPresentation: Bool {
-        canPresentDeferredRootSheet
-            && codex.bridgeUpdatePrompt == nil
-            && pendingWhatsNewVersion == nil
-    }
-
-    private func handleDismissedRootSheet(_ route: RootSheetRoute) {
-        switch route {
-        case .bridgeUpdate:
-            dismissBridgeUpdatePrompt()
-        case .whatsNew(let version):
-            dismissWhatsNewSheet(version: version)
-        }
-
-        syncRootSheetPresentationIfNeeded()
-    }
-
-    private func dismissPresentedRootSheet() {
-        guard let dismissedRoute = presentedRootSheet else {
-            return
-        }
-
-        presentedRootSheet = nil
-        handleDismissedRootSheet(dismissedRoute)
-    }
-
-    private func dismissBridgeUpdatePrompt() {
-        codex.bridgeUpdatePrompt = nil
-        isRetryingBridgeUpdate = false
-        isUpdatingBridgePackage = false
-    }
-
-    private func dismissWhatsNewSheet(version: String) {
-        lastPresentedWhatsNewVersion = version
-        isWhatsNewPresentationReady = false
-    }
-
-    private func bridgeUpdateSheet(prompt: CodexBridgeUpdatePrompt) -> some View {
-        BridgeUpdateSheet(
-            prompt: prompt,
-            isRetrying: isRetryingBridgeUpdate,
-            isUpdatingBridge: isUpdatingBridgePackage,
-            onUpdateBridge: codex.isConnected && codex.supportsBridgeSelfUpdate ? {
-                updateBridgePackageAndRestart()
-            } : nil,
-            onRetry: {
-                retryBridgeConnectionAfterUpdate()
-            },
-            onScanNewQR: {
-                presentManualScannerForBridgeRecovery()
-            },
-            onDismiss: {
-                dismissPresentedRootSheet()
-            }
-        )
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-
-    private func whatsNewSheet(version: String) -> some View {
-        WhatsNewSheet(
-            version: version,
-            onDismiss: {
-                dismissPresentedRootSheet()
-            }
-        )
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-    }
-
-    private func updateBridgePackageAndRestart() {
-        guard !isUpdatingBridgePackage else {
-            return
-        }
-
-        isUpdatingBridgePackage = true
-
-        Task {
-            do {
-                let handoffService = DesktopHandoffService(codex: codex)
-                try await handoffService.updateBridgePackageAndRestart()
-                await MainActor.run {
-                    isUpdatingBridgePackage = false
-                    isRetryingBridgeUpdate = true
-                }
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                await viewModel.toggleConnection(codex: codex)
-                await MainActor.run {
-                    isRetryingBridgeUpdate = false
-                }
-            } catch {
-                await MainActor.run {
-                    isUpdatingBridgePackage = false
-                    codex.lastErrorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    // Re-tries the saved relay session after the user updates the Mac package.
-    private func retryBridgeConnectionAfterUpdate() {
-        guard !isRetryingBridgeUpdate, !isUpdatingBridgePackage else {
-            return
-        }
-
-        isRetryingBridgeUpdate = true
-
-        Task {
-            await viewModel.toggleConnection(codex: codex)
-            await MainActor.run {
-                isRetryingBridgeUpdate = false
-            }
-        }
-    }
-
     // Switches the user back to the QR path when the old relay session is no longer useful.
-    private func presentManualScannerForBridgeRecovery() {
+    func presentManualScannerForBridgeRecovery() {
         guard !isShowingManualScanner else {
             return
         }
