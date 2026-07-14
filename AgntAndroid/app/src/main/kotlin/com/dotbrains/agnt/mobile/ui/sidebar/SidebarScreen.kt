@@ -6,16 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,7 +24,6 @@ import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightOperation
 import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightPolicy
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlert
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertAction
-import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertButtonRole
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
@@ -211,11 +200,13 @@ fun SidebarScreen(
                 .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        SidebarSearchField(query = query, onQueryChange = { query = it })
         val bridgeConnected = conn is ConnectionState.Connected
         val worktreeEntryEnabled = ready && bridgeConnected && !newChatBusy && !worktreeChatBusy
 
-        SidebarTopActionsRow(
+        SidebarHeaderActions(
+            query = query,
+            onQueryChange = { query = it },
+            colors = sidebarColors,
             enabled = ready && bridgeConnected,
             pendingAction =
                 when {
@@ -224,6 +215,8 @@ fun SidebarScreen(
                     worktreeChatBusy -> SidebarTopAction.NewProject
                     else -> null
                 },
+            newChatError = newChatError,
+            worktreeChatError = worktreeChatError,
             onNewChat = {
                 newChatError = null
                 projectPickerInitialPath = WorktreeNewChatDefaults.baseProjectPath(activeId, threads)
@@ -239,168 +232,71 @@ fun SidebarScreen(
                 }
             },
             onNewProject = { startManagedWorktreeChat() },
+            onOpenArchivedChats = onOpenArchivedChats,
         )
-        SidebarCompactActionRow(
-            label = stringResource(R.string.nav_archived_chats),
-            enabled = true,
-            busy = false,
-            onClick = onOpenArchivedChats,
-            leading = {
-                Icon(
-                    imageVector = Icons.Outlined.Archive,
-                    contentDescription = stringResource(R.string.nav_archived_chats),
-                    modifier = Modifier.size(21.dp),
-                    tint = sidebarColors.secondaryText,
-                )
+        SidebarThreadGroupsList(
+            modifier = Modifier.weight(1f),
+            groups = groups,
+            activeId = activeId,
+            activeChatMetadata = activeChatMetadata,
+            colors = sidebarColors,
+            newChatBusy = newChatBusy,
+            worktreeChatBusy = worktreeChatBusy,
+            worktreeEntryEnabled = worktreeEntryEnabled,
+            runningTurnIdsByThread = runningTurnByThread,
+            protectedRunningFallbackThreadIds = protectedRunningFallback,
+            collapsedGroupIds = collapsedGroupIds,
+            expandedGroupIds = expandedGroupIds,
+            onToggleCollapsed = { groupId ->
+                collapsedGroupIds =
+                    if (groupId in collapsedGroupIds) {
+                        collapsedGroupIds - groupId
+                    } else {
+                        collapsedGroupIds + groupId
+                    }
+            },
+            onToggleExpanded = { groupId ->
+                expandedGroupIds =
+                    if (groupId in expandedGroupIds) {
+                        expandedGroupIds - groupId
+                    } else {
+                        expandedGroupIds + groupId
+                    }
+            },
+            onNewChatInProject = { projectPath ->
+                newChatError = null
+                projectPickerInitialPath = projectPath
+                projectPickerFoldersCollapsed = true
+                showProjectPicker = true
+            },
+            onNewWorktreeInProject = { projectPath ->
+                worktreeChatError = null
+                worktreeSheetBasePath = projectPath
+                showWorktreeSheet = true
+            },
+            onArchiveProjectGroup = { group ->
+                archiveGroupTarget = group
+                archiveGroupError = null
+            },
+            onDeleteLocalGroup = { group ->
+                deleteLocalGroupTarget = group
+                deleteLocalGroupError = null
+            },
+            onSelectThread = { thread ->
+                scope.launch {
+                    repository.setActiveThreadId(thread.id)
+                    onThreadSelected()
+                }
+            },
+            onRenameThread = { thread ->
+                renameTarget = thread
+                renameError = null
+            },
+            onDeleteLocalThread = { thread ->
+                deleteLocalTarget = thread
+                deleteLocalError = null
             },
         )
-        newChatError?.let { err ->
-            Text(
-                text = err,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        worktreeChatError?.let { err ->
-            Text(
-                text = err,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            groups.filter { it.kind != SidebarThreadGroupKind.Archived }.forEach { group ->
-                item(key = "hdr-${group.id}") {
-                    val isCollapsed = group.id in collapsedGroupIds
-                    RepoHeader(
-                        group = group,
-                        newChatBusy = newChatBusy,
-                        worktreeChatBusy = worktreeChatBusy,
-                        colors = sidebarColors,
-                        collapsed = isCollapsed,
-                        onToggleCollapse = {
-                            collapsedGroupIds =
-                                if (isCollapsed) {
-                                    collapsedGroupIds - group.id
-                                } else {
-                                    collapsedGroupIds + group.id
-                                }
-                        },
-                        onNewChatInProject =
-                            if (group.kind == SidebarThreadGroupKind.Project && group.projectPath != null) {
-                                {
-                                    newChatError = null
-                                    projectPickerInitialPath = group.projectPath
-                                    projectPickerFoldersCollapsed = true
-                                    showProjectPicker = true
-                                }
-                            } else {
-                                null
-                            },
-                        onNewWorktreeInProject =
-                            if (
-                                group.kind == SidebarThreadGroupKind.Project &&
-                                group.projectPath != null &&
-                                worktreeEntryEnabled
-                            ) {
-                                {
-                                    worktreeChatError = null
-                                    worktreeSheetBasePath = group.projectPath
-                                    showWorktreeSheet = true
-                                }
-                            } else {
-                                null
-                            },
-                        onArchiveProjectGroup =
-                            if (group.kind == SidebarThreadGroupKind.Project) {
-                                {
-                                    archiveGroupTarget = group
-                                    archiveGroupError = null
-                                }
-                            } else {
-                                null
-                            },
-                        onDeleteLocalGroup =
-                            if (group.kind == SidebarThreadGroupKind.Project) {
-                                {
-                                    deleteLocalGroupTarget = group
-                                    deleteLocalGroupError = null
-                                }
-                            } else {
-                                null
-                            },
-                        onOpenArchivedChats = null,
-                    )
-                }
-                items(
-                    items = if (group.id in collapsedGroupIds) emptyList() else group.visibleThreads,
-                    key = { it.id },
-                ) { thread ->
-                    val isActive = thread.id == activeId
-                    val isRunning =
-                        runningTurnByThread.containsKey(thread.id) ||
-                            protectedRunningFallback.contains(thread.id)
-                    val onSelectThread = {
-                        scope.launch {
-                            repository.setActiveThreadId(thread.id)
-                            onThreadSelected()
-                        }
-                        Unit
-                    }
-                    val onRenameThread = {
-                        renameTarget = thread
-                        renameError = null
-                    }
-                    val onDeleteThread = {
-                        deleteLocalTarget = thread
-                        deleteLocalError = null
-                    }
-                    if (isActive) {
-                        ActiveChatRow(
-                            thread = thread,
-                            isRunning = isRunning,
-                            activeMetadata = activeChatMetadata,
-                            onSelect = onSelectThread,
-                            onRenameRequest = onRenameThread,
-                            onDeleteLocalRequest = onDeleteThread,
-                        )
-                    } else {
-                        ChatRow(
-                            thread = thread,
-                            isRunning = isRunning,
-                            onSelect = onSelectThread,
-                            onRenameRequest = onRenameThread,
-                            onDeleteLocalRequest = onDeleteThread,
-                        )
-                    }
-                }
-                if (group.id !in collapsedGroupIds &&
-                    (
-                        group.hiddenCount > 0 ||
-                            (group.id in expandedGroupIds && group.totalCount > SIDEBAR_THREADS_PER_GROUP)
-                    )
-                ) {
-                    item(key = "more-${group.id}") {
-                        ShowAllRow(
-                            expanded = group.id in expandedGroupIds,
-                            totalCount = group.totalCount,
-                            colors = sidebarColors,
-                            onClick = {
-                                expandedGroupIds =
-                                    if (group.id in expandedGroupIds) {
-                                        expandedGroupIds - group.id
-                                    } else {
-                                        expandedGroupIds + group.id
-                                    }
-                            },
-                        )
-                    }
-                }
-            }
-        }
         ThreadRenameDialog(
             visible = renameTarget != null,
             initialName = renameTarget?.displayTitle.orEmpty(),
@@ -432,196 +328,77 @@ fun SidebarScreen(
                 }
             },
         )
-        deleteLocalTarget?.let { target ->
-            AlertDialog(
-                onDismissRequest = {
-                    if (!deleteLocalBusy) {
+        SidebarDeleteLocalThreadDialog(
+            target = deleteLocalTarget,
+            busy = deleteLocalBusy,
+            error = deleteLocalError,
+            onDismiss = {
+                deleteLocalTarget = null
+                deleteLocalError = null
+            },
+            onConfirm = { target ->
+                deleteLocalBusy = true
+                deleteLocalError = null
+                scope.launch {
+                    runCatching {
+                        repository.deleteThreadLocally(target.id)
+                    }.onSuccess {
                         deleteLocalTarget = null
-                        deleteLocalError = null
+                    }.onFailure { e ->
+                        deleteLocalError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                     }
-                },
-                title = { Text(stringResource(R.string.sidebar_thread_delete_local_title)) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.sidebar_thread_delete_local_message, target.displayTitle))
-                        deleteLocalError?.let { err ->
-                            Text(
-                                text = err,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = !deleteLocalBusy,
-                        onClick = {
-                            deleteLocalBusy = true
-                            deleteLocalError = null
-                            scope.launch {
-                                runCatching {
-                                    repository.deleteThreadLocally(target.id)
-                                }.onSuccess {
-                                    deleteLocalTarget = null
-                                }.onFailure { e ->
-                                    deleteLocalError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                                }
-                                deleteLocalBusy = false
-                            }
-                        },
-                    ) {
-                        Text(
-                            text =
-                                if (deleteLocalBusy) {
-                                    stringResource(R.string.sidebar_thread_delete_local_deleting)
-                                } else {
-                                    stringResource(R.string.sidebar_thread_delete_local_confirm)
-                                },
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        enabled = !deleteLocalBusy,
-                        onClick = {
-                            deleteLocalTarget = null
-                            deleteLocalError = null
-                        },
-                    ) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                },
-            )
-        }
-        archiveGroupTarget?.let { group ->
-            AlertDialog(
-                onDismissRequest = {
-                    if (!archiveGroupBusy) {
+                    deleteLocalBusy = false
+                }
+            },
+        )
+        SidebarArchiveGroupDialog(
+            group = archiveGroupTarget,
+            busy = archiveGroupBusy,
+            error = archiveGroupError,
+            onDismiss = {
+                archiveGroupTarget = null
+                archiveGroupError = null
+            },
+            onConfirm = { group ->
+                archiveGroupBusy = true
+                archiveGroupError = null
+                scope.launch {
+                    runCatching {
+                        val ids = SidebarThreadGrouping.liveThreadIdsForGroup(group, threads)
+                        repository.archiveThreadGroup(ids)
+                    }.onSuccess {
                         archiveGroupTarget = null
-                        archiveGroupError = null
+                    }.onFailure { e ->
+                        archiveGroupError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                     }
-                },
-                title = { Text(stringResource(R.string.sidebar_project_archive_title, group.label)) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.sidebar_project_archive_message))
-                        archiveGroupError?.let { err ->
-                            Text(
-                                text = err,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = !archiveGroupBusy,
-                        onClick = {
-                            archiveGroupBusy = true
-                            archiveGroupError = null
-                            scope.launch {
-                                runCatching {
-                                    val ids = SidebarThreadGrouping.liveThreadIdsForGroup(group, threads)
-                                    repository.archiveThreadGroup(ids)
-                                }.onSuccess {
-                                    archiveGroupTarget = null
-                                }.onFailure { e ->
-                                    archiveGroupError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                                }
-                                archiveGroupBusy = false
-                            }
-                        },
-                    ) {
-                        Text(
-                            text =
-                                if (archiveGroupBusy) {
-                                    stringResource(R.string.sidebar_project_archive_busy)
-                                } else {
-                                    stringResource(R.string.sidebar_project_archive_confirm)
-                                },
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        enabled = !archiveGroupBusy,
-                        onClick = {
-                            archiveGroupTarget = null
-                            archiveGroupError = null
-                        },
-                    ) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                },
-            )
-        }
-        deleteLocalGroupTarget?.let { group ->
-            AlertDialog(
-                onDismissRequest = {
-                    if (!deleteLocalGroupBusy) {
+                    archiveGroupBusy = false
+                }
+            },
+        )
+        SidebarDeleteLocalGroupDialog(
+            group = deleteLocalGroupTarget,
+            busy = deleteLocalGroupBusy,
+            error = deleteLocalGroupError,
+            onDismiss = {
+                deleteLocalGroupTarget = null
+                deleteLocalGroupError = null
+            },
+            onConfirm = { group ->
+                deleteLocalGroupBusy = true
+                deleteLocalGroupError = null
+                scope.launch {
+                    runCatching {
+                        val ids = SidebarThreadGrouping.liveThreadIdsForGroup(group, threads)
+                        repository.deleteLocalThreadGroup(ids)
+                    }.onSuccess {
                         deleteLocalGroupTarget = null
-                        deleteLocalGroupError = null
+                    }.onFailure { e ->
+                        deleteLocalGroupError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                     }
-                },
-                title = { Text(stringResource(R.string.sidebar_project_delete_local_title, group.label)) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.sidebar_project_delete_local_message))
-                        deleteLocalGroupError?.let { err ->
-                            Text(
-                                text = err,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = !deleteLocalGroupBusy,
-                        onClick = {
-                            deleteLocalGroupBusy = true
-                            deleteLocalGroupError = null
-                            scope.launch {
-                                runCatching {
-                                    val ids = SidebarThreadGrouping.liveThreadIdsForGroup(group, threads)
-                                    repository.deleteLocalThreadGroup(ids)
-                                }.onSuccess {
-                                    deleteLocalGroupTarget = null
-                                }.onFailure { e ->
-                                    deleteLocalGroupError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                                }
-                                deleteLocalGroupBusy = false
-                            }
-                        },
-                    ) {
-                        Text(
-                            text =
-                                if (deleteLocalGroupBusy) {
-                                    stringResource(R.string.sidebar_project_delete_local_busy)
-                                } else {
-                                    stringResource(R.string.sidebar_project_delete_local_confirm)
-                                },
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        enabled = !deleteLocalGroupBusy,
-                        onClick = {
-                            deleteLocalGroupTarget = null
-                            deleteLocalGroupError = null
-                        },
-                    ) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                },
-            )
-        }
+                    deleteLocalGroupBusy = false
+                }
+            },
+        )
         SidebarProjectPickerSheet(
             repository = repository,
             visible = showProjectPicker,
@@ -657,87 +434,54 @@ fun SidebarScreen(
                 )
             },
         )
-        worktreeGitSyncAlert?.let { alert ->
-            fun dismissWorktreeAlert() {
+        SidebarWorktreeGitSyncAlertDialog(
+            alert = worktreeGitSyncAlert,
+            onDismiss = {
                 worktreeGitSyncAlert = null
                 pendingWorktreeChat = null
-            }
-
-            AlertDialog(
-                onDismissRequest = { dismissWorktreeAlert() },
-                title = { Text(alert.title) },
-                text = { Text(alert.message) },
-                confirmButton = {
-                    Column {
-                        alert.buttons
-                            .filter { it.role != TurnGitSyncAlertButtonRole.cancel }
-                            .forEach { button ->
-                                TextButton(
-                                    onClick = {
-                                        when (button.action) {
-                                            TurnGitSyncAlertAction.continuePendingGitOperation,
-                                            TurnGitSyncAlertAction.continueGitBranchOperation,
-                                            -> {
-                                                val pending = pendingWorktreeChat
-                                                dismissWorktreeAlert()
-                                                if (pending != null) {
-                                                    startManagedWorktreeChat(
-                                                        preselected = pending,
-                                                        changeTransfer = pending.changeTransfer,
-                                                        skipPreflight = true,
-                                                    )
-                                                }
-                                            }
-                                            TurnGitSyncAlertAction.pullRebase -> {
-                                                val pending = pendingWorktreeChat
-                                                dismissWorktreeAlert()
-                                                if (pending != null) {
-                                                    worktreeChatBusy = true
-                                                    scope.launch {
-                                                        runCatching {
-                                                            GitActionsService(
-                                                                repository,
-                                                                pending.baseProjectPath,
-                                                            ).pull()
-                                                        }.onFailure { e ->
-                                                            worktreeChatError =
-                                                                GitBranchDisplayMapper.userVisibleMessage(e)
-                                                        }
-                                                        worktreeChatBusy = false
-                                                    }
-                                                }
-                                            }
-                                            else -> dismissWorktreeAlert()
-                                        }
-                                    },
-                                ) {
-                                    Text(
-                                        text = button.title,
-                                        color =
-                                            if (button.role == TurnGitSyncAlertButtonRole.destructive) {
-                                                MaterialTheme.colorScheme.error
-                                            } else {
-                                                MaterialTheme.colorScheme.primary
-                                            },
-                                    )
+            },
+            onAction = { action ->
+                when (action) {
+                    TurnGitSyncAlertAction.continuePendingGitOperation,
+                    TurnGitSyncAlertAction.continueGitBranchOperation,
+                    -> {
+                        val pending = pendingWorktreeChat
+                        worktreeGitSyncAlert = null
+                        pendingWorktreeChat = null
+                        if (pending != null) {
+                            startManagedWorktreeChat(
+                                preselected = pending,
+                                changeTransfer = pending.changeTransfer,
+                                skipPreflight = true,
+                            )
+                        }
+                    }
+                    TurnGitSyncAlertAction.pullRebase -> {
+                        val pending = pendingWorktreeChat
+                        worktreeGitSyncAlert = null
+                        pendingWorktreeChat = null
+                        if (pending != null) {
+                            worktreeChatBusy = true
+                            scope.launch {
+                                runCatching {
+                                    GitActionsService(
+                                        repository,
+                                        pending.baseProjectPath,
+                                    ).pull()
+                                }.onFailure { e ->
+                                    worktreeChatError =
+                                        GitBranchDisplayMapper.userVisibleMessage(e)
                                 }
-                            }
-                        if (alert.buttons.none { it.role != TurnGitSyncAlertButtonRole.cancel }) {
-                            TextButton(onClick = { dismissWorktreeAlert() }) {
-                                Text(stringResource(android.R.string.ok))
+                                worktreeChatBusy = false
                             }
                         }
                     }
-                },
-                dismissButton = {
-                    val cancel = alert.buttons.firstOrNull { it.role == TurnGitSyncAlertButtonRole.cancel }
-                    if (cancel != null && alert.buttons.size > 1) {
-                        TextButton(onClick = { dismissWorktreeAlert() }) {
-                            Text(cancel.title)
-                        }
+                    else -> {
+                        worktreeGitSyncAlert = null
+                        pendingWorktreeChat = null
                     }
-                },
-            )
-        }
+                }
+            },
+        )
     }
 }
