@@ -2,6 +2,9 @@
 @import "./sections/workspace-chat.css";
 @import "./sections/modals-sidebar-git.css";
 @import "./sections/navigation-projects.css";
+@import "./sections/project-picker.css";
+@import "./sections/chat-utility-overlays.css";
+@import "./sections/markdown-workspace-preview.css";
 @import "./sections/command-settings-diff.css";
 @import "./sections/sidebar-files-diff.css";
 @import "./sections/sidebar-density-settings.css";

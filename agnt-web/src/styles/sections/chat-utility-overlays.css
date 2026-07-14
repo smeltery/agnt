@@ -1,0 +1,216 @@
+.agnt-row-system-error {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--agnt-danger);
+  border-radius: 8px;
+  background: rgba(255, 80, 80, 0.06);
+  font-size: 13px;
+}
+.agnt-row-system-error-tag {
+  border-color: var(--agnt-danger);
+  color: var(--agnt-danger);
+}
+.agnt-row-system-error-text { flex: 1; color: var(--agnt-fg); }
+
+/* iOS reconnect banner: tinted info-strip while connecting, soft red wash
+   on close/error. No hard border — just a tinted background that pairs
+   with the rest of the chrome. */
+.agnt-reconnect-banner {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--agnt-accent) 14%, var(--agnt-bg));
+  border-bottom: 1px solid var(--agnt-border);
+  font-size: 13px;
+  color: var(--agnt-fg);
+  font-weight: 500;
+}
+.agnt-reconnect-banner-text { flex: 1; }
+.agnt-reconnect-banner-closed,
+.agnt-reconnect-banner-error {
+  background: color-mix(in srgb, var(--agnt-danger) 14%, var(--agnt-bg));
+  border-bottom-color: color-mix(in srgb, var(--agnt-danger) 50%, transparent);
+  color: var(--agnt-fg);
+}
+.agnt-reconnect-banner-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--agnt-border);
+  border-top-color: var(--agnt-accent);
+  animation: agnt-voice-spin 0.8s linear infinite;
+}
+.agnt-reconnect-banner-closed .agnt-reconnect-banner-spinner,
+.agnt-reconnect-banner-error .agnt-reconnect-banner-spinner {
+  animation: none;
+  border-top-color: var(--agnt-danger);
+}
+
+.agnt-chat-header-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+
+.agnt-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.agnt-settings-segments {
+  display: inline-flex;
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.agnt-settings-segment {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--agnt-border);
+  color: var(--agnt-fg-dim);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.agnt-settings-segment:last-child { border-right: 0; }
+.agnt-settings-segment:hover { color: var(--agnt-fg); }
+.agnt-settings-segment-active { background: var(--agnt-bg-elev-2); color: var(--agnt-fg); }
+
+.agnt-row-attachment-button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: zoom-in;
+  border-radius: 6px;
+}
+.agnt-row-attachment-button:hover .agnt-row-attachment-thumb { border-color: var(--agnt-accent); }
+
+.agnt-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  z-index: 200;
+  cursor: zoom-out;
+}
+.agnt-lightbox-image {
+  max-width: 100%;
+  max-height: calc(100vh - 80px);
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+.agnt-lightbox-caption {
+  color: var(--agnt-fg);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-family: var(--agnt-mono);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.agnt-lightbox-counter { color: var(--agnt-fg-dim); }
+.agnt-lightbox-zoom-indicator { color: var(--agnt-fg-dim); }
+/* When zoomed, suppress the `max-*` constraints so the transform-driven
+   scale isn't fighting the contain-fit logic. The image already lives
+   inside `overflow: hidden` on the backdrop. */
+.agnt-lightbox-zoomed .agnt-lightbox-image {
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.agnt-lightbox-backdrop { overflow: hidden; }
+
+.agnt-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  border: 0;
+  color: var(--agnt-fg);
+  font-size: 28px;
+  width: 40px;
+  height: 64px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.agnt-lightbox-nav:hover { background: rgba(0, 0, 0, 0.75); }
+.agnt-lightbox-nav-prev { left: 24px; }
+.agnt-lightbox-nav-next { right: 24px; }
+
+/* iOS-style thread search bar: tertiarySystemFill input with the same
+   14px corner as the sidebar search, modeless toolbar above the chat. */
+.agnt-thread-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+  background: var(--agnt-bg);
+}
+.agnt-thread-search-input {
+  flex: 1;
+  background: var(--agnt-bg-elev-2);
+  border: 0;
+  border-radius: var(--agnt-radius-control);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--agnt-fg);
+}
+.agnt-thread-search-input::placeholder { color: var(--agnt-fg-tertiary); }
+.agnt-thread-search-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--agnt-accent) 30%, transparent);
+}
+.agnt-thread-search-count { color: var(--agnt-fg-dim); font-size: 12px; min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.agnt-thread-search button { padding: 4px 10px; font-size: 12px; }
+
+.agnt-row-highlight > .agnt-row { box-shadow: 0 0 0 2px var(--agnt-accent); transition: box-shadow 800ms ease; }
+
+.agnt-chat-jump {
+  position: absolute;
+  bottom: 132px;
+  right: 24px;
+  background: var(--agnt-accent);
+  color: var(--agnt-bg);
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.agnt-chat-jump:hover { filter: brightness(1.1); }
+
+.agnt-chat { position: relative; }
+
+.agnt-context-bar-warn .agnt-context-bar-fill { background: var(--agnt-warn); }
+.agnt-context-warning {
+  background: rgba(244, 184, 96, 0.12);
+  border-bottom: 1px solid var(--agnt-warn);
+  color: var(--agnt-fg);
+  font-size: 12px;
+  padding: 6px 12px;
+}

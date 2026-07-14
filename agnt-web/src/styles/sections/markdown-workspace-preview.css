@@ -1,0 +1,251 @@
+.agnt-md-image {
+  display: block;
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 6px;
+  border: 1px solid var(--agnt-border);
+  margin: 6px 0;
+}
+.agnt-md-svg-preview {
+  display: block;
+  width: min(100%, 640px);
+  height: clamp(220px, 42vw, 420px);
+  border: 1px solid var(--agnt-border);
+  border-radius: var(--agnt-radius-card);
+  margin: 6px 0;
+  background: var(--agnt-bg-subtle);
+}
+.agnt-md-image-placeholder {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px dashed var(--agnt-border);
+  border-radius: 4px;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-md-image-error { border-color: var(--agnt-danger); color: var(--agnt-danger); }
+.agnt-md-tasklist { padding-left: 4px; list-style: none; }
+.agnt-md-tasklist-item { display: flex; align-items: baseline; gap: 6px; }
+.agnt-md-tasklist-checkbox { margin: 0; cursor: not-allowed; }
+.agnt-md-tasklist-done span { color: var(--agnt-fg-dim); text-decoration: line-through; }
+.agnt-md-blockquote {
+  margin: 0;
+  padding: 6px 12px;
+  border-left: 3px solid var(--agnt-border);
+  color: var(--agnt-fg-dim);
+  font-style: italic;
+}
+.agnt-md-hr {
+  border: 0;
+  border-top: 1px solid var(--agnt-border);
+  margin: 12px 0;
+}
+
+.agnt-slash-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 8px 6px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--agnt-bg-elev);
+}
+.agnt-slash-item {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 10px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: var(--agnt-fg);
+  cursor: pointer;
+}
+.agnt-slash-item:hover { background: var(--agnt-bg-elev-2); }
+.agnt-slash-item-active { background: var(--agnt-bg-elev-2); box-shadow: inset 2px 0 0 var(--agnt-accent); }
+.agnt-slash-item-name { font-family: var(--agnt-mono); color: var(--agnt-accent); min-width: 96px; }
+.agnt-slash-item-args { color: var(--agnt-text-muted, #888); font-style: italic; margin-left: 4px; }
+.agnt-slash-item-description { color: var(--agnt-fg-dim); font-size: 12px; }
+.agnt-slash-empty {
+  margin: 0 8px 6px;
+  padding: 6px 10px;
+  border: 1px dashed var(--agnt-border);
+  border-radius: 8px;
+  color: var(--agnt-fg-dim);
+  font-size: 12px;
+}
+.agnt-md-paragraph a,
+.agnt-md-list li a,
+.agnt-md-table a {
+  color: var(--agnt-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.agnt-md-paragraph a:hover,
+.agnt-md-list li a:hover,
+.agnt-md-table a:hover { filter: brightness(1.1); }
+
+.agnt-md-file-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--agnt-accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.agnt-md-file-link:hover { filter: brightness(1.1); }
+.agnt-md-file-link-disabled {
+  color: var(--agnt-fg-dim);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.agnt-workspace-file-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: min(70vh, 560px);
+}
+.agnt-workspace-file-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid var(--agnt-border);
+}
+.agnt-workspace-file-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--agnt-fg);
+  font-weight: 600;
+}
+.agnt-workspace-file-meta {
+  flex: 0 0 auto;
+  color: var(--agnt-fg-dim);
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+}
+.agnt-workspace-file-code {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--agnt-border);
+  border-radius: var(--agnt-radius-card);
+  background: var(--agnt-bg-subtle);
+}
+.agnt-workspace-file-code .agnt-md-pre {
+  margin: 0;
+  max-height: min(64vh, 620px);
+  border: 0;
+  border-radius: 0;
+}
+.agnt-workspace-file-loading,
+.agnt-workspace-file-error {
+  padding: 14px;
+  border: 1px solid var(--agnt-border);
+  border-radius: var(--agnt-radius-card);
+  color: var(--agnt-fg-dim);
+  background: var(--agnt-bg-subtle);
+}
+.agnt-workspace-file-error {
+  color: var(--agnt-danger);
+  border-color: var(--agnt-danger);
+}
+
+.agnt-md-pre { position: relative; }
+.agnt-md-pre-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  color: var(--agnt-fg-dim);
+  font: inherit;
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.agnt-md-pre:hover .agnt-md-pre-copy { opacity: 1; }
+.agnt-md-pre-copy:hover { color: var(--agnt-fg); border-color: var(--agnt-accent); }
+.agnt-md-pre-copy-done { color: var(--agnt-ok); border-color: var(--agnt-ok); opacity: 1; }
+/* Language label sits in the top-left mirror-position of the copy button
+   and stays visible (no hover-only fade) so the language is always
+   discoverable. Lowercase + slightly muted so it reads as metadata, not
+   content. */
+.agnt-md-pre-lang {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-family: var(--agnt-mono);
+  font-size: 10px;
+  color: var(--agnt-fg-dim);
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  pointer-events: none;
+  text-transform: lowercase;
+}
+.agnt-md-pre-lines {
+  position: absolute;
+  top: 6px;
+  right: 56px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  color: var(--agnt-fg-dim);
+  font: inherit;
+  font-family: var(--agnt-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.agnt-md-pre:hover .agnt-md-pre-lines { opacity: 1; }
+.agnt-md-pre-lines-on { opacity: 1; color: var(--agnt-fg); border-color: var(--agnt-accent); }
+.agnt-md-pre-numbered {
+  /* Make room for the gutter alongside the code without stealing from
+     the right-edge buttons. Padding-left pads the visual gutter; the
+     gutter itself is absolutely positioned so the existing code layout
+     doesn't shift line-by-line. */
+  padding-left: 44px;
+}
+.agnt-md-pre-gutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 36px;
+  padding: var(--agnt-md-pre-padding-y, 12px) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--agnt-mono);
+  font-size: 12px;
+  /* Match `<code>`'s line-height so a 200-line block stays aligned. The
+     fallback `1.5` mirrors the global default; the cascade still wins
+     when a more-specific rule sets `--agnt-md-pre-line-height`. */
+  line-height: var(--agnt-md-pre-line-height, 1.5);
+  color: var(--agnt-fg-dim);
+  background: var(--agnt-bg-elev-2);
+  border-right: 1px solid var(--agnt-border);
+  user-select: none;
+  pointer-events: none;
+}
+.agnt-md-pre-gutter > span {
+  padding: 0 6px;
+  white-space: pre;
+}
