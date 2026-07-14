@@ -46,11 +46,11 @@
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Connection.swift": 1300,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+SecureTransport.swift": 1150,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+Transport.swift": 1150,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexThreadStartProjectBinding.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadListing.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+ThreadResume.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+TurnStart.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Threads/CodexService+TurnSteering.swift": 500
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexThreadStartProjectBinding.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+ThreadListing.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+ThreadResume.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+TurnStart.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Threads/Turns/CodexService+TurnSteering.swift": 500
     }
   },
   "flat_directories": {
