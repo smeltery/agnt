@@ -12,12 +12,12 @@ const {
   findRecentRolloutFileForContextRead,
   findRecentRolloutFileForWatch,
   findRolloutFileForThread,
-} = require("./rollout-file-lookup");
+} = require("./rollout/file-lookup");
 const {
   contextUsageFromTokenCountPayload,
   readLatestContextWindowUsage: readLatestContextWindowUsageFromRoot,
   readRolloutUsageChunk,
-} = require("./rollout-usage");
+} = require("./rollout/usage");
 
 const DEFAULT_WATCH_INTERVAL_MS = 1_000;
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;

@@ -1,4 +1,4 @@
-// FILE: rollout-file-lookup.js
+// FILE: rollout/file-lookup.js
 // Purpose: Locate Codex rollout JSONL files for watchers, context reads, and history recovery.
 
 const fs = require("fs");

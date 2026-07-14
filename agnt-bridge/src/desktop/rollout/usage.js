@@ -1,4 +1,4 @@
-// FILE: rollout-usage.js
+// FILE: rollout/usage.js
 // Purpose: Read and parse context-window usage snapshots from rollout JSONL.
 
 const fs = require("fs");
@@ -6,7 +6,7 @@ const {
   DEFAULT_CONTEXT_READ_CANDIDATE_LIMIT,
   findRecentRolloutFileForContextRead,
   readFileSlice,
-} = require("./rollout-file-lookup");
+} = require("./file-lookup");
 
 const DEFAULT_CONTEXT_READ_SCAN_BYTES = 512 * 1024;
 
