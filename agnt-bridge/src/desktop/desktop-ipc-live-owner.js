@@ -39,15 +39,16 @@ const {
   createFollowerRuntimeState,
 } = require("./desktop-ipc-live-owner-runtime");
 const {
+  createLiveOwnerListMetadataState,
+} = require("./desktop-ipc-live-owner-list-metadata");
+const {
   AGNT_LIVE_OWNER_SOURCE,
   OWNER_INBOUND_METHODS,
   SUPPORTED_FOLLOWER_REQUEST_METHODS,
-  THREAD_ARCHIVED,
   THREAD_QUEUED_FOLLOWUPS_CHANGED,
   THREAD_READ_METHODS,
   THREAD_READ_STATE_CHANGED,
   THREAD_STREAM_STATE_CHANGED,
-  THREAD_UNARCHIVED,
   activeTurnIdFromConversation,
   conversationHasActiveTurn,
   createDisabledDesktopIpcLiveOwner,
@@ -126,8 +127,6 @@ function createDesktopIpcLiveOwner({
   // baseRevision matches their last-seen revision, and load-complete-history
   // waits for the snapshot carrying the returned revision.
   const streamRevisionsByThreadId = new Map();
-  const announcedSidebarThreadIds = new Set();
-  const sidebarRefreshTimersByThreadId = new Map();
   const pendingTurnStartParamsByThreadId = new Map();
   const pendingTurnStartEntriesByRequestId = new Map();
   const followerRuntimeOverridesByThreadId = new Map();
@@ -136,7 +135,6 @@ function createDesktopIpcLiveOwner({
   const queuedFollowUpsByThreadId = new Map();
   const runningQueuedFollowUpThreadIds = new Set();
   const announcedReadStateThreadIds = new Set();
-  const pendingThreadArchiveMetadataByThreadId = new Map();
   const dirtyThreadIds = new Set();
   let snapshotTimer = null;
   const pendingTurnStarts = createPendingTurnStartState({
@@ -159,7 +157,7 @@ function createDesktopIpcLiveOwner({
     reconnectMs,
     logPrefix,
     onConnected() {
-      flushPendingThreadArchiveMetadataBroadcasts();
+      listMetadata.flushPendingThreadArchiveMetadataBroadcasts();
       broadcastAllOwnedSnapshots();
     },
     onBroadcast(envelope) {
@@ -178,6 +176,15 @@ function createDesktopIpcLiveOwner({
     runtimeSettingsStore,
     scheduleSnapshot,
     logPrefix,
+  });
+  const listMetadata = createLiveOwnerListMetadataState({
+    conversations,
+    hostId,
+    ipc,
+    lastBroadcastStatesByThreadId,
+    ownedThreadIds,
+    removeOwnedThread,
+    sidebarRefreshDelayMs,
   });
 
   function observeInbound(rawMessage, parsedMessage = null) {
@@ -209,7 +216,7 @@ function createDesktopIpcLiveOwner({
     }
 
     if (method === "thread/archive") {
-      broadcastThreadArchived(threadId, readArchiveCwd(threadId, message?.params));
+      listMetadata.broadcastThreadArchived(threadId, listMetadata.readArchiveCwd(threadId, message?.params));
       removeOwnedThread(threadId, {
         broadcastRemoval: true,
         reason: method,
@@ -227,7 +234,7 @@ function createDesktopIpcLiveOwner({
       return;
     }
     if (method === "thread/unarchive") {
-      broadcastThreadUnarchived(threadId);
+      listMetadata.broadcastThreadUnarchived(threadId);
       return;
     }
 
@@ -240,7 +247,7 @@ function createDesktopIpcLiveOwner({
     let pendingTurnStartEntry = null;
     if (method === "turn/start") {
       pendingTurnStartEntry = pendingTurnStarts.remember(threadId, message?.params, message?.id);
-      scheduleSidebarAnnouncement(threadId);
+      listMetadata.scheduleSidebarAnnouncement(threadId);
     }
     if (method === "turn/interrupt") {
       markTurnInterruptedOptimistically(threadId, message?.params);
@@ -346,14 +353,9 @@ function createDesktopIpcLiveOwner({
     lastBroadcastStatesByThreadId.clear();
     fallbackTurnIdsByThreadId.clear();
     streamRevisionsByThreadId.clear();
-    for (const timer of sidebarRefreshTimersByThreadId.values()) {
-      clearTimeout(timer);
-    }
-    sidebarRefreshTimersByThreadId.clear();
-    announcedSidebarThreadIds.clear();
+    listMetadata.clearAll();
     pendingTurnStarts.clear();
     followerRuntimeOverridesByThreadId.clear();
-    pendingThreadArchiveMetadataByThreadId.clear();
     queuedFollowUpsByThreadId.clear();
     runningQueuedFollowUpThreadIds.clear();
     announcedReadStateThreadIds.clear();
@@ -473,8 +475,7 @@ function createDesktopIpcLiveOwner({
     }
     runningQueuedFollowUpThreadIds.delete(normalizedThreadId);
     announcedReadStateThreadIds.delete(normalizedThreadId);
-    cancelSidebarAnnouncement(normalizedThreadId);
-    announcedSidebarThreadIds.delete(normalizedThreadId);
+    listMetadata.forgetThread(normalizedThreadId);
     pendingTurnStarts.removeThread(normalizedThreadId);
     followerRuntimeOverridesByThreadId.delete(normalizedThreadId);
     dirtyThreadIds.delete(normalizedThreadId);
@@ -485,7 +486,7 @@ function createDesktopIpcLiveOwner({
       || lastBroadcastStatesByThreadId.get(threadId)
       || createEmptyConversationState(threadId, { hostId, now });
     if (reason === "thread/archive" && !skipArchiveMetadataBroadcast) {
-      broadcastThreadArchived(threadId, readString(previousState?.cwd));
+      listMetadata.broadcastThreadArchived(threadId, readString(previousState?.cwd));
     }
     const removedState = {
       ...cloneJSON(previousState),
@@ -511,101 +512,6 @@ function createDesktopIpcLiveOwner({
         conversationState: removedState,
       },
     });
-  }
-
-  function broadcastThreadArchived(threadId, cwd) {
-    queueThreadArchiveMetadataBroadcast(THREAD_ARCHIVED, threadId, { cwd });
-  }
-
-  function broadcastThreadUnarchived(threadId) {
-    queueThreadArchiveMetadataBroadcast(THREAD_UNARCHIVED, threadId);
-  }
-
-  // Desktop has no watcher on the shared session store, but its webview reacts
-  // to thread-unarchived broadcasts by re-running thread/list. Announcing each
-  // phone-driven thread once (after the rollout has had time to persist) makes
-  // it appear in Desktop's sidebar without the disruptive deep-link bounce.
-  function scheduleSidebarAnnouncement(threadId) {
-    const normalizedThreadId = readString(threadId);
-    if (!normalizedThreadId
-      || announcedSidebarThreadIds.has(normalizedThreadId)
-      || sidebarRefreshTimersByThreadId.has(normalizedThreadId)) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      sidebarRefreshTimersByThreadId.delete(normalizedThreadId);
-      if (!ownedThreadIds.has(normalizedThreadId)) {
-        return;
-      }
-      announcedSidebarThreadIds.add(normalizedThreadId);
-      broadcastThreadUnarchived(normalizedThreadId);
-    }, Math.max(0, sidebarRefreshDelayMs));
-    timer.unref?.();
-    sidebarRefreshTimersByThreadId.set(normalizedThreadId, timer);
-  }
-
-  function cancelSidebarAnnouncement(threadId) {
-    const timer = sidebarRefreshTimersByThreadId.get(threadId);
-    if (timer) {
-      clearTimeout(timer);
-      sidebarRefreshTimersByThreadId.delete(threadId);
-    }
-  }
-
-  // Archive/unarchive are list metadata updates; keep only the final per-thread
-  // state while IPC reconnects so rapid toggles cannot flush out of order.
-  function queueThreadArchiveMetadataBroadcast(method, threadId, { cwd } = {}) {
-    const normalizedThreadId = readString(threadId);
-    if (!normalizedThreadId) {
-      return;
-    }
-    pendingThreadArchiveMetadataByThreadId.set(normalizedThreadId, {
-      method,
-      cwd: readString(cwd),
-    });
-    ipc.ensureConnected();
-    flushPendingThreadArchiveMetadataBroadcasts();
-  }
-
-  function flushPendingThreadArchiveMetadataBroadcasts() {
-    for (const [threadId, pending] of pendingThreadArchiveMetadataByThreadId) {
-      const params = {
-        hostId,
-        conversationId: threadId,
-      };
-      if (pending.method === THREAD_ARCHIVED) {
-        params.cwd = pending.cwd;
-      }
-      if (!ipc.sendBroadcast(pending.method, params)) {
-        return;
-      }
-      pendingThreadArchiveMetadataByThreadId.delete(threadId);
-    }
-  }
-
-  function readArchiveCwd(threadId, params) {
-    return readString(params?.cwd)
-      || readString(conversations.get(threadId)?.cwd)
-      || readString(lastBroadcastStatesByThreadId.get(threadId)?.cwd);
-  }
-
-  function maybeYieldOwnedThreadForPeerArchive(envelope) {
-    if (envelope?.method !== THREAD_ARCHIVED) {
-      return false;
-    }
-    if (envelope.sourceClientId && envelope.sourceClientId === ipc.clientId) {
-      return true;
-    }
-    const params = envelope.params || {};
-    const threadId = readString(params.conversationId) || readString(params.conversation_id);
-    if (!threadId || !ownedThreadIds.has(threadId)) {
-      return true;
-    }
-
-    // Desktop archive is a list-level ownership signal; stop publishing snapshots
-    // so archived threads do not immediately reappear from bridge-owned state.
-    removeOwnedThread(threadId);
-    return true;
   }
 
   function upsertConversationFromThread(thread) {
@@ -891,7 +797,7 @@ function createDesktopIpcLiveOwner({
       broadcastAllOwnedSnapshots();
       return;
     }
-    if (maybeYieldOwnedThreadForPeerArchive(envelope)) {
+    if (listMetadata.maybeYieldOwnedThreadForPeerArchive(envelope)) {
       return;
     }
     if (envelope?.method !== THREAD_STREAM_STATE_CHANGED) {
