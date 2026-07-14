@@ -1,4 +1,4 @@
-// FILE: desktop-ipc-action-follower-state.js
+// FILE: action-follower/state.js
 // Purpose: Desktop IPC action follower conversation-state projection helpers.
 // Layer: CLI helper
 // Depends on: ./desktop-ipc-shared
@@ -7,7 +7,7 @@ const {
   cloneJSON,
   normalizeToken,
   readString,
-} = require("./desktop-ipc-shared");
+} = require("../desktop-ipc-shared");
 
 function applyConversationStateChange(previousState, change) {
   if (!change || typeof change !== "object") {

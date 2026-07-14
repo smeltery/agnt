@@ -24,7 +24,7 @@ const {
   latestActiveBackgroundTurn,
   normalizeBoundedTurnsForRuntime,
   seedConversationStateFromThreadRead,
-} = require("./desktop-ipc-action-follower-state");
+} = require("./action-follower/state");
 
 const DESKTOP_IPC_ACTION_SOURCE = "desktop-ipc-action-follower";
 const AGNT_LIVE_OWNER_SOURCE = "desktop-ipc-live-owner";
