@@ -1,14 +1,10 @@
 package com.dotbrains.agnt.mobile.ui.settings
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,23 +30,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,19 +55,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.AppFontStyle
 import com.dotbrains.agnt.mobile.core.model.AppLanguagePreference
 import com.dotbrains.agnt.mobile.core.model.AppThemePreference
-import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
-import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.UserBubbleColor
-import com.dotbrains.agnt.mobile.core.notification.LocalNotificationSettings
 import com.dotbrains.agnt.mobile.core.readAgntAppVersionName
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.AppFontPreferences
@@ -86,11 +69,9 @@ import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.LanguagePreferences
 import com.dotbrains.agnt.mobile.data.ThemePreferences
 import com.dotbrains.agnt.mobile.data.UserBubblePreferences
-import com.dotbrains.agnt.mobile.ui.shared.UsageStatusSummary
 import com.dotbrains.agnt.mobile.ui.theme.agntScreenTopAppBarColors
 import com.dotbrains.agnt.mobile.ui.theme.bubbleForeground
 import com.dotbrains.agnt.mobile.ui.theme.swatchColor
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -291,7 +272,7 @@ private fun SettingsCard(
 }
 
 @Composable
-private fun SettingsOptionRow(
+internal fun SettingsOptionRow(
     selected: Boolean,
     onClick: () -> Unit,
     title: String,
@@ -391,180 +372,6 @@ private fun settingsBubbleColorLabelRes(color: UserBubbleColor): Int =
     }
 
 @Composable
-private fun SettingsPetSection(repository: CodexRepository) {
-    val store = AppContainer.petCompanionStore
-    val scope = rememberCoroutineScope()
-    val isEnabled by store.isEnabled.collectAsStateWithLifecycle()
-    val availablePets by store.availablePets.collectAsStateWithLifecycle()
-    val selectedPetId by store.selectedPetId.collectAsStateWithLifecycle()
-    val isLoading by store.isLoading.collectAsStateWithLifecycle()
-    val errorMessage by store.errorMessage.collectAsStateWithLifecycle()
-    val ready by repository.isSessionReady.collectAsStateWithLifecycle()
-
-    LaunchedEffect(isEnabled, ready) {
-        if (isEnabled && ready) store.loadPetsIfNeeded(repository)
-    }
-
-    Text(
-        text = stringResource(R.string.settings_pet_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.settings_pet_enable_title),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-        Switch(
-            checked = isEnabled,
-            onCheckedChange = { enabled ->
-                store.setEnabled(enabled)
-                if (enabled && ready) {
-                    scope.launch { store.refreshPets(repository) }
-                }
-            },
-        )
-    }
-
-    if (isEnabled) {
-        when {
-            !ready ->
-                Text(
-                    text = stringResource(R.string.settings_pet_connect_first),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-            isLoading ->
-                Text(
-                    text = stringResource(R.string.settings_pet_loading),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-            availablePets.isEmpty() ->
-                Text(
-                    text = errorMessage ?: stringResource(R.string.settings_pet_empty),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-            else ->
-                availablePets.forEach { pet ->
-                    SettingsOptionRow(
-                        selected = pet.id == (selectedPetId ?: availablePets.firstOrNull()?.id),
-                        onClick = {
-                            store.selectPet(pet.id)
-                            scope.launch { store.loadSelectedPet(repository) }
-                        },
-                        title = pet.displayName,
-                        subtitle = pet.description ?: stringResource(R.string.settings_pet_default_description),
-                    )
-                }
-        }
-        if (ready) {
-            TextButton(onClick = { scope.launch { store.refreshPets(repository) } }) {
-                Text(stringResource(R.string.settings_pet_refresh))
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsNotificationSection(context: Context) {
-    var refreshNonce by remember { mutableStateOf(0) }
-    var requestedInSession by remember { mutableStateOf(false) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val permissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            requestedInSession = true
-            refreshNonce++
-        }
-    DisposableEffect(lifecycleOwner) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    refreshNonce++
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    val permissionStatus =
-        remember(refreshNonce, context) {
-            LocalNotificationSettings.permissionStatus(context)
-        }
-    val notificationsEnabled =
-        permissionStatus == LocalNotificationSettings.PermissionStatus.Granted ||
-            permissionStatus == LocalNotificationSettings.PermissionStatus.NotRequired
-
-    Text(
-        text = stringResource(R.string.settings_notifications_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.settings_notifications_run_completion_title),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                text =
-                    stringResource(
-                        if (notificationsEnabled) {
-                            R.string.settings_notifications_status_enabled
-                        } else {
-                            R.string.settings_notifications_status_disabled
-                        },
-                    ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-
-    if (notificationsEnabled) {
-        Text(
-            text = stringResource(R.string.settings_notifications_enabled_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        Text(
-            text = stringResource(R.string.settings_notifications_disabled_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (
-            Build.VERSION.SDK_INT >= 33 &&
-            permissionStatus == LocalNotificationSettings.PermissionStatus.RuntimePermissionRequired &&
-            !requestedInSession
-        ) {
-            TextButton(
-                onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
-            ) {
-                Text(stringResource(R.string.settings_notifications_request_permission))
-            }
-        } else {
-            TextButton(
-                onClick = { openSystemNotificationSettings(context) },
-            ) {
-                Text(stringResource(R.string.settings_notifications_open_system_settings))
-            }
-        }
-    }
-}
-
-@Composable
 private fun SettingsNavigationRow(
     title: String,
     subtitle: String,
@@ -595,207 +402,6 @@ private fun SettingsNavigationRow(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun SettingsUsageRateLimitsSection(repository: CodexRepository) {
-    val sessionReady by repository.isSessionReady.collectAsStateWithLifecycle()
-    val conn by repository.connectionState.collectAsStateWithLifecycle()
-    val hasResolved by repository.hasResolvedRateLimitsSnapshot.collectAsStateWithLifecycle()
-    val isLoading by repository.isLoadingRateLimits.collectAsStateWithLifecycle()
-    val err by repository.rateLimitsErrorMessage.collectAsStateWithLifecycle()
-    val buckets by repository.rateLimitBuckets.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(sessionReady, conn, hasResolved, err, isLoading) {
-        if (sessionReady &&
-            conn is ConnectionState.Connected &&
-            !hasResolved &&
-            err == null &&
-            !isLoading
-        ) {
-            runCatching { repository.refreshRateLimits() }
-        }
-    }
-
-    val displayRows = remember(buckets) { CodexRateLimitBucket.visibleDisplayRows(buckets) }
-    val refreshCd = stringResource(R.string.cd_usage_rate_limits_refresh)
-    val activeThreadId by repository.activeThreadId.collectAsStateWithLifecycle()
-    val contextUsageMap by repository.contextWindowUsageByThread.collectAsStateWithLifecycle()
-    val contextLoading by repository.contextWindowUsageLoadingThreads.collectAsStateWithLifecycle()
-    val contextErrors by repository.contextWindowUsageErrorByThread.collectAsStateWithLifecycle()
-
-    Text(
-        text = stringResource(R.string.usage_rate_limits_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    val usageSummary =
-        activeThreadId
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { tid -> contextUsageMap[tid] }
-    UsageStatusSummary(
-        contextUsage = usageSummary,
-        rateLimitRows = displayRows,
-        loading = isLoading,
-    )
-
-    Text(
-        text = stringResource(R.string.usage_context_window_title),
-        style = MaterialTheme.typography.titleSmall,
-    )
-    Text(
-        text = stringResource(R.string.usage_context_window_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    when {
-        activeThreadId.isNullOrBlank() -> {
-            Text(
-                text = stringResource(R.string.usage_context_window_no_thread),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        !sessionReady || conn !is ConnectionState.Connected -> {
-            Text(
-                text = stringResource(R.string.usage_rate_limits_offline),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        else -> {
-            val tid = activeThreadId.orEmpty().trim()
-            val usage: ContextWindowUsage? = contextUsageMap[tid]
-            val ctxLoading = contextLoading.contains(tid)
-            val ctxErr = contextErrors[tid]
-            val ctxRefreshCd = stringResource(R.string.cd_usage_context_window_refresh)
-            val ctxLoadingCd = stringResource(R.string.cd_usage_context_window_loading)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    onClick = { scope.launch { runCatching { repository.refreshContextWindowUsage(tid) } } },
-                    enabled = !ctxLoading,
-                    modifier = Modifier.semantics { contentDescription = ctxRefreshCd },
-                ) {
-                    Text(stringResource(R.string.usage_context_window_refresh))
-                }
-                if (ctxLoading) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    CircularProgressIndicator(
-                        modifier =
-                            Modifier
-                                .size(20.dp)
-                                .align(Alignment.CenterVertically)
-                                .semantics { contentDescription = ctxLoadingCd },
-                        strokeWidth = 2.dp,
-                    )
-                }
-            }
-            ctxErr?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            if (!ctxLoading && ctxErr == null && usage == null) {
-                Text(
-                    text = stringResource(R.string.usage_context_window_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            usage?.let { u ->
-                LinearProgressIndicator(
-                    progress = { u.fractionUsed.toFloat().coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text =
-                        stringResource(
-                            R.string.usage_context_window_tokens,
-                            u.tokensUsedFormatted,
-                            u.tokenLimitFormatted,
-                            u.percentUsed,
-                        ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-    }
-
-    Text(
-        text = stringResource(R.string.usage_account_limits_title),
-        style = MaterialTheme.typography.titleSmall,
-    )
-
-    if (!sessionReady || conn !is ConnectionState.Connected) {
-        Text(
-            text = stringResource(R.string.usage_rate_limits_offline),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    } else {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(
-                onClick = { scope.launch { runCatching { repository.refreshRateLimits() } } },
-                enabled = !isLoading,
-                modifier = Modifier.semantics { contentDescription = refreshCd },
-            ) {
-                Text(stringResource(R.string.usage_rate_limits_refresh))
-            }
-            if (isLoading) {
-                Spacer(modifier = Modifier.width(8.dp))
-                val loadingCd = stringResource(R.string.cd_usage_rate_limits_loading)
-                CircularProgressIndicator(
-                    modifier =
-                        Modifier
-                            .size(20.dp)
-                            .align(Alignment.CenterVertically)
-                            .semantics { contentDescription = loadingCd },
-                    strokeWidth = 2.dp,
-                )
-            }
-        }
-        err?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        if (!isLoading && err == null && hasResolved && displayRows.isEmpty()) {
-            Text(
-                text = stringResource(R.string.usage_rate_limits_empty),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            displayRows.forEach { row ->
-                Column(Modifier.fillMaxWidth()) {
-                    Text(
-                        text = row.label,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { row.window.clampedUsedPercent / 100f },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = stringResource(R.string.usage_rate_limits_percent, row.window.clampedUsedPercent),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -842,7 +448,7 @@ private fun settingsLanguageSubtitleRes(option: AppLanguagePreference): Int =
 
 private fun readAppVersionName(context: Context): String = readAgntAppVersionName(context)
 
-private fun openSystemNotificationSettings(context: Context) {
+internal fun openSystemNotificationSettings(context: Context) {
     val appPackage = Uri.fromParts("package", context.packageName, null)
     val intent =
         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
