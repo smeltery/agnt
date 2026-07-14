@@ -18,13 +18,18 @@ import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.AIChangeSet
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
+import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
+import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.GitBranchDisplaySummary
+import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnFeedbackDialog
 import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnRichMarkdownBody
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.ForkThreadActionSheet
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.PlanDetailsActionSheet
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.WorktreeHandoffActionSheet
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun TurnConversationPaneSheetHost(
@@ -93,6 +98,90 @@ internal fun TurnConversationPaneSheetHost(
     FullTimelineMessageSheet(
         message = fullTimelineMessage,
         onDismiss = onDismissFullTimelineMessage,
+    )
+}
+
+@Composable
+internal fun TurnConversationPaneSheetHostWithActions(
+    threadId: String,
+    repository: CodexRepository,
+    scope: CoroutineScope,
+    activeThread: CodexThread?,
+    gitCwd: String?,
+    showForkThreadSheet: Boolean,
+    forkingThread: Boolean,
+    showFeedbackDialog: Boolean,
+    showWorktreeHandoffSheet: Boolean,
+    isHandingOffWorktree: Boolean,
+    loadedGitBranchSummary: GitBranchDisplaySummary?,
+    defaultReviewBaseBranch: String?,
+    localWorktreeHandoffTargetPath: String?,
+    worktreeHandoffError: String?,
+    showPlanDetailsSheet: Boolean,
+    visiblePlanAccessoryMessage: CodexMessage?,
+    isThreadRunning: Boolean,
+    sending: Boolean,
+    hasComposerDraftContent: Boolean,
+    fullTimelineMessage: CodexMessage?,
+    handoffCurrentThread: (String?) -> Unit,
+    applyPlanToComposer: () -> Unit,
+    setForkingThread: (Boolean) -> Unit,
+    setShowForkThreadSheet: (Boolean) -> Unit,
+    setShowFeedbackDialog: (Boolean) -> Unit,
+    setShowWorktreeHandoffSheet: (Boolean) -> Unit,
+    setShowPlanDetailsSheet: (Boolean) -> Unit,
+    setFullTimelineMessage: (CodexMessage?) -> Unit,
+    setLastError: (String?) -> Unit,
+) {
+    TurnConversationPaneSheetHost(
+        showForkThreadSheet = showForkThreadSheet,
+        projectPath = activeThread?.cwd,
+        forkingThread = forkingThread,
+        onDismissForkThread = {
+            if (!forkingThread) setShowForkThreadSheet(false)
+        },
+        onConfirmForkThread = {
+            scope.launch {
+                setForkingThread(true)
+                runCatching {
+                    val forked = repository.forkThread(threadId, targetProjectPath = activeThread?.cwd)
+                    repository.setActiveThreadId(forked.id)
+                    setShowForkThreadSheet(false)
+                    setLastError(null)
+                }.onFailure { e ->
+                    setLastError(formatTurnSendError(e))
+                }
+                setForkingThread(false)
+            }
+        },
+        showFeedbackDialog = showFeedbackDialog,
+        onDismissFeedbackDialog = { setShowFeedbackDialog(false) },
+        onSubmitFeedback = { setShowFeedbackDialog(false) },
+        showWorktreeHandoffSheet = showWorktreeHandoffSheet,
+        isWorktreeProject = activeThread?.isManagedWorktreeProject == true,
+        isHandingOffWorktree = isHandingOffWorktree,
+        loadedGitBranchSummary = loadedGitBranchSummary,
+        defaultReviewBaseBranch = defaultReviewBaseBranch,
+        sourceProjectPath = gitCwd,
+        localTargetPath = localWorktreeHandoffTargetPath,
+        associatedWorktreePath = repository.associatedManagedWorktreePathFor(threadId),
+        worktreeHandoffError = worktreeHandoffError,
+        onDismissWorktreeHandoff = {
+            if (!isHandingOffWorktree) setShowWorktreeHandoffSheet(false)
+        },
+        onConfirmWorktreeHandoff = handoffCurrentThread,
+        showPlanDetailsSheet = showPlanDetailsSheet,
+        visiblePlanAccessoryMessage = visiblePlanAccessoryMessage,
+        canApplyPlan = !isThreadRunning && !sending,
+        onDismissPlanDetails = { setShowPlanDetailsSheet(false) },
+        onApplyPlanDetails = {
+            applyPlanToComposer()
+            if (!hasComposerDraftContent) {
+                setShowPlanDetailsSheet(false)
+            }
+        },
+        fullTimelineMessage = fullTimelineMessage,
+        onDismissFullTimelineMessage = { setFullTimelineMessage(null) },
     )
 }
 

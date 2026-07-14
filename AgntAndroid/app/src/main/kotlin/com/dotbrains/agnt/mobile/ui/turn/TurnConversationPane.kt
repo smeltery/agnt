@@ -43,7 +43,6 @@ import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionChipPayload
 import com.dotbrains.agnt.mobile.ui.turn.composer.TURN_COMPOSER_RUNTIME_AUTO_ID
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerBar
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerSecondaryBar
-import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.GitBranchPaneState
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnPlanAccessoryCard
@@ -859,57 +858,35 @@ fun TurnConversationPane(
             )
         }
     }
-    TurnConversationPaneSheetHost(
+    TurnConversationPaneSheetHostWithActions(
+        threadId = threadId,
+        repository = repository,
+        scope = scope,
+        activeThread = activeThread,
+        gitCwd = gitCwd,
         showForkThreadSheet = showForkThreadSheet,
-        projectPath = activeThread?.cwd,
         forkingThread = forkingThread,
-        onDismissForkThread = {
-            if (!forkingThread) showForkThreadSheet = false
-        },
-        onConfirmForkThread = {
-            scope.launch {
-                forkingThread = true
-                runCatching {
-                    val forked = repository.forkThread(threadId, targetProjectPath = activeThread?.cwd)
-                    repository.setActiveThreadId(forked.id)
-                    showForkThreadSheet = false
-                    lastError = null
-                }.onFailure { e ->
-                    lastError =
-                        formatTurnSendError(e)
-                }
-                forkingThread = false
-            }
-        },
         showFeedbackDialog = showFeedbackDialog,
-        onDismissFeedbackDialog = { showFeedbackDialog = false },
-        onSubmitFeedback = { showFeedbackDialog = false },
         showWorktreeHandoffSheet = showWorktreeHandoffSheet,
-        isWorktreeProject = activeThread?.isManagedWorktreeProject == true,
         isHandingOffWorktree = isHandingOffWorktree,
         loadedGitBranchSummary = loadedGitBranchSummary,
         defaultReviewBaseBranch = defaultReviewBaseBranch,
-        sourceProjectPath = gitCwd,
-        localTargetPath = localWorktreeHandoffTargetPath,
-        associatedWorktreePath = repository.associatedManagedWorktreePathFor(threadId),
+        localWorktreeHandoffTargetPath = localWorktreeHandoffTargetPath,
         worktreeHandoffError = worktreeHandoffError,
-        onDismissWorktreeHandoff = {
-            if (!isHandingOffWorktree) showWorktreeHandoffSheet = false
-        },
-        onConfirmWorktreeHandoff = { selectedBaseBranch ->
-            handoffCurrentThread(selectedBaseBranch)
-        },
         showPlanDetailsSheet = showPlanDetailsSheet,
         visiblePlanAccessoryMessage = visiblePlanAccessoryMessage,
-        canApplyPlan = !isThreadRunning && !sending,
-        onDismissPlanDetails = { showPlanDetailsSheet = false },
-        onApplyPlanDetails = {
-            applyPlanToComposer()
-            if (!hasComposerDraftContent) {
-                showPlanDetailsSheet = false
-            }
-        },
+        isThreadRunning = isThreadRunning,
+        sending = sending,
+        hasComposerDraftContent = hasComposerDraftContent,
         fullTimelineMessage = fullTimelineMessage,
-        onDismissFullTimelineMessage = { fullTimelineMessage = null },
+        handoffCurrentThread = { selectedBaseBranch -> handoffCurrentThread(selectedBaseBranch) },
+        applyPlanToComposer = { applyPlanToComposer() },
+        setForkingThread = { forkingThread = it },
+        setShowForkThreadSheet = { showForkThreadSheet = it },
+        setShowFeedbackDialog = { showFeedbackDialog = it },
+        setShowWorktreeHandoffSheet = { showWorktreeHandoffSheet = it },
+        setShowPlanDetailsSheet = { showPlanDetailsSheet = it },
+        setFullTimelineMessage = { fullTimelineMessage = it },
+        setLastError = { lastError = it },
     )
 }
