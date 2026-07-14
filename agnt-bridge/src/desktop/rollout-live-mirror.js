@@ -2,22 +2,35 @@
 // Purpose: Mirrors desktop-origin rollout activity back into live bridge notifications for iPhone catch-up.
 // Layer: CLI helper
 // Exports: createRolloutLiveMirrorController
-// Depends on: fs, ./rollout-watch, ./apply-patch-changes, rollout-live-mirror-utils
+// Depends on: ./rollout-live-mirror-controller, ./apply-patch-changes, rollout-live-mirror-utils
 
-const fs = require("fs");
-const {
-  findRecentRolloutFileForContextRead,
-  resolveSessionsRoot,
-} = require("./rollout-watch");
-const {
-  visibleUserPromptFromInputEntries,
-} = require("../bridge/contextual-user-items");
-const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
 const { hasVisiblePlanUpdate } = require("./desktop-ipc-shared");
 const {
-  bootstrapFromExistingRollout,
   terminalEventClosesTrackedTurn,
 } = require("./rollout-live-mirror-bootstrap");
+const {
+  createRolloutLiveMirrorController: createController,
+} = require("./rollout-live-mirror-controller");
+const {
+  customToolStartNotifications,
+  imageGenerationNotifications,
+  patchApplyEndNotifications,
+  toolOutputNotifications,
+  toolStartNotifications,
+  turnFileChangeSnapshotNotifications,
+} = require("./rollout-live-mirror-tool-notifications");
+const {
+  clearPendingSyntheticTerminal,
+  createMirrorState,
+  finalizePendingSyntheticTerminalIfReady,
+  flushPendingUserMessageNotifications,
+  isSyntheticTerminalMismatch,
+  markPendingSyntheticTerminal,
+  populateSessionMetaState,
+  resetRunState,
+  resolveRolloutEventTurnId,
+  rolloutUserPromptText,
+} = require("./rollout-live-mirror-state");
 const {
   agentMessageDedupeKey,
   buildAgentMessageItemId,
@@ -26,296 +39,28 @@ const {
   createNotification,
   extractReasoningText,
   firstNonEmptyString,
-  generatedImagePathForRolloutItem,
-  genericToolActivityMessage,
-  isCommandToolName,
   isDesktopRolloutOrigin,
-  isInternalProgressPlanToolName,
   normalizeProgressPlanSteps,
   normalizeRolloutItemType,
-  parseToolArguments,
-  readFileSize,
-  readFileSlice,
   readString,
-  readThreadId,
   readUserMessageTimestamp,
-  resolveToolCommand,
-  resolveToolWorkingDirectory,
   safeParseJSON,
   timestampParams,
 } = require("./rollout-live-mirror-utils");
+const notificationHelpers = {
+  ensureThinkingNotifications,
+  planUpdateNotifications,
+  resolveRolloutEventTurnId,
+};
 
-const DEFAULT_POLL_INTERVAL_MS = 700;
-const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;
-const DEFAULT_IDLE_TIMEOUT_MS = 60_000;
-const DEFAULT_ACTIVITY_HEARTBEAT_MS = 5_000;
-// Bootstrap replay must not revive old runs whose rollout stopped growing
-// before a terminal event was written.
-const DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS = 10 * 60_000;
-const DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS = 1_000;
-const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
-
-// Observes desktop-authored rollout files and replays the currently active run as
-// bridge notifications so the phone can render live thinking/tool activity.
-function createRolloutLiveMirrorController({
-  sendApplicationResponse,
-  shouldSuppressThread = () => false,
-  logPrefix = "[agnt]",
-  fsModule = fs,
-  now = () => Date.now(),
-  setIntervalFn = setInterval,
-  clearIntervalFn = clearInterval,
-  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
-  lookupTimeoutMs = DEFAULT_LOOKUP_TIMEOUT_MS,
-  idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
-  activityHeartbeatMs = DEFAULT_ACTIVITY_HEARTBEAT_MS,
-  staleActiveRunMaxAgeMs = DEFAULT_STALE_ACTIVE_RUN_MAX_AGE_MS,
-  syntheticTerminalGraceMs = DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS,
-} = {}) {
-  const mirrorsByThreadId = new Map();
-
-  function observeInbound(rawMessage) {
-    const request = safeParseJSON(rawMessage);
-    const method = readString(request?.method);
-    if (!DESKTOP_RESUME_METHODS.has(method)) {
-      return;
-    }
-
-    const threadId = readThreadId(request?.params);
-    if (!threadId) {
-      return;
-    }
-
-    const existingMirror = mirrorsByThreadId.get(threadId);
-    if (existingMirror) {
-      existingMirror.bump();
-      return;
-    }
-
-    let mirror;
-    mirror = createThreadRolloutLiveMirror({
-      threadId,
-      sendApplicationResponse: (rawNotification) => {
-        if (!shouldSuppressThread(threadId)) {
-          sendApplicationResponse(rawNotification);
-        }
-      },
-      isSuppressed: () => Boolean(shouldSuppressThread(threadId)),
-      logPrefix,
-      fsModule,
-      now,
-      setIntervalFn,
-      clearIntervalFn,
-      pollIntervalMs,
-      lookupTimeoutMs,
-      idleTimeoutMs,
-      activityHeartbeatMs,
-      staleActiveRunMaxAgeMs,
-      syntheticTerminalGraceMs,
-      onStop() {
-        if (mirrorsByThreadId.get(threadId) === mirror) {
-          mirrorsByThreadId.delete(threadId);
-        }
-      },
-    });
-    mirrorsByThreadId.set(threadId, mirror);
-  }
-
-  function stopAll() {
-    for (const mirror of mirrorsByThreadId.values()) {
-      mirror.stop();
-    }
-    mirrorsByThreadId.clear();
-  }
-
-  return {
-    observeInbound,
-    stopAll,
-  };
-}
-
-// Tails one thread rollout and emits synthetic app-server-like notifications for
-// the currently active desktop-origin run only.
-function createThreadRolloutLiveMirror({
-  threadId,
-  sendApplicationResponse,
-  isSuppressed = () => false,
-  logPrefix,
-  fsModule,
-  now,
-  setIntervalFn,
-  clearIntervalFn,
-  pollIntervalMs,
-  lookupTimeoutMs,
-  idleTimeoutMs,
-  activityHeartbeatMs,
-  staleActiveRunMaxAgeMs,
-  syntheticTerminalGraceMs,
-  onStop = () => {},
-}) {
-  const startedAt = now();
-  const state = createMirrorState(threadId);
-
-  let isStopped = false;
-  let rolloutPath = null;
-  let lastSize = 0;
-  let partialLine = "";
-  let lastActivityAt = startedAt;
-  let lastGrowthAt = startedAt;
-  let lastHeartbeatAt = startedAt;
-  let didBootstrap = false;
-  let wasSuppressed = false;
-
-  const intervalId = setIntervalFn(tick, pollIntervalMs);
-  tick();
-
-  function tick() {
-    if (isStopped) {
-      return;
-    }
-
-    try {
-      const currentTime = now();
-      const suppressed = isSuppressed();
-      if (wasSuppressed && !suppressed && didBootstrap) {
-        lastSize = 0;
-        partialLine = "";
-        didBootstrap = false;
-        resetRunState(state);
-      }
-      wasSuppressed = suppressed;
-
-      if (!rolloutPath) {
-        if (currentTime - startedAt >= lookupTimeoutMs) {
-          stop();
-          return;
-        }
-
-        rolloutPath = findRecentRolloutFileForContextRead(resolveSessionsRoot(), {
-          threadId,
-          fsModule,
-        });
-        if (!rolloutPath) {
-          return;
-        }
-      }
-
-      const fileSize = readFileSize(rolloutPath, fsModule);
-      if (!didBootstrap) {
-        didBootstrap = true;
-        bootstrapFromExistingRollout({
-          rolloutPath,
-          fileSize,
-          state,
-          fsModule,
-          sendApplicationResponse,
-          processRolloutLines,
-          nowMs: currentTime,
-          staleActiveRunMaxAgeMs,
-        });
-        lastSize = fileSize;
-        lastActivityAt = currentTime;
-        lastGrowthAt = currentTime;
-        lastHeartbeatAt = currentTime;
-        if (state.isDesktopOrigin === false) {
-          stop();
-        }
-        return;
-      }
-
-      if (fileSize < lastSize) {
-        lastSize = 0;
-        partialLine = "";
-        didBootstrap = false;
-        resetRunState(state);
-        lastGrowthAt = currentTime;
-        return;
-      }
-
-      if (fileSize > lastSize) {
-        const chunk = readFileSlice(rolloutPath, lastSize, fileSize, fsModule);
-        lastSize = fileSize;
-        lastActivityAt = currentTime;
-        lastGrowthAt = currentTime;
-        lastHeartbeatAt = currentTime;
-        state.suppressLiveActivityUntilGrowth = false;
-        if (!chunk) {
-          return;
-        }
-
-        const combined = `${partialLine}${chunk}`;
-        const lines = combined.split("\n");
-        partialLine = lines.pop() || "";
-        processRolloutLines(lines, state, sendApplicationResponse, { nowMs: currentTime });
-        return;
-      }
-
-      const syntheticTerminalNotifications = finalizePendingSyntheticTerminalIfReady(
-        state,
-        currentTime,
-        syntheticTerminalGraceMs
-      );
-      if (syntheticTerminalNotifications.length > 0) {
-        for (const notification of syntheticTerminalNotifications) {
-          sendApplicationResponse(JSON.stringify(notification));
-        }
-        lastActivityAt = currentTime;
-        lastHeartbeatAt = currentTime;
-        return;
-      }
-
-      if (state.activeTurnId && currentTime - lastGrowthAt >= staleActiveRunMaxAgeMs) {
-        stop();
-        return;
-      }
-
-      if (
-        state.isDesktopOrigin !== false
-        && state.activeTurnId
-        && !state.suppressLiveActivityUntilGrowth
-        && currentTime - lastHeartbeatAt >= activityHeartbeatMs
-      ) {
-        lastHeartbeatAt = currentTime;
-        lastActivityAt = currentTime;
-        sendApplicationResponse(JSON.stringify(createNotification("turn/activity", {
-          threadId: state.threadId,
-          turnId: state.activeTurnId,
-          id: state.activeTurnId,
-        })));
-      }
-
-      if (currentTime - lastActivityAt >= idleTimeoutMs) {
-        if (partialLine) {
-          const flushLine = partialLine;
-          partialLine = "";
-          processRolloutLines([flushLine], state, sendApplicationResponse);
-        }
-        stop();
-      }
-    } catch (error) {
-      console.warn(`${logPrefix} rollout live mirror stopped for ${threadId}: ${error.message}`);
-      stop();
-    }
-  }
-
-  function bump() {
-    lastActivityAt = now();
-  }
-
-  function stop() {
-    if (isStopped) {
-      return;
-    }
-
-    isStopped = true;
-    clearIntervalFn(intervalId);
-    onStop();
-  }
-
-  return {
-    bump,
-    stop,
-  };
+function createRolloutLiveMirrorController(options = {}) {
+  return createController({
+    ...options,
+    createMirrorState,
+    processRolloutLines,
+    resetRunState,
+    finalizePendingSyntheticTerminalIfReady,
+  });
 }
 
 function processRolloutLines(lines, state, sendApplicationResponse, options = {}) {
@@ -485,14 +230,14 @@ function synthesizeNotificationsFromRolloutEntry(entry, state, options = {}) {
     }
 
     if (eventType === "image_generation_end") {
-      notifications.push(...imageGenerationNotifications(state, payload, {
+      notifications.push(...imageGenerationNotifications(state, payload, notificationHelpers, {
         preferCallId: true,
       }));
       return notifications;
     }
 
     if (eventType === "patch_apply_end") {
-      notifications.push(...patchApplyEndNotifications(state, payload));
+      notifications.push(...patchApplyEndNotifications(state, payload, notificationHelpers));
       return notifications;
     }
 
@@ -517,22 +262,22 @@ function synthesizeNotificationsFromRolloutEntry(entry, state, options = {}) {
   }
 
   if (itemType === "functioncall") {
-    notifications.push(...toolStartNotifications(state, payload));
+    notifications.push(...toolStartNotifications(state, payload, notificationHelpers));
     return notifications;
   }
 
   if (itemType === "customtoolcall") {
-    notifications.push(...customToolStartNotifications(state, payload));
+    notifications.push(...customToolStartNotifications(state, payload, notificationHelpers));
     return notifications;
   }
 
   if (itemType === "functioncalloutput") {
-    notifications.push(...toolOutputNotifications(state, payload));
+    notifications.push(...toolOutputNotifications(state, payload, notificationHelpers));
     return notifications;
   }
 
   if (itemType === "imagegeneration" || itemType === "imagegenerationcall" || itemType === "imagegenerationend" || itemType === "imageview") {
-    notifications.push(...imageGenerationNotifications(state, payload));
+    notifications.push(...imageGenerationNotifications(state, payload, notificationHelpers));
     return notifications;
   }
 
@@ -662,264 +407,6 @@ function summaryOnlyReasoningEntries(text) {
   return entries.length > 0 ? entries : null;
 }
 
-function toolStartNotifications(state, payload) {
-  if (!state.activeTurnId) {
-    return [];
-  }
-
-  const callId = readString(payload.call_id) || readString(payload.callId);
-  const toolName = readString(payload.name);
-  if (!callId || !toolName) {
-    return [];
-  }
-
-  const argumentsObject = parseToolArguments(payload.arguments);
-  if (isInternalProgressPlanToolName(toolName)) {
-    return [
-      ...ensureThinkingNotifications(state),
-      ...planUpdateNotifications(state, argumentsObject),
-    ];
-  }
-
-  state.commandCalls.set(callId, {
-    toolName,
-    command: resolveToolCommand(toolName, argumentsObject),
-    cwd: resolveToolWorkingDirectory(argumentsObject, state),
-  });
-
-  if (isCommandToolName(toolName)) {
-    const command = state.commandCalls.get(callId)?.command || toolName;
-    return [
-      ...ensureThinkingNotifications(state),
-      createNotification("codex/event/exec_command_begin", {
-        threadId: state.threadId,
-        turnId: state.activeTurnId,
-        call_id: callId,
-        command,
-        cwd: state.commandCalls.get(callId)?.cwd || state.sessionMeta?.cwd || "",
-        status: "running",
-      }),
-    ];
-  }
-
-  const activityMessage = genericToolActivityMessage(toolName);
-  if (!activityMessage) {
-    return ensureThinkingNotifications(state);
-  }
-
-  return [
-    ...ensureThinkingNotifications(state),
-    createNotification("codex/event/background_event", {
-      threadId: state.threadId,
-      turnId: state.activeTurnId,
-      call_id: callId,
-      message: activityMessage,
-    }),
-  ];
-}
-
-function customToolStartNotifications(state, payload) {
-  if (!state.activeTurnId) {
-    return [];
-  }
-
-  const callId = readString(payload.call_id) || readString(payload.callId);
-  const toolName = readString(payload.name);
-  if (!callId || !toolName) {
-    return [];
-  }
-
-  const notifications = [...ensureThinkingNotifications(state)];
-  if (toolName === "apply_patch") {
-    const item = buildApplyPatchFileChangeItem({
-      callId,
-      patch: readString(payload.input),
-      status: readString(payload.status) || "completed",
-      idFallback: buildSyntheticItemId("file-change", state.threadId, state.activeTurnId, callId),
-      cwd: resolveToolWorkingDirectory({}, state),
-    });
-    if (item) {
-      state.applyPatchCalls.set(callId, item);
-      notifications.push(createNotification("codex/event/patch_apply_begin", {
-        threadId: state.threadId,
-        turnId: state.activeTurnId,
-        id: state.activeTurnId,
-        call_id: callId,
-        itemId: item.id,
-        status: "inProgress",
-        changes: item.changes,
-      }));
-    }
-  }
-
-  const activityMessage = genericToolActivityMessage(toolName);
-  if (!activityMessage) {
-    return notifications;
-  }
-
-  return [
-    ...notifications,
-    createNotification("codex/event/background_event", {
-      threadId: state.threadId,
-      turnId: state.activeTurnId,
-      call_id: callId,
-      message: activityMessage,
-    }),
-  ];
-}
-
-function patchApplyEndNotifications(state, payload) {
-  const turnId = resolveRolloutEventTurnId(state, payload);
-  const callId = readString(payload.call_id) || readString(payload.callId);
-  if (!turnId || !callId || state.emittedPatchApplyEndCalls.has(callId)) {
-    return [];
-  }
-
-  const fileChangeItem = state.applyPatchCalls.get(callId);
-  const changes = Array.isArray(payload.changes)
-    ? payload.changes
-    : fileChangeItem?.changes || [];
-  if (changes.length === 0) {
-    return [];
-  }
-
-  state.emittedPatchApplyEndCalls.add(callId);
-  return [
-    ...ensureThinkingNotifications(state),
-    createNotification("codex/event/patch_apply_end", {
-      threadId: state.threadId,
-      turnId,
-      id: turnId,
-      call_id: callId,
-      itemId: fileChangeItem?.id || callId,
-      status: readString(payload.status) || fileChangeItem?.status || "completed",
-      success: payload.success !== false,
-      changes,
-    }),
-  ];
-}
-
-function turnFileChangeSnapshotNotifications(state, turnId) {
-  const patchEntries = Array.from(state.applyPatchCalls.entries());
-  if (!turnId || patchEntries.length === 0) {
-    return [];
-  }
-
-  const changes = patchEntries.flatMap(([, item]) => Array.isArray(item?.changes) ? item.changes : []);
-  if (changes.length === 0) {
-    return [];
-  }
-
-  const [lastCallId, lastItem] = patchEntries[patchEntries.length - 1];
-  const itemId = readString(lastItem?.id) || readString(lastCallId) || buildSyntheticItemId("file-change", state.threadId, turnId);
-  return [
-    createNotification("codex/event/patch_apply_end", {
-      threadId: state.threadId,
-      turnId,
-      id: turnId,
-      call_id: itemId,
-      itemId,
-      status: "completed",
-      success: true,
-      changes,
-    }),
-  ];
-}
-
-function toolOutputNotifications(state, payload) {
-  if (!state.activeTurnId) {
-    return [];
-  }
-
-  const callId = readString(payload.call_id) || readString(payload.callId);
-  if (!callId) {
-    return [];
-  }
-
-  const toolCall = state.commandCalls.get(callId);
-  if (!toolCall) {
-    return [];
-  }
-
-  if (!isCommandToolName(toolCall.toolName)) {
-    state.commandCalls.delete(callId);
-    return [];
-  }
-
-  const output = readString(payload.output);
-  const notifications = [...ensureThinkingNotifications(state)];
-  if (output) {
-    notifications.push(createNotification("codex/event/exec_command_output_delta", {
-      threadId: state.threadId,
-      turnId: state.activeTurnId,
-      call_id: callId,
-      command: toolCall.command,
-      cwd: toolCall.cwd || "",
-      chunk: output,
-    }));
-  }
-
-  notifications.push(createNotification("codex/event/exec_command_end", {
-    threadId: state.threadId,
-    turnId: state.activeTurnId,
-    call_id: callId,
-    command: toolCall.command,
-    cwd: toolCall.cwd || "",
-    status: "completed",
-    output: output || "",
-  }));
-  state.commandCalls.delete(callId);
-  return notifications;
-}
-
-function imageGenerationNotifications(state, payload, { preferCallId = false } = {}) {
-  if (!state.activeTurnId) {
-    return [];
-  }
-
-  const callId = preferCallId
-    ? firstNonEmptyString([
-        readString(payload.call_id),
-        readString(payload.callId),
-        readString(payload.itemId),
-        readString(payload.item_id),
-        readString(payload.id),
-      ])
-    : firstNonEmptyString([
-        readString(payload.id),
-        readString(payload.call_id),
-        readString(payload.callId),
-        readString(payload.itemId),
-        readString(payload.item_id),
-      ]);
-  if (!callId) {
-    return [];
-  }
-
-  const imagePath = firstNonEmptyString([
-    readString(payload.saved_path),
-    readString(payload.savedPath),
-    readString(payload.file_path),
-    readString(payload.path),
-  ]) || generatedImagePathForRolloutItem(state.threadId, callId);
-  if (!imagePath) {
-    return [];
-  }
-
-  return [
-    ...ensureThinkingNotifications(state),
-    createNotification("codex/event/image_generation_end", {
-      threadId: state.threadId,
-      turnId: state.activeTurnId,
-      call_id: callId,
-      itemId: callId,
-      saved_path: imagePath,
-      file_path: imagePath,
-      path: imagePath,
-    }),
-  ];
-}
-
 function itemCompletedNotifications(state, payload) {
   const item = payload && typeof payload.item === "object" && !Array.isArray(payload.item)
     ? payload.item
@@ -962,42 +449,6 @@ function ensureThinkingNotifications(state) {
   ];
 }
 
-function createMirrorState(threadId) {
-  return {
-    threadId,
-    sessionMeta: null,
-    isDesktopOrigin: null,
-    activeTurnId: null,
-    activeTurnIdIsSynthetic: false,
-    pendingSyntheticTerminalTurnId: null,
-    pendingSyntheticTerminalStartedAt: 0,
-    pendingSyntheticTerminalStatus: "",
-    pendingSyntheticTerminalErrorMessage: "",
-    reasoningItemId: null,
-    hasThinking: false,
-    hasReasoningContent: false,
-    emittedReasoningSummaryKeys: new Set(),
-    commandCalls: new Map(),
-    applyPatchCalls: new Map(),
-    emittedPatchApplyEndCalls: new Set(),
-    emittedAgentMessageKeys: new Set(),
-    pendingUserMessages: [],
-    suppressLiveActivityUntilGrowth: false,
-  };
-}
-
-function populateSessionMetaState(state, payload) {
-  if (!payload || typeof payload !== "object") {
-    return;
-  }
-
-  state.sessionMeta = {
-    originator: readString(payload.originator),
-    source: readString(payload.source),
-    cwd: readString(payload.cwd),
-  };
-}
-
 function planUpdateNotifications(state, argumentsObject) {
   const plan = normalizeProgressPlanSteps(argumentsObject.plan);
   const explanation = readString(argumentsObject.explanation);
@@ -1015,146 +466,6 @@ function planUpdateNotifications(state, argumentsObject) {
   }
 
   return [createNotification("turn/plan/updated", params)];
-}
-
-// When the active turn id was synthesized, ignore any (absent) explicit turn id
-// on later events and keep them attached to the synthetic run.
-function resolveRolloutEventTurnId(state, payload = {}, options = {}) {
-  const explicitTurnId = readString(payload.turn_id) || readString(payload.turnId);
-  if (state.activeTurnIdIsSynthetic && state.activeTurnId) {
-    if (explicitTurnId) {
-      if (options.allowSyntheticPromotion !== false) {
-        promoteSyntheticTurnId(state, explicitTurnId);
-      }
-      return explicitTurnId;
-    }
-    return state.activeTurnId;
-  }
-  return explicitTurnId || state.activeTurnId || "";
-}
-
-function promoteSyntheticTurnId(state, explicitTurnId) {
-  const oldTurnId = state.activeTurnId;
-  if (!oldTurnId || oldTurnId === explicitTurnId) {
-    state.activeTurnId = explicitTurnId;
-    state.activeTurnIdIsSynthetic = false;
-    return;
-  }
-
-  state.activeTurnId = explicitTurnId;
-  state.activeTurnIdIsSynthetic = false;
-  if (state.reasoningItemId === buildSyntheticItemId("thinking", state.threadId, oldTurnId)) {
-    state.reasoningItemId = buildSyntheticItemId("thinking", state.threadId, explicitTurnId);
-  }
-}
-
-function markPendingSyntheticTerminal(state, terminalParams, nowMs) {
-  if (state.activeTurnIdIsSynthetic && state.activeTurnId) {
-    state.pendingSyntheticTerminalTurnId = state.activeTurnId;
-    state.pendingSyntheticTerminalStartedAt = nowMs;
-    state.pendingSyntheticTerminalStatus = readString(terminalParams.status) || "";
-    state.pendingSyntheticTerminalErrorMessage = readString(terminalParams.error?.message) || "";
-  }
-}
-
-function clearPendingSyntheticTerminal(state) {
-  state.pendingSyntheticTerminalTurnId = null;
-  state.pendingSyntheticTerminalStartedAt = 0;
-  state.pendingSyntheticTerminalStatus = "";
-  state.pendingSyntheticTerminalErrorMessage = "";
-}
-
-function isSyntheticTerminalMismatch(state, terminalTurnId) {
-  return Boolean(
-    state.activeTurnIdIsSynthetic
-    && state.activeTurnId
-    && terminalTurnId
-    && terminalTurnId !== state.activeTurnId
-  );
-}
-
-function finalizePendingSyntheticTerminal(state) {
-  const turnId = state.pendingSyntheticTerminalTurnId;
-  if (!turnId) {
-    return [];
-  }
-
-  const terminalParams = {
-    threadId: state.threadId,
-    turnId,
-    id: turnId,
-  };
-  if (state.pendingSyntheticTerminalStatus) {
-    terminalParams.status = state.pendingSyntheticTerminalStatus;
-  }
-  if (state.pendingSyntheticTerminalErrorMessage) {
-    terminalParams.error = { message: state.pendingSyntheticTerminalErrorMessage };
-  }
-
-  const notifications = [
-    ...turnFileChangeSnapshotNotifications(state, turnId),
-    createNotification("turn/completed", terminalParams),
-  ];
-  resetRunState(state);
-  return notifications;
-}
-
-function finalizePendingSyntheticTerminalIfReady(state, nowMs, graceMs) {
-  if (!state.pendingSyntheticTerminalTurnId) {
-    return [];
-  }
-  const startedAt = Number.isFinite(state.pendingSyntheticTerminalStartedAt)
-    ? state.pendingSyntheticTerminalStartedAt
-    : nowMs;
-  const resolvedGraceMs = Number.isFinite(graceMs)
-    ? Math.max(0, graceMs)
-    : DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS;
-  if (nowMs - startedAt < resolvedGraceMs) {
-    return [];
-  }
-  return finalizePendingSyntheticTerminal(state);
-}
-
-function flushPendingUserMessageNotifications(state, turnId) {
-  const messages = state.pendingUserMessages.splice(0);
-  if (messages.length === 0) {
-    return [];
-  }
-
-  const resolvedTurnId = readString(turnId) || readString(state.activeTurnId);
-  return messages.map((pending) => createNotification("codex/event/user_message", {
-    threadId: state.threadId,
-    ...(resolvedTurnId ? { turnId: resolvedTurnId } : {}),
-    message: visibleUserPromptFromInputEntries(pending.message),
-    ...(pending.id ? { id: pending.id } : {}),
-    ...timestampParams(pending.timestamp),
-  })).filter((notification) => notification.params.message);
-}
-
-function rolloutUserPromptText(payload = {}) {
-  const candidates = [payload.message, payload.text, payload.input];
-  for (const candidate of candidates) {
-    const message = visibleUserPromptFromInputEntries(candidate);
-    if (message) {
-      return message;
-    }
-  }
-  return "";
-}
-
-function resetRunState(state) {
-  state.activeTurnId = null;
-  state.activeTurnIdIsSynthetic = false;
-  clearPendingSyntheticTerminal(state);
-  state.reasoningItemId = null;
-  state.hasThinking = false;
-  state.hasReasoningContent = false;
-  state.emittedReasoningSummaryKeys.clear();
-  state.commandCalls.clear();
-  state.applyPatchCalls.clear();
-  state.emittedPatchApplyEndCalls.clear();
-  state.emittedAgentMessageKeys.clear();
-  state.pendingUserMessages.length = 0;
 }
 
 module.exports = {
