@@ -3,7 +3,6 @@ package com.dotbrains.agnt.mobile.ui.agent
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,38 +10,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class TimelineMessageGroupingTest {
-    private val t0 = Instant.parse("2024-01-01T00:00:00Z")
-
-    private fun cmd(id: String): CodexMessage =
-        CodexMessage(
-            id = id,
-            threadId = "t1",
-            role = CodexMessageRole.system,
-            kind = CodexMessageKind.commandExecution,
-            text = "completed > $id",
-            createdAt = t0,
-        )
-
-    private fun file(id: String): CodexMessage =
-        CodexMessage(
-            id = id,
-            threadId = "t1",
-            role = CodexMessageRole.system,
-            kind = CodexMessageKind.fileChange,
-            text = "path $id",
-            createdAt = t0,
-        )
-
-    private fun thinking(id: String): CodexMessage =
-        CodexMessage(
-            id = id,
-            threadId = "t1",
-            role = CodexMessageRole.system,
-            kind = CodexMessageKind.thinking,
-            text = "Thinking...",
-            createdAt = t0,
-        )
-
     @Test
     fun upToTwoCommands_remainSingles() {
         val items = listOf(cmd("a"), cmd("b")).toTimelineListItems()
@@ -508,60 +475,5 @@ class TimelineMessageGroupingTest {
         assertEquals(2, items.size)
         assertIs<TimelineListItem.Single>(items[0]).also { assertEquals("c1", it.message.id) }
         assertIs<TimelineListItem.Single>(items[1]).also { assertEquals("f1", it.message.id) }
-    }
-
-    @Test
-    fun transientActivityStatus_hidesWhileAssistantTextStreams() {
-        val streaming =
-            CodexMessage(
-                id = "as",
-                threadId = "t1",
-                role = CodexMessageRole.assistant,
-                kind = CodexMessageKind.chat,
-                text = "streaming",
-                createdAt = t0,
-                turnId = "turn-1",
-                isStreaming = true,
-            )
-
-        val status =
-            listOf(streaming).deriveTransientActivityStatus(
-                isThreadRunning = true,
-                activeTurnId = "turn-1",
-            )
-
-        assertEquals(null, status)
-    }
-
-    @Test
-    fun transientActivityStatus_derivesToolStates() {
-        val checks =
-            cmd("compile").copy(
-                text = "running > ./gradlew test",
-                turnId = "turn-1",
-            )
-        val diff =
-            cmd("diff").copy(
-                text = "running > git diff",
-                turnId = "turn-1",
-            )
-        val edit =
-            file("edit").copy(
-                text = "android/app/src/main/kotlin/MainShell.kt +1 -1",
-                turnId = "turn-1",
-            )
-
-        assertEquals(
-            "running checks...",
-            listOf(checks).deriveTransientActivityStatus(true, "turn-1"),
-        )
-        assertEquals(
-            "checking changes...",
-            listOf(diff).deriveTransientActivityStatus(true, "turn-1"),
-        )
-        assertEquals(
-            "editing MainShell.kt...",
-            listOf(edit).deriveTransientActivityStatus(true, "turn-1"),
-        )
     }
 }
