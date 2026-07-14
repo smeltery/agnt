@@ -1,6 +1,8 @@
 @import "./sections/base.css";
 @import "./sections/workspace-chat.css";
 @import "./sections/modals-sidebar-git.css";
+@import "./sections/git-panel.css";
+@import "./sections/voice-controls.css";
 @import "./sections/navigation-projects.css";
 @import "./sections/project-picker.css";
 @import "./sections/chat-utility-overlays.css";
