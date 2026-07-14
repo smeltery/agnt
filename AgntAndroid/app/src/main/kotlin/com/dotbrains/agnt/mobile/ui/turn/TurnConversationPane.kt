@@ -890,89 +890,38 @@ fun TurnConversationPane(
         collaborationMode: CodexCollaborationModeKind?,
         fromQueue: Boolean,
     ) {
-        if (text.trim().isEmpty() &&
-            attachments.isEmpty() &&
-            skillMentions.isEmpty() &&
-            fileMentions.isEmpty()
-        ) {
-            return
-        }
-        if (!fromQueue && isThreadRunning) {
-            scope.launch {
-                runCatching {
-                    repository.enqueueTurnDraft(
-                        threadId = threadId,
-                        text = text,
-                        attachments = attachments,
-                        skillMentions = skillMentions,
-                        fileMentions = fileMentions,
-                        collaborationMode = collaborationMode,
-                    )
-                }.onSuccess {
-                    draft = ""
-                    composerAttachments = emptyList()
-                    mentionChips = emptyList()
-                }.onFailure { e ->
-                    lastError =
-                        formatTurnSendError(e)
-                }
-            }
-            return
-        }
-
-        sending = true
-        scope.launch {
-            runCatching {
-                repository.startTurn(
-                    threadId = threadId,
-                    text = text,
-                    attachments = attachments,
-                    skillMentions = skillMentions,
-                    fileMentions = fileMentions,
-                    collaborationMode = collaborationMode,
+        dispatchTurnFromConversationPane(
+            text = text,
+            attachments = attachments,
+            skillMentions = skillMentions,
+            fileMentions = fileMentions,
+            collaborationMode = collaborationMode,
+            fromQueue = fromQueue,
+            threadId = threadId,
+            repository = repository,
+            scope = scope,
+            isThreadRunning = isThreadRunning,
+            queuedDraftSendFailedMessage = queuedDraftSendFailedMessage,
+            setSending = { sending = it },
+            clearComposer = {
+                clearTurnComposerState(
+                    setDraft = { draft = it },
+                    setComposerAttachments = { composerAttachments = it },
+                    setMentionChips = { mentionChips = it },
                 )
-            }.onSuccess {
-                sending = false
-                if (!fromQueue) {
-                    draft = ""
-                    composerAttachments = emptyList()
-                    mentionChips = emptyList()
-                }
-            }.onFailure { e ->
-                sending = false
-                if (fromQueue) {
-                    runCatching {
-                        repository.enqueueTurnDraft(
-                            threadId = threadId,
-                            text = text,
-                            attachments = attachments,
-                            skillMentions = skillMentions,
-                            fileMentions = fileMentions,
-                            collaborationMode = collaborationMode,
-                            prepend = true,
-                        )
-                    }
-                    lastError = "$queuedDraftSendFailedMessage: ${formatTurnSendError(e)}"
-                } else {
-                    lastError =
-                        formatTurnSendError(e)
-                }
-            }
-        }
+            },
+            setLastError = { lastError = it },
+        )
     }
 
     fun stopActiveTurn() {
-        scope.launch {
-            runCatching {
-                repository.interruptTurn(
-                    threadId = threadId,
-                    turnId = activeTurnId,
-                )
-            }.onFailure { e ->
-                lastError =
-                    formatTurnSendError(e)
-            }
-        }
+        stopTurnFromConversationPane(
+            threadId = threadId,
+            activeTurnId = activeTurnId,
+            repository = repository,
+            scope = scope,
+            setLastError = { lastError = it },
+        )
     }
 
     LaunchedEffect(threadId, isThreadRunning, sending, queuedDraftCount, hasComposerDraftContent) {
