@@ -50,7 +50,6 @@ import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
-import com.dotbrains.agnt.mobile.services.agent.review.AiChangeSetRevertService
 import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
 import com.dotbrains.agnt.mobile.services.agent.threads.isPluginListUnsupported
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
@@ -95,7 +94,6 @@ import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectPinnedPlanAccessoryMessag
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import java.time.Instant
 
 private const val MAX_COMPOSER_ATTACHMENTS = 4
 private const val MAX_NON_IMAGE_ATTACHMENT_BYTES = 256 * 1024
@@ -1090,65 +1088,26 @@ fun TurnConversationPane(
                     assistantUndoChangeSetsByMessageId = assistantUndoChangeSetsByMessageId,
                     applyingUndoChangeSetIds = applyingUndoChangeSetIds,
                     onUndoAssistantChanges = { changeSet ->
-                        val workingDirectory = changeSet.repoRoot ?: activeThread?.cwd
-                        if (workingDirectory.isNullOrBlank()) {
-                            inlineUndoError = undoMissingCwdMessage
-                            return@MessageList
-                        }
-                        scope.launch {
-                            applyingUndoChangeSetIds = applyingUndoChangeSetIds + changeSet.id
-                            inlineUndoError = null
-                            runCatching {
-                                AiChangeSetRevertService(repository).apply(
-                                    changeSet = changeSet,
-                                    workingDirectory = workingDirectory,
-                                )
-                            }.onSuccess { applyResult ->
-                                if (applyResult.success) {
-                                    aiChangeSetPersistence.save(
-                                        TurnUsageSheetLogic.markChangeSetReverted(
-                                            changeSets = aiChangeSetPersistence.load(),
-                                            changeSetId = changeSet.id,
-                                            now = Instant.now(),
-                                        ),
+                        handleTurnAssistantUndo(
+                            changeSet = changeSet,
+                            activeThread = activeThread,
+                            repository = repository,
+                            aiChangeSetPersistence = aiChangeSetPersistence,
+                            scope = scope,
+                            applyingUndoChangeSetIds = applyingUndoChangeSetIds,
+                            undoMissingCwdMessage = undoMissingCwdMessage,
+                            undoFailedMessage = undoFailedMessage,
+                            setApplyingUndoChangeSetIds = { applyingUndoChangeSetIds = it },
+                            setInlineUndoError = { inlineUndoError = it },
+                            refreshThreadChangeSets = {
+                                threadChangeSets =
+                                    TurnUsageSheetLogic.recentChangeSetsForThread(
+                                        threadId,
+                                        aiChangeSetPersistence.load(),
+                                        limit = 50,
                                     )
-                                } else {
-                                    val message =
-                                        applyResult.unsupportedReasons.firstOrNull()
-                                            ?: applyResult.conflicts.firstOrNull()?.message
-                                            ?: undoFailedMessage
-                                    inlineUndoError = message
-                                    aiChangeSetPersistence.save(
-                                        TurnUsageSheetLogic.recordChangeSetRevertError(
-                                            changeSets = aiChangeSetPersistence.load(),
-                                            changeSetId = changeSet.id,
-                                            message = message,
-                                            now = Instant.now(),
-                                        ),
-                                    )
-                                }
-                            }.onFailure { error ->
-                                val message =
-                                    error.message?.ifBlank { null }
-                                        ?: undoFailedMessage
-                                inlineUndoError = message
-                                aiChangeSetPersistence.save(
-                                    TurnUsageSheetLogic.recordChangeSetRevertError(
-                                        changeSets = aiChangeSetPersistence.load(),
-                                        changeSetId = changeSet.id,
-                                        message = message,
-                                        now = Instant.now(),
-                                    ),
-                                )
-                            }
-                            threadChangeSets =
-                                TurnUsageSheetLogic.recentChangeSetsForThread(
-                                    threadId,
-                                    aiChangeSetPersistence.load(),
-                                    limit = 50,
-                                )
-                            applyingUndoChangeSetIds = applyingUndoChangeSetIds - changeSet.id
-                        }
+                            },
+                        )
                     },
                     onForkThread = {
                         showForkThreadSheet = true
