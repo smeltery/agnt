@@ -156,6 +156,10 @@
         "limit": 40,
         "reason": "Bridge contract tests are grouped by shared wire contract."
       },
+      "agnt-bridge/src/bridge": {
+        "limit": 40,
+        "reason": "Bridge runtime modules stay flat so handler, relay, lifecycle, and sanitizer boundaries remain import-light."
+      },
       "AgntAndroid/app/src/test/kotlin/com/dotbrains/agnt/mobile/data": {
         "limit": 40,
         "reason": "Android data tests mirror the main data package."
