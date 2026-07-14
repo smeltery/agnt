@@ -2,7 +2,14 @@
   "file_sizes": {
     "default_lines": 1200,
     "files": {
-      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 1500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel/TurnViewModel+Approvals.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel/TurnViewModel+Autocomplete.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel/TurnViewModel+ComposerState.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel/TurnViewModel+ComposerTokens.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel/TurnViewModel+Git.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel/TurnViewModel+PendingSend.swift": 500,
+      "AgntMobile/AgntMobile/Features/Chat/TurnViewModel/TurnViewModel+Sending.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/TurnMessageComponents.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/MessageRow+Assistant.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/Timeline/MessageRow/MessageRow+System.swift": 500,
