@@ -31,34 +31,34 @@
 //     threadId, then map that threadId to whatever session_id Claude reports
 //     in the `system.init` line of the next turn.
 
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-
 const {
   buildTurnOverlapError,
   createFrameEmitter,
   createTurnLifecycleEmitter,
-  deriveTitleFromSeed,
-  emitAssistantItemStarted,
-  generateItemId,
   generateThreadId,
   generateTurnId,
-  numberOr,
   readString,
   safeParseJson,
 } = require("../_shared/translator-utils");
 const { reconstructThreadFromJsonl } = require("../_shared/thread-jsonl-reconstructor");
 const {
   buildClaudeUserMessageLine,
-  mapCodexEffortToClaude,
 } = require("./turn-input");
+const { createClaudeSessionStore } = require("./session-store");
+const {
+  handleContextWindowRead,
+  handleGenerateTitle,
+  publishTurnArgsForParams,
+} = require("./turn-options");
+const { createClaudeToolEmitter } = require("./tools");
+const { createClaudeStreamHandlers } = require("./stream-handlers");
 
 const PROTO_VERSION = "1.0.0-claude-shim";
 
 function createClaudeTranslator({ injectInbound, transport, env = process.env } = {}) {
   const { emitNotification, injectResponse, respondError } = createFrameEmitter(injectInbound);
   const turnLifecycle = createTurnLifecycleEmitter(emitNotification);
+  const sessionStore = createClaudeSessionStore({ env });
 
   // ── per-connection state ───────────────────────────────────────────────
   /** Synthetic threadId surfaced to the iOS app. */
@@ -95,6 +95,50 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
   let didEmitTurnStarted = false;
   /** Last Claude usage snapshot for token usage updates. */
   let lastUsage = null;
+  const state = {
+    get activeAssistantItemId() { return activeAssistantItemId; },
+    set activeAssistantItemId(value) { activeAssistantItemId = value; },
+    get activeTurnId() { return activeTurnId; },
+    set activeTurnId(value) { activeTurnId = value; },
+    get assistantTextAccumulator() { return assistantTextAccumulator; },
+    set assistantTextAccumulator(value) { assistantTextAccumulator = value; },
+    blocksByIndex,
+    get didEmitThreadStarted() { return didEmitThreadStarted; },
+    set didEmitThreadStarted(value) { didEmitThreadStarted = value; },
+    get didEmitTurnStarted() { return didEmitTurnStarted; },
+    set didEmitTurnStarted(value) { didEmitTurnStarted = value; },
+    get lastAssistantMessageId() { return lastAssistantMessageId; },
+    set lastAssistantMessageId(value) { lastAssistantMessageId = value; },
+    get lastUsage() { return lastUsage; },
+    set lastUsage(value) { lastUsage = value; },
+    get reasoningAccumulator() { return reasoningAccumulator; },
+    set reasoningAccumulator(value) { reasoningAccumulator = value; },
+    get reasoningItemId() { return reasoningItemId; },
+    set reasoningItemId(value) { reasoningItemId = value; },
+    get sessionCwd() { return sessionCwd; },
+    set sessionCwd(value) { sessionCwd = value; },
+    get sessionId() { return sessionId; },
+    set sessionId(value) { sessionId = value; },
+    get threadId() { return threadId; },
+    set threadId(value) { threadId = value; },
+  };
+  const toolEmitter = createClaudeToolEmitter({
+    emitNotification,
+    getActiveTurnId: () => activeTurnId,
+    getSessionCwd: () => sessionCwd,
+    getThreadId: () => threadId,
+    pendingToolCalls,
+  });
+  const streamHandlers = createClaudeStreamHandlers({
+    emitErrorNotification,
+    emitNotification,
+    emitTurnCompleted,
+    emitTurnStarted,
+    resetTurnState,
+    state,
+    toolEmitter,
+    transport,
+  });
 
   return {
     outbound,
@@ -170,12 +214,12 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     }
 
     if (method === "thread/contextWindow/read") {
-      handleContextWindowRead(parsed);
+      handleContextWindowRead({ lastUsage, request: parsed, threadId, injectResponse });
       return null;
     }
 
     if (method === "thread/generateTitle") {
-      handleGenerateTitle(parsed);
+      handleGenerateTitle({ injectResponse, request: parsed, threadId });
       return null;
     }
 
@@ -218,22 +262,22 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     if (!type) return null;
 
     if (type === "system") {
-      return handleSystem(parsed);
+      return streamHandlers.handleSystem(parsed);
     }
     if (type === "stream_event") {
-      return handleStreamEvent(parsed);
+      return streamHandlers.handleStreamEvent(parsed);
     }
     if (type === "assistant") {
-      return handleAssistant(parsed);
+      return streamHandlers.handleAssistant(parsed);
     }
     if (type === "user") {
-      return handleUser(parsed);
+      return streamHandlers.handleUser(parsed);
     }
     if (type === "result") {
-      return handleResult(parsed);
+      return streamHandlers.handleResult(parsed);
     }
     if (type === "rate_limit_event") {
-      return handleRateLimitEvent(parsed);
+      return streamHandlers.handleRateLimitEvent(parsed);
     }
     return null;
   }
@@ -308,7 +352,7 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     // Translate per-turn JSON-RPC params into Claude CLI flags. Applying via
     // setTurnArgs respawns the CLI when flags change (with --resume so the
     // conversation continues). Most users only set these once at thread start.
-    publishTurnArgsForParams(params);
+    publishTurnArgsForParams(params, transport);
 
     const turnId = generateTurnId();
     activeTurnId = turnId;
@@ -371,7 +415,7 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
 
     const reconstructed = reconstructThreadFromJsonl({
       targetThreadId,
-      sessionFile: locateSessionFile(targetThreadId),
+      sessionFile: sessionStore.locateSessionFile(targetThreadId),
       fallbackCwd: sessionCwd,
     });
     if (request?.id != null) {
@@ -395,7 +439,7 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
       || threadId;
     const reconstructed = reconstructThreadFromJsonl({
       targetThreadId,
-      sessionFile: locateSessionFile(targetThreadId),
+      sessionFile: sessionStore.locateSessionFile(targetThreadId),
       fallbackCwd: sessionCwd,
     });
     const turns = reconstructed?.turns || [];
@@ -414,671 +458,12 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
 
   function handleThreadList(request) {
     if (request?.id == null) return;
-    const summaries = listThreadSummaries();
+    const summaries = sessionStore.listThreadSummaries();
     injectResponse(request.id, {
       data: summaries,
       threads: summaries,
       nextCursor: null,
       hasMore: false,
-    });
-  }
-
-  function handleContextWindowRead(request) {
-    if (request?.id == null) return;
-    // Claude doesn't surface a context-window endpoint on the CLI; report a
-    // best-effort snapshot so the iOS app's status row keeps rendering.
-    injectResponse(request.id, {
-      threadId: threadId || "",
-      contextWindow: lastUsage
-        ? {
-          inputTokens: numberOr(lastUsage.input_tokens, 0),
-          outputTokens: numberOr(lastUsage.output_tokens, 0),
-          cacheReadTokens: numberOr(lastUsage.cache_read_input_tokens, 0),
-          cacheCreateTokens: numberOr(lastUsage.cache_creation_input_tokens, 0),
-        }
-        : null,
-    });
-  }
-
-  // ── inbound handlers ───────────────────────────────────────────────────
-  function handleSystem(message) {
-    const subtype = readString(message.subtype);
-    if (subtype === "status") {
-      // `status: "requesting"` is a hint that work has begun; we already
-      // emitted turn/started up-front so no need to mirror it.
-      return null;
-    }
-    if (subtype !== "init") return null;
-
-    const newSessionId = readString(message.session_id);
-    if (newSessionId) {
-      sessionId = newSessionId;
-      // Tell the transport so the next respawn (after an interrupt) picks up
-      // history with `--resume <sessionId>`.
-      try { transport?.setResumeSessionId?.(newSessionId); } catch { /* best-effort */ }
-    }
-    const initCwd = readString(message.cwd);
-    if (initCwd) sessionCwd = initCwd;
-
-    if (!threadId) {
-      threadId = generateThreadId();
-    }
-
-    if (!didEmitThreadStarted) {
-      didEmitThreadStarted = true;
-      emitNotification("thread/started", {
-        threadId,
-        thread_id: threadId,
-        thread: {
-          id: threadId,
-          threadId,
-          thread_id: threadId,
-          cwd: sessionCwd,
-        },
-      });
-      emitNotification("thread/initialized", {
-        threadId,
-        thread_id: threadId,
-        provider: "claude",
-        model: readString(message.model),
-        permissionMode: readString(message.permissionMode),
-        cwd: sessionCwd,
-        tools: Array.isArray(message.tools) ? message.tools.slice(0, 200) : [],
-        slashCommands: Array.isArray(message.slash_commands) ? message.slash_commands.slice(0, 200) : [],
-        skills: Array.isArray(message.skills) ? message.skills.slice(0, 200) : [],
-        agents: Array.isArray(message.agents) ? message.agents.slice(0, 100) : [],
-        outputStyle: readString(message.output_style),
-        version: readString(message.claude_code_version),
-      });
-    }
-
-    if (activeTurnId && !didEmitTurnStarted) {
-      emitTurnStarted(activeTurnId);
-    }
-    return null;
-  }
-
-  // ── stream_event handler (the real delta source when --include-partial-messages is on) ──
-  function handleStreamEvent(envelope) {
-    const event = envelope?.event;
-    if (!event || typeof event !== "object") return null;
-    const evType = readString(event.type);
-
-    if (evType === "message_start") {
-      const inner = event.message;
-      if (inner && typeof inner === "object") {
-        const messageId = readString(inner.id);
-        if (messageId && messageId !== lastAssistantMessageId) {
-          // New assistant message: reset per-message bookkeeping.
-          lastAssistantMessageId = messageId;
-          activeAssistantItemId = "";
-          assistantTextAccumulator = "";
-          reasoningItemId = "";
-          reasoningAccumulator = "";
-          blocksByIndex.clear();
-        }
-      }
-      return null;
-    }
-
-    if (evType === "content_block_start") {
-      const index = numberOr(event.index, -1);
-      if (index < 0) return null;
-      const block = event.content_block || {};
-      const blockType = readString(block.type);
-      if (blockType === "text") {
-        const itemId = ensureAssistantItemId();
-        blocksByIndex.set(index, { kind: "text", itemId });
-      } else if (blockType === "thinking") {
-        const itemId = ensureReasoningItemId();
-        blocksByIndex.set(index, { kind: "thinking", itemId });
-      } else if (blockType === "tool_use") {
-        // Tool use deltas come via input_json_delta; we wait for the
-        // consolidated `assistant` frame (which has the parsed input) before
-        // emitting exec_command_begin to avoid acting on partial JSON.
-        blocksByIndex.set(index, {
-          kind: "tool_use",
-          toolUseId: readString(block.id),
-          toolName: readString(block.name),
-        });
-      }
-      return null;
-    }
-
-    if (evType === "content_block_delta") {
-      const index = numberOr(event.index, -1);
-      const block = blocksByIndex.get(index);
-      if (!block) return null;
-      const delta = event.delta || {};
-      const deltaType = readString(delta.type);
-
-      if (deltaType === "text_delta" && block.kind === "text") {
-        const text = readString(delta.text);
-        if (!text) return null;
-        emitNotification("item/agentMessage/delta", {
-          threadId,
-          turnId: activeTurnId,
-          itemId: block.itemId,
-          delta: text,
-        });
-        assistantTextAccumulator += text;
-      } else if (deltaType === "thinking_delta" && block.kind === "thinking") {
-        const text = readString(delta.thinking) || readString(delta.text);
-        if (!text) return null;
-        emitNotification("item/reasoning/textDelta", {
-          threadId,
-          turnId: activeTurnId,
-          itemId: block.itemId,
-          delta: text,
-        });
-        reasoningAccumulator += text;
-      }
-      // input_json_delta and signature_delta are intentionally dropped — we
-      // re-emit tool calls from the consolidated assistant frame instead.
-      return null;
-    }
-
-    if (evType === "content_block_stop") {
-      // No-op: the per-block state lives until the next message_start clears it.
-      return null;
-    }
-
-    if (evType === "message_delta") {
-      const usage = event.usage && typeof event.usage === "object" ? event.usage : null;
-      if (usage) {
-        lastUsage = mergeUsage(lastUsage, usage);
-      }
-      return null;
-    }
-
-    if (evType === "message_stop") {
-      return null;
-    }
-
-    return null;
-  }
-
-  // The consolidated `assistant` frame appears once per message after the
-  // stream_event sequence. We use it to:
-  //   - emit tool_use exec_command_begin events with the FULL parsed input
-  //     (stream_event input_json_delta is fragmentary)
-  //   - act as a fallback delta source for clients running without
-  //     --include-partial-messages
-  function handleAssistant(message) {
-    const inner = message.message;
-    if (!inner || typeof inner !== "object") return null;
-
-    const messageId = readString(inner.id);
-    if (messageId) lastAssistantMessageId = messageId;
-    const usage = inner.usage && typeof inner.usage === "object" ? inner.usage : null;
-    if (usage) lastUsage = mergeUsage(lastUsage, usage);
-
-    const content = Array.isArray(inner.content) ? inner.content : [];
-    if (content.length === 0) return null;
-
-    if (!activeTurnId) {
-      activeTurnId = generateTurnId();
-    }
-    if (!didEmitTurnStarted) {
-      emitTurnStarted(activeTurnId);
-    }
-
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      const partType = readString(part.type);
-
-      if (partType === "text") {
-        // Fallback path: if no stream_event delta delivered any text yet for
-        // this message, treat the consolidated text as a single delta. This
-        // keeps the shim working without --include-partial-messages.
-        const text = readString(part.text);
-        if (!text || assistantTextAccumulator.length >= text.length) continue;
-        const newText = text.startsWith(assistantTextAccumulator)
-          ? text.slice(assistantTextAccumulator.length)
-          : text;
-        const itemId = ensureAssistantItemId();
-        emitNotification("item/agentMessage/delta", {
-          threadId,
-          turnId: activeTurnId,
-          itemId,
-          delta: newText,
-        });
-        assistantTextAccumulator = text;
-        continue;
-      }
-
-      if (partType === "thinking") {
-        const reasoning = readString(part.thinking) || readString(part.text);
-        if (!reasoning || reasoningAccumulator.length >= reasoning.length) continue;
-        const newReasoning = reasoning.startsWith(reasoningAccumulator)
-          ? reasoning.slice(reasoningAccumulator.length)
-          : reasoning;
-        const itemId = ensureReasoningItemId();
-        emitNotification("item/reasoning/textDelta", {
-          threadId,
-          turnId: activeTurnId,
-          itemId,
-          delta: newReasoning,
-        });
-        reasoningAccumulator = reasoning;
-        continue;
-      }
-
-      if (partType === "tool_use") {
-        emitToolUseStart(part);
-        continue;
-      }
-    }
-
-    return null;
-  }
-
-  function ensureAssistantItemId() {
-    if (activeAssistantItemId) return activeAssistantItemId;
-    activeAssistantItemId = generateItemId("assistant");
-    emitAssistantItemStarted({
-      emitNotification,
-      threadId,
-      turnId: activeTurnId,
-      itemId: activeAssistantItemId,
-    });
-    return activeAssistantItemId;
-  }
-
-  function ensureReasoningItemId() {
-    if (reasoningItemId) return reasoningItemId;
-    reasoningItemId = generateItemId("thinking");
-    emitNotification("item/started", {
-      threadId,
-      turnId: activeTurnId,
-      itemId: reasoningItemId,
-      item: {
-        id: reasoningItemId,
-        itemId: reasoningItemId,
-        type: "reasoning",
-      },
-    });
-    return reasoningItemId;
-  }
-
-  function handleRateLimitEvent(envelope) {
-    const info = envelope?.rate_limit_info && typeof envelope.rate_limit_info === "object"
-      ? envelope.rate_limit_info
-      : null;
-    if (!info) return null;
-    if (!threadId) return null;
-    emitNotification("thread/status/changed", {
-      threadId,
-      thread_id: threadId,
-      status: {
-        type: "rateLimited",
-        rateLimit: {
-          type: readString(info.rateLimitType),
-          status: readString(info.status),
-          resetsAt: numberOr(info.resetsAt, 0),
-          isUsingOverage: info.isUsingOverage === true,
-        },
-      },
-    });
-    return null;
-  }
-
-  function handleUser(message) {
-    // The user-frame echo with role:"user" is the bridge's own input — ignore.
-    // The interesting case is when claude relays a tool_result: we close the
-    // matching exec_command_* event so the iOS app shows the output.
-    const inner = message.message;
-    if (!inner || typeof inner !== "object") return null;
-    const content = Array.isArray(inner.content) ? inner.content : [];
-    if (content.length === 0) return null;
-
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      const partType = readString(part.type);
-      if (partType !== "tool_result") continue;
-      emitToolResult(part);
-    }
-    return null;
-  }
-
-  function handleResult(message) {
-    // claude emits a single `result` line per logical turn (in --print/--input
-    // stream mode). It carries duration_ms, usage, total_cost_usd, result.
-    const finalText = readString(message.result);
-    const usage = message.usage && typeof message.usage === "object" ? message.usage : null;
-    if (usage) lastUsage = usage;
-    const newSessionId = readString(message.session_id);
-    if (newSessionId && !sessionId) sessionId = newSessionId;
-
-    if (activeTurnId && threadId) {
-      // Promote any streamed assistant deltas into a final agent_message + item/completed
-      // so the iOS app pins the message in history.
-      const agentText = assistantTextAccumulator || finalText || "";
-      if (agentText) {
-        const itemId = activeAssistantItemId || generateItemId("assistant");
-        emitNotification("codex/event/agent_message", {
-          threadId,
-          turnId: activeTurnId,
-          itemId,
-          message: agentText,
-        });
-        emitNotification("item/completed", {
-          threadId,
-          turnId: activeTurnId,
-          itemId,
-          item: {
-            id: itemId,
-            itemId,
-            type: "assistant_message",
-            role: "assistant",
-            text: agentText,
-            content: [{ type: "text", text: agentText }],
-          },
-        });
-      }
-      if (reasoningItemId && reasoningAccumulator) {
-        emitNotification("item/completed", {
-          threadId,
-          turnId: activeTurnId,
-          itemId: reasoningItemId,
-          item: {
-            id: reasoningItemId,
-            itemId: reasoningItemId,
-            type: "reasoning",
-            text: reasoningAccumulator,
-          },
-        });
-      }
-
-      if (lastUsage) {
-        emitNotification("thread/tokenUsage/updated", {
-          threadId,
-          tokenUsage: {
-            inputTokens: numberOr(lastUsage.input_tokens, 0),
-            outputTokens: numberOr(lastUsage.output_tokens, 0),
-            cachedInputTokens: numberOr(lastUsage.cache_read_input_tokens, 0),
-            cachedCreationInputTokens: numberOr(lastUsage.cache_creation_input_tokens, 0),
-            totalCostUsd: numberOr(message.total_cost_usd, 0),
-          },
-        });
-      }
-
-      if (readString(message.subtype) === "error" || message.is_error === true) {
-        emitErrorNotification(activeTurnId, readString(message.error?.message) || "claude reported a turn error");
-      }
-
-      emitTurnCompleted(activeTurnId);
-    }
-
-    resetTurnState();
-    return null;
-  }
-
-  // ── tool_use / tool_result mapping ─────────────────────────────────────
-  function emitToolUseStart(part) {
-    const toolUseId = readString(part.id) || generateItemId("tool");
-    const toolName = readString(part.name);
-    const input = part.input && typeof part.input === "object" ? part.input : {};
-    if (!threadId || !activeTurnId) return;
-    if (pendingToolCalls.has(toolUseId)) return; // de-dup if assistant frame appears twice
-
-    if (toolName === "Bash") {
-      const command = readString(input.command);
-      const cwd = readString(input.cwd) || sessionCwd || "";
-      pendingToolCalls.set(toolUseId, { kind: "bash", toolName, command, cwd });
-      emitNotification("codex/event/exec_command_begin", {
-        threadId, turnId: activeTurnId,
-        call_id: toolUseId, command, cwd, status: "running",
-      });
-      return;
-    }
-
-    if (toolName === "Read" || toolName === "Glob" || toolName === "Grep") {
-      const filePath = readString(input.file_path) || readString(input.path) || "";
-      pendingToolCalls.set(toolUseId, { kind: "file_read", toolName, filePath });
-      emitNotification("item/started", {
-        threadId, turnId: activeTurnId, itemId: toolUseId,
-        item: {
-          id: toolUseId, itemId: toolUseId,
-          type: toolName === "Read" ? "file_read" : "tool_call",
-          tool: toolName, name: toolName,
-          file_path: filePath, path: filePath,
-          query: readString(input.pattern) || readString(input.query) || "",
-        },
-      });
-      return;
-    }
-
-    if (toolName === "Write" || toolName === "Edit" || toolName === "NotebookEdit") {
-      const filePath = readString(input.file_path) || readString(input.path) || "";
-      pendingToolCalls.set(toolUseId, { kind: "file_change", toolName, filePath });
-      emitNotification("item/started", {
-        threadId, turnId: activeTurnId, itemId: toolUseId,
-        item: {
-          id: toolUseId, itemId: toolUseId,
-          type: "file_change",
-          tool: toolName, name: toolName,
-          file_path: filePath, path: filePath,
-        },
-      });
-      return;
-    }
-
-    pendingToolCalls.set(toolUseId, {
-      kind: "background", toolName, command: toolName, cwd: sessionCwd || "",
-    });
-    emitNotification("codex/event/background_event", {
-      threadId, turnId: activeTurnId,
-      call_id: toolUseId, message: describeToolForUi(toolName, input),
-    });
-  }
-
-  function emitToolResult(part) {
-    const toolUseId = readString(part.tool_use_id);
-    if (!toolUseId) return;
-    const call = pendingToolCalls.get(toolUseId);
-    if (!call) return;
-
-    const output = readToolResultText(part.content);
-    const errored = part.is_error === true;
-
-    if (call.kind === "bash") {
-      if (output) {
-        emitNotification("codex/event/exec_command_output_delta", {
-          threadId, turnId: activeTurnId,
-          call_id: toolUseId, command: call.command, cwd: call.cwd,
-          chunk: output,
-        });
-      }
-      emitNotification("codex/event/exec_command_end", {
-        threadId, turnId: activeTurnId,
-        call_id: toolUseId, command: call.command, cwd: call.cwd,
-        status: errored ? "error" : "completed",
-        output: output || "",
-      });
-    } else if (call.kind === "file_read") {
-      if (output) {
-        emitNotification("item/toolCall/outputDelta", {
-          threadId, turnId: activeTurnId, itemId: toolUseId,
-          delta: output,
-        });
-      }
-      emitNotification("item/completed", {
-        threadId, turnId: activeTurnId, itemId: toolUseId,
-        item: {
-          id: toolUseId, itemId: toolUseId,
-          type: call.toolName === "Read" ? "file_read" : "tool_call",
-          tool: call.toolName, name: call.toolName,
-          file_path: call.filePath, path: call.filePath,
-          status: errored ? "error" : "completed",
-          output: output || "",
-        },
-      });
-    } else if (call.kind === "file_change") {
-      if (output) {
-        emitNotification("item/fileChange/outputDelta", {
-          threadId, turnId: activeTurnId, itemId: toolUseId,
-          delta: output,
-        });
-      }
-      emitNotification("item/completed", {
-        threadId, turnId: activeTurnId, itemId: toolUseId,
-        item: {
-          id: toolUseId, itemId: toolUseId,
-          type: "file_change",
-          tool: call.toolName, name: call.toolName,
-          file_path: call.filePath, path: call.filePath,
-          status: errored ? "error" : "completed",
-        },
-      });
-    }
-
-    pendingToolCalls.delete(toolUseId);
-  }
-
-  function readToolResultText(content) {
-    if (typeof content === "string") return content;
-    if (!Array.isArray(content)) return "";
-    const parts = [];
-    for (const entry of content) {
-      if (!entry || typeof entry !== "object") continue;
-      if (entry.type === "text" && typeof entry.text === "string") {
-        parts.push(entry.text);
-      }
-    }
-    return parts.join("");
-  }
-
-  function describeToolForUi(toolName, input) {
-    switch (toolName) {
-      case "Read":      return `Reading ${shortPathOf(input)}`;
-      case "Write":     return `Writing ${shortPathOf(input)}`;
-      case "Edit":      return `Editing ${shortPathOf(input)}`;
-      case "Glob":      return `Searching for ${readString(input.pattern) || "files"}`;
-      case "Grep":      return `Grep ${readString(input.pattern) || ""}`;
-      case "WebFetch":  return `Fetching ${readString(input.url) || "URL"}`;
-      case "WebSearch": return `Searching the web`;
-      default:          return `Running ${toolName}`;
-    }
-  }
-
-  function shortPathOf(input) {
-    const p = readString(input.file_path) || readString(input.path) || "";
-    if (!p) return "file";
-    const home = os.homedir();
-    return p.startsWith(home) ? `~${p.slice(home.length)}` : p;
-  }
-
-  function locateSessionFile(targetThreadId) {
-    if (!targetThreadId) return "";
-    const projectsDir = path.join(claudeHome(), "projects");
-    let entries;
-    try {
-      entries = fs.readdirSync(projectsDir, { withFileTypes: true });
-    } catch {
-      return "";
-    }
-    for (const dirent of entries) {
-      if (!dirent.isDirectory()) continue;
-      const candidate = path.join(projectsDir, dirent.name, `${targetThreadId}.jsonl`);
-      if (fs.existsSync(candidate)) return candidate;
-    }
-    return "";
-  }
-
-  function listThreadSummaries() {
-    const projectsDir = path.join(claudeHome(), "projects");
-    let projects;
-    try {
-      projects = fs.readdirSync(projectsDir, { withFileTypes: true });
-    } catch {
-      return [];
-    }
-    const summaries = [];
-    for (const project of projects) {
-      if (!project.isDirectory()) continue;
-      let files;
-      try {
-        files = fs.readdirSync(path.join(projectsDir, project.name), { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const file of files) {
-        if (!file.isFile() || !file.name.endsWith(".jsonl")) continue;
-        const id = file.name.slice(0, -".jsonl".length);
-        let stat;
-        try {
-          stat = fs.statSync(path.join(projectsDir, project.name, file.name));
-        } catch {
-          continue;
-        }
-        summaries.push({
-          id,
-          threadId: id,
-          thread_id: id,
-          status: "idle",
-          updatedAt: stat.mtimeMs,
-          createdAt: stat.birthtimeMs || stat.ctimeMs,
-        });
-      }
-    }
-    summaries.sort((a, b) => b.updatedAt - a.updatedAt);
-    return summaries.slice(0, 200);
-  }
-
-  function claudeHome() {
-    return env.CLAUDE_HOME || path.join(os.homedir(), ".claude");
-  }
-
-  // ── per-turn CLI flag publishing ───────────────────────────────────────
-  function publishTurnArgsForParams(params) {
-    const args = [];
-    const model = readString(params?.model)
-      || readString(params?.modelId)
-      || readString(params?.modelID);
-    if (model) args.push("--model", model);
-
-    const effort = readString(params?.effort)
-      || readString(params?.reasoning_effort);
-    if (effort) {
-      const mapped = mapCodexEffortToClaude(effort.toLowerCase());
-      if (mapped) args.push("--effort", mapped);
-    }
-
-    const collaborationMode = readString(params?.collaborationMode?.mode);
-    if (collaborationMode === "plan") {
-      args.push("--permission-mode", "plan");
-    } else {
-      const explicitMode = readString(params?.permissionMode);
-      const permissionMode = ["acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"]
-        .includes(explicitMode) ? explicitMode : "";
-      // In --print mode there is no TTY for Claude to prompt on. The
-      // `default` mode would block forever waiting for an approval that
-      // never comes. Fall back to `acceptEdits` so file-edit tool calls
-      // proceed; iOS clients can override per-turn via `permissionMode`.
-      args.push("--permission-mode", permissionMode || "acceptEdits");
-    }
-
-    try { transport?.setTurnArgs?.(args); } catch { /* best-effort */ }
-  }
-
-  // ── thread/generateTitle (heuristic from first user message) ───────────
-  // Spawning a fresh `claude --print` for title-only generation would be
-  // expensive and depends on auth state. The iOS app already does its own
-  // automatic title pass; here we just produce a deterministic seed so the
-  // request does not hang.
-  function handleGenerateTitle(request) {
-    if (request?.id == null) return;
-    const params = request?.params || {};
-    const seed = readString(params.seed)
-      || readString(params.firstMessage)
-      || readString(params.message)
-      || "";
-    const title = deriveTitleFromSeed(seed);
-    injectResponse(request.id, {
-      threadId: readString(params.threadId) || threadId,
-      title,
-      name: title,
     });
   }
 
@@ -1107,18 +492,6 @@ function createClaudeTranslator({ injectInbound, transport, env = process.env } 
     blocksByIndex.clear();
   }
 
-}
-
-function mergeUsage(prev, next) {
-  if (!prev) return next;
-  return {
-    ...prev,
-    ...next,
-    input_tokens: numberOr(next.input_tokens, prev.input_tokens),
-    output_tokens: numberOr(next.output_tokens, prev.output_tokens),
-    cache_read_input_tokens: numberOr(next.cache_read_input_tokens, prev.cache_read_input_tokens),
-    cache_creation_input_tokens: numberOr(next.cache_creation_input_tokens, prev.cache_creation_input_tokens),
-  };
 }
 
 module.exports = {
