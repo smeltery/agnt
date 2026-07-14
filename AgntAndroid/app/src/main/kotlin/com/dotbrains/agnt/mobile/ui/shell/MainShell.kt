@@ -20,15 +20,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
@@ -36,13 +33,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.toClipEntry
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.R
 import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.GitDiffTotals
@@ -53,8 +46,6 @@ import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightOperation
 import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightPolicy
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlert
 import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertAction
-import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutAction
-import com.dotbrains.agnt.mobile.core.shortcut.AgntShortcutPublisher
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnAggregator
 import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnFileRow
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
@@ -70,7 +61,6 @@ import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
 import com.dotbrains.agnt.mobile.ui.agent.ConversationHeader
 import com.dotbrains.agnt.mobile.ui.agent.SidebarDrawerContent
 import com.dotbrains.agnt.mobile.ui.agent.truncatePathMiddle
-import com.dotbrains.agnt.mobile.ui.draft.NewChatDraftSource
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressBannerState
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressPhase
 import com.dotbrains.agnt.mobile.ui.home.RootViewModel
@@ -102,7 +92,6 @@ fun MainShell(
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
     val showShellHeader = currentRoute == AppRoutes.Home
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Hoisted out of scope.launch so they re-cache on configuration change.
     val gitRepoDiffLoadErrorMessage = stringResource(R.string.git_repo_diff_load_error)
@@ -110,8 +99,6 @@ fun MainShell(
     val gitInitInitializedMessage = stringResource(R.string.git_init_initialized)
 
     val ready by repository.isSessionReady.collectAsStateWithLifecycle()
-    val currentReady by rememberUpdatedState(ready)
-    var backgroundedWhileReady by remember { mutableStateOf(false) }
     val activeThreadId by repository.activeThreadId.collectAsStateWithLifecycle()
     val threads by repository.threads.collectAsStateWithLifecycle()
     val runningTurnByThread by repository.runningTurnIdByThread.collectAsStateWithLifecycle()
@@ -196,45 +183,6 @@ fun MainShell(
         remember(activeThreadId, messagesByThread) {
             activeThreadId?.let { tid -> messagesByThread[tid] }.orEmpty()
         }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_STOP -> {
-                        if (currentReady) {
-                            backgroundedWhileReady = true
-                        }
-                    }
-                    Lifecycle.Event.ON_RESUME -> {
-                        viewModel.onAppForegrounded()
-                        if (backgroundedWhileReady) {
-                            backgroundedWhileReady = false
-                        }
-                    }
-                    else -> Unit
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.onAppLaunched()
-    }
-
-    LaunchedEffect(ready) {
-        if (ready) {
-            viewModel.restoreActiveThreadIfNeeded()
-        }
-    }
-
-    LaunchedEffect(activeThreadId) {
-        val id = activeThreadId
-        if (!id.isNullOrBlank()) {
-            viewModel.persistActiveThreadId(id)
-        }
-    }
 
     val gitCwd = remember(activeThread) { activeThread?.gitWorkingDirectoryForGitActions() }
     val showGitControls = ready && !gitCwd.isNullOrBlank()
@@ -920,52 +868,16 @@ fun MainShell(
     }
 
     val hasSidebarSnapshot = threads.isNotEmpty()
-    LaunchedEffect(context, threads) {
-        AgntShortcutPublisher.publish(context, threads)
-    }
-
-    LaunchedEffect(navController, repository) {
-        suspend fun routeShortcut(action: AgntShortcutAction) {
-            when (action) {
-                AgntShortcutAction.NewChat -> {
-                    navController.navigate(AppRoutes.newChatDraftRoute(NewChatDraftSource.generalChat.name)) {
-                        launchSingleTop = true
-                    }
-                }
-                is AgntShortcutAction.OpenThread -> {
-                    repository.setActiveThreadId(action.threadId)
-                    navController.popBackStack(AppRoutes.Home, inclusive = false)
-                }
-            }
-        }
-        AppContainer.consumePendingShortcutLaunch()?.let { routeShortcut(it) }
-        AppContainer.shortcutLaunches.collect {
-            AppContainer.consumePendingShortcutLaunch()
-            routeShortcut(it)
-        }
-    }
-
-    LaunchedEffect(drawerState, ready, hasSidebarSnapshot) {
-        snapshotFlow { drawerState.isOpen }
-            .collect { open ->
-                if (open && ready && !hasSidebarSnapshot) {
-                    runCatching { repository.refreshThreads() }
-                }
-            }
-    }
-
-    DisposableEffect(navController, drawerState, scope) {
-        val listener =
-            androidx.navigation.NavController.OnDestinationChangedListener { _, _, _ ->
-                if (drawerState.isOpen) {
-                    scope.launch { drawerState.close() }
-                }
-            }
-        navController.addOnDestinationChangedListener(listener)
-        onDispose {
-            navController.removeOnDestinationChangedListener(listener)
-        }
-    }
+    MainShellEffects(
+        viewModel = viewModel,
+        repository = repository,
+        navController = navController,
+        drawerState = drawerState,
+        ready = ready,
+        activeThreadId = activeThreadId,
+        threads = threads,
+        hasSidebarSnapshot = hasSidebarSnapshot,
+    )
 
     ModalNavigationDrawer(
         drawerState = drawerState,
