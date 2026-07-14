@@ -15,13 +15,13 @@ struct TurnView: View {
     private let onInitialAssistantAnchorConsumed: (() -> Void)?
     var onOpenTerminal: ((String?) -> Void)? = nil
 
-    @Environment(CodexService.self) private var codex
-    @Environment(\.openURL) private var openURL
-    @Environment(\.reconnectAction) private var reconnectAction
+    @Environment(CodexService.self) var codex
+    @Environment(\.openURL) var openURL
+    @Environment(\.reconnectAction) var reconnectAction
     @Environment(\.wakeMacDisplayAction) private var wakeMacDisplayAction
     @Environment(\.scenePhase) private var scenePhase
-    @State private var viewModel: TurnViewModel
-    @State private var isInputFocused = false
+    @State var viewModel: TurnViewModel
+    @State var isInputFocused = false
     @State private var isShowingThreadPathSheet = false
     @State private var isShowingStatusSheet = false
     @State private var isShowingGoalSheet = false
@@ -40,15 +40,15 @@ struct TurnView: View {
     @State private var isStartingSiblingChat = false
     @State private var isForkingThread = false
     @State private var checkedOutElsewhereAlert: CheckedOutElsewhereAlert?
-    @State private var isVoiceRecording = false
-    @State private var isVoicePreflighting = false
-    @State private var voicePreflightGeneration = 0
-    @State private var isVoiceTranscribing = false
-    @State private var hasTriggeredVoiceAutoStop = false
-    @State private var voiceRecoveryReason: CodexVoiceFailureReason?
-    @State private var isShowingVoiceSetupSheet = false
+    @State var isVoiceRecording = false
+    @State var isVoicePreflighting = false
+    @State var voicePreflightGeneration = 0
+    @State var isVoiceTranscribing = false
+    @State var hasTriggeredVoiceAutoStop = false
+    @State var voiceRecoveryReason: CodexVoiceFailureReason?
+    @State var isShowingVoiceSetupSheet = false
     @State private var hasConsumedInitialAssistantAnchor = false
-    @StateObject private var voiceTranscriptionManager = GPTVoiceTranscriptionManager()
+    @StateObject var voiceTranscriptionManager = GPTVoiceTranscriptionManager()
     @State private var workspaceFilePreviewRequest: WorkspaceFilePreviewRequest?
 
     init(
@@ -648,18 +648,6 @@ struct TurnView: View {
         return normalizedMessage.contains("cancellationerror")
             || normalizedMessage.contains("cancelled")
             || normalizedMessage.contains("canceled")
-    }
-
-    private var voiceRecoveryPresentation: VoiceRecoveryPresentation? {
-        guard let voiceRecoveryReason else {
-            return nil
-        }
-
-        guard let resolvedReason = codex.resolveVoiceRecoveryReason(voiceRecoveryReason) else {
-            return nil
-        }
-
-        return buildVoiceRecoveryPresentation(for: resolvedReason)
     }
 
     private var connectionRecoverySnapshot: ConnectionRecoverySnapshot? {
@@ -1623,205 +1611,6 @@ struct TurnView: View {
         }
     }
 
-    // Mirrors the mic CTA state so the composer can swap between ready, record, and stop.
-    private var voiceButtonPresentation: TurnComposerVoiceButtonPresentation {
-        if isVoiceTranscribing {
-            return TurnComposerVoiceButtonPresentation(
-                systemImageName: "waveform",
-                foregroundColor: Color(.secondaryLabel),
-                backgroundColor: Color(.systemGray5),
-                accessibilityLabel: "Transcribing voice note",
-                isDisabled: true,
-                showsProgress: true,
-                hasCircleBackground: true
-            )
-        }
-
-        if isVoicePreflighting {
-            return TurnComposerVoiceButtonPresentation(
-                systemImageName: "hourglass",
-                foregroundColor: Color(.secondaryLabel),
-                backgroundColor: Color(.systemGray5),
-                accessibilityLabel: "Preparing microphone",
-                isDisabled: true,
-                showsProgress: true,
-                hasCircleBackground: true
-            )
-        }
-
-        if isVoiceRecording {
-            return TurnComposerVoiceButtonPresentation(
-                systemImageName: "stop.fill",
-                foregroundColor: Color(.systemBackground),
-                backgroundColor: Color(.systemRed),
-                accessibilityLabel: "Stop voice recording",
-                isDisabled: false,
-                showsProgress: false,
-                hasCircleBackground: true
-            )
-        }
-
-        return TurnComposerVoiceButtonPresentation(
-            systemImageName: "mic",
-            foregroundColor: Color(.secondaryLabel),
-            backgroundColor: .clear,
-            accessibilityLabel: "Start voice transcription",
-            isDisabled: !codex.isConnected,
-            showsProgress: false,
-            hasCircleBackground: false
-        )
-    }
-
-    // Switches the mic button between login, recording, and transcription states.
-    private func handleVoiceButtonTap() {
-        if isVoiceTranscribing {
-            return
-        }
-
-        if isVoiceRecording {
-            Task { @MainActor in
-                await stopVoiceTranscription()
-            }
-            return
-        }
-
-        Task { @MainActor in
-            await startVoiceRecordingIfReady()
-        }
-    }
-
-    // Stops the recorder, transcribes through the bridge, and appends the final text into the draft.
-    private func stopVoiceTranscription() async {
-        hasTriggeredVoiceAutoStop = false
-        isVoiceTranscribing = true
-        defer { isVoiceTranscribing = false }
-
-        do {
-            guard let clip = try voiceTranscriptionManager.stopRecording() else {
-                isVoiceRecording = false
-                voiceTranscriptionManager.resetMeteringState()
-                return
-            }
-
-            defer {
-                try? FileManager.default.removeItem(at: clip.url)
-            }
-
-            isVoiceRecording = false
-            voiceTranscriptionManager.resetMeteringState()
-            let transcript = try await codex.transcribeVoiceAudioFile(
-                at: clip.url,
-                durationSeconds: clip.durationSeconds
-            )
-            clearVoiceRecovery()
-            viewModel.appendVoiceTranscript(transcript)
-            // Keep voice flows keyboard-free; users can tap into the draft afterward if they want to edit.
-            isInputFocused = false
-        } catch {
-            isVoiceRecording = false
-            voiceTranscriptionManager.resetMeteringState()
-            presentVoiceRecovery(for: error)
-        }
-    }
-
-    // Starts microphone capture directly; auth is resolved when the user stops recording, matching Litter's flow.
-    @MainActor
-    private func startVoiceRecordingIfReady() async {
-        guard !isVoicePreflighting else {
-            return
-        }
-
-        guard codex.supportsBridgeVoiceAuth else {
-            presentVoiceRecovery(for: .bridgeSessionUnsupported)
-            return
-        }
-
-        guard codex.isConnected else {
-            presentVoiceRecovery(for: .reconnectRequired)
-            return
-        }
-
-        clearVoiceRecovery()
-        codex.lastErrorMessage = nil
-        hasTriggeredVoiceAutoStop = false
-        // Dismiss any active text focus before recording so the keyboard does not
-        // compete with the waveform UI or waste vertical space during capture.
-        isInputFocused = false
-        let preflightGeneration = voicePreflightGeneration + 1
-        voicePreflightGeneration = preflightGeneration
-        isVoicePreflighting = true
-        defer {
-            if isVoicePreflightCurrent(preflightGeneration) {
-                isVoicePreflighting = false
-            }
-        }
-
-        do {
-            guard isVoicePreflightCurrent(preflightGeneration), codex.isConnected else {
-                return
-            }
-            try await voiceTranscriptionManager.startRecording()
-            guard isVoicePreflightCurrent(preflightGeneration), codex.isConnected else {
-                voiceTranscriptionManager.cancelRecording()
-                return
-            }
-            isVoiceRecording = true
-            isInputFocused = false
-        } catch {
-            presentVoiceRecovery(for: error)
-        }
-    }
-
-    // Clears any partial microphone capture when the screen leaves the active voice flow.
-    private func cancelVoiceRecordingIfNeeded() {
-        guard isVoiceRecording else {
-            return
-        }
-
-        voiceTranscriptionManager.cancelRecording()
-        isVoiceRecording = false
-        hasTriggeredVoiceAutoStop = false
-    }
-
-    // Trigger a hair before the hard validation limit so the saved WAV never misses by timer drift.
-    private var voiceAutoStopThreshold: TimeInterval {
-        max(0, CodexVoiceTranscriptionPreflight.maxDurationSeconds - 0.25)
-    }
-
-    private func clearVoiceRecovery() {
-        voiceRecoveryReason = nil
-    }
-
-    // Keeps voice failures out of the transcript by routing them into a dedicated recovery accessory.
-    private func presentVoiceRecovery(for error: Error) {
-        presentVoiceRecovery(for: codex.classifyVoiceFailure(error))
-    }
-
-    private func presentVoiceRecovery(for reason: CodexVoiceFailureReason) {
-        voiceRecoveryReason = reason
-        codex.lastErrorMessage = nil
-    }
-
-    private func buildVoiceRecoveryPresentation(for reason: CodexVoiceFailureReason) -> VoiceRecoveryPresentation {
-        TurnVoiceRecoveryPresentationBuilder.makePresentation(for: reason)
-    }
-
-    private func handleVoiceRecoveryAction(_ action: VoiceRecoveryAction) {
-        switch action {
-        case .reconnect:
-            reconnectAction?()
-        case .showSetupHelp:
-            isShowingVoiceSetupSheet = true
-        case .openSystemSettings:
-            guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else {
-                return
-            }
-            openURL(settingsURL)
-        case .none:
-            break
-        }
-    }
-
     private func handleConnectionRecoveryAction() {
         if shouldOfferWakeSavedMacDisplayAction {
             wakeMacDisplayAction?()
@@ -1829,16 +1618,6 @@ struct TurnView: View {
         }
 
         reconnectAction?()
-    }
-
-    // Invalidates any in-flight async mic startup so it cannot reopen the recorder after leaving the screen.
-    private func invalidatePendingVoicePreflight() {
-        voicePreflightGeneration += 1
-        isVoicePreflighting = false
-    }
-
-    private func isVoicePreflightCurrent(_ generation: Int) -> Bool {
-        generation == voicePreflightGeneration
     }
 
     private var forkLoadingNotice: some View {
