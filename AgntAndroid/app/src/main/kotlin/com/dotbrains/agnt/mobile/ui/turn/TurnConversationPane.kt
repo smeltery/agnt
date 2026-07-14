@@ -46,8 +46,6 @@ import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
-import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
-import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
 import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
@@ -372,62 +370,25 @@ fun TurnConversationPane(
     }
 
     fun handoffCurrentThread(selectedBaseBranch: String? = null) {
-        val cwd = gitCwd
-        if (cwd == null || isThreadRunning || sending || isHandingOffWorktree) return
-        val isWorktreeProject = activeThread?.isManagedWorktreeProject == true
-        val baseBranch = selectedBaseBranch?.trim()?.takeIf { it.isNotEmpty() } ?: defaultReviewBaseBranch
-        val localTargetPath = localWorktreeHandoffTargetPath
-        val associatedWorktreePath = repository.associatedManagedWorktreePathFor(threadId)
-        if (isWorktreeProject && localTargetPath == null) {
-            worktreeHandoffError = handoffMissingLocalMessage
-            return
-        }
-        if (!isWorktreeProject && baseBranch == null && associatedWorktreePath == null) {
-            worktreeHandoffError = handoffMissingBaseMessage
-            showWorktreeHandoffSheet = true
-            return
-        }
-        scope.launch {
-            isHandingOffWorktree = true
-            worktreeHandoffError = null
-            try {
-                showWorktreeHandoffSheet = false
-                val outcome =
-                    runCatching {
-                        val coordinator = WorktreeFlowCoordinator(repository)
-                        if (isWorktreeProject) {
-                            coordinator.handoffThreadToProjectPath(
-                                threadId = threadId,
-                                sourceProjectPath = cwd,
-                                targetProjectPath = localTargetPath ?: error(handoffMissingLocalMessage),
-                            )
-                        } else {
-                            coordinator.handoffThreadToWorktree(
-                                threadId = threadId,
-                                sourceProjectPath = cwd,
-                                associatedWorktreePath = associatedWorktreePath,
-                                baseBranchForNewWorktree = baseBranch,
-                            )
-                        }
-                    }.getOrElse { e ->
-                        worktreeHandoffError = GitBranchDisplayMapper.userVisibleMessage(e)
-                        return@launch
-                    }
-                when (outcome) {
-                    is WorktreeFlowHandoffOutcome.Moved -> {
-                        repository.setActiveThreadId(outcome.move.thread.id)
-                        gitBranchReloadNonce++
-                    }
-                    WorktreeFlowHandoffOutcome.MissingAssociatedWorktree -> {
-                        worktreeHandoffError =
-                            "The associated worktree is no longer available. Create a new managed worktree to continue."
-                        showWorktreeHandoffSheet = true
-                    }
-                }
-            } finally {
-                isHandingOffWorktree = false
-            }
-        }
+        handleTurnWorktreeHandoff(
+            selectedBaseBranch = selectedBaseBranch,
+            gitCwd = gitCwd,
+            isThreadRunning = isThreadRunning,
+            sending = sending,
+            isHandingOffWorktree = isHandingOffWorktree,
+            activeThread = activeThread,
+            defaultReviewBaseBranch = defaultReviewBaseBranch,
+            localWorktreeHandoffTargetPath = localWorktreeHandoffTargetPath,
+            repository = repository,
+            threadId = threadId,
+            scope = scope,
+            handoffMissingLocalMessage = handoffMissingLocalMessage,
+            handoffMissingBaseMessage = handoffMissingBaseMessage,
+            setWorktreeHandoffError = { worktreeHandoffError = it },
+            setShowWorktreeHandoffSheet = { showWorktreeHandoffSheet = it },
+            setHandingOffWorktree = { isHandingOffWorktree = it },
+            afterMoved = { gitBranchReloadNonce++ },
+        )
     }
 
     fun applyPlanToComposer() {
