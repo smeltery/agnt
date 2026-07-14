@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { isTauri } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import QRCode from "qrcode";
 import type {
   AppConfig,
@@ -16,60 +13,27 @@ import type {
   UpdateInfo,
   View,
 } from "./host-types";
-import { DashboardView } from "./DashboardView";
-import { DiagnosticsView } from "./DiagnosticsView";
-import { LogsView } from "./LogsView";
-import { NetworkView } from "./NetworkView";
-import { SettingsView } from "./SettingsView";
 import {
-  ActionBtn,
-  ViewTab,
-} from "./ui-components";
-
-const STATE_LABELS: Record<string, string> = {
-  stopped: "Stopped",
-  starting: "Starting...",
-  relay_running: "Relay Running",
-  local_ready: "Local Ready",
-  remote_placeholder_ready: "Remote Placeholder",
-  waiting_for_pairing: "Waiting for Pairing",
-  connected: "Connected",
-  warning: "Warning",
-  error: "Error",
-};
-
-const STATE_COLORS: Record<string, string> = {
-  stopped: "#9AA4B2",
-  starting: "#FFB020",
-  relay_running: "#4F8CFF",
-  local_ready: "#35C759",
-  remote_placeholder_ready: "#FFB020",
-  waiting_for_pairing: "#4F8CFF",
-  connected: "#35C759",
-  warning: "#FFB020",
-  error: "#FF5C5C",
-};
+  DEFAULT_CONFIG,
+  DEFAULT_PROVIDER_BRIDGE_STATUS,
+  DEFAULT_PROVIDER_KEY_STATUS,
+  DEFAULT_STATUS,
+} from "./host-defaults";
+import { AppShell } from "./AppShell";
+import { AppViews } from "./AppViews";
+import { useHostEvents } from "./useHostEvents";
+import { useTauriReady } from "./useTauriReady";
 
 function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [appState, setAppState] = useState("stopped");
-  const [status, setStatus] = useState<AppStatus>({
-    state: "stopped",
-    relay_mode: "local",
-    relay: "stopped",
-    bridge: "stopped",
-    network: "--",
-    relay_url: "",
-    pairing_payload: null,
-    pairing_code: null,
-    phone_connected: false,
-  });
+  const [status, setStatus] = useState<AppStatus>(DEFAULT_STATUS);
   const [networks, setNetworks] = useState<NetworkInterface[]>([]);
   const [pairingPayload, setPairingPayload] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [view, setView] = useState<View>("dashboard");
   const [starting, setStarting] = useState(false);
-  const [tauriReady, setTauriReady] = useState(false);
+  const tauriReady = useTauriReady();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsSnapshot | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
@@ -78,42 +42,11 @@ function App() {
   const [firewallWarning, setFirewallWarning] = useState<{ ip: string; port: number; message: string } | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "installing">("idle");
-  const [settings, setSettings] = useState<AppConfig>({
-    relay_mode: "local",
-    selected_ip: "",
-    relay_port: 9000,
-    remote_relay_url: "ws://127.0.0.1:9000",
-    auto_start: false,
-    auto_restart: false,
-    start_minimized: false,
-    launch_at_startup: false,
-    setup_completed: false,
-    requires_entitlement: true,
-    free_message_limit: 5,
-    relay_path: null,
-    bridge_path: null,
-    log_level: "info",
-    provider_bridge: {
-      bind_host: "127.0.0.1",
-      port: 8787,
-      provider: "deepseek",
-      default_model: "deepseek-v4-pro",
-    },
-  });
+  const [settings, setSettings] = useState<AppConfig>(DEFAULT_CONFIG);
   const [settingsPort, setSettingsPort] = useState("9000");
   const [portStatus, setPortStatus] = useState<"checking" | "available" | "taken">("available");
-  const [providerBridgeStatus, setProviderBridgeStatus] = useState<ProviderBridgeStatus>({
-    running: false,
-    bind_host: "127.0.0.1",
-    port: 8787,
-    base_url: "http://127.0.0.1:8787",
-    provider: "deepseek",
-  });
-  const [providerKeyStatus, setProviderKeyStatus] = useState<ProviderKeyStatus>({
-    available: false,
-    source: "missing",
-    has_stored_key: false,
-  });
+  const [providerBridgeStatus, setProviderBridgeStatus] = useState<ProviderBridgeStatus>(DEFAULT_PROVIDER_BRIDGE_STATUS);
+  const [providerKeyStatus, setProviderKeyStatus] = useState<ProviderKeyStatus>(DEFAULT_PROVIDER_KEY_STATUS);
   const [providerApiKeyInput, setProviderApiKeyInput] = useState("");
   const [providerBridgeBusy, setProviderBridgeBusy] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -202,21 +135,6 @@ function App() {
     }
   }, [tauriReady, logError]);
 
-  // Wait for Tauri to be ready before registering listeners
-  useEffect(() => {
-    if (!isTauri()) return;
-
-    // Poll until Tauri internals are available
-    const checkReady = () => {
-      if ((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__) {
-        setTauriReady(true);
-      } else {
-        setTimeout(checkReady, 50);
-      }
-    };
-    checkReady();
-  }, []);
-
   // Load settings when Tauri is ready
   useEffect(() => {
     if (!tauriReady) return;
@@ -237,185 +155,20 @@ function App() {
     }, 0);
     return () => window.clearTimeout(id);
   }, [tauriReady, refreshProviderBridgeStatus]);
-
-
-  // Listen for log entries
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<LogEntry>("log-entry", (event) => {
-      addLog(event.payload);
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady, addLog]);
-
-  // Listen for status changes
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<AppStatus>("status-changed", (event) => {
-      setStatus((prev) => ({ ...prev, ...event.payload }));
-      if (event.payload.state) setAppState(event.payload.state);
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady]);
-
-  // Listen for pairing ready
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<string>("pairing-ready", (event) => {
-      setPairingPayload(event.payload);
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady]);
-
-  useEffect(() => {
-    if (!tauriReady) return;
-    invoke<UpdateInfo | null>("check_for_update")
-      .then(setUpdateInfo)
-      .catch(() => {});
-  }, [tauriReady]);
-
-  // Listen for manual pairing code
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<string>("pairing-code-ready", (event) => {
-      setPairingCode(event.payload);
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady]);
-
-  // Listen for phone connection from relay logs
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<string>("phone-connected", () => {
-      setPhoneConnected(true);
-      setAppState("connected");
-      invoke("notify", { title: "Agnt Host", body: "Phone connected!" }).catch(() => {});
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady]);
-
-  // Listen for phone disconnection
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<string>("phone-disconnected", () => {
-      setPhoneConnected(false);
-      setAppState((prev) => (prev === "connected" ? "running" : prev));
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady]);
-
-  // Listen for first-run
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen("first-run", () => {
-      setFirstRun(true);
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => { unlistenFn?.(); };
-  }, [tauriReady]);
-
-  // Listen for firewall warning
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<{ ip: string; port: number; message: string }>("firewall-warning", (event) => {
-      setFirewallWarning(event.payload);
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => { unlistenFn?.(); };
-  }, [tauriReady]);
-
-  // Listen for process crashes
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen<{ process: string; exit_code: number }>("process-crashed", (event) => {
-      const { process, exit_code } = event.payload;
-      addLog({
-        timestamp: new Date().toLocaleTimeString(),
-        source: "app",
-        level: "error",
-        message: `${process} crashed (exit code: ${exit_code})`,
-      });
-      setErrorMsg(`${process} crashed with exit code ${exit_code}`);
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady, addLog]);
-
-  // Listen for show-qr event from tray
-  useEffect(() => {
-    if (!tauriReady) return;
-    let unlistenFn: (() => void) | null = null;
-
-    listen("show-qr", async () => {
-      const win = getCurrentWindow();
-      await win.show().catch(() => {});
-      await win.setFocus().catch(() => {});
-      setView("dashboard");
-      await refreshStatus();
-    }).then((fn) => {
-      unlistenFn = fn;
-    });
-
-    return () => {
-      unlistenFn?.();
-    };
-  }, [tauriReady, refreshStatus]);
+  useHostEvents({
+    tauriReady,
+    addLog,
+    refreshStatus,
+    setAppState,
+    setErrorMsg,
+    setFirewallWarning,
+    setFirstRun,
+    setPairingCode,
+    setPairingPayload,
+    setPhoneConnected,
+    setStatus,
+    setView,
+  });
 
   // Scroll logs to bottom
   useEffect(() => {
@@ -695,283 +448,52 @@ function App() {
   };
 
   const isStopped = appState === "stopped" || appState === "error";
-  const viewBodyStyle = {
-    flex: 1,
-    minHeight: 0,
-    overflowY: "auto" as const,
-    overflowX: "hidden" as const,
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "10px",
-    paddingRight: "2px",
-  };
 
   return (
-    <div
-      style={{
-        background: "var(--bg-primary)",
-        height: "100vh",
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-        padding: "12px 14px 10px",
-        gap: "10px",
+    <AppShell
+      appState={appState}
+      errorMsg={errorMsg}
+      firewallWarning={firewallWarning}
+      updateInfo={updateInfo}
+      updateStatus={updateStatus}
+      view={view}
+      onDismissFirewall={() => setFirewallWarning(null)}
+      onInstallUpdate={handleInstallUpdate}
+      onDashboard={() => setView("dashboard")}
+      onLoadNetworks={handleLoadNetworks}
+      onLogs={() => setView("logs")}
+      onSettings={() => {
+        invoke<AppConfig>("get_config").then(setSettings).catch(() => {});
+        setSettingsPort(String(settings.relay_port));
+        setView("settings");
       }}
+      onDiagnostics={handleDiagnostics}
     >
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.3px" }}>
-            Agnt Host
-          </div>
-          <div style={{ fontSize: "10px", color: "var(--text-secondary)", marginTop: "1px" }}>
-            Local bridge manager
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "5px",
-            background: "var(--bg-surface)",
-            padding: "3px 8px",
-            borderRadius: "5px",
-            border: "1px solid var(--border-color)",
-          }}
-        >
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: STATE_COLORS[appState] || "#9AA4B2",
-              animation: appState === "starting" ? "pulse 1s infinite" : "none",
-            }}
-          />
-          <span style={{ fontSize: "10px", color: "var(--text-secondary)", fontWeight: 500 }}>
-            {STATE_LABELS[appState] || appState}
-          </span>
-        </div>
-      </div>
-
-      {/* Error Banner */}
-      {errorMsg && (
-        <div
-          style={{
-            background: "#FF5C5C15",
-            border: "1px solid #FF5C5C30",
-            borderRadius: "6px",
-            padding: "8px 10px",
-            fontSize: "11px",
-            color: "#FF5C5C",
-            fontFamily: "monospace",
-            wordBreak: "break-all",
-          }}
-        >
-          {errorMsg}
-        </div>
-      )}
-
-      {/* Firewall Warning */}
-      {firewallWarning && (
-        <div
-          style={{
-            background: "#FFB02015",
-            border: "1px solid #FFB02030",
-            borderRadius: "6px",
-            padding: "8px 10px",
-            fontSize: "11px",
-            color: "#FFB020",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-          }}
-        >
-          <span style={{ flex: 1 }}>{firewallWarning.message}</span>
-          <button
-            onClick={() => setFirewallWarning(null)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#FFB020",
-              cursor: "pointer",
-              fontSize: "14px",
-              padding: "0 0 0 8px",
-              lineHeight: 1,
-            }}
-          >
-            x
-          </button>
-        </div>
-      )}
-
-      {updateInfo && (
-        <div
-          style={{
-            background: "#4F8CFF15",
-            border: "1px solid #4F8CFF35",
-            borderRadius: "6px",
-            padding: "8px 10px",
-            fontSize: "11px",
-            color: "var(--text-primary)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "8px",
-          }}
-        >
-          <span style={{ color: "var(--text-secondary)" }}>
-            Agnt Host {updateInfo.version} is available.
-          </span>
-          <button
-            onClick={handleInstallUpdate}
-            disabled={updateStatus !== "idle"}
-            style={{
-              background: "var(--accent-blue)",
-              border: "none",
-              borderRadius: "4px",
-              color: "#fff",
-              cursor: updateStatus === "idle" ? "pointer" : "default",
-              fontSize: "10px",
-              fontWeight: 600,
-              padding: "5px 8px",
-              whiteSpace: "nowrap",
-              opacity: updateStatus === "idle" ? 1 : 0.7,
-            }}
-          >
-            {updateStatus === "installing" ? "Installing..." : "Install"}
-          </button>
-        </div>
-      )}
-
-      <div style={viewBodyStyle}>
-      {/* Onboarding / First-run */}
-      {firstRun && (
-        <div
-          style={{
-            flex: 1,
-            background: "var(--bg-surface)",
-            borderRadius: "7px",
-            border: "1px solid var(--border-color)",
-            padding: "16px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            gap: "16px",
-          }}
-        >
-          <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
-            Welcome to Agnt Host
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-secondary)", maxWidth: "300px" }}>
-            This app lets you pair your phone with your PC to use Agnt without terminals.
-            Let's get your local relay and bridge running.
-          </div>
-          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-            <ActionBtn
-              label="Let's Go"
-              color="#35C759"
-              onClick={async () => {
-                setFirstRun(false);
-                await invoke("complete_setup");
-                handleLoadNetworks();
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* View: Dashboard, Network, Logs, Debug */}
-      {view === "dashboard" && (
-        <DashboardView
-          status={status}
-          pairingPayload={pairingPayload}
-          pairingCode={pairingCode}
-          phoneConnected={phoneConnected}
-          isStopped={isStopped}
-          starting={starting}
-          tauriReady={tauriReady}
-          setStatus={setStatus}
-          onLoadNetworks={handleLoadNetworks}
-          onCopyUrl={handleCopyUrl}
-          onCopyPairingCode={handleCopyPairingCode}
-          onStartAll={handleStartAll}
-          onStopAll={handleStopAll}
-          onRestartBridge={handleRestartBridge}
-          onRestartRelay={handleRestartRelay}
-        />
-      )}
-
-      {view === "network" && (
-        <NetworkView
-          networks={networks}
-          status={status}
-          setView={setView}
-          onSelectNetwork={handleSelectNetwork}
-        />
-      )}
-
-      {view === "logs" && (
-        <LogsView
-          logs={logs}
-          logsEndRef={logsEndRef}
-          setView={setView}
-          onClearLogs={handleClearLogs}
-        />
-      )}
-
-      {view === "settings" && (
-        <SettingsView
-          settings={settings}
-          setSettings={setSettings}
-          settingsPort={settingsPort}
-          portStatus={portStatus}
-          tauriReady={tauriReady}
-          updateInfo={updateInfo}
-          updateStatus={updateStatus}
-          providerBridgeStatus={providerBridgeStatus}
-          providerKeyStatus={providerKeyStatus}
-          providerApiKeyInput={providerApiKeyInput}
-          providerBridgeBusy={providerBridgeBusy}
-          setProviderApiKeyInput={setProviderApiKeyInput}
-          setView={setView}
-          onCheckPort={handleCheckPort}
-          onCheckForUpdate={handleCheckForUpdate}
-          onInstallUpdate={handleInstallUpdate}
-          onToggleProviderBridge={handleToggleProviderBridge}
-          onSaveProviderApiKey={handleSaveProviderApiKey}
-          onClearProviderApiKey={handleClearProviderApiKey}
-          onSaveSettings={handleSaveSettings}
-        />
-      )}
-
-      {view === "diagnostics" && (
-        <DiagnosticsView
-          diagnostics={diagnostics}
-          diagnosticsLoading={diagnosticsLoading}
-          tauriReady={tauriReady}
-          onRefresh={handleDiagnostics}
-          onAction={handleDiagnosticAction}
-        />
-      )}
-
-      </div>
-
-      {/* Bottom tabs */}
-      <div style={{ display: "flex", gap: "2px", background: "var(--bg-surface)", borderRadius: "6px", padding: "2px" }}>
-        <ViewTab label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-        <ViewTab label="Network" active={view === "network"} onClick={handleLoadNetworks} />
-        <ViewTab label="Logs" active={view === "logs"} onClick={() => setView("logs")} />
-        <ViewTab label="Settings" active={view === "settings"} onClick={() => {
-          invoke<AppConfig>("get_config").then(setSettings).catch(() => {});
-          setSettingsPort(String(settings.relay_port));
-          setView("settings");
-        }} />
-        <ViewTab label="Diagnostics" active={view === "diagnostics"} onClick={handleDiagnostics} />
-      </div>
-    </div>
+      <AppViews
+        view={view} firstRun={firstRun} status={status}
+        pairingPayload={pairingPayload} pairingCode={pairingCode}
+        phoneConnected={phoneConnected} isStopped={isStopped}
+        starting={starting} tauriReady={tauriReady}
+        networks={networks} logs={logs} logsEndRef={logsEndRef}
+        settings={settings} settingsPort={settingsPort} portStatus={portStatus}
+        updateInfo={updateInfo} updateStatus={updateStatus}
+        providerBridgeStatus={providerBridgeStatus} providerKeyStatus={providerKeyStatus}
+        providerApiKeyInput={providerApiKeyInput} providerBridgeBusy={providerBridgeBusy}
+        diagnostics={diagnostics} diagnosticsLoading={diagnosticsLoading}
+        setStatus={setStatus} setFirstRun={setFirstRun} setSettings={setSettings}
+        setProviderApiKeyInput={setProviderApiKeyInput} setView={setView}
+        onLoadNetworks={handleLoadNetworks} onCopyUrl={handleCopyUrl}
+        onCopyPairingCode={handleCopyPairingCode} onStartAll={handleStartAll}
+        onStopAll={handleStopAll} onRestartBridge={handleRestartBridge}
+        onRestartRelay={handleRestartRelay} onSelectNetwork={handleSelectNetwork}
+        onClearLogs={handleClearLogs} onCheckPort={handleCheckPort}
+        onCheckForUpdate={handleCheckForUpdate} onInstallUpdate={handleInstallUpdate}
+        onToggleProviderBridge={handleToggleProviderBridge}
+        onSaveProviderApiKey={handleSaveProviderApiKey}
+        onClearProviderApiKey={handleClearProviderApiKey} onSaveSettings={handleSaveSettings}
+        onDiagnostics={handleDiagnostics} onDiagnosticAction={handleDiagnosticAction}
+      />
+    </AppShell>
   );
 }
 
