@@ -39,8 +39,6 @@ import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectUiState
 import com.dotbrains.agnt.mobile.ui.turn.attachments.TurnComposerAttachment
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToFileMentions
-import com.dotbrains.agnt.mobile.ui.turn.autocomplete.mentionChipsToSkillMentions
 import com.dotbrains.agnt.mobile.ui.turn.composer.ComposerMentionChipPayload
 import com.dotbrains.agnt.mobile.ui.turn.composer.TURN_COMPOSER_RUNTIME_AUTO_ID
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerBar
@@ -791,7 +789,7 @@ fun TurnConversationPane(
                             },
                             selectedAccessMode = selectedAccessMode,
                             accessPickerEnabled =
-                                    ready &&
+                                ready &&
                                     !composerLocks.runtimeControlsLocked &&
                                     composerState.runtimeControls.accessMode.enabled,
                             onSelectAccessMode = { mode ->
