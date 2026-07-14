@@ -1,5 +1,6 @@
 @import "./sections/base.css";
 @import "./sections/workspace-chat.css";
+@import "./sections/turn-artifacts.css";
 @import "./sections/modals-sidebar-git.css";
 @import "./sections/git-panel.css";
 @import "./sections/voice-controls.css";
