@@ -15,6 +15,7 @@ use std::fs;
 use std::os::windows::process::CommandExt;
 
 mod app_types;
+mod bridge_runtime;
 mod diagnostics;
 mod host_config;
 mod network;
@@ -25,12 +26,13 @@ mod provider_bridge;
 mod runtime_bundle;
 
 use app_types::{AppState, AppStatus, DebugInfo, LogEntry, UpdateInfo};
+use bridge_runtime::{start_bridge, stop_bridge};
 use diagnostics::DiagnosticsSnapshot;
 use host_config::{config_path, load_config, save_config, AppConfig};
 use network::detect_network_interfaces;
 pub use network::NetworkInterface;
 use process_helpers::{find_available_port, get_repo_root, is_port_available};
-use process_runtime::{start_all, start_bridge, start_relay, stop_all, stop_bridge, stop_relay};
+use process_runtime::{start_all, start_relay, stop_all, stop_relay};
 #[cfg(test)]
 use runtime_bundle::{
     bundle_manifests_match, copy_fixture_runtime_from_bundle, read_bundle_manifest, BundleManifest,
@@ -697,8 +699,8 @@ pub fn run() {
             save_config_cmd,
             process_runtime::start_relay,
             process_runtime::stop_relay,
-            process_runtime::start_bridge,
-            process_runtime::stop_bridge,
+            bridge_runtime::start_bridge,
+            bridge_runtime::stop_bridge,
             process_runtime::start_all,
             process_runtime::stop_all,
             get_logs,
