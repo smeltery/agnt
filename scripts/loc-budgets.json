@@ -94,7 +94,11 @@
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ConnectionReceive.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+ConnectionStateReset.swift": 500,
       "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+PostConnectSync.swift": 500,
-      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+LocalNetwork.swift": 500
+      "AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService+LocalNetwork.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageTimeline.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageProjection.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+MessageLookup.swift": 500,
+      "AgntMobile/AgntMobile/Services/CodexService/Composer/CodexService+AssistantStreamingRows.swift": 500
     }
   },
   "flat_directories": {
