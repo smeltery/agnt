@@ -3,4 +3,6 @@
 @import "./sections/modals-sidebar-git.css";
 @import "./sections/navigation-projects.css";
 @import "./sections/command-settings-diff.css";
+@import "./sections/sidebar-files-diff.css";
+@import "./sections/sidebar-density-settings.css";
 @import "./sections/accessibility-overlays.css";

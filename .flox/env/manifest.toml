@@ -5,8 +5,8 @@
 ## the same pinned Node, Bun, JDK, and Rust regardless of host package manager.
 ##
 ## Components covered:
-##   - agnt-bridge / relay  -> Node 20 (runtime) + Bun (installer/test runner)
-##   - agnt-web / agnt-host  -> Node 20 + Bun (Vite/React/Vitest)
+##   - agnt-bridge / relay  -> Node 22 (runtime) + Bun (installer/test runner)
+##   - agnt-web / agnt-host  -> Node 22 + Bun (Vite/React/Vitest)
 ##   - agnt-host (Tauri)     -> Rust toolchain (macOS-leaning; see CLAUDE.md)
 ##   - AgntAndroid           -> JDK 17 (Gradle still pulls the Android SDK itself)
 ##   - AgntMobile (iOS)      -> Xcode-only; not provisioned by Flox.
@@ -18,8 +18,8 @@ schema-version = "1.12.0"
 ## Install Packages --------------------------------------------------
 [install]
 # Node is the runtime for agnt-bridge + relay (require() + node:test) and the
-# build host for agnt-web/agnt-host. Pinned to 20 to match CI.
-nodejs.pkg-path = "nodejs_20"
+# build host for agnt-web/agnt-host. Pinned to 22 to match current Vite/Vitest tooling.
+nodejs.pkg-path = "nodejs_22"
 
 # Bun is the installer + test runner across all JS components (bun.lock).
 # Pinned to match `packageManager` in package.json and the CI setup-bun step.
