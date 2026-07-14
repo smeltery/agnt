@@ -5,16 +5,16 @@
 
 const {
   visibleUserPromptFromInputEntries,
-} = require("../bridge/contextual-user-items");
+} = require("../../bridge/contextual-user-items");
 const {
   turnFileChangeSnapshotNotifications,
-} = require("./rollout-live-mirror-tool-notifications");
+} = require("./tool-notifications");
 const {
   buildSyntheticItemId,
   createNotification,
   readString,
   timestampParams,
-} = require("./rollout-live-mirror-utils");
+} = require("../rollout-live-mirror-utils");
 
 const DEFAULT_SYNTHETIC_TERMINAL_GRACE_MS = 1_000;
 

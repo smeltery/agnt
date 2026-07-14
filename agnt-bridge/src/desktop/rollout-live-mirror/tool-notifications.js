@@ -3,7 +3,7 @@
 // Layer: CLI helper
 // Depends on: ./apply-patch-changes, ./rollout-live-mirror-utils
 
-const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
+const { buildApplyPatchFileChangeItem } = require("../apply-patch-changes");
 const {
   buildSyntheticItemId,
   createNotification,
@@ -16,7 +16,7 @@ const {
   readString,
   resolveToolCommand,
   resolveToolWorkingDirectory,
-} = require("./rollout-live-mirror-utils");
+} = require("../rollout-live-mirror-utils");
 
 function toolStartNotifications(state, payload, helpers) {
   if (!state.activeTurnId) {

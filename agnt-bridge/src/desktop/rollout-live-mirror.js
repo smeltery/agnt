@@ -10,7 +10,7 @@ const {
 } = require("./rollout-live-mirror-bootstrap");
 const {
   createRolloutLiveMirrorController: createController,
-} = require("./rollout-live-mirror-controller");
+} = require("./rollout-live-mirror/controller");
 const {
   customToolStartNotifications,
   imageGenerationNotifications,
@@ -18,7 +18,7 @@ const {
   toolOutputNotifications,
   toolStartNotifications,
   turnFileChangeSnapshotNotifications,
-} = require("./rollout-live-mirror-tool-notifications");
+} = require("./rollout-live-mirror/tool-notifications");
 const {
   clearPendingSyntheticTerminal,
   createMirrorState,
@@ -30,7 +30,7 @@ const {
   resetRunState,
   resolveRolloutEventTurnId,
   rolloutUserPromptText,
-} = require("./rollout-live-mirror-state");
+} = require("./rollout-live-mirror/state");
 const {
   agentMessageDedupeKey,
   buildAgentMessageItemId,

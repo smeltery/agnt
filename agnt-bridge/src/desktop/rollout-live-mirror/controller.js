@@ -8,10 +8,10 @@ const fs = require("fs");
 const {
   findRecentRolloutFileForContextRead,
   resolveSessionsRoot,
-} = require("./rollout-watch");
+} = require("../rollout-watch");
 const {
   bootstrapFromExistingRollout,
-} = require("./rollout-live-mirror-bootstrap");
+} = require("../rollout-live-mirror-bootstrap");
 const {
   createNotification,
   readFileSize,
@@ -19,7 +19,7 @@ const {
   readString,
   readThreadId,
   safeParseJSON,
-} = require("./rollout-live-mirror-utils");
+} = require("../rollout-live-mirror-utils");
 
 const DEFAULT_POLL_INTERVAL_MS = 700;
 const DEFAULT_LOOKUP_TIMEOUT_MS = 5_000;
