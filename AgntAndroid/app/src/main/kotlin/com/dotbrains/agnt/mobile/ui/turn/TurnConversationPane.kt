@@ -51,15 +51,12 @@ import com.dotbrains.agnt.mobile.core.model.CodexCollaborationModeKind
 import com.dotbrains.agnt.mobile.core.model.CodexPluginMetadata
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
-import com.dotbrains.agnt.mobile.core.model.CodexThread
-import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
 import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.core.voice.BridgeVoiceRecorder
 import com.dotbrains.agnt.mobile.core.voice.VoiceDraftAppend
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.GitBranchDisplayMapper
-import com.dotbrains.agnt.mobile.data.TurnWorktreePathRouting
 import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
 import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
 import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
@@ -67,7 +64,6 @@ import com.dotbrains.agnt.mobile.data.loadGitBranchesWithStatus
 import com.dotbrains.agnt.mobile.services.agent.review.AiChangeSetRevertService
 import com.dotbrains.agnt.mobile.services.agent.threads.CodexLookupService
 import com.dotbrains.agnt.mobile.services.agent.threads.isPluginListUnsupported
-import com.dotbrains.agnt.mobile.services.git.GitActionsService
 import com.dotbrains.agnt.mobile.ui.LocalAIChangeSetPersistence
 import com.dotbrains.agnt.mobile.ui.agent.MessageList
 import com.dotbrains.agnt.mobile.ui.home.RootReconnectRecoveryAction
@@ -101,18 +97,14 @@ import com.dotbrains.agnt.mobile.ui.turn.composer.buildRuntimeControlsState
 import com.dotbrains.agnt.mobile.ui.turn.composer.formatTurnSendError
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoveryCard
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshotBuilder
-import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnFeedbackDialog
 import com.dotbrains.agnt.mobile.ui.turn.timeline.SmartScrollNavigationCta
 import com.dotbrains.agnt.mobile.ui.turn.timeline.buildChatAnchors
 import com.dotbrains.agnt.mobile.ui.turn.timeline.buildSmartScrollNavigationState
 import com.dotbrains.agnt.mobile.ui.turn.timeline.shouldFollowTimelineBottom
-import com.dotbrains.agnt.mobile.ui.turn.toolbar.ForkThreadActionSheet
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.GitBranchPaneState
-import com.dotbrains.agnt.mobile.ui.turn.toolbar.PlanDetailsActionSheet
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.QueuedDraftsCard
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnPlanAccessoryCard
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnReviewAccessoryCard
-import com.dotbrains.agnt.mobile.ui.turn.toolbar.WorktreeHandoffActionSheet
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.resolveReviewBaseBranch
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.reviewSelectableDefaultBranch
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.selectCompletedPlanAccessoryMessage
@@ -1410,104 +1402,37 @@ fun TurnConversationPane(
                 )
             }
             val onGitCheckout: (String) -> Unit =
-                checkout@{ selectedBranch ->
-                    val cwd = gitCwd
-                    val loaded = gitBranchPaneState as? GitBranchPaneState.Loaded
-                    if (cwd == null || loaded == null) return@checkout
-                    val summary = loaded.summary
-                    val elsewhereSet = summary.branchesCheckedOutElsewhere.toSet()
-                    val elsewherePathRaw = summary.worktreePathByBranch[selectedBranch]?.trim()
-                    val selectedElsewhereUnresolved =
-                        elsewhereSet.contains(selectedBranch) &&
-                            elsewherePathRaw.isNullOrEmpty()
-                    if (selectedElsewhereUnresolved) {
-                        gitBranchCheckoutError = checkoutElsewhereBlockedMessage
-                        return@checkout
-                    }
-                    if (
-                        elsewhereSet.contains(selectedBranch) &&
-                        !elsewherePathRaw.isNullOrEmpty()
-                    ) {
-                        val targetComparable =
-                            TurnWorktreePathRouting.comparableGitProjectPath(
-                                CodexThread.normalizeProjectPath(elsewherePathRaw) ?: elsewherePathRaw,
-                            )
-                                ?: return@checkout
-                        val cwdComparable =
-                            TurnWorktreePathRouting.comparableGitProjectPath(activeThread?.cwd ?: cwd)
-                        if (cwdComparable != null && targetComparable == cwdComparable) {
-                            gitBranchCheckoutError = null
-                            return@checkout
-                        }
-                        val siblingElsewhere =
-                            TurnWorktreePathRouting.liveThreadAtProjectPath(
-                                elsewherePathRaw,
-                                threads,
-                                threadId,
-                            )
-                        scope.launch {
-                            isSwitchingGitBranch = true
-                            gitBranchCheckoutError = null
-                            runCatching {
-                                val targetNormalized =
-                                    CodexThread.normalizeProjectPath(elsewherePathRaw) ?: elsewherePathRaw
-                                if (siblingElsewhere != null) {
-                                    repository.setActiveThreadId(siblingElsewhere.id)
-                                    hydrateGitContextAfterMutation(siblingElsewhere.id)
-                                } else {
-                                    repository.moveThreadToProjectPath(threadId, targetNormalized)
-                                    hydrateGitContextAfterMutation()
-                                }
-                            }.onFailure { e ->
-                                gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
-                            }
-                            isSwitchingGitBranch = false
-                        }
-                        return@checkout
-                    }
-                    scope.launch {
-                        isSwitchingGitBranch = true
-                        gitBranchCheckoutError = null
-                        runCatching { GitActionsService(repository, cwd).checkout(selectedBranch) }
-                            .onSuccess { hydrateGitContextAfterMutation() }
-                            .onFailure { e ->
-                                gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
-                            }
-                        isSwitchingGitBranch = false
-                    }
+                { selectedBranch ->
+                    handleTurnGitCheckout(
+                        selectedBranch = selectedBranch,
+                        cwd = gitCwd,
+                        gitBranchPaneState = gitBranchPaneState,
+                        checkoutElsewhereBlockedMessage = checkoutElsewhereBlockedMessage,
+                        activeThread = activeThread,
+                        threads = threads,
+                        threadId = threadId,
+                        repository = repository,
+                        scope = scope,
+                        setSwitchingGitBranch = { isSwitchingGitBranch = it },
+                        setGitBranchCheckoutError = { gitBranchCheckoutError = it },
+                        hydrateGitContextAfterMutation = { targetThreadId ->
+                            hydrateGitContextAfterMutation(targetThreadId)
+                        },
+                    )
                 }
             val onGitCreateBranch: (String) -> Unit =
-                createBranch@{ branchName ->
-                    val cwd = gitCwd ?: return@createBranch
-                    val loaded = gitBranchPaneState as? GitBranchPaneState.Loaded ?: return@createBranch
-                    if (branchName.isBlank()) return@createBranch
-                    scope.launch {
-                        isSwitchingGitBranch = true
-                        gitBranchCheckoutError = null
-                        runCatching {
-                            GitActionsService(repository, cwd).createBranch(branchName.trim())
-                        }.onSuccess {
-                            val createdBranch = it.branch.trim()
-                            val previous = loaded.summary
-                            val nextSummary =
-                                GitBranchDisplayMapper.summaryFrom(
-                                    GitBranchesWithStatusResult(
-                                        branches = (previous.branches + createdBranch).filter { branch -> branch.isNotBlank() }.distinct(),
-                                        branchesCheckedOutElsewhere = previous.branchesCheckedOutElsewhere.toSet(),
-                                        worktreePathByBranch = previous.worktreePathByBranch,
-                                        localCheckoutPath = null,
-                                        currentBranch = createdBranch.ifEmpty { previous.currentBranch },
-                                        defaultBranch = previous.defaultBranch,
-                                        status = it.status,
-                                    ),
-                                )
-                            gitBranchPaneState = GitBranchPaneState.Loaded(nextSummary)
-                            hydrateGitContextAfterMutation()
-                        }.onFailure { e ->
-                            gitBranchCheckoutError = GitBranchDisplayMapper.userVisibleMessage(e)
-                        }
-                        isSwitchingGitBranch = false
-                    }
+                { branchName ->
+                    handleTurnGitCreateBranch(
+                        branchName = branchName,
+                        cwd = gitCwd,
+                        gitBranchPaneState = gitBranchPaneState,
+                        repository = repository,
+                        scope = scope,
+                        setSwitchingGitBranch = { isSwitchingGitBranch = it },
+                        setGitBranchCheckoutError = { gitBranchCheckoutError = it },
+                        setGitBranchPaneState = { gitBranchPaneState = it },
+                        hydrateGitContextAfterMutation = { hydrateGitContextAfterMutation() },
+                    )
                 }
             TurnComposerBar(
                 draft = draft,
@@ -1830,14 +1755,14 @@ fun TurnConversationPane(
             )
         }
     }
-    ForkThreadActionSheet(
-        visible = showForkThreadSheet,
+    TurnConversationPaneSheetHost(
+        showForkThreadSheet = showForkThreadSheet,
         projectPath = activeThread?.cwd,
-        inProgress = forkingThread,
-        onDismiss = {
+        forkingThread = forkingThread,
+        onDismissForkThread = {
             if (!forkingThread) showForkThreadSheet = false
         },
-        onConfirm = {
+        onConfirmForkThread = {
             scope.launch {
                 forkingThread = true
                 runCatching {
@@ -1852,48 +1777,35 @@ fun TurnConversationPane(
                 forkingThread = false
             }
         },
-    )
-    if (showFeedbackDialog) {
-        TurnFeedbackDialog(
-            onDismiss = { showFeedbackDialog = false },
-            onSubmit = {
-                showFeedbackDialog = false
-            },
-        )
-    }
-    WorktreeHandoffActionSheet(
-        visible = showWorktreeHandoffSheet,
+        showFeedbackDialog = showFeedbackDialog,
+        onDismissFeedbackDialog = { showFeedbackDialog = false },
+        onSubmitFeedback = { showFeedbackDialog = false },
+        showWorktreeHandoffSheet = showWorktreeHandoffSheet,
         isWorktreeProject = activeThread?.isManagedWorktreeProject == true,
-        inProgress = isHandingOffWorktree,
-        availableBaseBranches = loadedGitBranchSummary?.branches.orEmpty(),
-        defaultBaseBranch = defaultReviewBaseBranch,
-        currentBranch = loadedGitBranchSummary?.currentBranch,
+        isHandingOffWorktree = isHandingOffWorktree,
+        loadedGitBranchSummary = loadedGitBranchSummary,
+        defaultReviewBaseBranch = defaultReviewBaseBranch,
         sourceProjectPath = gitCwd,
         localTargetPath = localWorktreeHandoffTargetPath,
         associatedWorktreePath = repository.associatedManagedWorktreePathFor(threadId),
-        hasAssociatedWorktree = repository.associatedManagedWorktreePathFor(threadId) != null,
-        errorMessage = worktreeHandoffError,
-        onDismiss = {
+        worktreeHandoffError = worktreeHandoffError,
+        onDismissWorktreeHandoff = {
             if (!isHandingOffWorktree) showWorktreeHandoffSheet = false
         },
-        onConfirm = { selectedBaseBranch ->
+        onConfirmWorktreeHandoff = { selectedBaseBranch ->
             handoffCurrentThread(selectedBaseBranch)
         },
-    )
-    PlanDetailsActionSheet(
-        visible = showPlanDetailsSheet,
-        message = visiblePlanAccessoryMessage,
+        showPlanDetailsSheet = showPlanDetailsSheet,
+        visiblePlanAccessoryMessage = visiblePlanAccessoryMessage,
         canApplyPlan = !isThreadRunning && !sending,
-        onDismiss = { showPlanDetailsSheet = false },
-        onApplyPlan = {
+        onDismissPlanDetails = { showPlanDetailsSheet = false },
+        onApplyPlanDetails = {
             applyPlanToComposer()
             if (!hasComposerDraftContent) {
                 showPlanDetailsSheet = false
             }
         },
-    )
-    FullTimelineMessageSheet(
-        message = fullTimelineMessage,
-        onDismiss = { fullTimelineMessage = null },
+        fullTimelineMessage = fullTimelineMessage,
+        onDismissFullTimelineMessage = { fullTimelineMessage = null },
     )
 }

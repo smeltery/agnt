@@ -19,7 +19,82 @@ import com.dotbrains.agnt.mobile.core.model.AIChangeSet
 import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
 import com.dotbrains.agnt.mobile.core.model.TurnUsageSheetLogic
+import com.dotbrains.agnt.mobile.data.GitBranchDisplaySummary
+import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnFeedbackDialog
 import com.dotbrains.agnt.mobile.ui.turn.timeline.TurnRichMarkdownBody
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.ForkThreadActionSheet
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.PlanDetailsActionSheet
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.WorktreeHandoffActionSheet
+
+@Composable
+internal fun TurnConversationPaneSheetHost(
+    showForkThreadSheet: Boolean,
+    projectPath: String?,
+    forkingThread: Boolean,
+    onDismissForkThread: () -> Unit,
+    onConfirmForkThread: () -> Unit,
+    showFeedbackDialog: Boolean,
+    onDismissFeedbackDialog: () -> Unit,
+    onSubmitFeedback: () -> Unit,
+    showWorktreeHandoffSheet: Boolean,
+    isWorktreeProject: Boolean,
+    isHandingOffWorktree: Boolean,
+    loadedGitBranchSummary: GitBranchDisplaySummary?,
+    defaultReviewBaseBranch: String?,
+    sourceProjectPath: String?,
+    localTargetPath: String?,
+    associatedWorktreePath: String?,
+    worktreeHandoffError: String?,
+    onDismissWorktreeHandoff: () -> Unit,
+    onConfirmWorktreeHandoff: (String?) -> Unit,
+    showPlanDetailsSheet: Boolean,
+    visiblePlanAccessoryMessage: CodexMessage?,
+    canApplyPlan: Boolean,
+    onDismissPlanDetails: () -> Unit,
+    onApplyPlanDetails: () -> Unit,
+    fullTimelineMessage: CodexMessage?,
+    onDismissFullTimelineMessage: () -> Unit,
+) {
+    ForkThreadActionSheet(
+        visible = showForkThreadSheet,
+        projectPath = projectPath,
+        inProgress = forkingThread,
+        onDismiss = onDismissForkThread,
+        onConfirm = onConfirmForkThread,
+    )
+    if (showFeedbackDialog) {
+        TurnFeedbackDialog(
+            onDismiss = onDismissFeedbackDialog,
+            onSubmit = { onSubmitFeedback() },
+        )
+    }
+    WorktreeHandoffActionSheet(
+        visible = showWorktreeHandoffSheet,
+        isWorktreeProject = isWorktreeProject,
+        inProgress = isHandingOffWorktree,
+        availableBaseBranches = loadedGitBranchSummary?.branches.orEmpty(),
+        defaultBaseBranch = defaultReviewBaseBranch,
+        currentBranch = loadedGitBranchSummary?.currentBranch,
+        sourceProjectPath = sourceProjectPath,
+        localTargetPath = localTargetPath,
+        associatedWorktreePath = associatedWorktreePath,
+        hasAssociatedWorktree = associatedWorktreePath != null,
+        errorMessage = worktreeHandoffError,
+        onDismiss = onDismissWorktreeHandoff,
+        onConfirm = onConfirmWorktreeHandoff,
+    )
+    PlanDetailsActionSheet(
+        visible = showPlanDetailsSheet,
+        message = visiblePlanAccessoryMessage,
+        canApplyPlan = canApplyPlan,
+        onDismiss = onDismissPlanDetails,
+        onApplyPlan = onApplyPlanDetails,
+    )
+    FullTimelineMessageSheet(
+        message = fullTimelineMessage,
+        onDismiss = onDismissFullTimelineMessage,
+    )
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
