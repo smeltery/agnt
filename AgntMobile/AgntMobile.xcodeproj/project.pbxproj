@@ -80,6 +80,8 @@
 		B1C2D3E4F5061728394A5B8E /* CodexServiceIncomingHistoryMergeTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B8F /* CodexServiceIncomingHistoryMergeTestSupport.swift */; };
 		B1C2D3E4F5061728394A5B90 /* CodexServiceIncomingHistoryReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B91 /* CodexServiceIncomingHistoryReplayTests.swift */; };
 		B1C2D3E4F5061728394A5B8A /* CodexServiceIncomingFileChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B8B /* CodexServiceIncomingFileChangeTests.swift */; };
+		B1C2D3E4F5061728394A5B92 /* CodexServiceIncomingFileChangeTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B93 /* CodexServiceIncomingFileChangeTestSupport.swift */; };
+		B1C2D3E4F5061728394A5B94 /* CodexServiceIncomingFileChangeHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B95 /* CodexServiceIncomingFileChangeHistoryTests.swift */; };
 		B1C2D3E4F5061728394A5B6D /* CodexServiceIncomingImageGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B6D8 /* CodexServiceIncomingImageGenerationTests.swift */; };
 		B1C2D3E4F5061728394A5B6F /* CodexServiceImageGenerationMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B6F0 /* CodexServiceImageGenerationMergeTests.swift */; };
 		B1C2D3E4F5061728394A5B71 /* CodexServiceImageGenerationHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B712 /* CodexServiceImageGenerationHistoryTests.swift */; };
@@ -280,6 +282,8 @@
 		C1D2E3F40516273849A5B8F /* CodexServiceIncomingHistoryMergeTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingHistoryMergeTestSupport.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B91 /* CodexServiceIncomingHistoryReplayTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingHistoryReplayTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B8B /* CodexServiceIncomingFileChangeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingFileChangeTests.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B93 /* CodexServiceIncomingFileChangeTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingFileChangeTestSupport.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B95 /* CodexServiceIncomingFileChangeHistoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingFileChangeHistoryTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B6D8 /* CodexServiceIncomingImageGenerationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceIncomingImageGenerationTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B6F0 /* CodexServiceImageGenerationMergeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationMergeTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B712 /* CodexServiceImageGenerationHistoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationHistoryTests.swift; sourceTree = "<group>"; };
@@ -408,6 +412,8 @@
 				C1D2E3F40516273849A5B91 /* CodexServiceIncomingHistoryReplayTests.swift */,
 				B0C1D2E3F40516273849A5C2 /* CodexServiceIncomingContextCompactionTests.swift */,
 				C1D2E3F40516273849A5B8B /* CodexServiceIncomingFileChangeTests.swift */,
+				C1D2E3F40516273849A5B93 /* CodexServiceIncomingFileChangeTestSupport.swift */,
+				C1D2E3F40516273849A5B95 /* CodexServiceIncomingFileChangeHistoryTests.swift */,
 				C1D2E3F40516273849A5B755 /* ImageGeneration */,
 				8D1F2A3B4C5D6E7F8091A2B4 /* CodexServiceConnectionErrorTests.swift */,
 				8F1A2B3C4D5E6F708192A3B5 /* CodexPushNotificationRegistrationTests.swift */,
@@ -883,6 +889,8 @@
 				B1C2D3E4F5061728394A5B90 /* CodexServiceIncomingHistoryReplayTests.swift in Sources */,
 				B0C1D2E3F40516273849A5C1 /* CodexServiceIncomingContextCompactionTests.swift in Sources */,
 				B1C2D3E4F5061728394A5B8A /* CodexServiceIncomingFileChangeTests.swift in Sources */,
+				B1C2D3E4F5061728394A5B92 /* CodexServiceIncomingFileChangeTestSupport.swift in Sources */,
+				B1C2D3E4F5061728394A5B94 /* CodexServiceIncomingFileChangeHistoryTests.swift in Sources */,
 				B1C2D3E4F5061728394A5B6D /* CodexServiceIncomingImageGenerationTests.swift in Sources */,
 				B1C2D3E4F5061728394A5B6F /* CodexServiceImageGenerationMergeTests.swift in Sources */,
 				B1C2D3E4F5061728394A5B71 /* CodexServiceImageGenerationHistoryTests.swift in Sources */,
