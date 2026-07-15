@@ -1,13 +1,10 @@
 package com.dotbrains.agnt.mobile.ui.shell
 
 import android.content.ClipData
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,38 +19,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.core.model.GitBranchesWithStatusResult
-import com.dotbrains.agnt.mobile.core.model.GitDiffTotals
-import com.dotbrains.agnt.mobile.core.model.GitRepoSyncResult
-import com.dotbrains.agnt.mobile.core.model.GitWorktreeChangeTransferMode
-import com.dotbrains.agnt.mobile.core.model.TurnGitActionKind
-import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightOperation
-import com.dotbrains.agnt.mobile.core.model.TurnGitPreflightPolicy
-import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlert
-import com.dotbrains.agnt.mobile.core.model.TurnGitSyncAlertAction
-import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnAggregator
-import com.dotbrains.agnt.mobile.data.RepoDiffLastTurnFileRow
-import com.dotbrains.agnt.mobile.data.WorktreeFlowCoordinator
-import com.dotbrains.agnt.mobile.data.WorktreeFlowHandoffOutcome
-import com.dotbrains.agnt.mobile.data.agntBuildPullRequestUrl
-import com.dotbrains.agnt.mobile.data.agntResolveCommitMessage
-import com.dotbrains.agnt.mobile.data.gitWorkingDirectoryForGitActions
 import com.dotbrains.agnt.mobile.services.agent.connection.DesktopHandoffService
-import com.dotbrains.agnt.mobile.services.git.GitActionsError
-import com.dotbrains.agnt.mobile.services.git.GitActionsService
 import com.dotbrains.agnt.mobile.services.workspace.WorkspaceTextFileService
 import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
 import com.dotbrains.agnt.mobile.ui.agent.truncatePathMiddle
-import com.dotbrains.agnt.mobile.ui.home.GitActionProgressBannerState
-import com.dotbrains.agnt.mobile.ui.home.GitActionProgressPhase
 import com.dotbrains.agnt.mobile.ui.home.RootViewModel
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
 import com.dotbrains.agnt.mobile.ui.turn.WorkspaceTextFilePreviewRequest
-import com.dotbrains.agnt.mobile.ui.turn.timeline.RepoMarkdownFileLink
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 
 private const val GIT_OPERATION_TIMEOUT_MS = 150_000L
 
@@ -98,37 +71,6 @@ fun MainShell(
     var bridgeUpdateError by remember { mutableStateOf<String?>(null) }
     var isUpdatingBridge by remember { mutableStateOf(false) }
     var handingOffToDesktop by remember { mutableStateOf(false) }
-    var handingOffWorktree by remember { mutableStateOf(false) }
-    var worktreeHandoffError by remember { mutableStateOf<String?>(null) }
-    var repoStatusSnapshot by remember { mutableStateOf<GitRepoSyncResult?>(null) }
-    var branchesWithStatusSnapshot by remember { mutableStateOf<GitBranchesWithStatusResult?>(null) }
-    var repoDiffTotals by remember { mutableStateOf<GitDiffTotals?>(null) }
-    var defaultGitBaseBranch by remember { mutableStateOf<String?>(null) }
-    var isLoadingRepoDiff by remember { mutableStateOf(false) }
-    var gitToolbarRefreshNonce by remember { mutableStateOf(0) }
-    var showRepoDiffSheet by remember { mutableStateOf(false) }
-    var repoDiffSheetScope by remember { mutableStateOf(GitRepoDiffScope.LastTurn) }
-
-    /** threadId → full working-tree patch from bridge (invalidated via [gitToolbarRefreshNonce]). */
-    var cachedFullWorkingTreeDiff by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var repoDiffSheetLastTurnRows by remember { mutableStateOf<List<RepoDiffLastTurnFileRow>>(emptyList()) }
-    var repoDiffSheetFullPatch by remember { mutableStateOf("") }
-    var repoDiffSheetFullLoading by remember { mutableStateOf(false) }
-    var repoDiffSheetFullError by remember { mutableStateOf<String?>(null) }
-    var repoDiffMarkdownFocusQuery by remember { mutableStateOf<String?>(null) }
-    var gitActionBusy by remember { mutableStateOf(false) }
-    var gitActionError by remember { mutableStateOf<String?>(null) }
-    var gitActionProgressMessage by remember { mutableStateOf<String?>(null) }
-    var gitActionProgressPhase by remember { mutableStateOf<GitActionProgressPhase?>(null) }
-    var gitActionProgressIncludesPush by remember { mutableStateOf(true) }
-    var gitActionProgressIncludesPullRequest by remember { mutableStateOf(false) }
-    var gitActionSheetMode by remember { mutableStateOf<GitActionSheetMode?>(null) }
-    var gitActionSheetInitialNextStep by remember { mutableStateOf<GitActionNextStep?>(null) }
-    var showGitInitPrompt by remember { mutableStateOf(false) }
-    var gitInitError by remember { mutableStateOf<String?>(null) }
-    var gitSyncAlert by remember { mutableStateOf<TurnGitSyncAlert?>(null) }
-    var pendingGitOperation by remember { mutableStateOf<PendingGitOperation?>(null) }
-    var showNothingToCommit by remember { mutableStateOf(false) }
     var showPathDialog by remember { mutableStateOf(false) }
     var workspaceTextFilePreview by remember { mutableStateOf<WorkspaceTextFilePreviewRequest?>(null) }
     val workspaceTextFileService = remember(repository) { WorkspaceTextFileService(repository) }
@@ -162,689 +104,30 @@ fun MainShell(
         remember(activeThreadId, messagesByThread) {
             activeThreadId?.let { tid -> messagesByThread[tid] }.orEmpty()
         }
-
-    val gitCwd = remember(activeThread) { activeThread?.gitWorkingDirectoryForGitActions() }
-    val showGitControls = ready && !gitCwd.isNullOrBlank()
-    val isWorktreeProject = activeThread?.isManagedWorktreeProject == true
-    LaunchedEffect(repoStatusSnapshot?.state, gitCwd, showGitControls) {
-        val needsInit = repoStatusSnapshot?.state in setOf("not_initialized", "missing_local_repo")
-        if (showGitControls && needsInit) {
-            showGitInitPrompt = true
-        } else {
-            showGitInitPrompt = false
-            gitInitError = null
-        }
-    }
-    val associatedWorktreePath =
-        remember(activeThreadId, threads) {
-            activeThreadId?.let { repository.associatedManagedWorktreePathFor(it) }
-        }
-    val localWorktreeHandoffTargetPath =
-        remember(branchesWithStatusSnapshot) {
-            val branches = branchesWithStatusSnapshot ?: return@remember null
-            val preferredBranch = branches.defaultBranch ?: branches.currentBranch
-            preferredBranch
-                ?.let { branches.worktreePathByBranch[it]?.trim()?.takeIf { path -> path.isNotEmpty() } }
-                ?: branches.worktreePathByBranch.values
-                    .firstOrNull { it.isNotBlank() }
-                    ?.trim()
-        }
-    val showWorktreeHandoff =
-        showGitControls &&
-            ready &&
-            activeThreadId != null &&
-            !showTurnStop &&
-            !handingOffWorktree &&
-            (
-                (isWorktreeProject && localWorktreeHandoffTargetPath != null) ||
-                    (!isWorktreeProject && (associatedWorktreePath != null || defaultGitBaseBranch != null))
-            )
-    val gitToastMessage =
-        if (isLoadingRepoDiff && showGitControls && gitActionProgressPhase == null) {
-            gitStatusLoadingToast
-        } else {
-            null
-        }
-    val gitProgressToast =
-        gitActionProgressPhase?.let {
-            GitActionProgressBannerState(
-                phase = it,
-                includesPush = gitActionProgressIncludesPush,
-                includesPullRequest = gitActionProgressIncludesPullRequest,
-            )
-        }
-
-    fun enqueueRepoDiffFullTreePrefetch() {
-        val tid = activeThreadId
-        val cwd = gitCwd
-        if (tid != null && !cwd.isNullOrBlank()) {
-            val cached = cachedFullWorkingTreeDiff?.takeIf { it.first == tid }
-            repoDiffSheetFullPatch = cached?.second.orEmpty()
-            repoDiffSheetFullLoading = cached == null || cached.second.isBlank()
-            scope.launch {
-                runCatching { GitActionsService(repository, cwd).diff() }
-                    .onSuccess {
-                        cachedFullWorkingTreeDiff = tid to it.patch
-                        repoDiffSheetFullPatch = it.patch
-                    }.onFailure {
-                        val rawMessage = it.message.orEmpty()
-                        val userVisibleMessage = rawMessage.withoutGitLineEndingWarnings().ifBlank { null }
-                        repoDiffSheetFullError =
-                            if (rawMessage.isNotBlank() && userVisibleMessage == null) {
-                                null
-                            } else {
-                                userVisibleMessage ?: gitRepoDiffLoadErrorMessage
-                            }
-                    }
-                repoDiffSheetFullLoading = false
-            }
-        } else {
-            repoDiffSheetFullPatch = ""
-            repoDiffSheetFullLoading = false
-        }
-    }
-
-    fun openRepoDiffSheetFromHeader() {
-        repoDiffMarkdownFocusQuery = null
-        showRepoDiffSheet = true
-        repoDiffSheetScope = GitRepoDiffScope.LastTurn
-        repoDiffSheetFullError = null
-        repoDiffSheetLastTurnRows =
-            RepoDiffLastTurnAggregator.fileRowsFromLastTurn(threadMessages)
-        enqueueRepoDiffFullTreePrefetch()
-    }
-
-    fun openWorkspaceTextFilePreview(link: String) {
-        val normalizedPath = RepoMarkdownFileLink.normalizePath(link).takeIf { it.isNotBlank() } ?: return
-        workspaceTextFilePreview =
-            WorkspaceTextFilePreviewRequest(
-                path = normalizedPath,
-                cwd = threadPathFull,
-            )
-    }
-
-    fun openRepoDiffSheetFromMarkdown(link: String) {
-        // When the repo has working-tree changes, open the diff sheet so a tapped path lands on its
-        // diff (LastTurn if it was edited this turn, otherwise the full working tree). When there is
-        // no diff to show (clean tree, no git controls, or no active thread) fall back to the
-        // read-only workspace text preview instead of silently doing nothing.
-        if (repoDiffTotals?.hasChanges != true || !showGitControls || activeThreadId == null) {
-            openWorkspaceTextFilePreview(link)
-            return
-        }
-        val q = RepoMarkdownFileLink.canonicalFilenameQuery(link)
-        repoDiffMarkdownFocusQuery = q
-        val lastRows = RepoDiffLastTurnAggregator.fileRowsFromLastTurn(threadMessages)
-        repoDiffSheetLastTurnRows = lastRows
-        repoDiffSheetScope =
-            if (lastRows.any { RepoMarkdownFileLink.rowMatchesQuery(it.path, q) }) {
-                GitRepoDiffScope.LastTurn
-            } else {
-                GitRepoDiffScope.FullWorkingTree
-            }
-        repoDiffSheetFullError = null
-        enqueueRepoDiffFullTreePrefetch()
-        showRepoDiffSheet = true
-    }
-
-    LaunchedEffect(activeThreadId, gitToolbarRefreshNonce) {
-        cachedFullWorkingTreeDiff = null
-    }
-
-    fun handleGitActionFailure(
-        e: Throwable,
-        onNothingToCommit: () -> Unit,
-    ) {
-        gitActionProgressMessage = null
-        gitActionProgressPhase = null
-        gitActionProgressIncludesPush = true
-        gitActionProgressIncludesPullRequest = false
-        when {
-            e is GitActionsError.BridgeFailure && e.errorCode == "nothing_to_commit" -> onNothingToCommit()
-            e is GitActionsError.BridgeFailure &&
-                (e.errorCode == "branch_is_main" || e.errorCode == "protected_branch") -> {
-                gitSyncAlert =
-                    TurnGitSyncAlert.withDefaultButtons(
-                        title = "Protected branch",
-                        message = e.message?.ifBlank { null } ?: "This branch is protected.",
-                        action = TurnGitSyncAlertAction.dismissOnly,
-                    )
-                pendingGitOperation = null
-            }
-            e is TimeoutCancellationException -> {
-                gitActionError = "Git operation timed out. Check the desktop bridge and try again."
-            }
-            else -> {
-                gitActionError = e.message?.ifBlank { null } ?: e.toString()
-            }
-        }
-    }
-
-    suspend fun resolveCommitMessage(
-        git: GitActionsService,
-        rawMessage: String,
-    ): String? = agntResolveCommitMessage(rawMessage) { git.generateCommitMessage().fullMessage }
-
-    suspend fun openPullRequestUrl(
-        git: GitActionsService,
-        submission: GitActionSheetSubmission,
-    ) {
-        val st = git.status()
-        val bw = git.branchesWithStatus()
-        val branch = st.currentBranch?.trim().orEmpty()
-        val base =
-            submission.baseBranch
-                .trim()
-                .ifEmpty { bw.defaultBranch?.trim().orEmpty() }
-        if (branch.isEmpty() || base.isEmpty()) {
-            throw IllegalStateException("Could not determine branch or default for PR.")
-        }
-        val draft =
-            if (submission.pullRequestTitle.isBlank() || submission.pullRequestBody.isBlank()) {
-                runCatching { git.generatePullRequestDraft(baseBranch = base) }.getOrNull()
-            } else {
-                null
-            }
-        val title =
-            submission.pullRequestTitle
-                .trim()
-                .ifEmpty { draft?.title?.trim().orEmpty() }
-        val body =
-            submission.pullRequestBody
-                .trim()
-                .ifEmpty { draft?.body?.trim().orEmpty() }
-        val remote = git.remoteUrl()
-        val ownerRepo =
-            remote.ownerRepo?.trim()?.takeIf { it.isNotEmpty() }
-                ?: throw IllegalStateException("Could not read Git remote (GitHub PR link needs origin).")
-        val url = agntBuildPullRequestUrl(ownerRepo, branch, base, title, body)
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    }
-
-    fun operationForSubmission(submission: GitActionSheetSubmission): TurnGitPreflightOperation =
-        when (submission.nextStep) {
-            GitActionNextStep.commit -> TurnGitPreflightOperation.commit
-            GitActionNextStep.commitAndPush,
-            GitActionNextStep.push,
-            -> TurnGitPreflightOperation.push
-            GitActionNextStep.commitPushAndPullRequest,
-            GitActionNextStep.pushAndPullRequest,
-            GitActionNextStep.createPullRequest,
-            -> TurnGitPreflightOperation.createPullRequest
-        }
-
-    fun enqueueGitPreflightIfNeeded(
-        cwd: String,
-        operation: TurnGitPreflightOperation,
-        submission: GitActionSheetSubmission? = null,
-        status: GitRepoSyncResult? = repoStatusSnapshot,
-        branches: GitBranchesWithStatusResult? = branchesWithStatusSnapshot,
-    ): Boolean {
-        val alert = TurnGitPreflightPolicy.alertFor(status, branches, operation) ?: return false
-        pendingGitOperation =
-            PendingGitOperation(
-                operation = operation,
-                cwd = cwd,
-                submission = submission,
-            )
-        gitSyncAlert = alert
-        return true
-    }
-
-    suspend fun executeGitActionSheetNow(
-        submission: GitActionSheetSubmission,
-        cwd: String,
-    ) {
-        gitActionBusy = true
-        gitActionError = null
-        try {
-            withTimeout(GIT_OPERATION_TIMEOUT_MS) {
-                val git = GitActionsService(repository, cwd)
-                when (submission.nextStep) {
-                    GitActionNextStep.commit -> {
-                        gitActionProgressMessage = null
-                        gitActionProgressIncludesPush = false
-                        gitActionProgressIncludesPullRequest = false
-                        gitActionProgressPhase = GitActionProgressPhase.resolvingCommitMessage
-                        val commitMessage = resolveCommitMessage(git, submission.commitMessage)
-                        gitActionProgressPhase = GitActionProgressPhase.committing
-                        git.commit(commitMessage)
-                        gitActionProgressPhase = GitActionProgressPhase.done
-                    }
-                    GitActionNextStep.commitAndPush -> {
-                        gitActionProgressMessage = null
-                        gitActionProgressIncludesPush = true
-                        gitActionProgressIncludesPullRequest = false
-                        gitActionProgressPhase = GitActionProgressPhase.resolvingCommitMessage
-                        val commitMessage = resolveCommitMessage(git, submission.commitMessage)
-                        gitActionProgressPhase = GitActionProgressPhase.committing
-                        git.commit(commitMessage)
-                        gitActionProgressPhase = GitActionProgressPhase.pushing
-                        git.push(submission.pushRemoteName)
-                        gitActionProgressPhase = GitActionProgressPhase.done
-                    }
-                    GitActionNextStep.commitPushAndPullRequest -> {
-                        gitActionProgressMessage = null
-                        gitActionProgressIncludesPush = true
-                        gitActionProgressIncludesPullRequest = true
-                        gitActionProgressPhase = GitActionProgressPhase.resolvingCommitMessage
-                        val commitMessage = resolveCommitMessage(git, submission.commitMessage)
-                        gitActionProgressPhase = GitActionProgressPhase.committing
-                        git.commit(commitMessage)
-                        gitActionProgressPhase = GitActionProgressPhase.pushing
-                        git.push(submission.pushRemoteName)
-                        gitActionProgressPhase = GitActionProgressPhase.preparingPullRequest
-                        openPullRequestUrl(git, submission)
-                        gitActionProgressPhase = GitActionProgressPhase.done
-                    }
-                    GitActionNextStep.push -> {
-                        gitActionProgressMessage = "Pushing branch..."
-                        git.push(submission.pushRemoteName)
-                        gitActionProgressMessage = "Pushed branch."
-                    }
-                    GitActionNextStep.pushAndPullRequest -> {
-                        gitActionProgressMessage = "Pushing branch..."
-                        git.push(submission.pushRemoteName)
-                        gitActionProgressMessage = "Preparing pull request..."
-                        openPullRequestUrl(git, submission)
-                        gitActionProgressMessage = "Pull request draft opened."
-                    }
-                    GitActionNextStep.createPullRequest -> {
-                        gitActionProgressMessage = "Preparing pull request..."
-                        openPullRequestUrl(git, submission)
-                        gitActionProgressMessage = "Pull request draft opened."
-                    }
-                }
-            }
-            gitActionError = null
-            gitActionSheetMode = null
-            gitActionSheetInitialNextStep = null
-        } catch (e: Throwable) {
-            handleGitActionFailure(e) { showNothingToCommit = true }
-        } finally {
-            gitActionBusy = false
-            gitToolbarRefreshNonce++
-        }
-    }
-
-    LaunchedEffect(gitActionProgressMessage, gitActionProgressPhase, gitActionBusy) {
-        val message = gitActionProgressMessage
-        val phase = gitActionProgressPhase
-        if (!gitActionBusy && (!message.isNullOrBlank() || phase == GitActionProgressPhase.done)) {
-            delay(3_500)
-            if (gitActionProgressMessage == message && gitActionProgressPhase == phase) {
-                gitActionProgressMessage = null
-                gitActionProgressPhase = null
-            }
-        }
-    }
-
-    fun continuePendingGitOperation(commitFirst: Boolean = false) {
-        val pending = pendingGitOperation ?: return
-        gitSyncAlert = null
-        pendingGitOperation = null
-        scope.launch {
-            gitActionBusy = true
-            gitActionError = null
-            try {
-                withTimeout(GIT_OPERATION_TIMEOUT_MS) {
-                    val git = GitActionsService(repository, pending.cwd)
-                    if (commitFirst) {
-                        git.commit("WIP before continuing")
-                    }
-                    val submission = pending.submission
-                    if (submission != null) {
-                        gitActionBusy = false
-                        executeGitActionSheetNow(submission, pending.cwd)
-                    } else if (pending.operation is TurnGitPreflightOperation.CreateManagedWorktree) {
-                        gitActionBusy = false
-                        val tid = activeThreadId ?: return@withTimeout
-                        val baseBranch = pending.operation.baseBranch
-                        handingOffWorktree = true
-                        worktreeHandoffError = null
-                        try {
-                            val outcome =
-                                WorktreeFlowCoordinator(repository).handoffThreadToWorktree(
-                                    threadId = tid,
-                                    sourceProjectPath = pending.cwd,
-                                    associatedWorktreePath = associatedWorktreePath,
-                                    baseBranchForNewWorktree = baseBranch,
-                                )
-                            when (outcome) {
-                                is WorktreeFlowHandoffOutcome.Moved -> repository.setActiveThreadId(outcome.move.thread.id)
-                                WorktreeFlowHandoffOutcome.MissingAssociatedWorktree ->
-                                    worktreeHandoffError =
-                                        "The associated worktree is no longer available. Open the thread to create a new managed worktree."
-                            }
-                        } catch (e: Throwable) {
-                            worktreeHandoffError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-                        } finally {
-                            handingOffWorktree = false
-                        }
-                    }
-                }
-            } catch (e: Throwable) {
-                handleGitActionFailure(e) { showNothingToCommit = true }
-            } finally {
-                if (gitActionBusy) {
-                    gitActionBusy = false
-                    gitToolbarRefreshNonce++
-                }
-            }
-        }
-    }
-
-    fun initializeRepositoryForCurrentThread() {
-        val cwd = gitCwd ?: return
-        if (repoStatusSnapshot?.isRepo == true) return
-        if (!showGitControls || gitActionBusy) return
-        scope.launch {
-            gitActionBusy = true
-            gitActionProgressMessage = gitInitInitializingMessage
-            gitInitError = null
-            try {
-                withTimeout(GIT_OPERATION_TIMEOUT_MS) {
-                    val git = GitActionsService(repository, cwd)
-                    val result = git.initializeRepository()
-                    val refreshedStatus = result.status ?: runCatching { git.status() }.getOrNull()
-                    repoStatusSnapshot = refreshedStatus
-                    repoDiffTotals = refreshedStatus?.workingTreeDiffTotals
-                    branchesWithStatusSnapshot = runCatching { git.branchesWithStatus() }.getOrNull()
-                    defaultGitBaseBranch = branchesWithStatusSnapshot?.defaultBranch
-                    showGitInitPrompt = false
-                    gitActionProgressMessage = gitInitInitializedMessage
-                }
-            } catch (e: Throwable) {
-                gitActionProgressMessage = null
-                gitInitError = e.message?.ifBlank { null } ?: e.toString()
-            } finally {
-                gitActionBusy = false
-                gitToolbarRefreshNonce++
-            }
-        }
-    }
-
-    fun pullRebaseForPendingGitOperation() {
-        val cwd = pendingGitOperation?.cwd ?: gitCwd ?: return
-        gitSyncAlert = null
-        pendingGitOperation = null
-        scope.launch {
-            gitActionBusy = true
-            gitActionError = null
-            runCatching {
-                withTimeout(GIT_OPERATION_TIMEOUT_MS) {
-                    val result = GitActionsService(repository, cwd).pull()
-                    result.status?.let {
-                        repoStatusSnapshot = it
-                        repoDiffTotals = it.workingTreeDiffTotals
-                    }
-                }
-            }.onFailure { e ->
-                handleGitActionFailure(e) { showNothingToCommit = true }
-            }
-            gitActionBusy = false
-            gitToolbarRefreshNonce++
-        }
-    }
-
-    fun discardRuntimeChangesForPendingGitOperation() {
-        val cwd = pendingGitOperation?.cwd ?: gitCwd ?: return
-        gitSyncAlert = null
-        pendingGitOperation = null
-        scope.launch {
-            gitActionBusy = true
-            gitActionError = null
-            runCatching {
-                withTimeout(GIT_OPERATION_TIMEOUT_MS) {
-                    val result = GitActionsService(repository, cwd).resetToRemoteDiscardRuntime()
-                    result.status?.let {
-                        repoStatusSnapshot = it
-                        repoDiffTotals = it.workingTreeDiffTotals
-                    }
-                }
-            }.onFailure { e ->
-                handleGitActionFailure(e) { showNothingToCommit = true }
-            }
-            gitActionBusy = false
-            gitToolbarRefreshNonce++
-        }
-    }
-
-    fun handoffCurrentThreadWorktree(skipPreflight: Boolean = false) {
-        val tid = activeThreadId ?: return
-        val cwd = gitCwd ?: return
-        if (!showGitControls || showTurnStop || handingOffWorktree) return
-        val baseBranch =
-            defaultGitBaseBranch?.trim()?.takeIf { it.isNotEmpty() }
-                ?: branchesWithStatusSnapshot?.currentBranch?.trim()?.takeIf { it.isNotEmpty() }
-        val localTarget = localWorktreeHandoffTargetPath
-        if (isWorktreeProject && localTarget == null) {
-            gitSyncAlert =
-                TurnGitSyncAlert.withDefaultButtons(
-                    title = "Worktree handoff unavailable",
-                    message = "Could not resolve the paired Local checkout for this worktree.",
-                    action = TurnGitSyncAlertAction.dismissOnly,
-                )
-            return
-        }
-        if (!isWorktreeProject && associatedWorktreePath == null && baseBranch == null) {
-            gitSyncAlert =
-                TurnGitSyncAlert.withDefaultButtons(
-                    title = "Worktree handoff unavailable",
-                    message = "Could not determine a base branch for the managed worktree.",
-                    action = TurnGitSyncAlertAction.dismissOnly,
-                )
-            return
-        }
-
-        val preflightBranches = branchesWithStatusSnapshot
-        if (
-            !skipPreflight &&
-            !isWorktreeProject &&
-            associatedWorktreePath == null &&
-            preflightBranches != null &&
-            baseBranch != null
-        ) {
-            val alert =
-                TurnGitPreflightPolicy.alertFor(
-                    status = repoStatusSnapshot ?: preflightBranches.status,
-                    branches = preflightBranches,
-                    operation =
-                        TurnGitPreflightOperation.createManagedWorktree(
-                            baseBranch = baseBranch,
-                            changeTransfer = GitWorktreeChangeTransferMode.move,
-                        ),
-                )
-            if (alert != null) {
-                pendingGitOperation =
-                    PendingGitOperation(
-                        operation =
-                            TurnGitPreflightOperation.createManagedWorktree(
-                                baseBranch = baseBranch,
-                                changeTransfer = GitWorktreeChangeTransferMode.move,
-                            ),
-                        cwd = cwd,
-                    )
-                gitSyncAlert = alert
-                return
-            }
-        }
-
-        scope.launch {
-            handingOffWorktree = true
-            worktreeHandoffError = null
-            try {
-                val coordinator = WorktreeFlowCoordinator(repository)
-                val outcome =
-                    if (isWorktreeProject) {
-                        coordinator.handoffThreadToProjectPath(
-                            threadId = tid,
-                            sourceProjectPath = cwd,
-                            targetProjectPath = localTarget ?: error("Missing local checkout path."),
-                        )
-                    } else {
-                        coordinator.handoffThreadToWorktree(
-                            threadId = tid,
-                            sourceProjectPath = cwd,
-                            associatedWorktreePath = associatedWorktreePath,
-                            baseBranchForNewWorktree = baseBranch,
-                        )
-                    }
-                when (outcome) {
-                    is WorktreeFlowHandoffOutcome.Moved -> {
-                        repository.setActiveThreadId(outcome.move.thread.id)
-                        gitToolbarRefreshNonce++
-                    }
-                    WorktreeFlowHandoffOutcome.MissingAssociatedWorktree ->
-                        worktreeHandoffError =
-                            "The associated worktree is no longer available. Open the thread to create a new managed worktree."
-                }
-            } catch (e: Throwable) {
-                worktreeHandoffError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-            } finally {
-                handingOffWorktree = false
-            }
-        }
-    }
-
-    fun handleGitAction(action: TurnGitActionKind) {
-        val cwd = gitCwd ?: return
-        if (action == TurnGitActionKind.discardRuntimeChangesAndSync) {
-            enqueueGitPreflightIfNeeded(cwd, TurnGitPreflightOperation.discardRuntimeChanges)
-            return
-        }
-        if (!showGitControls || showTurnStop) return
-        if (action == TurnGitActionKind.initialize) {
-            initializeRepositoryForCurrentThread()
-            return
-        }
-        when (action) {
-            TurnGitActionKind.commit -> {
-                gitActionSheetMode = GitActionSheetMode.commit
-                gitActionSheetInitialNextStep = GitActionNextStep.commit
-                return
-            }
-            TurnGitActionKind.push -> {
-                gitActionSheetMode = GitActionSheetMode.push
-                gitActionSheetInitialNextStep = GitActionNextStep.push
-                return
-            }
-            TurnGitActionKind.commitAndPush -> {
-                gitActionSheetMode = GitActionSheetMode.commit
-                gitActionSheetInitialNextStep = GitActionNextStep.commitAndPush
-                return
-            }
-            TurnGitActionKind.createPR -> {
-                gitActionSheetMode = GitActionSheetMode.createPullRequest
-                gitActionSheetInitialNextStep = GitActionNextStep.createPullRequest
-                return
-            }
-            TurnGitActionKind.previewCommitPushToast -> {
-                if (gitActionBusy) return
-                scope.launch {
-                    gitActionBusy = true
-                    gitActionError = null
-                    gitActionProgressMessage = null
-                    gitActionProgressIncludesPush = true
-                    gitActionProgressIncludesPullRequest = false
-                    gitActionProgressPhase = GitActionProgressPhase.resolvingCommitMessage
-                    delay(900)
-                    gitActionProgressPhase = GitActionProgressPhase.committing
-                    delay(900)
-                    gitActionProgressPhase = GitActionProgressPhase.pushing
-                    delay(900)
-                    gitActionProgressPhase = GitActionProgressPhase.done
-                    gitActionBusy = false
-                }
-                return
-            }
-            else -> Unit
-        }
-        scope.launch {
-            gitActionBusy = true
-            gitActionError = null
-            try {
-                withTimeout(GIT_OPERATION_TIMEOUT_MS) {
-                    val git = GitActionsService(repository, cwd)
-                    when (action) {
-                        TurnGitActionKind.syncNow -> {
-                            val s = git.status()
-                            repoStatusSnapshot = s
-                            repoDiffTotals = s.workingTreeDiffTotals
-                            if (
-                                enqueueGitPreflightIfNeeded(
-                                    cwd = cwd,
-                                    operation = TurnGitPreflightOperation.syncUpdate,
-                                    status = s,
-                                )
-                            ) {
-                                return@withTimeout
-                            }
-                            when (s.state) {
-                                "behind_only" -> git.pull()
-                                else -> Unit
-                            }
-                        }
-                        else -> Unit
-                    }
-                }
-            } catch (e: Throwable) {
-                handleGitActionFailure(e) { showNothingToCommit = true }
-            } finally {
-                gitActionBusy = false
-                gitToolbarRefreshNonce++
-            }
-        }
-    }
-
-    fun executeGitActionSheet(submission: GitActionSheetSubmission) {
-        val cwd = gitCwd ?: return
-        if (!showGitControls || showTurnStop || gitActionBusy) return
-        if (enqueueGitPreflightIfNeeded(cwd, operationForSubmission(submission), submission)) return
-        scope.launch {
-            executeGitActionSheetNow(submission, cwd)
-        }
-    }
-
-    LaunchedEffect(activeThreadId, ready, threads, gitToolbarRefreshNonce) {
-        if (!ready) {
-            repoStatusSnapshot = null
-            branchesWithStatusSnapshot = null
-            repoDiffTotals = null
-            defaultGitBaseBranch = null
-            isLoadingRepoDiff = false
-            return@LaunchedEffect
-        }
-        val tid = activeThreadId
-        if (tid.isNullOrBlank()) {
-            repoStatusSnapshot = null
-            branchesWithStatusSnapshot = null
-            repoDiffTotals = null
-            defaultGitBaseBranch = null
-            isLoadingRepoDiff = false
-            return@LaunchedEffect
-        }
-        val thread = threads.firstOrNull { it.id == tid }
-        val cwd = thread?.gitWorkingDirectoryForGitActions()
-        if (cwd == null) {
-            repoStatusSnapshot = null
-            branchesWithStatusSnapshot = null
-            repoDiffTotals = null
-            defaultGitBaseBranch = null
-            isLoadingRepoDiff = false
-            return@LaunchedEffect
-        }
-        repoStatusSnapshot = null
-        isLoadingRepoDiff = true
-        val git = GitActionsService(repository, cwd)
-        val status = runCatching { git.status() }.getOrNull()
-        val branches = runCatching { git.branchesWithStatus() }.getOrNull()
-        repoStatusSnapshot = status
-        branchesWithStatusSnapshot = branches
-        repoDiffTotals = status?.workingTreeDiffTotals
-        defaultGitBaseBranch = branches?.defaultBranch
-        isLoadingRepoDiff = false
-    }
+    val gitWorkflow =
+        rememberMainShellGitWorkflow(
+            repository = repository,
+            scope = scope,
+            context = context,
+            ready = ready,
+            activeThreadId = activeThreadId,
+            threads = threads,
+            activeThread = activeThread,
+            threadMessages = threadMessages,
+            threadPathFull = threadPathFull,
+            showTurnStop = showTurnStop,
+            gitRepoDiffLoadErrorMessage = gitRepoDiffLoadErrorMessage,
+            gitInitInitializingMessage = gitInitInitializingMessage,
+            gitInitInitializedMessage = gitInitInitializedMessage,
+            gitStatusLoadingToast = gitStatusLoadingToast,
+            setWorkspaceTextFilePreview = { workspaceTextFilePreview = it },
+        )
+    val gitCwd = gitWorkflow.gitCwd
+    val showGitControls = gitWorkflow.showGitControls
+    val isWorktreeProject = gitWorkflow.isWorktreeProject
+    val repoStatusSnapshot = gitWorkflow.repoStatusSnapshot
+    val repoDiffTotals = gitWorkflow.repoDiffTotals
+    val gitActionBusy = gitWorkflow.gitActionBusy
 
     val hasSidebarSnapshot = threads.isNotEmpty()
     MainShellEffects(
@@ -877,18 +160,18 @@ fun MainShell(
         onShowPathDialog = { showPathDialog = true },
         showTurnStop = showTurnStop,
         repoDiffTotals = repoDiffTotals,
-        isLoadingRepoDiff = isLoadingRepoDiff,
+        isLoadingRepoDiff = gitWorkflow.isLoadingRepoDiff,
         showGitControls = showGitControls,
-        onOpenRepoDiffSheetFromHeader = { openRepoDiffSheetFromHeader() },
-        onGitAction = { handleGitAction(it) },
+        onOpenRepoDiffSheetFromHeader = gitWorkflow.openRepoDiffSheetFromHeader,
+        onGitAction = gitWorkflow.handleGitAction,
         gitActionBusy = gitActionBusy,
         repoIsDirty = repoStatusSnapshot?.isDirty == true,
         gitActionEnabled = showGitControls && !showTurnStop,
         gitInitialized = repoStatusSnapshot?.isRepo == true,
         showDesktopHandoff = showDesktopHandoff,
         handingOffToDesktop = handingOffToDesktop,
-        showWorktreeHandoff = showWorktreeHandoff,
-        handingOffWorktree = handingOffWorktree,
+        showWorktreeHandoff = gitWorkflow.showWorktreeHandoff,
+        handingOffWorktree = gitWorkflow.handingOffWorktree,
         isWorktreeProject = isWorktreeProject,
         onContinueDesktop = {
             val tid = activeThreadId
@@ -902,7 +185,7 @@ fun MainShell(
                 }
             }
         },
-        onWorktreeHandoff = { handoffCurrentThreadWorktree() },
+        onWorktreeHandoff = gitWorkflow.handoffCurrentThreadWorktree,
         onStopTurn = {
             val tid = activeThreadId
             if (tid != null) {
@@ -910,14 +193,11 @@ fun MainShell(
             }
         },
         gitCwd = gitCwd,
-        gitToastMessage = gitToastMessage,
-        gitProgressToast = gitProgressToast,
-        onDismissGitProgress = {
-            if (gitActionProgressMessage != null) gitActionProgressMessage = null
-            if (gitActionProgressPhase != null) gitActionProgressPhase = null
-        },
-        onGitContextChanged = { gitToolbarRefreshNonce++ },
-        onOpenRepoDiffFromMarkdown = { openRepoDiffSheetFromMarkdown(it) },
+        gitToastMessage = gitWorkflow.gitToastMessage,
+        gitProgressToast = gitWorkflow.gitProgressToast,
+        onDismissGitProgress = gitWorkflow.dismissGitProgress,
+        onGitContextChanged = gitWorkflow.refreshGitContext,
+        onOpenRepoDiffFromMarkdown = gitWorkflow.openRepoDiffSheetFromMarkdown,
     )
 
     MainShellOverlays(
@@ -932,68 +212,38 @@ fun MainShell(
                 showPathDialog = false
             }
         },
-        showRepoDiffSheet = showRepoDiffSheet,
-        repoDiffSheetScope = repoDiffSheetScope,
-        onRepoDiffScopeChange = { repoDiffSheetScope = it },
-        repoDiffSheetLastTurnRows = repoDiffSheetLastTurnRows,
-        repoDiffSheetFullPatch = repoDiffSheetFullPatch,
-        repoDiffSheetFullLoading = repoDiffSheetFullLoading,
-        repoDiffSheetFullError = repoDiffSheetFullError,
+        showRepoDiffSheet = gitWorkflow.showRepoDiffSheet,
+        repoDiffSheetScope = gitWorkflow.repoDiffSheetScope,
+        onRepoDiffScopeChange = gitWorkflow.setRepoDiffSheetScope,
+        repoDiffSheetLastTurnRows = gitWorkflow.repoDiffSheetLastTurnRows,
+        repoDiffSheetFullPatch = gitWorkflow.repoDiffSheetFullPatch,
+        repoDiffSheetFullLoading = gitWorkflow.repoDiffSheetFullLoading,
+        repoDiffSheetFullError = gitWorkflow.repoDiffSheetFullError,
         repoStatusSnapshot = repoStatusSnapshot,
-        repoDiffMarkdownFocusQuery = repoDiffMarkdownFocusQuery,
-        onFocusPathQueryConsumed = { repoDiffMarkdownFocusQuery = null },
-        onDismissRepoDiffSheet = {
-            showRepoDiffSheet = false
-            repoDiffMarkdownFocusQuery = null
-        },
-        gitActionSheetMode = gitActionSheetMode,
-        gitActionSheetInitialNextStep = gitActionSheetInitialNextStep,
-        defaultGitBaseBranch = defaultGitBaseBranch,
+        repoDiffMarkdownFocusQuery = gitWorkflow.repoDiffMarkdownFocusQuery,
+        onFocusPathQueryConsumed = gitWorkflow.consumeFocusPathQuery,
+        onDismissRepoDiffSheet = gitWorkflow.dismissRepoDiffSheet,
+        gitActionSheetMode = gitWorkflow.gitActionSheetMode,
+        gitActionSheetInitialNextStep = gitWorkflow.gitActionSheetInitialNextStep,
+        defaultGitBaseBranch = gitWorkflow.defaultGitBaseBranch,
         gitActionBusy = gitActionBusy,
-        onDismissGitActionSheet = {
-            gitActionSheetMode = null
-            gitActionSheetInitialNextStep = null
-        },
-        onSubmitGitActionSheet = { executeGitActionSheet(it) },
-        showGitInitPrompt = showGitInitPrompt,
-        gitInitError = gitInitError,
-        onInitializeRepository = { initializeRepositoryForCurrentThread() },
-        onDismissGitInitPrompt = {
-            if (!gitActionBusy) {
-                showGitInitPrompt = false
-                gitInitError = null
-            }
-        },
-        showNothingToCommit = showNothingToCommit,
-        onDismissNothingToCommit = { showNothingToCommit = false },
-        gitSyncAlert = gitSyncAlert,
-        onDismissGitSyncAlert = {
-            gitSyncAlert = null
-            pendingGitOperation = null
-        },
-        onGitSyncAlertAction = { action ->
-            when (action) {
-                TurnGitSyncAlertAction.dismissOnly -> {
-                    gitSyncAlert = null
-                    pendingGitOperation = null
-                }
-                TurnGitSyncAlertAction.pullRebase -> pullRebaseForPendingGitOperation()
-                TurnGitSyncAlertAction.continuePendingGitOperation,
-                TurnGitSyncAlertAction.continueGitBranchOperation,
-                -> continuePendingGitOperation()
-                TurnGitSyncAlertAction.commitAndContinuePendingGitOperation,
-                TurnGitSyncAlertAction.commitAndContinueGitBranchOperation,
-                -> continuePendingGitOperation(commitFirst = true)
-                TurnGitSyncAlertAction.discardRuntimeChanges ->
-                    discardRuntimeChangesForPendingGitOperation()
-            }
-        },
-        gitActionError = gitActionError,
-        onDismissGitActionError = { gitActionError = null },
+        onDismissGitActionSheet = gitWorkflow.dismissGitActionSheet,
+        onSubmitGitActionSheet = gitWorkflow.executeGitActionSheet,
+        showGitInitPrompt = gitWorkflow.showGitInitPrompt,
+        gitInitError = gitWorkflow.gitInitError,
+        onInitializeRepository = gitWorkflow.initializeRepositoryForCurrentThread,
+        onDismissGitInitPrompt = gitWorkflow.dismissGitInitPrompt,
+        showNothingToCommit = gitWorkflow.showNothingToCommit,
+        onDismissNothingToCommit = gitWorkflow.dismissNothingToCommit,
+        gitSyncAlert = gitWorkflow.gitSyncAlert,
+        onDismissGitSyncAlert = gitWorkflow.dismissGitSyncAlert,
+        onGitSyncAlertAction = gitWorkflow.handleGitSyncAlertAction,
+        gitActionError = gitWorkflow.gitActionError,
+        onDismissGitActionError = gitWorkflow.dismissGitActionError,
         desktopHandoffError = desktopHandoffError,
         onDismissDesktopHandoffError = { desktopHandoffError = null },
-        worktreeHandoffError = worktreeHandoffError,
-        onDismissWorktreeHandoffError = { worktreeHandoffError = null },
+        worktreeHandoffError = gitWorkflow.worktreeHandoffError,
+        onDismissWorktreeHandoffError = gitWorkflow.dismissWorktreeHandoffError,
         pendingApprovalRequest = pendingApprovalRequest,
         onResolvePendingApproval = { request, decision ->
             scope.launch { runCatching { repository.resolvePendingApproval(request.id, decision) } }
@@ -1048,20 +298,3 @@ fun MainShell(
         onDismissWorkspaceTextFilePreview = { workspaceTextFilePreview = null },
     )
 }
-
-private data class PendingGitOperation(
-    val operation: TurnGitPreflightOperation,
-    val cwd: String,
-    val submission: GitActionSheetSubmission? = null,
-)
-
-private fun String.withoutGitLineEndingWarnings(): String =
-    lineSequence()
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .filterNot { it.isGitLineEndingWarning() }
-        .joinToString("\n")
-
-private fun String.isGitLineEndingWarning(): Boolean =
-    startsWith("warning: in the working copy of ") &&
-        contains("LF will be replaced by CRLF the next time Git touches it")
