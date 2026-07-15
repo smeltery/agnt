@@ -22,6 +22,7 @@
 		4CCE0926DAD3125719343462 /* TurnTimelineReducerFileChangeDeduplicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B62 /* TurnTimelineReducerFileChangeDeduplicationTests.swift */; };
 		4CCE0926DAD3125719343463 /* TurnTimelineReducerFileChangeSnapshotDeduplicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B63 /* TurnTimelineReducerFileChangeSnapshotDeduplicationTests.swift */; };
 		4CCE0926DAD3125719343441 /* TurnTimelineReducerOrderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B21 /* TurnTimelineReducerOrderingTests.swift */; };
+		4CCE0926DAD3125719343464 /* TurnTimelineReducerIntraTurnOrderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B66 /* TurnTimelineReducerIntraTurnOrderingTests.swift */; };
 		4CCE0926DAD3125719343442 /* TurnTimelineRenderProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B22 /* TurnTimelineRenderProjectionTests.swift */; };
 		4CCE0926DAD3125719343460 /* TurnTimelineCompletedTurnProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B60 /* TurnTimelineCompletedTurnProjectionTests.swift */; };
 		4CCE0926DAD3125719343461 /* TurnTimelineFileChangeProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B61 /* TurnTimelineFileChangeProjectionTests.swift */; };
@@ -195,6 +196,7 @@
 		4EEB36EBEA2A475AC9B30B62 /* TurnTimelineReducerFileChangeDeduplicationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineReducerFileChangeDeduplicationTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B63 /* TurnTimelineReducerFileChangeSnapshotDeduplicationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineReducerFileChangeSnapshotDeduplicationTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B21 /* TurnTimelineReducerOrderingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineReducerOrderingTests.swift; sourceTree = "<group>"; };
+		4EEB36EBEA2A475AC9B30B66 /* TurnTimelineReducerIntraTurnOrderingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineReducerIntraTurnOrderingTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B22 /* TurnTimelineRenderProjectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineRenderProjectionTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B60 /* TurnTimelineCompletedTurnProjectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineCompletedTurnProjectionTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B61 /* TurnTimelineFileChangeProjectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineFileChangeProjectionTests.swift; sourceTree = "<group>"; };
@@ -509,6 +511,7 @@
 				4EEB36EBEA2A475AC9B30B62 /* TurnTimelineReducerFileChangeDeduplicationTests.swift */,
 				4EEB36EBEA2A475AC9B30B63 /* TurnTimelineReducerFileChangeSnapshotDeduplicationTests.swift */,
 				4EEB36EBEA2A475AC9B30B21 /* TurnTimelineReducerOrderingTests.swift */,
+				4EEB36EBEA2A475AC9B30B66 /* TurnTimelineReducerIntraTurnOrderingTests.swift */,
 				4EEB36EBEA2A475AC9B30B22 /* TurnTimelineRenderProjectionTests.swift */,
 				4EEB36EBEA2A475AC9B30B60 /* TurnTimelineCompletedTurnProjectionTests.swift */,
 				4EEB36EBEA2A475AC9B30B61 /* TurnTimelineFileChangeProjectionTests.swift */,
@@ -929,6 +932,7 @@
 				4CCE0926DAD3125719343462 /* TurnTimelineReducerFileChangeDeduplicationTests.swift in Sources */,
 				4CCE0926DAD3125719343463 /* TurnTimelineReducerFileChangeSnapshotDeduplicationTests.swift in Sources */,
 				4CCE0926DAD3125719343441 /* TurnTimelineReducerOrderingTests.swift in Sources */,
+				4CCE0926DAD3125719343464 /* TurnTimelineReducerIntraTurnOrderingTests.swift in Sources */,
 				4CCE0926DAD3125719343442 /* TurnTimelineRenderProjectionTests.swift in Sources */,
 				4CCE0926DAD3125719343460 /* TurnTimelineCompletedTurnProjectionTests.swift in Sources */,
 				4CCE0926DAD3125719343461 /* TurnTimelineFileChangeProjectionTests.swift in Sources */,
