@@ -29,6 +29,8 @@
 		4CCE0926DAD3125719343444 /* TurnTimelineTestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B24 /* TurnTimelineTestFixtures.swift */; };
 		4CCE0926DAD3125719343445 /* TurnTimelineMarkdownRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B25 /* TurnTimelineMarkdownRenderingTests.swift */; };
 		4CCE0926DAD3125719343446 /* TurnTimelineAssistantBlockInfoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B26 /* TurnTimelineAssistantBlockInfoTests.swift */; };
+		4CCE0926DAD3125719343464 /* TurnTimelineAssistantBlockDiffSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B64 /* TurnTimelineAssistantBlockDiffSnapshotTests.swift */; };
+		4CCE0926DAD3125719343465 /* TurnTimelineAssistantBlockDiffSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB36EBEA2A475AC9B30B65 /* TurnTimelineAssistantBlockDiffSummaryTests.swift */; };
 		FA571E0001000000000000F2 /* WorkspaceFileLinkResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0001000000000000F1 /* WorkspaceFileLinkResolverTests.swift */; };
 		FA571E0002000000000000F4 /* WorkspaceSVGPreviewSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0002000000000000F3 /* WorkspaceSVGPreviewSecurityTests.swift */; };
 		FA571E0003000000000000F6 /* TerminalPasteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0003000000000000F5 /* TerminalPasteTests.swift */; };
@@ -191,6 +193,8 @@
 		4EEB36EBEA2A475AC9B30B24 /* TurnTimelineTestFixtures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineTestFixtures.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B25 /* TurnTimelineMarkdownRenderingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineMarkdownRenderingTests.swift; sourceTree = "<group>"; };
 		4EEB36EBEA2A475AC9B30B26 /* TurnTimelineAssistantBlockInfoTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineAssistantBlockInfoTests.swift; sourceTree = "<group>"; };
+		4EEB36EBEA2A475AC9B30B64 /* TurnTimelineAssistantBlockDiffSnapshotTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineAssistantBlockDiffSnapshotTests.swift; sourceTree = "<group>"; };
+		4EEB36EBEA2A475AC9B30B65 /* TurnTimelineAssistantBlockDiffSummaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnTimelineAssistantBlockDiffSummaryTests.swift; sourceTree = "<group>"; };
 		FA571E0001000000000000F1 /* WorkspaceFileLinkResolverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceFileLinkResolverTests.swift; sourceTree = "<group>"; };
 		FA571E0002000000000000F3 /* WorkspaceSVGPreviewSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkspaceSVGPreviewSecurityTests.swift; sourceTree = "<group>"; };
 		FA571E0003000000000000F5 /* TerminalPasteTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalPasteTests.swift; sourceTree = "<group>"; };
@@ -467,6 +471,8 @@
 				4EEB36EBEA2A475AC9B30B61 /* TurnTimelineFileChangeProjectionTests.swift */,
 				4EEB36EBEA2A475AC9B30B25 /* TurnTimelineMarkdownRenderingTests.swift */,
 				4EEB36EBEA2A475AC9B30B26 /* TurnTimelineAssistantBlockInfoTests.swift */,
+				4EEB36EBEA2A475AC9B30B64 /* TurnTimelineAssistantBlockDiffSnapshotTests.swift */,
+				4EEB36EBEA2A475AC9B30B65 /* TurnTimelineAssistantBlockDiffSummaryTests.swift */,
 				4EEB36EBEA2A475AC9B30B23 /* TurnScrollStateTrackerTests.swift */,
 				4EEB36EBEA2A475AC9B30B24 /* TurnTimelineTestFixtures.swift */,
 			);
@@ -876,6 +882,8 @@
 				4CCE0926DAD3125719343461 /* TurnTimelineFileChangeProjectionTests.swift in Sources */,
 				4CCE0926DAD3125719343445 /* TurnTimelineMarkdownRenderingTests.swift in Sources */,
 				4CCE0926DAD3125719343446 /* TurnTimelineAssistantBlockInfoTests.swift in Sources */,
+				4CCE0926DAD3125719343464 /* TurnTimelineAssistantBlockDiffSnapshotTests.swift in Sources */,
+				4CCE0926DAD3125719343465 /* TurnTimelineAssistantBlockDiffSummaryTests.swift in Sources */,
 				4CCE0926DAD3125719343443 /* TurnScrollStateTrackerTests.swift in Sources */,
 				4CCE0926DAD3125719343444 /* TurnTimelineTestFixtures.swift in Sources */,
 				FA571E0001000000000000F2 /* WorkspaceFileLinkResolverTests.swift in Sources */,
