@@ -76,6 +76,9 @@
 		B1C2D3E4F5061728394A5B8C /* CodexServiceIncomingHistoryMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B8D /* CodexServiceIncomingHistoryMergeTests.swift */; };
 		B1C2D3E4F5061728394A5B8A /* CodexServiceIncomingFileChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B8B /* CodexServiceIncomingFileChangeTests.swift */; };
 		B1C2D3E4F5061728394A5B6D /* CodexServiceIncomingImageGenerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B6D8 /* CodexServiceIncomingImageGenerationTests.swift */; };
+		B1C2D3E4F5061728394A5B6F /* CodexServiceImageGenerationMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B6F0 /* CodexServiceImageGenerationMergeTests.swift */; };
+		B1C2D3E4F5061728394A5B71 /* CodexServiceImageGenerationHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B712 /* CodexServiceImageGenerationHistoryTests.swift */; };
+		B1C2D3E4F5061728394A5B73 /* CodexServiceImageGenerationTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B734 /* CodexServiceImageGenerationTestSupport.swift */; };
 		B2C3D4E5F60718293A4B5C82 /* CodexPlanStructuredInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C83 /* CodexPlanStructuredInputTests.swift */; };
 		B2C3D4E5F60718293A4B5C80 /* CodexPlanMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C81 /* CodexPlanMessageTests.swift */; };
 		B3C4D5E6F708192A3B4C5D6E /* CodexPlanModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D6F /* CodexPlanModeTests.swift */; };
@@ -260,6 +263,9 @@
 		C1D2E3F40516273849A5B8D /* CodexServiceIncomingHistoryMergeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingHistoryMergeTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B8B /* CodexServiceIncomingFileChangeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Incoming/CodexServiceIncomingFileChangeTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B6D8 /* CodexServiceIncomingImageGenerationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceIncomingImageGenerationTests.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B6F0 /* CodexServiceImageGenerationMergeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationMergeTests.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B712 /* CodexServiceImageGenerationHistoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationHistoryTests.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B734 /* CodexServiceImageGenerationTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationTestSupport.swift; sourceTree = "<group>"; };
 		B5C6D7E8F9012A3B4C5D6E72 /* CodexServiceIncomingRunStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceIncomingRunStateTests.swift; sourceTree = "<group>"; };
 		C9CD1EA13B728103A5654EEA /* BridgeControlModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeControlModels.swift; sourceTree = "<group>"; };
 		D4F56781234567890ABCDE02 /* CodexServiceIncomingRunIndicatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceIncomingRunIndicatorTests.swift; sourceTree = "<group>"; };
@@ -378,7 +384,7 @@
 				C1D2E3F40516273849A5B8D /* CodexServiceIncomingHistoryMergeTests.swift */,
 				B0C1D2E3F40516273849A5C2 /* CodexServiceIncomingContextCompactionTests.swift */,
 				C1D2E3F40516273849A5B8B /* CodexServiceIncomingFileChangeTests.swift */,
-				C1D2E3F40516273849A5B6D8 /* CodexServiceIncomingImageGenerationTests.swift */,
+				C1D2E3F40516273849A5B755 /* ImageGeneration */,
 				8D1F2A3B4C5D6E7F8091A2B4 /* CodexServiceConnectionErrorTests.swift */,
 				8F1A2B3C4D5E6F708192A3B5 /* CodexPushNotificationRegistrationTests.swift */,
 				D4F56781234567890ABCDE02 /* CodexServiceIncomingRunIndicatorTests.swift */,
@@ -422,6 +428,17 @@
 				FA571E0002000000000000F3 /* WorkspaceSVGPreviewSecurityTests.swift */,
 			);
 			path = AgntMobileTests;
+			sourceTree = "<group>";
+		};
+		C1D2E3F40516273849A5B755 /* ImageGeneration */ = {
+			isa = PBXGroup;
+			children = (
+				C1D2E3F40516273849A5B6D8 /* CodexServiceIncomingImageGenerationTests.swift */,
+				C1D2E3F40516273849A5B6F0 /* CodexServiceImageGenerationMergeTests.swift */,
+				C1D2E3F40516273849A5B712 /* CodexServiceImageGenerationHistoryTests.swift */,
+				C1D2E3F40516273849A5B734 /* CodexServiceImageGenerationTestSupport.swift */,
+			);
+			path = ImageGeneration;
 			sourceTree = "<group>";
 		};
 		74BE370810CFD7A76DC2A264 /* Composer */ = {
@@ -824,6 +841,9 @@
 				B0C1D2E3F40516273849A5C1 /* CodexServiceIncomingContextCompactionTests.swift in Sources */,
 				B1C2D3E4F5061728394A5B8A /* CodexServiceIncomingFileChangeTests.swift in Sources */,
 				B1C2D3E4F5061728394A5B6D /* CodexServiceIncomingImageGenerationTests.swift in Sources */,
+				B1C2D3E4F5061728394A5B6F /* CodexServiceImageGenerationMergeTests.swift in Sources */,
+				B1C2D3E4F5061728394A5B71 /* CodexServiceImageGenerationHistoryTests.swift in Sources */,
+				B1C2D3E4F5061728394A5B73 /* CodexServiceImageGenerationTestSupport.swift in Sources */,
 				8D1F2A3B4C5D6E7F8091A2B3 /* CodexServiceConnectionErrorTests.swift in Sources */,
 				8F1A2B3C4D5E6F708192A3B4 /* CodexPushNotificationRegistrationTests.swift in Sources */,
 				D4F56781234567890ABCDE01 /* CodexServiceIncomingRunIndicatorTests.swift in Sources */,
