@@ -46,6 +46,8 @@
 		7EFA3E8309EF41CA902C7A67 /* AssistantTurnEndActionVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02C96CD0916A43F38184398D /* AssistantTurnEndActionVisibilityTests.swift */; };
 		8B4A2F5E7D1C4B9AA1234567 /* TurnComposerAttachmentIntakePlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4A2F5E7D1C4B9AA1234568 /* TurnComposerAttachmentIntakePlanTests.swift */; };
 		8CE11223A4B5C6D7E8F90123 /* SidebarRunBadgePerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE11223A4B5C6D7E8F90124 /* SidebarRunBadgePerformanceTests.swift */; };
+		8CE11223A4B5C6D7E8F90125 /* SidebarThreadGroupingTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE11223A4B5C6D7E8F90126 /* SidebarThreadGroupingTestSupport.swift */; };
+		8CE11223A4B5C6D7E8F90127 /* SidebarProjectStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE11223A4B5C6D7E8F90128 /* SidebarProjectStateTests.swift */; };
 		8D1F2A3B4C5D6E7F8091A2B3 /* CodexServiceConnectionErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D1F2A3B4C5D6E7F8091A2B4 /* CodexServiceConnectionErrorTests.swift */; };
 		8F1A2B3C4D5E6F708192A3B4 /* CodexPushNotificationRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1A2B3C4D5E6F708192A3B5 /* CodexPushNotificationRegistrationTests.swift */; };
 		90120FC72C9B8D0F5F03F14D /* AgntMobileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D523A0A98D6540D0E2EE6131 /* AgntMobileUITests.swift */; };
@@ -224,6 +226,8 @@
 		7A1B2C3D4E5F60718293A4B6 /* CodexThreadRuntimeOverrideTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexThreadRuntimeOverrideTests.swift; sourceTree = "<group>"; };
 		8B4A2F5E7D1C4B9AA1234568 /* TurnComposerAttachmentIntakePlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TurnComposerAttachmentIntakePlanTests.swift; sourceTree = "<group>"; };
 		8CE11223A4B5C6D7E8F90124 /* SidebarRunBadgePerformanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarRunBadgePerformanceTests.swift; sourceTree = "<group>"; };
+		8CE11223A4B5C6D7E8F90126 /* SidebarThreadGroupingTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarThreadGroupingTestSupport.swift; sourceTree = "<group>"; };
+		8CE11223A4B5C6D7E8F90128 /* SidebarProjectStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarProjectStateTests.swift; sourceTree = "<group>"; };
 		8D1F2A3B4C5D6E7F8091A2B4 /* CodexServiceConnectionErrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceConnectionErrorTests.swift; sourceTree = "<group>"; };
 		8F1A2B3C4D5E6F708192A3B5 /* CodexPushNotificationRegistrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexPushNotificationRegistrationTests.swift; sourceTree = "<group>"; };
 		92DE4487B55C077AF7694484 /* AgntMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgntMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -423,6 +427,8 @@
 				A1D2E3F4B5C6D7E8F9001121 /* MyDevicesPresentationTests.swift */,
 				7A1B2C3D4E5F60718293A4B6 /* CodexThreadRuntimeOverrideTests.swift */,
 				B7A1C2D3E4F5061728394052 /* SidebarThreadGroupingTests.swift */,
+				8CE11223A4B5C6D7E8F90126 /* SidebarThreadGroupingTestSupport.swift */,
+				8CE11223A4B5C6D7E8F90128 /* SidebarProjectStateTests.swift */,
 				8CE11223A4B5C6D7E8F90124 /* SidebarRunBadgePerformanceTests.swift */,
 				FA571E0004000000000000F7 /* StreamingMarkdownBlockSplitterTests.swift */,
 				FA571E0005000000000000F9 /* StreamingUIInteractionMonitorTests.swift */,
@@ -905,6 +911,8 @@
 				A1D2E3F4B5C6D7E8F9001120 /* MyDevicesPresentationTests.swift in Sources */,
 				7A1B2C3D4E5F60718293A4B5 /* CodexThreadRuntimeOverrideTests.swift in Sources */,
 				B7A1C2D3E4F5061728394051 /* SidebarThreadGroupingTests.swift in Sources */,
+				8CE11223A4B5C6D7E8F90125 /* SidebarThreadGroupingTestSupport.swift in Sources */,
+				8CE11223A4B5C6D7E8F90127 /* SidebarProjectStateTests.swift in Sources */,
 				8CE11223A4B5C6D7E8F90123 /* SidebarRunBadgePerformanceTests.swift in Sources */,
 				FA571E0004000000000000F8 /* StreamingMarkdownBlockSplitterTests.swift in Sources */,
 				FA571E0005000000000000FA /* StreamingUIInteractionMonitorTests.swift in Sources */,
