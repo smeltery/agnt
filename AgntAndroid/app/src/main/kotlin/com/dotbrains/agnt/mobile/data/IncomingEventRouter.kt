@@ -1,10 +1,5 @@
 package com.dotbrains.agnt.mobile.data
 
-import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
-import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
-import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
-import com.dotbrains.agnt.mobile.core.model.CodexPlanStep
-import com.dotbrains.agnt.mobile.core.model.CodexPlanStepStatus
 import com.dotbrains.agnt.mobile.core.model.CodexThread
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsageCodec
@@ -12,16 +7,12 @@ import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalRequest
 import com.dotbrains.agnt.mobile.core.model.PendingStructuredInputRequest
-import com.dotbrains.agnt.mobile.core.model.RPCError
 import com.dotbrains.agnt.mobile.core.model.RPCMessage
 import com.dotbrains.agnt.mobile.core.notification.RunCompletionAttentionKind
 import com.dotbrains.agnt.mobile.core.notification.TurnCompletionNotificationLogic
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -99,6 +90,30 @@ internal class IncomingEventRouter(
             markTurnActiveFromLiveEvent = ::markTurnActiveFromLiveEvent,
         )
     }
+    private val serverRequestRouter by lazy {
+        IncomingServerRequestRouter(
+            scope = scope,
+            messageTimeline = messageTimeline,
+            shouldAutoApproveRequests = shouldAutoApproveRequests,
+            onApprovalRequest = onApprovalRequest,
+            onStructuredInputRequest = onStructuredInputRequest,
+            resolveThreadId = ::resolveThreadId,
+        )
+    }
+    private val timelineEventRouter by lazy {
+        IncomingTimelineEventRouter(
+            scope = scope,
+            messageTimeline = messageTimeline,
+            commandDetailsStore = commandDetailsStore,
+            isTurnStreamingActive = isTurnStreamingActive,
+            onTurnCompleted = onTurnCompleted,
+            onTurnFailed = onTurnFailed,
+            onRunCompletionAttention = onRunCompletionAttention,
+            resolveThreadId = ::resolveThreadId,
+            recordTurnThread = ::recordTurnThread,
+            markTurnActiveFromLiveEvent = ::markTurnActiveFromLiveEvent,
+        )
+    }
 
     fun resetCaches() {
         threadIdByTurnId.clear()
@@ -112,7 +127,7 @@ internal class IncomingEventRouter(
         val obj = params?.objectValue
         if (m.startsWith("codex/event/")) {
             val suffix =
-                normalizeMethod(m.removePrefix("codex/event/").trim()).replace("/", "")
+                normalizeIncomingMethod(m.removePrefix("codex/event/").trim()).replace("/", "")
             if (suffix == "tokencount" && obj != null) {
                 val payload =
                     obj["msg"]?.objectValue
@@ -136,34 +151,34 @@ internal class IncomingEventRouter(
             "thread/name/updated" -> handleThreadNameUpdated(obj)
             "turn/started" -> handleTurnStarted(obj)
             "turn/completed" -> handleTurnCompleted(obj)
-            "turn/plan/updated" -> handleTurnPlanUpdated(obj)
+            "turn/plan/updated" -> timelineEventRouter.handleTurnPlanUpdated(obj)
             "item/agentMessage/delta",
             "codex/event/agent_message_content_delta",
             "codex/event/agent_message_delta",
-            -> handleAgentDelta(obj)
+            -> timelineEventRouter.handleAgentDelta(obj)
             "item/completed",
             "codex/event/item_completed",
-            -> handleItemCompleted(obj)
-            "codex/event/agent_message" -> handleItemCompleted(obj, completesTurn = true)
-            "codex/event/user_message" -> handleUserMirrored(obj)
-            "codex/event/background_event" -> handleBackgroundEvent(obj)
-            "codex/event/image_generation_end" -> handleImageGenerationEnd(obj)
+            -> timelineEventRouter.handleItemCompleted(obj)
+            "codex/event/agent_message" -> timelineEventRouter.handleItemCompleted(obj, completesTurn = true)
+            "codex/event/user_message" -> timelineEventRouter.handleUserMirrored(obj)
+            "codex/event/background_event" -> timelineEventRouter.handleBackgroundEvent(obj)
+            "codex/event/image_generation_end" -> timelineEventRouter.handleImageGenerationEnd(obj)
             "item/reasoning/summaryTextDelta",
             "item/reasoning/summaryPartAdded",
             "item/reasoning/textDelta",
-            -> handleReasoningDelta(obj)
-            "item/plan/delta" -> handlePlanDelta(obj)
+            -> timelineEventRouter.handleReasoningDelta(obj)
+            "item/plan/delta" -> timelineEventRouter.handlePlanDelta(obj)
             "codex/event/plan_update",
             "codex/event/plan_updated",
             "codex/event/update_plan",
             "codex/event/plan_delta",
-            -> handleTurnPlanUpdated(obj)
-            "item/fileChange/outputDelta" -> handleFileChangeDelta(obj)
+            -> timelineEventRouter.handleTurnPlanUpdated(obj)
+            "item/fileChange/outputDelta" -> timelineEventRouter.handleFileChangeDelta(obj)
             "item/toolCall/outputDelta",
             "item/toolCall/output_delta",
             "item/tool_call/outputDelta",
             "item/tool_call/output_delta",
-            -> handleToolCallOutputDelta(obj)
+            -> timelineEventRouter.handleToolCallOutputDelta(obj)
             "item/commandExecution/outputDelta",
             "item/commandExecution/output_delta",
             "item/command_execution/outputDelta",
@@ -181,26 +196,26 @@ internal class IncomingEventRouter(
             "turn/failed" -> handleTurnFailed(obj)
             "error",
             "codex/event/error",
-            -> handleErrorNotification(obj)
+            -> timelineEventRouter.handleErrorNotification(obj)
             "account/rateLimits/updated" -> onRateLimitsUpdated(obj)
             "thread/tokenUsage/updated" -> handleThreadTokenUsagePush(obj)
             "system/notice" -> handleSystemNotice(obj)
             else -> {
-                val nm = normalizeMethod(m)
+                val nm = normalizeIncomingMethod(m)
                 when {
                     m.startsWith("codex/event/") && m.contains("agent") && m.contains("delta") ->
-                        handleAgentDelta(obj)
+                        timelineEventRouter.handleAgentDelta(obj)
                     m.startsWith("codex/event/") && nm.contains("plan") ->
-                        handleTurnPlanUpdated(obj)
+                        timelineEventRouter.handleTurnPlanUpdated(obj)
                     m.startsWith("codex/event/") && nm.contains("imagegeneration") ->
-                        handleImageGenerationEnd(obj)
+                        timelineEventRouter.handleImageGenerationEnd(obj)
                     nm.contains("filechange") && (nm.contains("delta") || nm.contains("partadded")) ->
-                        handleFileChangeDelta(obj)
+                        timelineEventRouter.handleFileChangeDelta(obj)
                     nm.contains("toolcall") && (nm.contains("delta") || nm.contains("partadded")) ->
-                        handleToolCallOutputDelta(obj)
+                        timelineEventRouter.handleToolCallOutputDelta(obj)
                     (nm.contains("turndiff") || nm.contains("/diff/") || nm.startsWith("diff/")) &&
                         (nm.contains("delta") || nm.contains("partadded")) ->
-                        handleFileChangeDelta(obj)
+                        timelineEventRouter.handleFileChangeDelta(obj)
                     else -> Unit
                 }
             }
@@ -249,7 +264,7 @@ internal class IncomingEventRouter(
                 ?.replace("-", "")
                 ?: return false
         if (!eventType.contains("plan")) return false
-        handleTurnPlanUpdated(p)
+        timelineEventRouter.handleTurnPlanUpdated(p)
         return true
     }
 
@@ -297,82 +312,12 @@ internal class IncomingEventRouter(
         onThreadContextUsageLive(threadId.trim(), usage)
     }
 
-    private fun normalizeMethod(method: String): String = method.lowercase().replace("_", "").replace("-", "")
-
     fun dispatchServerRequest(
         method: String,
         requestId: JSONValue,
         params: JSONValue?,
         respond: (RPCMessage) -> Unit,
-    ) {
-        val m = method.trim()
-        scope.launch(Dispatchers.IO) {
-            val nm = normalizeMethod(m)
-            when (classifyServerRequest(m, nm)) {
-                ServerRequestKind.StructuredInput -> {
-                    val request = buildStructuredInputRequest(requestId, params)
-                    appendStructuredInputTimelineMarker(request)
-                    onStructuredInputRequest(request) { answers ->
-                        respond(
-                            RPCMessage.success(
-                                id = requestId,
-                                result = structuredUserInputResult(answers),
-                                includeJsonRpc = false,
-                            ),
-                        )
-                    }
-                }
-                ServerRequestKind.Approval -> {
-                    if (shouldAutoApproveRequests()) {
-                        respond(
-                            RPCMessage.success(
-                                id = requestId,
-                                result = approvalDecisionResult("accept"),
-                                includeJsonRpc = false,
-                            ),
-                        )
-                        return@launch
-                    }
-                    val paramsObject = params?.objectValue
-                    val request = buildApprovalRequest(m, requestId, paramsObject, resolveThreadId(paramsObject))
-                    appendPendingApprovalTimelineMarker(request)
-                    onApprovalRequest(request) { decision ->
-                        val rpc =
-                            when (decision) {
-                                PendingApprovalDecision.Decline -> "decline"
-                                PendingApprovalDecision.Accept -> "accept"
-                                PendingApprovalDecision.AcceptForSession -> "acceptForSession"
-                            }
-                        respond(
-                            RPCMessage.success(
-                                id = requestId,
-                                result = approvalDecisionResult(rpc),
-                                includeJsonRpc = false,
-                            ),
-                        )
-                    }
-                }
-                ServerRequestKind.Unsupported -> {
-                    respond(
-                        RPCMessage.failure(
-                            id = requestId,
-                            error =
-                                RPCError(
-                                    code = -32601,
-                                    message = "Unsupported request method: $m",
-                                ),
-                            includeJsonRpc = false,
-                        ),
-                    )
-                }
-            }
-        }
-    }
-
-    private fun classifyServerRequest(
-        method: String,
-        normalizedMethod: String,
-    ): ServerRequestKind = serverRequestKind(method, normalizedMethod)
+    ) = serverRequestRouter.dispatch(method, requestId, params, respond)
 
     private fun recordTurnThread(
         turnId: String?,
@@ -404,7 +349,7 @@ internal class IncomingEventRouter(
         val jo = jsonObjectFromJsonValue(threadValue) ?: return
         val thread = runCatching { CodexThread.fromJsonObject(jo) }.getOrNull() ?: return
         val merged = remapThreadFromServer(thread)
-        threads.value = upsertThread(threads.value, merged)
+        threads.value = upsertIncomingThread(threads.value, merged)
         if (activeThreadId.value == null) {
             activeThreadId.value = merged.id
         }
@@ -415,13 +360,14 @@ internal class IncomingEventRouter(
 
     private fun handleThreadNameUpdated(params: Map<String, JSONValue>?) {
         if (params == null) return
-        val threadId = extractThreadId(params) ?: return
+        val threadId = extractIncomingThreadId(params) ?: return
         val event = envelopeEventObject(params)
         val renameKeys = listOf("threadName", "thread_name", "name", "title")
-        val hasExplicitRenameField = hasAnyKey(params, renameKeys) || event?.let { hasAnyKey(it, renameKeys) } == true
+        val hasExplicitRenameField =
+            hasAnyIncomingKey(params, renameKeys) || event?.let { hasAnyIncomingKey(it, renameKeys) } == true
         val name =
-            firstString(params, renameKeys)
-                ?: event?.let { firstString(it, renameKeys) }
+            firstIncomingString(params, renameKeys)
+                ?: event?.let { firstIncomingString(it, renameKeys) }
         val localRename = CodexThread.normalizeIdentifier(persistedThreadRename(threadId))
         val list = threads.value
         val idx = list.indexOfFirst { it.id == threadId }
@@ -438,14 +384,14 @@ internal class IncomingEventRouter(
                 } else {
                     list + CodexThread(id = threadId, title = localRename, name = localRename)
                 }
-            threads.value = sortThreadsForSidebar(next)
+            threads.value = sortIncomingThreadsForSidebar(next)
             return
         }
         val normalized = CodexThread.normalizeIdentifier(name)
         if (normalized == null) {
             if (hasExplicitRenameField && idx >= 0) {
                 threads.value =
-                    sortThreadsForSidebar(
+                    sortIncomingThreadsForSidebar(
                         list.mapIndexed { i, t ->
                             if (i == idx) {
                                 t.copy(title = null, name = null)
@@ -470,7 +416,7 @@ internal class IncomingEventRouter(
             } else {
                 list + CodexThread(id = threadId, title = normalized, name = normalized)
             }
-        threads.value = sortThreadsForSidebar(next)
+        threads.value = sortIncomingThreadsForSidebar(next)
         onRequestThreadSync()
     }
 
@@ -496,7 +442,7 @@ internal class IncomingEventRouter(
         val p = params ?: return
         val threadId = resolveThreadId(p) ?: IncomingNotificationParsers.extractThreadId(p) ?: return
         onTurnFailed(threadId)
-        handleErrorNotification(p, markFailed = false)
+        timelineEventRouter.handleErrorNotification(p, markFailed = false)
     }
 
     private fun handleTurnCompleted(params: Map<String, JSONValue>?) {
@@ -510,7 +456,7 @@ internal class IncomingEventRouter(
             }
         }
         val msg =
-            firstString(
+            firstIncomingString(
                 p,
                 listOf("failureMessage", "failure_message", "errorMessage", "message"),
             )
@@ -527,406 +473,6 @@ internal class IncomingEventRouter(
         }
     }
 
-    private fun handleAgentDelta(params: Map<String, JSONValue>?) {
-        val delta = IncomingNotificationParsers.extractAssistantDelta(params) ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(params)
-        val threadId = resolveThreadId(params) ?: IncomingNotificationParsers.extractThreadId(params) ?: return
-        val itemId = IncomingNotificationParsers.extractItemId(params)
-        val assistantPhase = IncomingNotificationParsers.extractAssistantPhase(params)
-        markTurnActiveFromLiveEvent(threadId, turnId)
-        scope.launch {
-            messageTimeline.appendAssistantDelta(threadId, turnId, itemId, delta, assistantPhase)
-        }
-    }
-
-    private fun handleItemCompleted(
-        params: Map<String, JSONValue>?,
-        completesTurn: Boolean = false,
-    ) {
-        val p = params ?: return
-        val ev = envelopeEventObject(p)
-        val itemObj = IncomingNotificationParsers.extractIncomingItemObject(p, ev)
-        if (itemObj == null) {
-            handleLegacyAgentCompleted(p, completesTurn)
-            return
-        }
-        val decoded = ThreadHistoryDecoder.decodeCompletedItem(itemObj)
-        if (decoded == null) {
-            handleLegacyAgentCompleted(p, completesTurn)
-            return
-        }
-        val threadId = resolveThreadId(p) ?: IncomingNotificationParsers.extractThreadId(p) ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(p)
-        val itemId = extractItemIdDeep(p, itemObj)
-        recordTurnThread(turnId, threadId)
-        when (decoded.kind) {
-            CodexMessageKind.chat ->
-                when (decoded.role) {
-                    CodexMessageRole.assistant -> {
-                        val text = decoded.text.trim()
-                        if (text.isEmpty() && decoded.attachments.isEmpty()) return
-                        val assistantPhase =
-                            decoded.assistantPhase ?: IncomingNotificationParsers.extractAssistantPhase(p, itemObj)
-                        scope.launch {
-                            messageTimeline.completeAssistantMessage(
-                                threadId = threadId,
-                                turnId = turnId,
-                                itemId = itemId,
-                                text = text,
-                                attachments = decoded.attachments,
-                                assistantPhase = assistantPhase,
-                            )
-                        }
-                        if (completesTurn && turnId.isNullOrBlank()) {
-                            onTurnCompleted(threadId)
-                        }
-                    }
-                    CodexMessageRole.user -> {
-                        val text = decoded.text.trim()
-                        if (text.isEmpty() && decoded.attachments.isEmpty()) return
-                        scope.launch {
-                            messageTimeline.appendMirroredUser(threadId, turnId, text, decoded.attachments)
-                        }
-                    }
-                    else -> handleLegacyAgentCompleted(p)
-                }
-            CodexMessageKind.thinking,
-            CodexMessageKind.fileChange,
-            CodexMessageKind.commandExecution,
-            -> {
-                val text = decoded.text.trim()
-                if (text.isEmpty()) return
-                if (decoded.kind == CodexMessageKind.commandExecution) {
-                    val state =
-                        CommandExecutionEventParser.parse(
-                            params = p,
-                            eventObject = itemObj,
-                            method = "item/completed",
-                        )
-                    commandDetailsStore.upsertFromState(
-                        itemId = state.itemId ?: itemId,
-                        fullCommand = state.fullCommand,
-                        cwd = state.cwd,
-                        exitCode = state.exitCode,
-                        durationMs = state.durationMs,
-                    )
-                }
-                scope.launch {
-                    messageTimeline.completeSystemItem(threadId, turnId, itemId, decoded.kind, text)
-                }
-            }
-            CodexMessageKind.plan -> {
-                val text = decoded.text.trim()
-                scope.launch {
-                    messageTimeline.upsertPlanMessage(
-                        threadId = threadId,
-                        turnId = turnId,
-                        itemId = itemId,
-                        text = text.ifEmpty { null },
-                        explanation = decoded.planState?.explanation,
-                        steps = decoded.planState?.steps,
-                        isStreaming = false,
-                    )
-                }
-            }
-            CodexMessageKind.subagentAction -> {
-                val action = decoded.subagentAction ?: return
-                scope.launch {
-                    messageTimeline.upsertSubagentActionMessage(
-                        threadId = threadId,
-                        turnId = turnId,
-                        itemId = itemId,
-                        action = action,
-                        isStreaming = false,
-                    )
-                }
-            }
-            else -> handleLegacyAgentCompleted(p)
-        }
-    }
-
-    private fun extractItemIdDeep(
-        params: Map<String, JSONValue>,
-        itemObject: Map<String, JSONValue>,
-    ): String? {
-        listOf(
-            itemObject["id"]?.stringValue,
-            itemObject["call_id"]?.stringValue,
-            itemObject["callId"]?.stringValue,
-        ).forEach { s ->
-            s?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-        }
-        return IncomingNotificationParsers.extractItemId(params)
-    }
-
-    private fun handleLegacyAgentCompleted(
-        params: Map<String, JSONValue>,
-        completesTurn: Boolean = false,
-    ) {
-        val threadId = resolveThreadId(params) ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(params)
-        val itemId = IncomingNotificationParsers.extractItemId(params)
-        val text =
-            IncomingNotificationParsers.extractAssistantDelta(params)
-                ?: IncomingNotificationParsers.extractUserMirrorText(params)
-                ?: return
-        if (text.isBlank()) return
-        val assistantPhase = IncomingNotificationParsers.extractAssistantPhase(params)
-        recordTurnThread(turnId, threadId)
-        scope.launch {
-            messageTimeline.completeAssistantMessage(
-                threadId = threadId,
-                turnId = turnId,
-                itemId = itemId,
-                text = text,
-                assistantPhase = assistantPhase,
-            )
-        }
-        if (completesTurn && turnId.isNullOrBlank()) {
-            onTurnCompleted(threadId)
-        }
-    }
-
-    private fun handleUserMirrored(params: Map<String, JSONValue>?) {
-        val text = IncomingNotificationParsers.extractUserMirrorText(params) ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(params)
-        val threadId = resolveThreadId(params) ?: return
-        markTurnActiveFromLiveEvent(threadId, turnId)
-        scope.launch {
-            messageTimeline.appendMirroredUser(threadId, turnId, text)
-            if (!turnId.isNullOrBlank()) {
-                messageTimeline.ensureStreamingAssistantPlaceholder(threadId, turnId)
-            }
-        }
-    }
-
-    private fun handleBackgroundEvent(params: Map<String, JSONValue>?) {
-        val p = params ?: return
-        val text =
-            (
-                IncomingNotificationParsers.extractTextDelta(p)
-                    ?: firstString(p, listOf("message", "activity", "status"))
-                    ?: envelopeEventObject(p)?.let { firstString(it, listOf("message", "activity", "status")) }
-            )?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(p)
-        val threadId = resolveThreadId(p) ?: return
-        markTurnActiveFromLiveEvent(threadId, turnId)
-        val itemId = IncomingNotificationParsers.extractItemId(p)
-        scope.launch {
-            if (!turnId.isNullOrBlank()) {
-                messageTimeline.upsertStreamingSystemItemSnapshot(
-                    threadId = threadId,
-                    turnId = turnId,
-                    itemId = itemId,
-                    kind = CodexMessageKind.thinking,
-                    snapshot = text,
-                )
-            } else {
-                messageTimeline.appendSystemLine(
-                    threadId = threadId,
-                    turnId = null,
-                    text = text,
-                    kind = CodexMessageKind.thinking,
-                )
-            }
-        }
-    }
-
-    private fun handleReasoningDelta(params: Map<String, JSONValue>?) {
-        val p = params ?: return
-        val delta = IncomingNotificationParsers.extractTextDelta(p) ?: return
-        if (delta.isEmpty()) return
-        val turnId = IncomingNotificationParsers.extractTurnId(p)
-        val threadId = resolveThreadId(p) ?: return
-        recordTurnThread(turnId, threadId)
-        val itemId = IncomingNotificationParsers.extractItemId(p)
-        if (!isTurnStreamingActive(threadId, turnId)) {
-            scope.launch {
-                messageTimeline.mergeLateReasoningDelta(threadId, turnId, itemId, delta)
-            }
-            return
-        }
-        scope.launch {
-            when {
-                itemId != null ->
-                    messageTimeline.appendStreamingSystemItemDelta(
-                        threadId = threadId,
-                        turnId = turnId,
-                        itemId = itemId,
-                        kind = CodexMessageKind.thinking,
-                        delta = delta,
-                    )
-                !turnId.isNullOrEmpty() ->
-                    messageTimeline.appendStreamingSystemItemDelta(
-                        threadId = threadId,
-                        turnId = turnId,
-                        itemId = null,
-                        kind = CodexMessageKind.thinking,
-                        delta = delta,
-                    )
-                else ->
-                    messageTimeline.appendSystemLine(
-                        threadId = threadId,
-                        turnId = null,
-                        text = delta,
-                        kind = CodexMessageKind.thinking,
-                    )
-            }
-        }
-    }
-
-    private fun handlePlanDelta(params: Map<String, JSONValue>?) {
-        val p = params ?: return
-        val event = envelopeEventObject(p)
-        val threadId =
-            resolveThreadId(p)
-                ?: firstString(p, listOf("threadId", "thread_id"))
-                    ?.let { CodexThread.normalizeIdentifier(it) }
-                ?: event
-                    ?.let { firstString(it, listOf("threadId", "thread_id")) }
-                    ?.let { CodexThread.normalizeIdentifier(it) }
-                ?: return
-        val turnId =
-            firstString(p, listOf("turnId", "turn_id"))
-                ?: event?.let { firstString(it, listOf("turnId", "turn_id")) }
-                ?: return
-        val itemId =
-            firstString(p, listOf("itemId", "item_id"))
-                ?: event?.let { firstString(it, listOf("itemId", "item_id")) }
-                ?: return
-        val delta = p["delta"]?.stringValue ?: event?.get("delta")?.stringValue ?: return
-        if (delta.isEmpty()) return
-        markTurnActiveFromLiveEvent(threadId, turnId)
-        scope.launch {
-            messageTimeline.upsertPlanMessage(
-                threadId = threadId,
-                turnId = turnId,
-                itemId = itemId,
-                text = delta,
-                isStreaming = true,
-            )
-        }
-    }
-
-    private fun handleTurnPlanUpdated(params: Map<String, JSONValue>?) {
-        val p = params ?: return
-        val event = envelopeEventObject(p)
-        val threadId =
-            resolveThreadId(p)
-                ?: firstString(p, listOf("threadId", "thread_id"))
-                    ?.let { CodexThread.normalizeIdentifier(it) }
-                ?: event
-                    ?.let { firstString(it, listOf("threadId", "thread_id")) }
-                    ?.let { CodexThread.normalizeIdentifier(it) }
-                ?: return
-        val turnId =
-            firstString(p, listOf("turnId", "turn_id"))
-                ?: event?.let { firstString(it, listOf("turnId", "turn_id")) }
-                ?: return
-        markTurnActiveFromLiveEvent(threadId, turnId)
-        val explanation =
-            firstString(p, listOf("explanation", "summary"))
-                ?: event?.let { firstString(it, listOf("explanation", "summary")) }
-        val steps = decodePlanSteps(p["plan"] ?: event?.get("plan"))
-        scope.launch {
-            messageTimeline.upsertPlanMessage(
-                threadId = threadId,
-                turnId = turnId,
-                itemId = null,
-                explanation = explanation,
-                steps = steps,
-                isStreaming = true,
-            )
-        }
-    }
-
-    private fun handleFileChangeDelta(params: Map<String, JSONValue>?) {
-        val p = params ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(p)
-        val threadId = resolveThreadId(p) ?: return
-        markTurnActiveFromLiveEvent(threadId, turnId)
-        val itemId = IncomingNotificationParsers.extractItemId(p)
-        val itemObj =
-            IncomingNotificationParsers.extractIncomingItemObject(
-                params = p,
-                event = envelopeEventObject(p),
-            )
-        val rendered = itemObj?.let { FileChangeItemBodyRenderer.renderFromIncomingItem(it) }?.trim().orEmpty()
-        val delta = IncomingNotificationParsers.extractTextDelta(p)?.trim().orEmpty()
-        if (shouldIgnoreFileChangeDelta(rendered, delta)) return
-        scope.launch {
-            if (rendered.isNotEmpty()) {
-                messageTimeline.upsertStreamingSystemItemSnapshot(
-                    threadId = threadId,
-                    turnId = turnId,
-                    itemId = itemId,
-                    kind = CodexMessageKind.fileChange,
-                    snapshot = rendered,
-                )
-                return@launch
-            }
-            if (delta.isEmpty() || delta.equals("[file change]", ignoreCase = true)) return@launch
-            when {
-                itemId != null ->
-                    messageTimeline.appendStreamingSystemItemDelta(
-                        threadId,
-                        turnId,
-                        itemId,
-                        CodexMessageKind.fileChange,
-                        delta,
-                    )
-                !turnId.isNullOrEmpty() ->
-                    messageTimeline.appendStreamingSystemItemDelta(
-                        threadId,
-                        turnId,
-                        null,
-                        CodexMessageKind.fileChange,
-                        delta,
-                    )
-                else ->
-                    messageTimeline.appendSystemLine(
-                        threadId,
-                        null,
-                        delta,
-                        CodexMessageKind.fileChange,
-                    )
-            }
-        }
-    }
-
-    private fun handleImageGenerationEnd(params: Map<String, JSONValue>?) {
-        val p = params ?: return
-        val event = envelopeEventObject(p)
-        val imagePath =
-            firstString(p, listOf("saved_path", "savedPath", "path", "url", "image_url"))
-                ?: event?.let { firstString(it, listOf("saved_path", "savedPath", "path", "url", "image_url")) }
-                ?: return
-        val attachment =
-            TurnAttachmentCodec.attachmentFromHistorySource(imagePath)
-                ?: CodexImageAttachment(thumbnailBase64JPEG = "", sourceURL = imagePath)
-        val turnId = IncomingNotificationParsers.extractTurnId(p)
-        val threadId = resolveThreadId(p) ?: return
-        recordTurnThread(turnId, threadId)
-        val itemId =
-            IncomingNotificationParsers.extractItemId(p)
-                ?: firstString(p, listOf("call_id", "callId", "id"))
-                ?: event?.let { firstString(it, listOf("call_id", "callId", "id")) }
-        scope.launch {
-            messageTimeline.completeAssistantMessage(
-                threadId = threadId,
-                turnId = turnId,
-                itemId = itemId,
-                text = "",
-                attachments = listOf(attachment),
-                assistantPhase = "final",
-            )
-        }
-    }
-
-    private fun handleToolCallOutputDelta(params: Map<String, JSONValue>?) {
-        handleFileChangeDelta(params)
-    }
-
     private fun handleCommandExecutionState(
         method: String,
         params: Map<String, JSONValue>?,
@@ -936,151 +482,4 @@ internal class IncomingEventRouter(
         method: String,
         params: Map<String, JSONValue>?,
     ) = commandExecutionRouter.handleDelta(method, params)
-
-    private fun handleErrorNotification(
-        params: Map<String, JSONValue>?,
-        markFailed: Boolean = true,
-    ) {
-        val threadId = resolveThreadId(params) ?: return
-        val turnId = IncomingNotificationParsers.extractTurnId(params)
-        val text = IncomingNotificationParsers.extractErrorMessage(params) ?: return
-        if (markFailed) {
-            onTurnFailed(threadId)
-        }
-        scope.launch {
-            messageTimeline.appendSystemLine(threadId, turnId, "Error: $text")
-        }
-        onRunCompletionAttention(threadId, turnId, RunCompletionAttentionKind.Failed)
-    }
-
-    private fun upsertThread(
-        list: List<CodexThread>,
-        thread: CodexThread,
-    ): List<CodexThread> {
-        val i = list.indexOfFirst { it.id == thread.id }
-        val merged =
-            if (i >= 0) {
-                val existing = list[i]
-                val filled = thread.withMissingDisplayFieldsFrom(existing)
-                list.mapIndexed { idx, t ->
-                    if (idx == i) {
-                        filled.copy(syncState = existing.syncState)
-                    } else {
-                        t
-                    }
-                }
-            } else {
-                list + thread
-            }
-        return sortThreadsForSidebar(merged)
-    }
-
-    private fun sortThreadsForSidebar(value: List<CodexThread>): List<CodexThread> {
-        val past = java.time.Instant.EPOCH
-        return value.sortedWith { lhs, rhs ->
-            val l = lhs.updatedAt ?: lhs.createdAt ?: past
-            val r = rhs.updatedAt ?: rhs.createdAt ?: past
-            r.compareTo(l)
-        }
-    }
-
-    private suspend fun appendStructuredInputTimelineMarker(request: PendingStructuredInputRequest) {
-        val threadId = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        messageTimeline.appendStructuredInputPromptMarker(
-            threadId = threadId,
-            turnId = request.turnId?.trim()?.takeIf { it.isNotEmpty() },
-            messageId = request.id,
-            bodyText = StructuredInputTimelineFormatter.bodyText(request.questions),
-        )
-    }
-
-    private suspend fun appendPendingApprovalTimelineMarker(request: PendingApprovalRequest) {
-        val threadId = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        messageTimeline.appendPendingApprovalMarker(
-            threadId = threadId,
-            turnId = request.turnId?.trim()?.takeIf { it.isNotEmpty() },
-            itemId = request.itemId?.trim()?.takeIf { it.isNotEmpty() },
-            messageId = request.id,
-            bodyText =
-                PendingApprovalTimelineFormatter.bodyText(
-                    request.method,
-                    request.command,
-                    request.reason,
-                ),
-        )
-    }
-
-    private fun buildStructuredInputRequest(
-        requestId: JSONValue,
-        params: JSONValue?,
-    ): PendingStructuredInputRequest =
-        params
-            ?.objectValue
-            .let { obj -> buildStructuredInputRequest(requestId, obj, resolveThreadId(obj)) }
-
-    private fun extractThreadId(params: Map<String, JSONValue>): String? {
-        fun norm(s: String?) = CodexThread.normalizeIdentifier(s)
-        norm(params["threadId"]?.stringValue)?.let { return it }
-        norm(params["thread_id"]?.stringValue)?.let { return it }
-        norm(params["conversationId"]?.stringValue)?.let { return it }
-        norm(params["conversation_id"]?.stringValue)?.let { return it }
-        norm(params["thread"]?.objectValue?.get("id")?.stringValue)?.let { return it }
-        val event = envelopeEventObject(params) ?: return null
-        norm(event["threadId"]?.stringValue)?.let { return it }
-        norm(event["thread_id"]?.stringValue)?.let { return it }
-        norm(event["thread"]?.objectValue?.get("id")?.stringValue)?.let { return it }
-        return null
-    }
-
-    private fun decodePlanSteps(value: JSONValue?): List<CodexPlanStep> {
-        val items = value?.arrayValue ?: return emptyList()
-        return items.mapNotNull { item ->
-            val objectValue = item.objectValue ?: return@mapNotNull null
-            val step = firstString(objectValue, listOf("step")) ?: return@mapNotNull null
-            val rawStatus = firstString(objectValue, listOf("status")) ?: return@mapNotNull null
-            val normalizedStatus =
-                rawStatus.lowercase().replace("_", "").replace("-", "")
-            val status =
-                when (normalizedStatus) {
-                    "pending" -> CodexPlanStepStatus.pending
-                    "inprogress" -> CodexPlanStepStatus.inProgress
-                    "completed" -> CodexPlanStepStatus.completed
-                    else -> null
-                } ?: return@mapNotNull null
-            CodexPlanStep(step = step, status = status)
-        }
-    }
-
-    private fun envelopeEventObject(params: Map<String, JSONValue>): Map<String, JSONValue>? = params["msg"]?.objectValue ?: params["event"]?.objectValue
-
-    private fun firstString(
-        obj: Map<String, JSONValue>,
-        keys: List<String>,
-    ): String? {
-        for (k in keys) {
-            obj[k]
-                ?.stringValue
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { return it }
-        }
-        return null
-    }
-
-    private fun hasAnyKey(
-        obj: Map<String, JSONValue>?,
-        keys: List<String>,
-    ): Boolean {
-        if (obj == null) return false
-        return keys.any { obj.containsKey(it) }
-    }
-
-    private fun jsonObjectFromJsonValue(v: JSONValue): JsonObject? {
-        if (v !is JSONValue.Obj) return null
-        return buildJsonObject {
-            v.map.forEach { (k, child) ->
-                put(k, JSONValue.toJsonElement(child))
-            }
-        }
-    }
 }
