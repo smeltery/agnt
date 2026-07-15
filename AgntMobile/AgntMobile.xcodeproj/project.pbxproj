@@ -79,6 +79,10 @@
 		B1C2D3E4F5061728394A5B6F /* CodexServiceImageGenerationMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B6F0 /* CodexServiceImageGenerationMergeTests.swift */; };
 		B1C2D3E4F5061728394A5B71 /* CodexServiceImageGenerationHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B712 /* CodexServiceImageGenerationHistoryTests.swift */; };
 		B1C2D3E4F5061728394A5B73 /* CodexServiceImageGenerationTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B734 /* CodexServiceImageGenerationTestSupport.swift */; };
+		B1C2D3E4F5061728394A5B75 /* CodexServiceRunIndicatorTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B756 /* CodexServiceRunIndicatorTestSupport.swift */; };
+		B1C2D3E4F5061728394A5B77 /* CodexServiceRunIndicatorBadgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B778 /* CodexServiceRunIndicatorBadgeTests.swift */; };
+		B1C2D3E4F5061728394A5B79 /* CodexServiceRunIndicatorDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B79A /* CodexServiceRunIndicatorDisplayTests.swift */; };
+		B1C2D3E4F5061728394A5B7B /* CodexServiceRunIndicatorConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B7BC /* CodexServiceRunIndicatorConnectionTests.swift */; };
 		B2C3D4E5F60718293A4B5C82 /* CodexPlanStructuredInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C83 /* CodexPlanStructuredInputTests.swift */; };
 		B2C3D4E5F60718293A4B5C80 /* CodexPlanMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C81 /* CodexPlanMessageTests.swift */; };
 		B3C4D5E6F708192A3B4C5D6E /* CodexPlanModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F708192A3B4C5D6F /* CodexPlanModeTests.swift */; };
@@ -266,6 +270,10 @@
 		C1D2E3F40516273849A5B6F0 /* CodexServiceImageGenerationMergeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationMergeTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B712 /* CodexServiceImageGenerationHistoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationHistoryTests.swift; sourceTree = "<group>"; };
 		C1D2E3F40516273849A5B734 /* CodexServiceImageGenerationTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceImageGenerationTestSupport.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B756 /* CodexServiceRunIndicatorTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceRunIndicatorTestSupport.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B778 /* CodexServiceRunIndicatorBadgeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceRunIndicatorBadgeTests.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B79A /* CodexServiceRunIndicatorDisplayTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceRunIndicatorDisplayTests.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B7BC /* CodexServiceRunIndicatorConnectionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceRunIndicatorConnectionTests.swift; sourceTree = "<group>"; };
 		B5C6D7E8F9012A3B4C5D6E72 /* CodexServiceIncomingRunStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceIncomingRunStateTests.swift; sourceTree = "<group>"; };
 		C9CD1EA13B728103A5654EEA /* BridgeControlModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeControlModels.swift; sourceTree = "<group>"; };
 		D4F56781234567890ABCDE02 /* CodexServiceIncomingRunIndicatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodexServiceIncomingRunIndicatorTests.swift; sourceTree = "<group>"; };
@@ -388,6 +396,7 @@
 				8D1F2A3B4C5D6E7F8091A2B4 /* CodexServiceConnectionErrorTests.swift */,
 				8F1A2B3C4D5E6F708192A3B5 /* CodexPushNotificationRegistrationTests.swift */,
 				D4F56781234567890ABCDE02 /* CodexServiceIncomingRunIndicatorTests.swift */,
+				C1D2E3F40516273849A5B7DE /* RunIndicator */,
 				B5C6D7E8F9012A3B4C5D6E72 /* CodexServiceIncomingRunStateTests.swift */,
 				B4C5D6E7F8091A2B3C4D5E71 /* CodexServiceIncomingReplayMirrorTests.swift */,
 				B4C5D6E7F8091A2B3C4D5E73 /* CodexServiceIncomingStreamingTests.swift */,
@@ -439,6 +448,17 @@
 				C1D2E3F40516273849A5B734 /* CodexServiceImageGenerationTestSupport.swift */,
 			);
 			path = ImageGeneration;
+			sourceTree = "<group>";
+		};
+		C1D2E3F40516273849A5B7DE /* RunIndicator */ = {
+			isa = PBXGroup;
+			children = (
+				C1D2E3F40516273849A5B756 /* CodexServiceRunIndicatorTestSupport.swift */,
+				C1D2E3F40516273849A5B778 /* CodexServiceRunIndicatorBadgeTests.swift */,
+				C1D2E3F40516273849A5B79A /* CodexServiceRunIndicatorDisplayTests.swift */,
+				C1D2E3F40516273849A5B7BC /* CodexServiceRunIndicatorConnectionTests.swift */,
+			);
+			path = RunIndicator;
 			sourceTree = "<group>";
 		};
 		74BE370810CFD7A76DC2A264 /* Composer */ = {
@@ -847,6 +867,10 @@
 				8D1F2A3B4C5D6E7F8091A2B3 /* CodexServiceConnectionErrorTests.swift in Sources */,
 				8F1A2B3C4D5E6F708192A3B4 /* CodexPushNotificationRegistrationTests.swift in Sources */,
 				D4F56781234567890ABCDE01 /* CodexServiceIncomingRunIndicatorTests.swift in Sources */,
+				B1C2D3E4F5061728394A5B75 /* CodexServiceRunIndicatorTestSupport.swift in Sources */,
+				B1C2D3E4F5061728394A5B77 /* CodexServiceRunIndicatorBadgeTests.swift in Sources */,
+				B1C2D3E4F5061728394A5B79 /* CodexServiceRunIndicatorDisplayTests.swift in Sources */,
+				B1C2D3E4F5061728394A5B7B /* CodexServiceRunIndicatorConnectionTests.swift in Sources */,
 				B5C6D7E8F9012A3B4C5D6E71 /* CodexServiceIncomingRunStateTests.swift in Sources */,
 				B4C5D6E7F8091A2B3C4D5E70 /* CodexServiceIncomingReplayMirrorTests.swift in Sources */,
 				B4C5D6E7F8091A2B3C4D5E72 /* CodexServiceIncomingStreamingTests.swift in Sources */,
