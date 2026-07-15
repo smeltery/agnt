@@ -3,36 +3,21 @@ package com.dotbrains.agnt.mobile.ui.shell
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.toClipEntry
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -58,18 +43,12 @@ import com.dotbrains.agnt.mobile.services.git.GitActionsError
 import com.dotbrains.agnt.mobile.services.git.GitActionsService
 import com.dotbrains.agnt.mobile.services.workspace.WorkspaceTextFileService
 import com.dotbrains.agnt.mobile.ui.LocalCodexRepository
-import com.dotbrains.agnt.mobile.ui.agent.ConversationHeader
-import com.dotbrains.agnt.mobile.ui.agent.SidebarDrawerContent
 import com.dotbrains.agnt.mobile.ui.agent.truncatePathMiddle
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressBannerState
 import com.dotbrains.agnt.mobile.ui.home.GitActionProgressPhase
 import com.dotbrains.agnt.mobile.ui.home.RootViewModel
-import com.dotbrains.agnt.mobile.ui.home.ThreadCompletionBanner
-import com.dotbrains.agnt.mobile.ui.navigation.AppNavHost
 import com.dotbrains.agnt.mobile.ui.navigation.AppRoutes
-import com.dotbrains.agnt.mobile.ui.pet.PetCompanionHost
 import com.dotbrains.agnt.mobile.ui.turn.WorkspaceTextFilePreviewRequest
-import com.dotbrains.agnt.mobile.ui.turn.timeline.LocalOpenRepoDiffForMarkdownLink
 import com.dotbrains.agnt.mobile.ui.turn.timeline.RepoMarkdownFileLink
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -879,156 +858,67 @@ fun MainShell(
         hasSidebarSnapshot = hasSidebarSnapshot,
     )
 
-    ModalNavigationDrawer(
+    MainShellContent(
+        modifier = modifier,
         drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                SidebarDrawerContent(
-                    repository = repository,
-                    navController = navController,
-                    drawerScope = scope,
-                    drawerState = drawerState,
-                    onOpenPairingScanner = onOpenPairingScanner,
-                    onReconnectSavedPairing = viewModel::reconnectSavedPairingManually,
-                    onWakeSavedComputer = viewModel::wakeSavedComputerDisplay,
-                    closeDrawer = { drawerState.close() },
-                    sessionReady = ready,
-                    connectionState = connectionState,
-                    reconnectUiState = reconnectUiState,
-                )
+        drawerScope = scope,
+        repository = repository,
+        navController = navController,
+        ready = ready,
+        connectionState = connectionState,
+        reconnectUiState = reconnectUiState,
+        onOpenPairingScanner = onOpenPairingScanner,
+        onReconnectSavedPairing = viewModel::reconnectSavedPairingManually,
+        onWakeSavedComputer = viewModel::wakeSavedComputerDisplay,
+        showShellHeader = showShellHeader,
+        activeThreadTitle = activeThreadTitle,
+        pathSubtitle = pathSubtitle,
+        threadPathFull = threadPathFull,
+        onShowPathDialog = { showPathDialog = true },
+        showTurnStop = showTurnStop,
+        repoDiffTotals = repoDiffTotals,
+        isLoadingRepoDiff = isLoadingRepoDiff,
+        showGitControls = showGitControls,
+        onOpenRepoDiffSheetFromHeader = { openRepoDiffSheetFromHeader() },
+        onGitAction = { handleGitAction(it) },
+        gitActionBusy = gitActionBusy,
+        repoIsDirty = repoStatusSnapshot?.isDirty == true,
+        gitActionEnabled = showGitControls && !showTurnStop,
+        gitInitialized = repoStatusSnapshot?.isRepo == true,
+        showDesktopHandoff = showDesktopHandoff,
+        handingOffToDesktop = handingOffToDesktop,
+        showWorktreeHandoff = showWorktreeHandoff,
+        handingOffWorktree = handingOffWorktree,
+        isWorktreeProject = isWorktreeProject,
+        onContinueDesktop = {
+            val tid = activeThreadId
+            if (tid != null) {
+                handingOffToDesktop = true
+                desktopHandoffError = null
+                scope.launch {
+                    runCatching { DesktopHandoffService(repository).continueOnDesktop(tid) }
+                        .onFailure { error -> desktopHandoffError = error.message ?: handoffFallbackMessage }
+                    handingOffToDesktop = false
+                }
             }
         },
-    ) {
-        Scaffold(
-            modifier = modifier.fillMaxSize(),
-            containerColor = MaterialTheme.colorScheme.background,
-            // Home overlays ConversationHeader inside content; do not reserve root top-bar height.
-            contentWindowInsets =
-                WindowInsets.safeDrawing.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
-                ),
-        ) { innerPadding ->
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-            ) {
-                CompositionLocalProvider(
-                    LocalOpenRepoDiffForMarkdownLink provides ::openRepoDiffSheetFromMarkdown,
-                ) {
-                    AppNavHost(
-                        navController = navController,
-                        repository = repository,
-                        reconnectUiState = reconnectUiState,
-                        onReconnectSavedPairing = viewModel::reconnectSavedPairingManually,
-                        onWakeSavedComputer = viewModel::wakeSavedComputerDisplay,
-                        onOpenPairingScanner = onOpenPairingScanner,
-                        onGitContextChanged = { gitToolbarRefreshNonce++ },
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .then(if (showShellHeader) Modifier.statusBarsPadding() else Modifier),
-                    )
-                }
-                // Optional companion pet, drawn above content. Interaction is limited
-                // to Home so drags don't fight other screens' gestures.
-                PetCompanionHost(
-                    bottomExclusionHeightDp = 140f,
-                    isInteractionEnabled = showShellHeader,
-                )
-                if (showShellHeader) {
-                    ConversationHeader(
-                        title = activeThreadTitle,
-                        pathSubtitle = pathSubtitle,
-                        onPathClick =
-                            threadPathFull?.let {
-                                { showPathDialog = true }
-                            },
-                        showRunningPill = showTurnStop,
-                        repoDiffTotals = repoDiffTotals,
-                        isLoadingRepoDiff = isLoadingRepoDiff,
-                        onTapRepoDiff =
-                            if (repoDiffTotals?.hasChanges == true && showGitControls) {
-                                {
-                                    openRepoDiffSheetFromHeader()
-                                }
-                            } else {
-                                null
-                            },
-                        showGitActions = showGitControls,
-                        onGitAction = { handleGitAction(it) },
-                        gitActionsBusy = gitActionBusy,
-                        showsDiscardRuntimeRecovery = repoStatusSnapshot?.isDirty == true,
-                        isGitActionEnabled = showGitControls && !showTurnStop,
-                        isGitInitialized = repoStatusSnapshot?.isRepo == true,
-                        showDesktopHandoff = showDesktopHandoff,
-                        handingOffToDesktop = handingOffToDesktop,
-                        showWorktreeHandoff = showWorktreeHandoff,
-                        handingOffWorktree = handingOffWorktree,
-                        isWorktreeProject = isWorktreeProject,
-                        showTurnStop = showTurnStop,
-                        onOpenDrawer = {
-                            scope.launch { drawerState.open() }
-                        },
-                        onContinueDesktop = {
-                            val tid = activeThreadId
-                            if (tid != null) {
-                                handingOffToDesktop = true
-                                desktopHandoffError = null
-                                scope.launch {
-                                    runCatching {
-                                        DesktopHandoffService(repository).continueOnDesktop(tid)
-                                    }.onFailure { error ->
-                                        desktopHandoffError =
-                                            error.message ?: handoffFallbackMessage
-                                    }
-                                    handingOffToDesktop = false
-                                }
-                            }
-                        },
-                        onWorktreeHandoff = { handoffCurrentThreadWorktree() },
-                        onStopTurn = {
-                            val tid = activeThreadId
-                            if (tid != null) {
-                                scope.launch {
-                                    runCatching { repository.interruptTurn(threadId = tid) }
-                                }
-                            }
-                        },
-                        // Surface the menu item whenever the active thread has a repo-bound
-                        // cwd. Mirrors iOS `onTapTerminal = onOpenTerminal == nil ? nil : { onOpenTerminal?(gitWorkingDirectory) }`.
-                        showOpenTerminalHere = !gitCwd.isNullOrBlank(),
-                        onOpenTerminalHere =
-                            gitCwd?.takeIf { it.isNotBlank() }?.let { cwd ->
-                                { navController.navigate(AppRoutes.terminalRoute(cwd)) }
-                            },
-                        modifier = Modifier.align(Alignment.TopCenter),
-                    )
-                }
-                if (showShellHeader) {
-                    ThreadCompletionBanner(
-                        bannerMessage = gitToastMessage,
-                        gitProgress = gitProgressToast,
-                        onTap = { },
-                        onDismiss = {
-                            if (gitActionProgressMessage != null) {
-                                gitActionProgressMessage = null
-                            }
-                            if (gitActionProgressPhase != null) {
-                                gitActionProgressPhase = null
-                            }
-                        },
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopCenter)
-                                .statusBarsPadding()
-                                .padding(top = 128.dp),
-                    )
-                }
+        onWorktreeHandoff = { handoffCurrentThreadWorktree() },
+        onStopTurn = {
+            val tid = activeThreadId
+            if (tid != null) {
+                scope.launch { runCatching { repository.interruptTurn(threadId = tid) } }
             }
-        }
-    }
+        },
+        gitCwd = gitCwd,
+        gitToastMessage = gitToastMessage,
+        gitProgressToast = gitProgressToast,
+        onDismissGitProgress = {
+            if (gitActionProgressMessage != null) gitActionProgressMessage = null
+            if (gitActionProgressPhase != null) gitActionProgressPhase = null
+        },
+        onGitContextChanged = { gitToolbarRefreshNonce++ },
+        onOpenRepoDiffFromMarkdown = { openRepoDiffSheetFromMarkdown(it) },
+    )
 
     MainShellOverlays(
         showPathDialog = showPathDialog,
