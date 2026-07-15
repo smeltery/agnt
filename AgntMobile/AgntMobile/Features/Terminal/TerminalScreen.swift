@@ -121,7 +121,7 @@ struct TerminalScreen: View {
     }
 
     private var terminalToolbarActions: [TerminalToolbarAction] {
-        terminalToolbarActions(for: hostPlatform)
+        buildTerminalToolbarActions(for: hostPlatform)
     }
 
     private var terminalMenuSessions: [TerminalMenuSessionItem] {
@@ -129,7 +129,7 @@ struct TerminalScreen: View {
         if !snapshots.contains(where: { $0.terminalId == activeTerminalId }) {
             snapshots.append(activeSnapshot)
         }
-        return terminalMenuSessions(from: snapshots, activeTerminalId: activeTerminalId)
+        return buildTerminalMenuSessions(from: snapshots, activeTerminalId: activeTerminalId)
     }
 
     private var canPasteIntoActiveTerminal: Bool {

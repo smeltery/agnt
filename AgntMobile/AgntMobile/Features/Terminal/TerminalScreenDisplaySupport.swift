@@ -64,7 +64,7 @@ func terminalStatusTone(for status: AgntTerminalStatus) -> TerminalStatusTone {
     }
 }
 
-func terminalToolbarActions(for hostPlatform: TerminalHostPlatform) -> [TerminalToolbarAction] {
+func buildTerminalToolbarActions(for hostPlatform: TerminalHostPlatform) -> [TerminalToolbarAction] {
     let modifierActions: [TerminalToolbarAction]
     switch hostPlatform {
     case .mac:
@@ -94,7 +94,7 @@ func terminalToolbarActions(for hostPlatform: TerminalHostPlatform) -> [Terminal
     ]
 }
 
-func terminalMenuSessions(
+func buildTerminalMenuSessions(
     from snapshots: [AgntTerminalSnapshot],
     activeTerminalId: String
 ) -> [TerminalMenuSessionItem] {
