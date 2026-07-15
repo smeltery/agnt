@@ -39,6 +39,8 @@
 		FA571E0005000000000000FA /* StreamingUIInteractionMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA571E0005000000000000F9 /* StreamingUIInteractionMonitorTests.swift */; };
 		516497899B5C9A82CD10D93F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A37794F4B32C1952A3770E0 /* Foundation.framework */; };
 		536FE94CCA889CE20A57EC42 /* BridgeControlService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357D589B8C179934A884F8CC /* BridgeControlService.swift */; };
+		5817D2C4A6B94F18835C2E14 /* BridgeControlShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5817D2C4A6B94F18835C2E15 /* BridgeControlShell.swift */; };
+		5817D2C4A6B94F18835C2E16 /* BridgeControlTrustFallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5817D2C4A6B94F18835C2E17 /* BridgeControlTrustFallback.swift */; };
 		5817D2C4A6B94F18835C2E12 /* BridgeMenuBarComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5817D2C4A6B94F18835C2E13 /* BridgeMenuBarComponents.swift */; };
 		5817D2C4A6B94F18835C2E10 /* BridgeMenuBarQRCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5817D2C4A6B94F18835C2E11 /* BridgeMenuBarQRCodeView.swift */; };
 		5D0DB447AAE8F5B60D164223 /* BridgeMenuBarViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C1E3E027CF4B98453962A0 /* BridgeMenuBarViews.swift */; };
@@ -220,6 +222,8 @@
 		FA571E0004000000000000F7 /* StreamingMarkdownBlockSplitterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingMarkdownBlockSplitterTests.swift; sourceTree = "<group>"; };
 		FA571E0005000000000000F9 /* StreamingUIInteractionMonitorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingUIInteractionMonitorTests.swift; sourceTree = "<group>"; };
 		53C1E3E027CF4B98453962A0 /* BridgeMenuBarViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeMenuBarViews.swift; sourceTree = "<group>"; };
+		5817D2C4A6B94F18835C2E15 /* BridgeControlShell.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeControlShell.swift; sourceTree = "<group>"; };
+		5817D2C4A6B94F18835C2E17 /* BridgeControlTrustFallback.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeControlTrustFallback.swift; sourceTree = "<group>"; };
 		5817D2C4A6B94F18835C2E13 /* BridgeMenuBarComponents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeMenuBarComponents.swift; sourceTree = "<group>"; };
 		5817D2C4A6B94F18835C2E11 /* BridgeMenuBarQRCodeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeMenuBarQRCodeView.swift; sourceTree = "<group>"; };
 		6880B31C08D19C3D55FC62F0 /* AgntMenuBar-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "AgntMenuBar-Info.plist"; sourceTree = "<group>"; };
@@ -647,6 +651,8 @@
 				C0B9CCCCC45E47616AB452FA /* AgntMenuBarApp.swift */,
 				C9CD1EA13B728103A5654EEA /* BridgeControlModels.swift */,
 				357D589B8C179934A884F8CC /* BridgeControlService.swift */,
+				5817D2C4A6B94F18835C2E15 /* BridgeControlShell.swift */,
+				5817D2C4A6B94F18835C2E17 /* BridgeControlTrustFallback.swift */,
 				3A1FC345ADD350213550F36C /* BridgeMenuBarStore.swift */,
 				5817D2C4A6B94F18835C2E13 /* BridgeMenuBarComponents.swift */,
 				5817D2C4A6B94F18835C2E11 /* BridgeMenuBarQRCodeView.swift */,
@@ -858,6 +864,8 @@
 				DAAD0C0C717F9415C3E9D21A /* AgntMenuBarApp.swift in Sources */,
 				653D2279D3E2FEE59237D854 /* BridgeControlModels.swift in Sources */,
 				536FE94CCA889CE20A57EC42 /* BridgeControlService.swift in Sources */,
+				5817D2C4A6B94F18835C2E14 /* BridgeControlShell.swift in Sources */,
+				5817D2C4A6B94F18835C2E16 /* BridgeControlTrustFallback.swift in Sources */,
 				1BF7B512D49503A3C3290F00 /* BridgeMenuBarStore.swift in Sources */,
 				5817D2C4A6B94F18835C2E12 /* BridgeMenuBarComponents.swift in Sources */,
 				5817D2C4A6B94F18835C2E10 /* BridgeMenuBarQRCodeView.swift in Sources */,
