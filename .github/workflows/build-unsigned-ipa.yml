@@ -34,8 +34,9 @@ jobs:
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v7
+        continue-on-error: true
         with:
           name: agnt-unsigned-ipa
           path: build/unsigned-ipa/agnt-unsigned-release.ipa
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
