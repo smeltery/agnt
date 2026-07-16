@@ -287,7 +287,7 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             shouldChangeTextIn range: NSRange,
             replacementText text: String
         ) -> Bool {
-            let expanded = TurnComposerInlineSkillToken.expandedEditingRange(range, in: textView.attributedText)
+            let expanded = TurnComposerInlineSkillToken.expandedEditingRange(for: range, in: textView.attributedText)
             guard expanded != range else { return true }
             textView.textStorage.replaceCharacters(in: expanded, with: text)
             textViewDidChange(textView)
