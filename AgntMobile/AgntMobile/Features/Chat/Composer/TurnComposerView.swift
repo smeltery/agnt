@@ -222,6 +222,7 @@ struct TurnComposerView: View {
                             dynamicHeight: $composerInputHeight,
                             runtimeState: runtimeState,
                             runtimeActions: runtimeActions,
+                            mentionedSkillNames: accessoryState.composerMentionedSkills.map(\.name),
                             maxVisibleLines: expandedInputMaxVisibleLines,
                             onPasteImageData: { imageDataItems in
                                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
