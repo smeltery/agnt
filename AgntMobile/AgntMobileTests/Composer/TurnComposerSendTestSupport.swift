@@ -94,4 +94,5 @@ class TurnComposerSendTestCase: XCTestCase {
         // Keep instances alive for process lifetime so assertions remain deterministic.
         Self.retainedServices.append(service)
         return service
+    }
 }

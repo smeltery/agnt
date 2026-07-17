@@ -62,21 +62,33 @@ extension ContentView {
     var rootContentWithBannerOverlay: some View {
         rootContentWithPresentations
             .overlay(alignment: .top) {
-                if let banner = codex.threadCompletionBanner {
-                    ThreadCompletionBannerView(
-                        banner: banner,
-                        onTap: {
-                            openCompletedThreadFromBanner(banner)
-                        },
-                        onDismiss: {
-                            dismissThreadCompletionBanner()
-                        }
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                VStack(spacing: 8) {
+                    ForEach(codex.systemNotices) { notice in
+                        SystemNoticeBannerView(
+                            notice: notice,
+                            onDismiss: {
+                                codex.dismissSystemNotice(id: notice.id)
+                            }
+                        )
+                    }
+
+                    if let banner = codex.threadCompletionBanner {
+                        ThreadCompletionBannerView(
+                            banner: banner,
+                            onTap: {
+                                openCompletedThreadFromBanner(banner)
+                            },
+                            onDismiss: {
+                                dismissThreadCompletionBanner()
+                            }
+                        )
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.88), value: codex.threadCompletionBanner?.id)
+            .animation(.spring(response: 0.35, dampingFraction: 0.88), value: codex.systemNotices.map(\.id))
     }
 }

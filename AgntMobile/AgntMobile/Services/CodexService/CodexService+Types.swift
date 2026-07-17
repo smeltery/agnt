@@ -172,6 +172,43 @@ struct CodexThreadCompletionBanner: Identifiable, Equatable, Sendable {
     let title: String
 }
 
+struct CodexSystemNotice: Identifiable, Equatable, Sendable {
+    let id = UUID()
+    let severity: CodexSystemNoticeSeverity
+    let title: String?
+    let message: String?
+    let provider: String?
+    let threadId: String?
+}
+
+enum CodexSystemNoticeSeverity: Equatable, Sendable {
+    case info
+    case warn
+    case error
+
+    init(rawBridgeValue: String?) {
+        switch rawBridgeValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "warn", "warning":
+            self = .warn
+        case "error", "danger":
+            self = .error
+        default:
+            self = .info
+        }
+    }
+
+    var defaultDurationNanoseconds: UInt64 {
+        switch self {
+        case .info:
+            return 5_000_000_000
+        case .warn:
+            return 8_000_000_000
+        case .error:
+            return 12_000_000_000
+        }
+    }
+}
+
 struct CodexMissingNotificationThreadPrompt: Identifiable, Equatable, Sendable {
     let id = UUID()
     let threadId: String

@@ -193,6 +193,9 @@ extension CodexService {
         }
 
         switch method {
+        case "system/notice":
+            handleSystemNotice(paramsObject)
+
         case "thread/started":
             handleThreadStarted(paramsObject)
 
