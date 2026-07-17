@@ -72,6 +72,7 @@ final class GhosttyTerminalView: UIView, UITextFieldDelegate, UIGestureRecognize
     static let minimumVerticalScrollStepPoints: CGFloat = 18
     static let verticalScrollStepMultiplier: CGFloat = 1.15
     static let selectionDragActivationDistance: CGFloat = 10
+    static let minimumDrawableViewportSize = CGSize(width: 24, height: 24)
     static let terminalResetSequence = Data("\u{1B}c".utf8)
     static let terminalReturnSequence = Data([0x0D])
 
@@ -173,6 +174,11 @@ final class GhosttyTerminalView: UIView, UITextFieldDelegate, UIGestureRecognize
         updateContentScale()
 
         let viewportSize = terminalViewport.bounds.size
+        guard Self.isDrawableViewportSize(viewportSize) else {
+            lastViewportSize = viewportSize
+            return
+        }
+
         if surface == nil {
             createSurfaceIfPossible()
         }
@@ -219,6 +225,11 @@ final class GhosttyTerminalView: UIView, UITextFieldDelegate, UIGestureRecognize
         emitInput(Self.terminalReturnSequence)
         textField.text = ""
         return false
+    }
+
+    static func isDrawableViewportSize(_ size: CGSize) -> Bool {
+        size.width >= minimumDrawableViewportSize.width
+            && size.height >= minimumDrawableViewportSize.height
     }
 
     // MARK: - Setup

@@ -11,7 +11,7 @@ extension GhosttyTerminalView {
 
     func createSurfaceIfPossible() {
         guard surface == nil, app == nil, !isCreatingSurface, !surfaceCreationFailed else { return }
-        guard terminalViewport.bounds.width > 0, terminalViewport.bounds.height > 0 else { return }
+        guard Self.isDrawableViewportSize(terminalViewport.bounds.size) else { return }
         guard canRenderSurface else { return }
         guard GhosttyRuntime.ensureInitialized() else {
             markSurfaceCreationFailed()
@@ -114,6 +114,7 @@ extension GhosttyTerminalView {
 
     func applyRemoteBuffer(_ buffer: Data) {
         guard canRenderSurface else { return }
+        guard Self.isDrawableViewportSize(terminalViewport.bounds.size) else { return }
         guard surface != nil else {
             createSurfaceIfPossible()
             return
@@ -131,12 +132,14 @@ extension GhosttyTerminalView {
 
     func feedBuffer(_ buffer: Data) {
         guard canRenderSurface, !buffer.isEmpty else { return }
+        guard Self.isDrawableViewportSize(terminalViewport.bounds.size) else { return }
         feedData(buffer)
         lastAppliedBuffer = buffer
     }
 
     func replaceRenderedBuffer(with buffer: Data) {
         guard canRenderSurface else { return }
+        guard Self.isDrawableViewportSize(terminalViewport.bounds.size) else { return }
         guard surface != nil else {
             lastAppliedBuffer = Data()
             createSurfaceIfPossible()
@@ -151,6 +154,7 @@ extension GhosttyTerminalView {
 
     func feedData(_ data: Data) {
         guard canRenderSurface, let surface, !data.isEmpty else { return }
+        guard Self.isDrawableViewportSize(terminalViewport.bounds.size) else { return }
 
         data.withUnsafeBytes { buffer in
             guard let pointer = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
@@ -178,6 +182,10 @@ extension GhosttyTerminalView {
     }
 
     func resizeSurface() {
+        guard Self.isDrawableViewportSize(terminalViewport.bounds.size) else {
+            emitEstimatedResize()
+            return
+        }
         guard let surface else {
             emitEstimatedResize()
             return
