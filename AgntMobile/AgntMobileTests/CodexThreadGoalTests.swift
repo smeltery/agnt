@@ -42,6 +42,26 @@ final class CodexThreadGoalTests: XCTestCase {
         XCTAssertEqual(params["tokenBudget"], .null)
     }
 
+    func testSetThreadGoalSendsIntegerBudget() async throws {
+        let (service, captured) = makeCapturingService()
+
+        _ = try await service.setThreadGoal(threadId: "thread-1", tokenBudget: .set(200_000))
+
+        let params = try XCTUnwrap(captured().first?.objectValue)
+        XCTAssertEqual(params["tokenBudget"]?.intValue, 200_000)
+    }
+
+    func testSetThreadGoalOmitsStatusOnObjectiveOnlyEdit() async throws {
+        let (service, captured) = makeCapturingService()
+
+        _ = try await service.setThreadGoal(threadId: "thread-1", objective: "Refined objective")
+
+        let params = try XCTUnwrap(captured().first?.objectValue)
+        XCTAssertEqual(params["objective"]?.stringValue, "Refined objective")
+        XCTAssertNil(params["status"])
+        XCTAssertNil(params["tokenBudget"])
+    }
+
     func testSetThreadGoalRejectsInvalidBudgetBeforeTransport() async {
         let service = makeService()
         var didSend = false
@@ -66,6 +86,22 @@ final class CodexThreadGoalTests: XCTestCase {
 
         XCTAssertEqual(goal.status, .active)
         XCTAssertEqual(service.goalByThreadID["thread-1"]?.objective, "Ship goal mode")
+    }
+
+    func testEphemeralThreadErrorMapsToUserFacingMessage() async {
+        let service = makeService()
+        service.requestTransportOverride = { _, _ in
+            throw CodexServiceError.rpcError(
+                RPCError(code: -32600, message: "ephemeral thread does not support goals: thread-1")
+            )
+        }
+
+        do {
+            _ = try await service.readThreadGoal(threadId: "thread-1")
+            XCTFail("Expected ephemeral thread error")
+        } catch {
+            XCTAssertEqual(error as? CodexThreadGoalError, .ephemeralThread)
+        }
     }
 
     func testMethodNotFoundDisablesGoalSupport() async {
