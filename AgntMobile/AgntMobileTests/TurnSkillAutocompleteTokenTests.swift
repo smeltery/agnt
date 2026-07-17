@@ -42,6 +42,36 @@ final class TurnSkillAutocompleteTokenTests: XCTestCase {
         XCTAssertFalse(attributed.string.contains("$check-code"))
     }
 
+    func testUnselectedInlineSkillReferenceStaysPlainText() {
+        let attributed = TurnComposerInlineSkillToken.displayAttributedString(
+            canonicalText: "$check-code please",
+            mentionNames: [],
+            font: .systemFont(ofSize: 15),
+            textColor: .label,
+            tintColor: .systemIndigo
+        )
+
+        XCTAssertEqual(attributed.string, "$check-code please")
+        XCTAssertEqual(TurnComposerInlineSkillToken.canonicalText(from: attributed), "$check-code please")
+    }
+
+    func testInlineSkillEditingRangeExpandsAcrossWholeToken() throws {
+        let attributed = TurnComposerInlineSkillToken.displayAttributedString(
+            canonicalText: "before $check-code after",
+            mentionNames: ["check-code"],
+            font: .systemFont(ofSize: 15),
+            textColor: .label,
+            tintColor: .systemIndigo
+        )
+        let tokenRange = try XCTUnwrap(inlineSkillTokenRange(in: attributed))
+        let partialRange = NSRange(location: tokenRange.location + 1, length: 1)
+
+        XCTAssertEqual(
+            TurnComposerInlineSkillToken.expandedEditingRange(for: partialRange, in: attributed),
+            tokenRange
+        )
+    }
+
     func testInlineSkillTokenSnapsSelectionOutOfToken() {
         let attributed = TurnComposerInlineSkillToken.displayAttributedString(
             canonicalText: "$check-code now",
@@ -54,5 +84,18 @@ final class TurnSkillAutocompleteTokenTests: XCTestCase {
         let snapped = TurnComposerInlineSkillToken.snappedSelection(NSRange(location: 2, length: 0), in: attributed)
         XCTAssertEqual(snapped.length, 0)
         XCTAssertTrue(snapped.location == 0 || snapped.location == ("$ Check Code" as NSString).length)
+    }
+
+    private func inlineSkillTokenRange(in attributed: NSAttributedString) -> NSRange? {
+        var result: NSRange?
+        attributed.enumerateAttribute(
+            TurnComposerInlineSkillToken.attributeKey,
+            in: NSRange(location: 0, length: attributed.length)
+        ) { value, range, stop in
+            guard value != nil else { return }
+            result = range
+            stop.pointee = true
+        }
+        return result
     }
 }
