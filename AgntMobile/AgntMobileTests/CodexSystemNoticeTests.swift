@@ -81,6 +81,23 @@ final class CodexSystemNoticeTests: XCTestCase {
         XCTAssertTrue(service.systemNoticeDismissTasksByID.isEmpty)
     }
 
+    func testTransientConnectionPromptResetClearsSystemNotices() {
+        let service = makeService()
+        service.handleNotification(
+            method: "system/notice",
+            params: .object([
+                "title": .string("Provider warning"),
+                "durationMs": .integer(1_000),
+            ])
+        )
+
+        XCTAssertEqual(service.systemNotices.count, 1)
+        service.clearTransientConnectionPrompts()
+
+        XCTAssertTrue(service.systemNotices.isEmpty)
+        XCTAssertTrue(service.systemNoticeDismissTasksByID.isEmpty)
+    }
+
     private func makeService() -> CodexService {
         let suiteName = "CodexSystemNoticeTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard

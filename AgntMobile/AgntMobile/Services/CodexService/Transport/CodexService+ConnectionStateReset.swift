@@ -60,6 +60,7 @@ extension CodexService {
         bridgeUpdatePrompt = nil
         threadCompletionBanner = nil
         missingNotificationThreadPrompt = nil
+        clearSystemNotices()
     }
 
     // Removes the current socket reference before reconnect/teardown logic mutates shared state.
