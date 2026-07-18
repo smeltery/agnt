@@ -3,6 +3,7 @@ package com.dotbrains.agnt.mobile.services.agent.connection
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.core.transport.SecureControlMultiplexer
 import com.dotbrains.agnt.mobile.services.agent.AgentService
+import com.dotbrains.agnt.mobile.services.agent.notifications.cancelAllRunOngoingNotifications
 import com.dotbrains.agnt.mobile.services.agent.notifications.clearPendingServerRequests
 import com.dotbrains.agnt.mobile.services.agent.runtime.refreshModelsInternal
 import com.dotbrains.agnt.mobile.services.agent.runtime.refreshRateLimitsInternal
@@ -126,6 +127,7 @@ internal suspend fun AgentService.resetBridgeSession(preservePresentationState: 
         _threads.value = emptyList()
         _activeThreadId.value = null
     }
+    cancelAllRunOngoingNotifications()
     _runningTurnIdByThread.value = emptyMap()
     _protectedRunningFallbackThreadIds.value = emptySet()
     _readyThreadIds.value = emptySet()

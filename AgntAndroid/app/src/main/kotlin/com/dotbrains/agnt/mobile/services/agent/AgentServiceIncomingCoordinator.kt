@@ -3,9 +3,11 @@ package com.dotbrains.agnt.mobile.services.agent
 import com.dotbrains.agnt.mobile.core.model.CodexAccessMode
 import com.dotbrains.agnt.mobile.core.model.SystemNoticeSeverity
 import com.dotbrains.agnt.mobile.data.IncomingEventRouter
+import com.dotbrains.agnt.mobile.services.agent.notifications.cancelRunOngoingNotification
 import com.dotbrains.agnt.mobile.services.agent.notifications.enqueuePendingApprovalRequest
 import com.dotbrains.agnt.mobile.services.agent.notifications.enqueuePendingStructuredInputRequest
 import com.dotbrains.agnt.mobile.services.agent.notifications.notifyRunCompletionAttention
+import com.dotbrains.agnt.mobile.services.agent.notifications.notifyRunStartedOngoing
 import com.dotbrains.agnt.mobile.services.agent.runtime.handleRateLimitsUpdatedParams
 import com.dotbrains.agnt.mobile.services.agent.runtime.refreshThreadsInternal
 import com.dotbrains.agnt.mobile.services.agent.threads.applyAuthoritativeProjectPathToServerThread
@@ -41,6 +43,7 @@ internal class AgentServiceIncomingCoordinator(
                 }
             },
             onTurnLifecycle = { threadId, turnId ->
+                service.notifyRunStartedOngoing(threadId, turnId)
                 if (turnId != null) {
                     noteTurnStarted(threadId, turnId)
                 } else {
@@ -117,6 +120,7 @@ internal class AgentServiceIncomingCoordinator(
             service._runningTurnIdByThread.value.filterKeys { it != normalizedThreadId }
         service._protectedRunningFallbackThreadIds.value =
             service._protectedRunningFallbackThreadIds.value - normalizedThreadId
+        service.cancelRunOngoingNotification(normalizedThreadId)
     }
 
     fun noteTurnCompleted(threadId: String) {

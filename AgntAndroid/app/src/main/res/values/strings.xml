@@ -3,8 +3,9 @@
     <string name="app_name">agnt</string>
     <string name="drawer_brand_subtitle">Chats &amp; bridge</string>
     <string name="notification_channel_name">agnt activity</string>
-    <string name="notification_channel_description">Local notifications for completed turns and requests that need attention.</string>
+    <string name="notification_channel_description">Local notifications for running turns and requests that need attention.</string>
     <string name="notification_default_thread_title">agnt</string>
+    <string name="notification_run_running_body">Turn running. Open agnt to follow along.</string>
     <string name="notification_run_completed_body">Turn completed.</string>
     <string name="notification_run_failed_body">Turn failed. Open agnt for details.</string>
     <string name="notification_approval_body">Approval needed to continue.</string>
