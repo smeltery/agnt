@@ -1,4 +1,4 @@
-// FILE: CodexAutoReviewAccessModeTests.swift
+// FILE: Account/CodexAutoReviewAccessModeTests.swift
 // Purpose: Verifies approve-for-me runtime payload compatibility.
 // Layer: Unit Test
 // Exports: CodexAutoReviewAccessModeTests
