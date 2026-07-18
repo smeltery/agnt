@@ -15,6 +15,12 @@ import {
   TerminalSurface,
   type TerminalTheme,
 } from "./TerminalSurface";
+import {
+  closeTerminalTab,
+  createTerminalTab,
+  terminalTabSubtitle,
+  type TerminalTab,
+} from "./terminal-tabs";
 
 interface TerminalRouteProps {
   onClose: () => void;
@@ -31,7 +37,7 @@ export function TerminalRoute({ onClose }: TerminalRouteProps) {
   const accountSnapshot = useAccountStore((state) => state.snapshot);
   const terminalEnabled = accountSnapshot?.hostCapabilities?.terminalLocal === true;
 
-  const snapshot = useTerminalStore((state) => state.snapshots[DEFAULT_TERMINAL_ID]);
+  const snapshots = useTerminalStore((state) => state.snapshots);
   const ensureSubscribed = useTerminalStore((state) => state.ensureSubscribed);
   const subscribeOutput = useTerminalStore((state) => state.subscribeOutput);
   const open = useTerminalStore((state) => state.open);
@@ -42,9 +48,12 @@ export function TerminalRoute({ onClose }: TerminalRouteProps) {
 
   const [fontSize, setFontSize] = useState(FONT_SIZE_DEFAULT);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<TerminalTab[]>([{ id: DEFAULT_TERMINAL_ID, title: "Terminal 1" }]);
+  const [activeTerminalId, setActiveTerminalId] = useState(DEFAULT_TERMINAL_ID);
   /** Pending open params we'll retry once the user accepts the first-use prompt. */
-  const [pendingFirstUseOpen, setPendingFirstUseOpen] = useState<{ cols: number; rows: number } | null>(null);
-  const bootedRef = useRef(false);
+  const [pendingFirstUseOpen, setPendingFirstUseOpen] = useState<{ terminalId: string; cols: number; rows: number } | null>(null);
+  const bootedTerminalIdsRef = useRef(new Set<string>());
+  const snapshot = snapshots[activeTerminalId];
 
   const theme = useMemo<TerminalTheme>(
     () => (themeMode === "light" ? TERMINAL_THEME_LIGHT : TERMINAL_THEME_DARK),
@@ -54,30 +63,30 @@ export function TerminalRoute({ onClose }: TerminalRouteProps) {
   const subscribe = useCallback(
     (listener: (bytes: Uint8Array) => void) => {
       return subscribeOutput((id, bytes) => {
-        if (id === DEFAULT_TERMINAL_ID) listener(bytes);
+        if (id === activeTerminalId) listener(bytes);
       });
     },
-    [subscribeOutput]
+    [activeTerminalId, subscribeOutput]
   );
 
   const handleInput = useCallback(
     (bytes: Uint8Array) => {
       if (!connection) return;
-      void write(connection.rpc, { bytes }).catch((err) => {
+      void write(connection.rpc, { terminalId: activeTerminalId, bytes }).catch((err) => {
         setActionError(err instanceof Error ? err.message : String(err));
       });
     },
-    [connection, write]
+    [activeTerminalId, connection, write]
   );
 
   const handleResize = useCallback(
     (cols: number, rows: number) => {
       if (!connection) return;
-      void resize(connection.rpc, { cols, rows }).catch((err) => {
+      void resize(connection.rpc, { terminalId: activeTerminalId, cols, rows }).catch((err) => {
         setActionError(err instanceof Error ? err.message : String(err));
       });
     },
-    [connection, resize]
+    [activeTerminalId, connection, resize]
   );
 
   // Wire notification listener once and (when enabled) auto-open a session.
@@ -90,14 +99,14 @@ export function TerminalRoute({ onClose }: TerminalRouteProps) {
   // prompt instead of an error message. The user can accept (we retry with
   // acknowledgeFirstUse: true) or close the route.
   const tryOpen = useCallback(
-    (params: { cols: number; rows: number; acknowledgeFirstUse?: boolean }) => {
+    (params: { terminalId: string; cols: number; rows: number; acknowledgeFirstUse?: boolean }) => {
       if (!connection) return;
       void open(connection.rpc, params).catch((err) => {
         if (
           err instanceof JsonRpcRemoteError &&
           (err.data as { errorCode?: string } | undefined)?.errorCode === TERMINAL_FIRST_USE_ERROR_CODE
         ) {
-          setPendingFirstUseOpen({ cols: params.cols, rows: params.rows });
+          setPendingFirstUseOpen({ terminalId: params.terminalId, cols: params.cols, rows: params.rows });
           return;
         }
         setActionError(err instanceof Error ? err.message : String(err));
@@ -107,37 +116,62 @@ export function TerminalRoute({ onClose }: TerminalRouteProps) {
   );
 
   useEffect(() => {
-    if (!connection || !terminalEnabled || bootedRef.current) return;
+    if (!connection || !terminalEnabled || bootedTerminalIdsRef.current.has(activeTerminalId)) return;
     if (snapshot?.status === "running" || snapshot?.status === "starting") {
-      bootedRef.current = true;
+      bootedTerminalIdsRef.current.add(activeTerminalId);
       return;
     }
-    bootedRef.current = true;
-    tryOpen({ cols: 100, rows: 30 });
-  }, [connection, terminalEnabled, tryOpen, snapshot?.status]);
+    bootedTerminalIdsRef.current.add(activeTerminalId);
+    tryOpen({ terminalId: activeTerminalId, cols: 100, rows: 30 });
+  }, [activeTerminalId, connection, terminalEnabled, tryOpen, snapshot?.status]);
 
   const isRunning = snapshot?.status === "running" || snapshot?.status === "starting";
 
   const onReconnect = useCallback(() => {
     if (!connection) return;
     setActionError(null);
-    bootedRef.current = true;
-    tryOpen({ cols: snapshot?.cols ?? 100, rows: snapshot?.rows ?? 30 });
-  }, [connection, tryOpen, snapshot?.cols, snapshot?.rows]);
+    bootedTerminalIdsRef.current.add(activeTerminalId);
+    tryOpen({ terminalId: activeTerminalId, cols: snapshot?.cols ?? 100, rows: snapshot?.rows ?? 30 });
+  }, [activeTerminalId, connection, tryOpen, snapshot?.cols, snapshot?.rows]);
 
   const onDisconnect = useCallback(() => {
     if (!connection) return;
-    void closeSession(connection.rpc, {}).catch((err) => {
+    void closeSession(connection.rpc, { terminalId: activeTerminalId }).catch((err) => {
       setActionError(err instanceof Error ? err.message : String(err));
     });
-  }, [connection, closeSession]);
+  }, [activeTerminalId, connection, closeSession]);
 
   const onClear = useCallback(() => {
     if (!connection) return;
-    void clearBuffer(connection.rpc, {}).catch((err) => {
+    void clearBuffer(connection.rpc, { terminalId: activeTerminalId }).catch((err) => {
       setActionError(err instanceof Error ? err.message : String(err));
     });
-  }, [connection, clearBuffer]);
+  }, [activeTerminalId, connection, clearBuffer]);
+
+  const onNewTerminal = useCallback(() => {
+    setActionError(null);
+    setTabs((current) => {
+      const next = createTerminalTab(current);
+      setActiveTerminalId(next.id);
+      return [...current, next];
+    });
+  }, []);
+
+  const onCloseTab = useCallback(
+    (terminalId: string) => {
+      if (tabs.length <= 1) return;
+      if (connection) {
+        void closeSession(connection.rpc, { terminalId }).catch((err) => {
+          setActionError(err instanceof Error ? err.message : String(err));
+        });
+      }
+      bootedTerminalIdsRef.current.delete(terminalId);
+      const next = closeTerminalTab(tabs, activeTerminalId, terminalId);
+      setTabs(next.tabs);
+      setActiveTerminalId(next.activeId);
+    },
+    [activeTerminalId, closeSession, connection, tabs]
+  );
 
   if (!connection) {
     return (
@@ -172,7 +206,7 @@ export function TerminalRoute({ onClose }: TerminalRouteProps) {
 
   const status = snapshot?.status ?? "idle";
   const errorDetail = actionError ?? snapshot?.errorMessage ?? null;
-  const terminalKey = `${DEFAULT_TERMINAL_ID}:${snapshot?.instanceId ?? "idle"}`;
+  const terminalKey = `${activeTerminalId}:${snapshot?.instanceId ?? "idle"}`;
 
   return (
     <div className="agnt-terminal-route" style={{ background: theme.background, color: theme.foreground }}>
@@ -206,6 +240,46 @@ export function TerminalRoute({ onClose }: TerminalRouteProps) {
           )}
         </div>
       </header>
+      <div className="agnt-terminal-tabbar" role="tablist" aria-label="Terminal sessions">
+        {tabs.map((tab) => {
+          const tabSnapshot = snapshots[tab.id];
+          const tabStatus = tabSnapshot?.status ?? "idle";
+          const selected = tab.id === activeTerminalId;
+          return (
+            <div
+              key={tab.id}
+              className={"agnt-terminal-tab" + (selected ? " agnt-terminal-tab-active" : "")}
+            >
+              <button
+                type="button"
+                className="agnt-terminal-tab-main"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => { setActionError(null); setActiveTerminalId(tab.id); }}
+              >
+                <span className="agnt-terminal-tab-title">{tab.title}</span>
+                <span className="agnt-terminal-tab-meta">
+                  <span className={"agnt-terminal-dot agnt-terminal-dot-" + tabStatus} />
+                  {terminalTabSubtitle(tabSnapshot)}
+                </span>
+              </button>
+              {tabs.length > 1 && (
+                <button
+                  type="button"
+                  className="agnt-terminal-tab-close"
+                  aria-label={`Close ${tab.title}`}
+                  onClick={() => onCloseTab(tab.id)}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
+        <button className="agnt-terminal-tab-add" type="button" onClick={onNewTerminal} aria-label="Open new terminal">
+          +
+        </button>
+      </div>
       {errorDetail && <div className="agnt-terminal-error">{errorDetail}</div>}
       {pendingFirstUseOpen && (
         <div className="agnt-terminal-confirm" role="alertdialog" aria-modal="true" aria-label="Confirm shell access">

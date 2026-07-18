@@ -48,6 +48,99 @@
 .agnt-terminal-status-closed,
 .agnt-terminal-status-exited,
 .agnt-terminal-status-idle { color: #a3a3a3; }
+.agnt-terminal-tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.03);
+}
+.agnt-terminal-tab {
+  display: grid;
+  grid-template-columns: minmax(96px, 180px) auto;
+  align-items: stretch;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 128px;
+}
+.agnt-terminal-tab-active {
+  background: rgba(0, 159, 255, 0.14);
+  border-color: rgba(0, 159, 255, 0.45);
+}
+.agnt-terminal-tab-main,
+.agnt-terminal-tab-close,
+.agnt-terminal-tab-add {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+.agnt-terminal-tab-main {
+  min-width: 0;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.agnt-terminal-tab-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agnt-terminal-tab-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  color: var(--agnt-muted-fg);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agnt-terminal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: #a3a3a3;
+}
+.agnt-terminal-dot-running { background: #34d399; }
+.agnt-terminal-dot-starting { background: #f59e0b; }
+.agnt-terminal-dot-error { background: #ef4444; }
+.agnt-terminal-dot-exited,
+.agnt-terminal-dot-closed,
+.agnt-terminal-dot-idle { background: #a3a3a3; }
+.agnt-terminal-tab-close {
+  width: 28px;
+  min-height: 100%;
+  cursor: pointer;
+  color: var(--agnt-muted-fg);
+  border-left: 1px solid var(--agnt-border);
+}
+.agnt-terminal-tab-close:hover {
+  color: var(--agnt-fg);
+  background: rgba(255, 255, 255, 0.06);
+}
+.agnt-terminal-tab-add {
+  flex: 0 0 34px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--agnt-muted-fg);
+}
+.agnt-terminal-tab-add:hover {
+  color: var(--agnt-fg);
+  background: rgba(255, 255, 255, 0.06);
+}
 .agnt-terminal-error {
   padding: 6px 12px;
   font-size: 12px;
