@@ -370,3 +370,80 @@ test("desktop IPC follower keeps live owner routing guard across IPC disconnects
     false
   );
 });
+
+test("desktop IPC follower rejects unsupported Desktop-owned mutations", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-unsupported-mutation-");
+  const outbound = [];
+  const localForwards = [];
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    sendApplicationResponse(rawMessage) {
+      outbound.push(JSON.parse(rawMessage));
+    },
+    forwardToLocalCodex(rawMessage) {
+      localForwards.push(JSON.parse(rawMessage));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  follower.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-desktop-mutation" },
+  }));
+  await waitFor(() => serverSocket);
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-state-changed",
+    sourceClientId: "desktop",
+    version: 6,
+    params: {
+      conversationId: "thread-desktop-mutation",
+      change: {
+        type: "snapshot",
+        conversationState: { turns: [], requests: [] },
+      },
+    },
+  });
+  await wait(25);
+
+  const handled = follower.observeInbound(JSON.stringify({
+    id: "review-start-1",
+    method: "review/start",
+    params: { threadId: "thread-desktop-mutation" },
+  }));
+
+  assert.equal(handled, true);
+  assert.deepEqual(outbound.find((message) => message.id === "review-start-1"), {
+    id: "review-start-1",
+    error: {
+      code: -32004,
+      message: "Start this review in Codex Desktop.",
+    },
+  });
+  assert.deepEqual(localForwards, []);
+});

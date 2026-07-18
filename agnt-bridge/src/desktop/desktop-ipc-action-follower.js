@@ -63,6 +63,11 @@ const DESKTOP_FOLLOWER_REQUEST_METHODS = new Set([
   "turn/interrupt",
   "thread/compact/start",
 ]);
+const DESKTOP_OWNER_UNSUPPORTED_MUTATION_ERRORS = new Map([
+  ["review/start", "Start this review in Codex Desktop."],
+  ["thread/settings/update", "Change these thread settings in Codex Desktop."],
+  ["thread/approveGuardianDeniedAction", "Approve this retry in Codex Desktop."],
+]);
 
 function createDesktopIpcActionFollower({
   sendApplicationResponse,
@@ -301,6 +306,10 @@ function createDesktopIpcActionFollower({
       }
     }
 
+    if (tryRejectDesktopOwnedUnsupportedMutation(message, method)) {
+      return true;
+    }
+
     if (tryServeDesktopOwnedRead(message)) {
       return true;
     }
@@ -322,6 +331,28 @@ function createDesktopIpcActionFollower({
     }
     ipc.ensureConnected();
     return false;
+  }
+
+  function tryRejectDesktopOwnedUnsupportedMutation(message, method) {
+    if (!DESKTOP_OWNER_UNSUPPORTED_MUTATION_ERRORS.has(method) || message?.id == null) {
+      return false;
+    }
+    const threadId = readThreadId(message?.params);
+    if (!threadId || liveOwnerThreadIds.has(threadId) || isLocallyOwnedThread(threadId)) {
+      return false;
+    }
+    if (!heldFollowerRequests.isDesktopRoutable(threadId)
+      && !activeThreads.has(threadId)) {
+      return false;
+    }
+    sendApplicationResponse(JSON.stringify({
+      id: message.id,
+      error: {
+        code: -32004,
+        message: DESKTOP_OWNER_UNSUPPORTED_MUTATION_ERRORS.get(method),
+      },
+    }));
+    return true;
   }
 
   function stopAll() {
