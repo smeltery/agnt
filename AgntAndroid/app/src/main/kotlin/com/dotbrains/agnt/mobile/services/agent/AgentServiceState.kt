@@ -10,6 +10,7 @@ import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexSecureSession
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
 import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRecord
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
@@ -334,6 +335,9 @@ abstract class AgentServiceState(
 
     override val messagesByThread: StateFlow<Map<String, List<CodexMessage>>> =
         messageTimelineStore.messagesByThread
+    internal val _threadGoalsByThread = MutableStateFlow<Map<String, CodexThreadGoal>>(emptyMap())
+    override val threadGoalsByThread: StateFlow<Map<String, CodexThreadGoal>> =
+        _threadGoalsByThread.asStateFlow()
     override val commandExecutionDetailsByItemId: StateFlow<Map<String, CommandExecutionDetails>> =
         commandExecutionDetailsStore.detailsByItemId
 

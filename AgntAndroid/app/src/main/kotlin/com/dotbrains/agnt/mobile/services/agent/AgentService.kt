@@ -8,6 +8,9 @@ import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalBudgetUpdate
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalStatus
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.JSONValue
@@ -42,6 +45,7 @@ import com.dotbrains.agnt.mobile.services.agent.runtime.setSelectedServiceTierFo
 import com.dotbrains.agnt.mobile.services.agent.runtime.shouldAutoRefreshUsageStatusForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.archiveThreadGroupForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.associatedManagedWorktreePathForImpl
+import com.dotbrains.agnt.mobile.services.agent.threads.clearThreadGoalInternal
 import com.dotbrains.agnt.mobile.services.agent.threads.currentAuthoritativeProjectPathForImpl
 import com.dotbrains.agnt.mobile.services.agent.threads.deleteLocalThreadGroupForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.deleteThreadLocallyForRepository
@@ -49,10 +53,12 @@ import com.dotbrains.agnt.mobile.services.agent.threads.forkThreadForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.interruptTurnForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.loadOlderThreadHistoryInternal
 import com.dotbrains.agnt.mobile.services.agent.threads.moveThreadToProjectPathImpl
+import com.dotbrains.agnt.mobile.services.agent.threads.readThreadGoalInternal
 import com.dotbrains.agnt.mobile.services.agent.threads.refreshContextWindowUsageForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.renameThreadForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.sendNotificationImpl
 import com.dotbrains.agnt.mobile.services.agent.threads.sendRequestImpl
+import com.dotbrains.agnt.mobile.services.agent.threads.setThreadGoalInternal
 import com.dotbrains.agnt.mobile.services.agent.threads.startThreadForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.startTurnForRepository
 import com.dotbrains.agnt.mobile.services.agent.threads.syncThreadHistoryInternal
@@ -198,6 +204,23 @@ class AgentService(
         method: String,
         params: JSONValue?,
     ): RPCMessage = sendRequestImpl(method, params)
+
+    override suspend fun refreshThreadGoal(threadId: String): CodexThreadGoal? = readThreadGoalInternal(threadId)
+
+    override suspend fun setThreadGoal(
+        threadId: String,
+        objective: String?,
+        status: CodexThreadGoalStatus?,
+        tokenBudget: CodexThreadGoalBudgetUpdate,
+    ): CodexThreadGoal =
+        setThreadGoalInternal(
+            threadId = threadId,
+            objective = objective,
+            status = status,
+            tokenBudget = tokenBudget,
+        )
+
+    override suspend fun clearThreadGoal(threadId: String): Boolean = clearThreadGoalInternal(threadId)
 
     override suspend fun renameThread(
         threadId: String,

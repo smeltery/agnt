@@ -12,6 +12,9 @@ import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalBudgetUpdate
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalStatus
 import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRecord
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
@@ -44,6 +47,10 @@ interface CodexRepository {
 
     /** Per-thread message rows (persisted + live notifications). */
     val messagesByThread: StateFlow<Map<String, List<CodexMessage>>>
+
+    /** Runtime-persisted thread goals mirrored from thread-goal RPCs and notifications. */
+    val threadGoalsByThread: StateFlow<Map<String, CodexThreadGoal>>
+        get() = MutableStateFlow(emptyMap())
 
     /** Cursor-backed history state for large threads. */
     val threadHistoryPaginationByThread: StateFlow<Map<String, ThreadHistoryPaginationState>>
@@ -258,6 +265,17 @@ interface CodexRepository {
         threadId: String,
         force: Boolean = false,
     )
+
+    suspend fun refreshThreadGoal(threadId: String): CodexThreadGoal? = null
+
+    suspend fun setThreadGoal(
+        threadId: String,
+        objective: String? = null,
+        status: CodexThreadGoalStatus? = null,
+        tokenBudget: CodexThreadGoalBudgetUpdate = CodexThreadGoalBudgetUpdate.Keep,
+    ): CodexThreadGoal = throw UnsupportedOperationException("thread goals are not implemented by this repository")
+
+    suspend fun clearThreadGoal(threadId: String): Boolean = false
 
     /** Loads the next older [thread/read] page when the bridge/runtime exposes a cursor. */
     suspend fun loadOlderThreadHistory(threadId: String) {

@@ -24,6 +24,9 @@ import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalBudgetUpdate
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalStatus
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
 import com.dotbrains.agnt.mobile.core.model.CommandExecutionDetails
@@ -39,6 +42,7 @@ import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerBar
 import com.dotbrains.agnt.mobile.ui.turn.composer.TurnComposerSecondaryBar
 import com.dotbrains.agnt.mobile.ui.turn.recovery.TurnConnectionRecoverySnapshot
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.GitBranchPaneState
+import com.dotbrains.agnt.mobile.ui.turn.toolbar.ThreadGoalControl
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnPlanAccessoryCard
 import com.dotbrains.agnt.mobile.ui.turn.toolbar.TurnReviewAccessoryCard
 import kotlinx.coroutines.CoroutineScope
@@ -101,6 +105,9 @@ internal fun TurnConversationPaneContent(
     voiceControls: TurnVoiceControls,
     isBranchPickerOpen: Boolean,
     selectedAccessMode: CodexAccessMode,
+    threadGoal: CodexThreadGoal?,
+    threadGoalBusy: Boolean,
+    threadGoalError: String?,
     branchPickerEnabled: Boolean,
     attachmentFileBinarySummary: String,
     reviewRunningUnavailableMessage: String,
@@ -126,6 +133,8 @@ internal fun TurnConversationPaneContent(
     setInlineUndoError: (String?) -> Unit,
     refreshThreadChangeSets: () -> Unit,
     setLastError: (String?) -> Unit,
+    setThreadGoalBusy: (Boolean) -> Unit,
+    setThreadGoalError: (String?) -> Unit,
     setDraft: (String) -> Unit,
     setMentionChips: (List<ComposerMentionChipPayload>) -> Unit,
     setComposerAttachments: (List<TurnComposerAttachment>) -> Unit,
@@ -256,6 +265,42 @@ internal fun TurnConversationPaneContent(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                 )
             }
+            ThreadGoalControl(
+                goal = threadGoal,
+                enabled = ready && connectionState is ConnectionState.Connected,
+                busy = threadGoalBusy,
+                errorMessage = threadGoalError,
+                onSetGoal = { objective: String?, status: CodexThreadGoalStatus?, budget: CodexThreadGoalBudgetUpdate ->
+                    setThreadGoalBusy(true)
+                    setThreadGoalError(null)
+                    scope.launch {
+                        runCatching {
+                            repository.setThreadGoal(
+                                threadId = threadId,
+                                objective = objective,
+                                status = status,
+                                tokenBudget = budget,
+                            )
+                        }.onFailure { error ->
+                            setThreadGoalError(error.localizedMessage ?: error.message ?: "Unable to update thread goal.")
+                        }
+                        setThreadGoalBusy(false)
+                    }
+                },
+                onClearGoal = {
+                    setThreadGoalBusy(true)
+                    setThreadGoalError(null)
+                    scope.launch {
+                        runCatching { repository.clearThreadGoal(threadId) }
+                            .onFailure { error ->
+                                setThreadGoalError(error.localizedMessage ?: error.message ?: "Unable to clear thread goal.")
+                            }
+                        setThreadGoalBusy(false)
+                    }
+                },
+                onDismissError = { setThreadGoalError(null) },
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            )
             visiblePlanAccessoryMessage?.let { planMessage ->
                 TurnPlanAccessoryCard(
                     message = planMessage,

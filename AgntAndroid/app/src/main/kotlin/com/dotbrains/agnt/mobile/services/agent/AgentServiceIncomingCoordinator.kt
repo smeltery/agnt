@@ -13,8 +13,10 @@ import com.dotbrains.agnt.mobile.services.agent.runtime.refreshThreadsInternal
 import com.dotbrains.agnt.mobile.services.agent.threads.applyAuthoritativeProjectPathToServerThread
 import com.dotbrains.agnt.mobile.services.agent.threads.applyLiveContextWindowUsage
 import com.dotbrains.agnt.mobile.services.agent.threads.applyPersistedThreadRename
+import com.dotbrains.agnt.mobile.services.agent.threads.clearThreadGoalMirror
 import com.dotbrains.agnt.mobile.services.agent.threads.persistedThreadRename
 import com.dotbrains.agnt.mobile.services.agent.threads.syncThreadHistoryInternal
+import com.dotbrains.agnt.mobile.services.agent.threads.updateThreadGoalMirror
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -63,6 +65,8 @@ internal class AgentServiceIncomingCoordinator(
             },
             onRateLimitsUpdated = { params -> service.handleRateLimitsUpdatedParams(params) },
             onThreadContextUsageLive = { threadId, usage -> service.applyLiveContextWindowUsage(threadId, usage) },
+            onThreadGoalUpdated = { goal -> service.updateThreadGoalMirror(goal) },
+            onThreadGoalCleared = { threadId -> service.clearThreadGoalMirror(threadId) },
             resolveAmbiguousUsageThreadId = ::resolveFallbackSingleThreadForUsage,
             remapThreadFromServer = { thread ->
                 service.applyPersistedThreadRename(service.applyAuthoritativeProjectPathToServerThread(thread))

@@ -1,6 +1,8 @@
 package com.dotbrains.agnt.mobile.data
 
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalStatus
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -109,6 +111,46 @@ class IncomingEventRouterNotificationTest {
         assertEquals("thr-live", captured?.first)
         assertEquals(17, captured?.second?.tokensUsed)
         assertEquals(258, captured?.second?.tokenLimit)
+    }
+
+    @Test
+    fun dispatchNotification_threadGoalUpdated_emitsDecodedGoal() {
+        var captured: CodexThreadGoal? = null
+        newRouter(
+            onThreadGoalUpdated = { captured = it },
+        ).dispatchNotification(
+            method = "thread/goal/updated",
+            params =
+                JSONValue.Obj(
+                    mapOf(
+                        "goal" to
+                            JSONValue.Obj(
+                                mapOf(
+                                    "threadId" to JSONValue.Str("thr-goal"),
+                                    "objective" to JSONValue.Str("Keep going"),
+                                    "status" to JSONValue.Str("active"),
+                                ),
+                            ),
+                    ),
+                ),
+        )
+
+        assertEquals("thr-goal", captured?.threadId)
+        assertEquals("Keep going", captured?.objective)
+        assertEquals(CodexThreadGoalStatus.Active, captured?.status)
+    }
+
+    @Test
+    fun dispatchNotification_threadGoalCleared_emitsThreadId() {
+        var captured: String? = null
+        newRouter(
+            onThreadGoalCleared = { captured = it },
+        ).dispatchNotification(
+            method = "thread/goal/cleared",
+            params = JSONValue.Obj(mapOf("threadId" to JSONValue.Str("thr-goal"))),
+        )
+
+        assertEquals("thr-goal", captured)
     }
 
     @Test

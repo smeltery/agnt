@@ -38,6 +38,7 @@ get a synthetic "managed externally" response.
 | Render reasoning deltas (Claude / Codex)                   | yes               | yes               | yes               | Codex-style reasoning rendering ported from upstream. Claude `system.init` reasoning shape needs runtime verification. |
 | Finalize turn on turnless desktop-mirror `agent_message`   | n/a (Codex-only)  | n/a (Codex-only)  | yes               | Codex desktop-mirror path emits no `turn/completed`, so `IncomingEventRouter` routes `codex/event/agent_message` with `completesTurn = true`; `handleItemCompleted` / `handleLegacyAgentCompleted` call `onTurnFinished` when the turn id is absent, clearing the running fallback. Regression: `IncomingEventRouterDesktopMirrorTest`. |
 | Per-turn provider flags (`params.model`, plan mode, …)     | yes               | yes               | yes               | Composer's selected-model override is sent as `params.model` on every `turn/start` (`runtimeModelIdentifierForTurn`); Claude / Cursor read it directly, opencode falls back from `modelID` (regression-pinned). Plan-mode toggle in the composer attachment menu wires `params.collaborationMode.mode = "plan"`, which the Claude bridge translator maps to `--permission-mode plan`. Granular per-turn `permissionMode` values (`acceptEdits` / `bypassPermissions` / `dontAsk`) aren't surfaced in the composer — deferred follow-up. |
+| Runtime-persisted thread goals (`thread/goal/*`)           | yes               | yes               | yes               | Android mirrors `thread/goal/updated|cleared`, supports `thread/goal/get|set|clear`, and exposes a composer-adjacent goal chip/dialog for create, edit, pause, resume, budget, and clear. Coverage: `CodexThreadGoalTest`, `IncomingEventRouterNotificationTest`. |
 
 ## UI / feature parity (vs iOS, inherited from upstream parity audit)
 
@@ -51,6 +52,7 @@ applicable iOS commits ported, 1 partial, and 7 iOS-only. Notable areas:
 | Image preview caching               | done            |
 | Workspace checkpoint lifecycle      | done            |
 | Composer features (skill mentions, runtime overrides, autocomplete) | done |
+| Thread goal controls | done — `CodexThreadGoal` model + repository/service RPC helpers, live notification mirror, and `ThreadGoalControl` in the chat composer area. |
 | Project/git flow (picker, dir mgmt, git init) | done |
 | iOS-style navigation, composer, settings, picker, onboarding, and grouped form chrome | done |
 | Sidebar redesign (color palette, active-chat metadata, new-worktree sheet, recent-workspaces carousel) | done — `SidebarColorPalette`/`AgntPopupChrome` ported, `SidebarActiveChatMetadata` threaded through screen → row + picker, `SidebarNewWorktreeSheet` added, project picker now surfaces current workspace + recent-workspaces carousel + `NewThreadSessionType` selector. `Theme.kt` `SystemBars` helper deferred (separate behavior). |

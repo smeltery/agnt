@@ -74,6 +74,15 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
 
 ### P2 — provider-flag plumbing
 
+- [x] **Thread goal controls.** Android now matches iOS/web for
+      runtime-persisted thread goals: `CodexThreadGoal` decodes the
+      `thread/goal/*` envelope, `AgentService` exposes
+      `threadGoalsByThread` plus `refreshThreadGoal` / `setThreadGoal` /
+      `clearThreadGoal`, `IncomingEventRouter` mirrors
+      `thread/goal/updated|cleared`, and `ThreadGoalControl` adds a compact
+      composer-adjacent chip/dialog for create, edit, pause, resume, token
+      budget, and clear. Coverage: `CodexThreadGoalTest`,
+      `IncomingEventRouterNotificationTest`; local gate: `./gradlew ciDebug`.
 - [x] **Plan mode for Claude**. Already wired end-to-end via the existing
       `collaborationMode` mechanism: the composer's plan-mode toggle
       (`TurnComposerBar.isPlanModeEnabled`, in the attachment-menu dropdown)

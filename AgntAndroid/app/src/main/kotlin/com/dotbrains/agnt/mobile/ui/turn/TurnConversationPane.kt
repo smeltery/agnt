@@ -55,6 +55,7 @@ fun TurnConversationPane(
     val selectedAccessMode by repository.selectedAccessMode.collectAsStateWithLifecycle()
     val selectedServiceTier by repository.selectedServiceTier.collectAsStateWithLifecycle()
     val messagesByThread by repository.messagesByThread.collectAsStateWithLifecycle()
+    val threadGoalsByThread by repository.threadGoalsByThread.collectAsStateWithLifecycle()
     val commandExecutionDetailsByItemId by repository.commandExecutionDetailsByItemId.collectAsStateWithLifecycle()
     val historyPaginationByThread by repository.threadHistoryPaginationByThread.collectAsStateWithLifecycle()
     val loadingOlderHistoryThreadIds by repository.loadingOlderHistoryThreadIds.collectAsStateWithLifecycle()
@@ -102,6 +103,8 @@ fun TurnConversationPane(
     var isBranchPickerOpen by rememberSaveable(threadId) { mutableStateOf(false) }
     var gitBranchCheckoutError by remember(threadId) { mutableStateOf<String?>(null) }
     var worktreeHandoffError by remember(threadId) { mutableStateOf<String?>(null) }
+    var threadGoalBusy by remember(threadId) { mutableStateOf(false) }
+    var threadGoalError by remember(threadId) { mutableStateOf<String?>(null) }
 
     suspend fun hydrateGitContextAfterMutation(targetThreadId: String = threadId) {
         runCatching { repository.syncThreadHistory(targetThreadId, force = true) }
@@ -118,6 +121,7 @@ fun TurnConversationPane(
             gitBranchPaneState = gitBranchPaneState,
         )
     val activeThread = gitReviewContext.activeThread
+    val threadGoal = threadGoalsByThread[threadId]
     val gitCwd = gitReviewContext.gitCwd
     val reviewTarget = gitReviewContext.reviewTarget
     val loadedGitBranchSummary = gitReviewContext.loadedGitBranchSummary
@@ -270,6 +274,7 @@ fun TurnConversationPane(
     LaunchedEffect(threadId, ready) {
         if (ready) {
             runCatching { repository.syncThreadHistory(threadId) }
+            runCatching { repository.refreshThreadGoal(threadId) }
             if (availableModels.isEmpty()) {
                 runCatching { repository.refreshModels() }
             }
@@ -293,6 +298,7 @@ fun TurnConversationPane(
         composerAttachments = emptyList()
         mentionChips = emptyList()
         expandedPlanAccessoryMessageId = null
+        threadGoalError = null
     }
 
     TurnConversationPaneGitBranchEffect(
@@ -446,6 +452,9 @@ fun TurnConversationPane(
         voiceControls = voiceControls,
         isBranchPickerOpen = isBranchPickerOpen,
         selectedAccessMode = selectedAccessMode,
+        threadGoal = threadGoal,
+        threadGoalBusy = threadGoalBusy,
+        threadGoalError = threadGoalError,
         branchPickerEnabled = branchPickerEnabled,
         attachmentFileBinarySummary = strings.attachmentFileBinarySummary,
         reviewRunningUnavailableMessage = strings.reviewRunningUnavailable,
@@ -478,6 +487,8 @@ fun TurnConversationPane(
                 )
         },
         setLastError = { lastError = it },
+        setThreadGoalBusy = { threadGoalBusy = it },
+        setThreadGoalError = { threadGoalError = it },
         setDraft = { draft = it },
         setMentionChips = { mentionChips = it },
         setComposerAttachments = { composerAttachments = it },

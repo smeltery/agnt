@@ -1,6 +1,7 @@
 package com.dotbrains.agnt.mobile.data
 
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.JSONValue
 import com.dotbrains.agnt.mobile.core.model.PendingApprovalDecision
@@ -43,6 +44,8 @@ internal fun newRouter(
     ) -> Unit = { _, _ -> },
     onRateLimitsUpdated: (Map<String, JSONValue>?) -> Unit = { _ -> },
     onThreadContextUsageLive: (String, ContextWindowUsage) -> Unit = { _, _ -> },
+    onThreadGoalUpdated: (CodexThreadGoal) -> Unit = { _ -> },
+    onThreadGoalCleared: (String) -> Unit = { _ -> },
     resolveAmbiguousUsageThreadId: () -> String? = { null },
     persistedThreadRename: (String) -> String? = { null },
     onSystemNotice: (
@@ -69,6 +72,8 @@ internal fun newRouter(
         onStructuredInputRequest = onStructuredInputRequest,
         onRateLimitsUpdated = onRateLimitsUpdated,
         onThreadContextUsageLive = onThreadContextUsageLive,
+        onThreadGoalUpdated = onThreadGoalUpdated,
+        onThreadGoalCleared = onThreadGoalCleared,
         resolveAmbiguousUsageThreadId = resolveAmbiguousUsageThreadId,
         persistedThreadRename = persistedThreadRename,
         onSystemNotice = onSystemNotice,

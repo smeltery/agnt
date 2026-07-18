@@ -1,6 +1,7 @@
 package com.dotbrains.agnt.mobile.data
 
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsage
 import com.dotbrains.agnt.mobile.core.model.ContextWindowUsageCodec
 import com.dotbrains.agnt.mobile.core.model.JSONValue
@@ -48,6 +49,8 @@ internal class IncomingEventRouter(
      * (parity iOS `handleThreadTokenUsageUpdated` / `handleLegacyTokenCountEvent`).
      */
     private val onThreadContextUsageLive: (String, ContextWindowUsage) -> Unit = { _, _ -> },
+    private val onThreadGoalUpdated: (CodexThreadGoal) -> Unit = { _ -> },
+    private val onThreadGoalCleared: (String) -> Unit = { _ -> },
     /**
      * When token events omit thread id, single unambiguous running thread (parity `resolveContextUsageThreadID`).
      */
@@ -198,6 +201,8 @@ internal class IncomingEventRouter(
             "codex/event/error",
             -> timelineEventRouter.handleErrorNotification(obj)
             "account/rateLimits/updated" -> onRateLimitsUpdated(obj)
+            "thread/goal/updated" -> handleThreadGoalUpdated(obj)
+            "thread/goal/cleared" -> handleThreadGoalCleared(obj)
             "thread/tokenUsage/updated" -> handleThreadTokenUsagePush(obj)
             "system/notice" -> handleSystemNotice(obj)
             else -> {
@@ -290,6 +295,27 @@ internal class IncomingEventRouter(
         val threadId = p["threadId"]?.stringValue
         val durationMs = p["durationMs"]?.longValue ?: p["durationMs"]?.doubleValue?.toLong()
         onSystemNotice(severity, title, message, provider, threadId, durationMs)
+    }
+
+    private fun handleThreadGoalUpdated(params: Map<String, JSONValue>?) {
+        val goal = CodexThreadGoal.fromEnvelope(params, params?.get("threadId")?.stringValue) ?: return
+        onThreadGoalUpdated(goal)
+    }
+
+    private fun handleThreadGoalCleared(params: Map<String, JSONValue>?) {
+        val threadId =
+            params
+                ?.get("threadId")
+                ?.stringValue
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: params
+                    ?.get("thread_id")
+                    ?.stringValue
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                ?: return
+        onThreadGoalCleared(threadId)
     }
 
     private fun handleLegacyTokenCountEvent(
