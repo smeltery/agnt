@@ -14,22 +14,33 @@ extension CodexService {
         context: String
     ) async throws -> RPCMessage {
         let policies = selectedAccessMode.approvalPolicyCandidates
+        let reviewers = selectedAccessMode.approvalsReviewerCandidates
         var lastError: Error?
 
-        for (index, policy) in policies.enumerated() {
-            var params = baseParams
-            params["approvalPolicy"] = .string(policy)
-
-            do {
-                return try await sendRequest(method: method, params: .object(params))
-            } catch {
-                lastError = error
-                let hasMorePolicies = index < (policies.count - 1)
-                if hasMorePolicies, shouldRetryWithApprovalPolicyFallback(error) {
-                    debugRuntimeLog("\(method) \(context) fallback approvalPolicy=\(policy)")
-                    continue
+        for (policyIndex, policy) in policies.enumerated() {
+            for (reviewerIndex, reviewer) in reviewers.enumerated() {
+                var params = baseParams
+                params["approvalPolicy"] = .string(policy)
+                if let reviewer {
+                    params["approvalsReviewer"] = .string(reviewer)
                 }
-                throw error
+
+                do {
+                    return try await sendRequest(method: method, params: .object(params))
+                } catch {
+                    lastError = error
+                    let hasMoreReviewers = reviewerIndex < (reviewers.count - 1)
+                    if hasMoreReviewers, shouldRetryWithApprovalsReviewerFallback(error) {
+                        debugRuntimeLog("\(method) \(context) fallback approvalsReviewer=\(reviewer ?? "nil")")
+                        continue
+                    }
+                    let hasMorePolicies = policyIndex < (policies.count - 1)
+                    if hasMorePolicies, shouldRetryWithApprovalPolicyFallback(error) {
+                        debugRuntimeLog("\(method) \(context) fallback approvalPolicy=\(policy)")
+                        break
+                    }
+                    throw error
+                }
             }
         }
 
@@ -38,7 +49,7 @@ extension CodexService {
 
     func runtimeSandboxPolicyObject(for accessMode: CodexAccessMode) -> JSONValue {
         switch accessMode {
-        case .onRequest:
+        case .onRequest, .autoReview:
             return .object([
                 "type": .string("workspaceWrite"),
                 "networkAccess": .bool(true),
@@ -132,5 +143,22 @@ extension CodexService {
             || message.contains("expected one of")
             || message.contains("onrequest")
             || message.contains("on-request")
+    }
+
+    func shouldRetryWithApprovalsReviewerFallback(_ error: Error) -> Bool {
+        guard let serviceError = error as? CodexServiceError,
+              case .rpcError(let rpcError) = serviceError else {
+            return false
+        }
+
+        if rpcError.code != -32600 && rpcError.code != -32602 {
+            return false
+        }
+
+        let message = rpcError.message.lowercased()
+        return message.contains("approvalsreviewer")
+            || message.contains("approvals_reviewer")
+            || message.contains("auto_review")
+            || message.contains("guardian_subagent")
     }
 }
