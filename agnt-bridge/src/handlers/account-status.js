@@ -24,10 +24,10 @@ function composeAccountStatus({
     normalizeString(authStatus?.authMethod),
     normalizeString(account?.type),
   ]) || null;
-  const tokenReady = Boolean(authToken);
+  const tokenReady = Boolean(authToken) && isChatGPTAuthMethod(authMethod);
   const requiresOpenaiAuth = Boolean(accountRead?.requiresOpenaiAuth || authStatus?.requiresOpenaiAuth);
   const hasPriorLoginContext = hasAccountLogin || Boolean(authMethod);
-  const needsReauth = !loginInFlight && requiresOpenaiAuth && hasPriorLoginContext;
+  const needsReauth = !tokenReady && !loginInFlight && requiresOpenaiAuth && hasPriorLoginContext;
   const isAuthenticated = !needsReauth && (tokenReady || hasAccountLogin);
   const status = isAuthenticated
     ? "authenticated"
@@ -145,6 +145,11 @@ function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isChatGPTAuthMethod(value) {
+  const normalized = normalizeString(value).replace(/[_-]/g, "").toLowerCase();
+  return normalized === "chatgpt" || normalized === "chatgptauthtokens";
+}
+
 function parseBoolean(value) {
   return value === true;
 }
@@ -169,6 +174,7 @@ function deriveHostCapabilities(platform, { webTerminalEnabled = false } = {}) {
     displayWake: isMacOS,
     keepAwake: isMacOS,
     hostBrowserLogin: isMacOS,
+    bridgeSelfUpdate: isMacOS,
     // On-device SSH terminal runs on the phone via Citadel; available regardless of host.
     terminal: true,
     // Bridge-spawned local PTY shell exposed to the web client. Off by default —
@@ -181,5 +187,6 @@ function deriveHostCapabilities(platform, { webTerminalEnabled = false } = {}) {
 module.exports = {
   composeAccountStatus,
   composeSanitizedAuthStatusFromSettledResults,
+  isChatGPTAuthMethod,
   redactAuthStatus,
 };

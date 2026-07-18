@@ -393,6 +393,7 @@ final class CodexPushNotificationRegistrationTests: XCTestCase {
         SecureStore.deleteValue(for: CodexSecureKeys.relayMacIdentityPublicKey)
         SecureStore.deleteValue(for: CodexSecureKeys.relayProtocolVersion)
         SecureStore.deleteValue(for: CodexSecureKeys.relayLastAppliedBridgeOutboundSeq)
+        SecureStore.deleteValue(for: CodexSecureKeys.relayBridgeReplayEpoch)
     }
 }
 

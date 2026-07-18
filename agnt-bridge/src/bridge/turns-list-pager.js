@@ -27,6 +27,7 @@
 //   paging entry points:
 //     - parseAdaptiveThreadTurnsListRequest
 //     - fetchAdaptiveThreadTurnsListForRelay
+//     - createThreadTurnsListFastPageCoordinator
 //     - maybeBuildJsonlThreadTurnsListFallback
 //     - buildEmptyTurnsListResponse
 //     - isEmptyTurnsListResponse
@@ -43,9 +44,35 @@ const {
 const {
   readThreadTurnsListPageFromSessionJsonl,
 } = require("../providers/codex/session-jsonl-history");
+const {
+  RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS,
+  buildEmergencySingleTurnResponse,
+  buildLargestSafeTurnsListResponse,
+  buildSafeTurnsListResponse,
+  compactEmergencySingleTurnForRelay,
+  compactHistoryItemForRelay,
+  firstRelayTextTail,
+  truncateRelayTextTail,
+} = require("./turns-list-pager/compaction");
+const {
+  JSONL_CANONICAL_HANDOFF_CURSOR_PREFIX,
+  RELAY_JSONL_FAST_FIRST_PAGE_WAIT_MS,
+  canonicalThreadTurnsListRequest,
+  createThreadTurnsListFastPageCoordinator,
+  isEmptyTurnsListResponse,
+  threadTurnsListHandoffDescriptor,
+} = require("./turns-list-pager/jsonl-handoff");
+const {
+  RELAY_TURNS_LIST_PAGINATION_RESULT_KEYS,
+  RELAY_TURNS_LIST_RESULT_KEYS,
+  buildAdaptiveTurnsListResult,
+  findTurnsListResultKey,
+  hasRelayCursor,
+  measureSanitizedTurnsListResponseBytes,
+  normalizeNonEmptyString,
+} = require("./turns-list-pager/utils");
 
 const RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES = 4 * 1024 * 1024;
-const RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS = 24_000;
 const RELAY_TURNS_LIST_TARGET_BUDGET_MS = 5_500;
 const RELAY_TURNS_LIST_BUDGET_RESERVE_MS = 1_000;
 // Cap how many turns we even ask the upstream for in one go so a misbehaving
@@ -54,22 +81,6 @@ const RELAY_TURNS_LIST_BUDGET_RESERVE_MS = 1_000;
 // when the normal pager hits the byte-soft-limit anyway.
 const RELAY_TURNS_LIST_MAX_INITIAL_LIMIT = 5;
 const RELAY_TURNS_LIST_SAFE_RETRY_LIMIT = 5;
-const RELAY_TURNS_LIST_RESULT_KEYS = ["data", "items", "turns"];
-const RELAY_TURNS_LIST_PAGINATION_RESULT_KEYS = [
-  "nextCursor",
-  "next_cursor",
-  "cursor",
-  "hasNextCursor",
-  "has_next_cursor",
-  "hasNextPage",
-  "has_next_page",
-  "hasMore",
-  "has_more",
-  "prevCursor",
-  "prev_cursor",
-  "previousCursor",
-  "previous_cursor",
-];
 
 function parseJSON(value) {
   try {
@@ -77,15 +88,6 @@ function parseJSON(value) {
   } catch {
     return null;
   }
-}
-
-function readString(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function normalizeNonEmptyString(value) {
-  const str = readString(value).trim();
-  return str.length > 0 ? str : "";
 }
 
 function unwrapAppServerPayloadResult(value) {
@@ -267,11 +269,6 @@ function buildEmptyTurnsListResponse(request) {
   };
 }
 
-function isEmptyTurnsListResponse(response) {
-  const turnsKey = findTurnsListResultKey(response?.result);
-  return Boolean(turnsKey) && response.result[turnsKey].length === 0;
-}
-
 // When the live thread/turns/list returns no turns (e.g. transient bridge
 // error or stale upstream cache), reconstruct a small page from the local
 // Codex rollout file so the iPhone has something to render. Codex-only — the
@@ -296,7 +293,8 @@ function maybeBuildJsonlThreadTurnsListFallback(activeProvider, request, respons
   const params = request?.params || {};
   const threadId = normalizeNonEmptyString(params.threadId)
     || normalizeNonEmptyString(params.thread_id);
-  if (!threadId || hasRelayCursor(params.cursor)) {
+  const requireCanonical = params.agntRequireCanonical === true;
+  if (!threadId || hasRelayCursor(params.cursor) || requireCanonical) {
     return null;
   }
 
@@ -370,113 +368,6 @@ async function fetchSafeThreadTurnsListFallback(request, {
   return buildEmptyTurnsListResponse(request);
 }
 
-function buildSafeTurnsListResponse(requestId, firstResult, lastResult, turnsKey, turns) {
-  return {
-    id: requestId,
-    result: buildAdaptiveTurnsListResult(firstResult, lastResult, turnsKey, turns),
-  };
-}
-
-// Trims oversized history pages progressively: normal page -> 5 turns -> ... -> 1 turn.
-function buildLargestSafeTurnsListResponse({
-  requestId,
-  firstResult,
-  lastResult,
-  turnsKey,
-  turns,
-  maxTurns,
-  sanitizeForRelay,
-  payloadSoftLimitBytes,
-}) {
-  const sliceLimit = Math.min(turns.length, maxTurns);
-  for (let count = sliceLimit; count > 0; count -= 1) {
-    const response = buildSafeTurnsListResponse(
-      requestId,
-      firstResult,
-      lastResult,
-      turnsKey,
-      turns.slice(0, count)
-    );
-    if (measureSanitizedTurnsListResponseBytes(response, sanitizeForRelay) < payloadSoftLimitBytes) {
-      return response;
-    }
-  }
-  return buildEmergencySingleTurnResponse({
-    requestId,
-    lastResult,
-    turnsKey,
-    turn: turns[0],
-    sanitizeForRelay,
-    payloadSoftLimitBytes,
-  });
-}
-
-function buildEmergencySingleTurnResponse({
-  requestId,
-  lastResult,
-  turnsKey,
-  turn,
-  sanitizeForRelay,
-  payloadSoftLimitBytes,
-}) {
-  if (!turn || typeof turn !== "object" || Array.isArray(turn)) {
-    return null;
-  }
-
-  for (const maxItems of [16, 4, 1]) {
-    for (const maxChars of [
-      RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS,
-      Math.floor(RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS / 4),
-      1_000,
-      0,
-    ]) {
-      const response = {
-        id: requestId,
-        result: {
-          ...buildAdaptiveTurnsListResult({}, lastResult, turnsKey, [
-            compactEmergencySingleTurnForRelay(turn, maxChars, maxItems),
-          ]),
-          agntEmergencySingleTurnForRelay: true,
-        },
-      };
-      if (measureSanitizedTurnsListResponseBytes(response, sanitizeForRelay) < payloadSoftLimitBytes) {
-        return response;
-      }
-    }
-  }
-
-  return null;
-}
-
-function compactEmergencySingleTurnForRelay(turn, maxChars, maxItems) {
-  const safeTurn = {};
-  for (const key of [
-    "id",
-    "turnId",
-    "turn_id",
-    "threadId",
-    "thread_id",
-    "createdAt",
-    "created_at",
-    "completedAt",
-    "completed_at",
-    "status",
-    "role",
-    "kind",
-  ]) {
-    const value = turn[key];
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      safeTurn[key] = value;
-    }
-  }
-
-  const items = Array.isArray(turn.items) ? turn.items : [];
-  safeTurn.items = items.slice(-maxItems).map((item) => compactHistoryItemForRelay(item, maxChars));
-  safeTurn.agntEmergencySingleTurnForRelay = true;
-  safeTurn.agntPageCompactedForRelay = true;
-  return safeTurn;
-}
-
 async function fetchMeasuredAdaptiveTurnsListPage(fetchPage, params, now) {
   const startedAt = now();
   const result = await fetchPage(params);
@@ -510,33 +401,6 @@ function buildAdaptiveTurnsListPageParams(baseParams, limit, cursor) {
   return params;
 }
 
-function findTurnsListResultKey(result) {
-  if (!result || typeof result !== "object" || Array.isArray(result)) {
-    return null;
-  }
-  return RELAY_TURNS_LIST_RESULT_KEYS.find((key) => Array.isArray(result[key])) || null;
-}
-
-function buildAdaptiveTurnsListResult(firstResult, lastResult, turnsKey, turns) {
-  const result = {
-    ...firstResult,
-  };
-  for (const key of RELAY_TURNS_LIST_RESULT_KEYS) {
-    delete result[key];
-  }
-  result[turnsKey] = turns;
-
-  for (const key of RELAY_TURNS_LIST_PAGINATION_RESULT_KEYS) {
-    if (Object.prototype.hasOwnProperty.call(lastResult, key)) {
-      result[key] = lastResult[key];
-    } else {
-      delete result[key];
-    }
-  }
-
-  return result;
-}
-
 function readTurnsListNextCursor(result) {
   if (!result || typeof result !== "object") {
     return undefined;
@@ -550,10 +414,6 @@ function readTurnsListNextCursor(result) {
   return undefined;
 }
 
-function hasRelayCursor(cursor) {
-  return cursor !== undefined && cursor !== null && cursor !== "";
-}
-
 function jsonByteLength(value) {
   try {
     return Buffer.byteLength(JSON.stringify(value), "utf8");
@@ -562,71 +422,13 @@ function jsonByteLength(value) {
   }
 }
 
-function measureSanitizedTurnsListResponseBytes(response, sanitizeForRelay) {
-  try {
-    const rawResponse = JSON.stringify(response);
-    const sanitizedResponse = sanitizeForRelay(rawResponse, "thread/turns/list");
-    return Buffer.byteLength(sanitizedResponse, "utf8");
-  } catch {
-    return Number.POSITIVE_INFINITY;
-  }
-}
-
-function compactHistoryItemForRelay(item, maxChars) {
-  const compactItem = {
-    id: typeof item?.id === "string" ? item.id : undefined,
-    type: typeof item?.type === "string" ? item.type : "relay_truncated_item",
-    role: typeof item?.role === "string" ? item.role : undefined,
-    itemId: typeof item?.itemId === "string" ? item.itemId : undefined,
-    relayPayloadTruncated: true,
-  };
-  const tailText = maxChars > 0 ? firstRelayTextTail(item, maxChars) : "";
-  if (tailText) {
-    compactItem.text = tailText;
-  }
-
-  return Object.fromEntries(
-    Object.entries(compactItem).filter(([, value]) => value !== undefined)
-  );
-}
-
-function firstRelayTextTail(value, maxChars) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return "";
-  }
-
-  for (const key of ["text", "message", "summary", "output", "outputText", "output_text"]) {
-    if (typeof value[key] === "string" && value[key].trim()) {
-      return truncateRelayTextTail(value[key], maxChars);
-    }
-  }
-
-  if (Array.isArray(value.content)) {
-    for (const entry of value.content) {
-      const tail = firstRelayTextTail(entry, maxChars);
-      if (tail) {
-        return tail;
-      }
-    }
-  }
-
-  return "";
-}
-
-function truncateRelayTextTail(value, maxChars) {
-  if (typeof value !== "string" || value.length <= maxChars) {
-    return value;
-  }
-
-  const tail = value.slice(-maxChars).trimStart();
-  return `…\n${tail}`;
-}
-
 module.exports = {
   RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES,
   RELAY_HISTORY_TEXT_TAIL_LIMIT_CHARS,
   RELAY_TURNS_LIST_TARGET_BUDGET_MS,
   RELAY_TURNS_LIST_BUDGET_RESERVE_MS,
+  RELAY_JSONL_FAST_FIRST_PAGE_WAIT_MS,
+  JSONL_CANONICAL_HANDOFF_CURSOR_PREFIX,
   RELAY_TURNS_LIST_MAX_INITIAL_LIMIT,
   RELAY_TURNS_LIST_SAFE_RETRY_LIMIT,
   RELAY_TURNS_LIST_RESULT_KEYS,
@@ -637,6 +439,9 @@ module.exports = {
   truncateRelayTextTail,
   parseAdaptiveThreadTurnsListRequest,
   fetchAdaptiveThreadTurnsListForRelay,
+  createThreadTurnsListFastPageCoordinator,
+  canonicalThreadTurnsListRequest,
+  threadTurnsListHandoffDescriptor,
   maybeBuildJsonlThreadTurnsListFallback,
   buildEmptyTurnsListResponse,
   isEmptyTurnsListResponse,

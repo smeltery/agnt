@@ -82,7 +82,7 @@ test("image_path_not_allowed error message no longer hardcodes 'Codex'", () => {
   // the source so the assertion is independent of the tricky "image outside
   // temp" rejection path (which is already covered by workspace-image.test.js).
   const handlerSource = fs.readFileSync(
-    path.join(__dirname, "..", "..", "src", "handlers", "workspace-handler.js"),
+    path.join(__dirname, "..", "..", "src", "handlers", "workspace-read-image.js"),
     "utf8"
   );
   assert.doesNotMatch(handlerSource, /Codex generated images/);

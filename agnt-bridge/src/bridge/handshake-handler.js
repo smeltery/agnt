@@ -29,7 +29,10 @@ const {
   buildIOSAppCompatibilitySnapshot,
   normalizeVersionString,
 } = require("./ios-app-compatibility");
-const { rememberLastSeenPhoneAppVersion } = require("../transport/secure-device-state");
+const {
+  rememberLastSeenClientDeviceKind,
+  rememberLastSeenPhoneAppVersion,
+} = require("../transport/secure-device-state");
 
 /**
  * @param {object} deps
@@ -203,6 +206,10 @@ function createHandshakeHandler({
   function buildCompatibilityError(params) {
     const clientInfo = params && typeof params === "object" ? params.clientInfo : null;
     const clientName = normalizeNonEmptyString(clientInfo?.name);
+    const clientDeviceKind = classifyClientDeviceKind(clientName);
+    if (clientDeviceKind) {
+      setDeviceState(rememberLastSeenClientDeviceKind(getDeviceState(), clientDeviceKind));
+    }
     if (clientName !== "codexmobile_ios") {
       return null;
     }
@@ -253,6 +260,27 @@ function normalizeNonEmptyString(value) {
   return trimmed.length === 0 ? "" : trimmed;
 }
 
+function classifyClientDeviceKind(clientName) {
+  const normalized = normalizeNonEmptyString(clientName).toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === "codexmobile_ios" || normalized.includes("ios") || normalized.includes("iphone")) {
+    return "iphone";
+  }
+  if (normalized.includes("android")) {
+    return "android";
+  }
+  if (normalized.includes("web") || normalized.includes("browser")) {
+    return "browser";
+  }
+  if (normalized.includes("mac") || normalized.includes("darwin")) {
+    return "mac";
+  }
+  return null;
+}
+
 module.exports = {
+  classifyClientDeviceKind,
   createHandshakeHandler,
 };

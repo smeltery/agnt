@@ -30,6 +30,27 @@ internal fun AgentService.notifyRunCompletionAttention(
     )
 }
 
+internal fun AgentService.notifyRunStartedOngoing(
+    threadId: String,
+    turnId: String?,
+) {
+    localNotificationPresenter.showOngoingRun(
+        threadId = threadId,
+        turnId = turnId,
+        displayTitle = threadDisplayTitleForNotification(threadId),
+    )
+}
+
+internal fun AgentService.cancelRunOngoingNotification(threadId: String) {
+    localNotificationPresenter.cancelOngoingRun(threadId)
+}
+
+internal fun AgentService.cancelAllRunOngoingNotifications() {
+    (_runningTurnIdByThread.value.keys + _protectedRunningFallbackThreadIds.value).forEach { threadId ->
+        localNotificationPresenter.cancelOngoingRun(threadId)
+    }
+}
+
 internal fun AgentService.notifyPendingApprovalAttention(request: PendingApprovalRequest) {
     val th = request.threadId?.trim()?.takeIf { it.isNotEmpty() } ?: return
     localNotificationPresenter.maybeNotifyPendingApproval(

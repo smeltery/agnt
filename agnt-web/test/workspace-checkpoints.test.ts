@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   applyCheckpointRestore,
+  checkpointDiff,
   decodePreview,
   previewCheckpointRestore,
 } from "../src/protocol/workspace-checkpoints";
@@ -120,6 +121,32 @@ describe("applyCheckpointRestore", () => {
   });
 });
 
+describe("checkpointDiff", () => {
+  it("diffs the turn-start checkpoint against the turn-end checkpoint", async () => {
+    const { rpc, calls } = fakeRpc(() => ({
+      repoRoot: "/Users/me/repo",
+      fromCheckpointRef: "refs/agnt/checkpoints/t/turn-start/u1",
+      toCheckpointRef: "refs/agnt/checkpoints/t/turn/u1",
+      diff: "diff --git a/x b/x",
+    }));
+    const result = await checkpointDiff(
+      rpc,
+      { threadId: "t1", turnId: "u1", cwd: "/Users/me/repo" },
+      "u1"
+    );
+    expect(result.diff).toBe("diff --git a/x b/x");
+    expect(calls[0].method).toBe("workspace/checkpointDiff");
+    expect(calls[0].params).toMatchObject({
+      threadId: "t1",
+      fromCheckpointKind: "turnStart",
+      fromTurnId: "u1",
+      toCheckpointKind: "turnEnd",
+      toTurnId: "u1",
+      cwd: "/Users/me/repo",
+    });
+  });
+});
+
 describe("checkpoints-store", () => {
   it("show() loads the preview and stamps it on state", async () => {
     const { rpc } = fakeRpc(() => ({
@@ -160,6 +187,50 @@ describe("checkpoints-store", () => {
     const ok = await useCheckpointsStore.getState().apply(rpc);
     expect(ok).toBe(false);
     expect(calls).toHaveLength(0);
+  });
+
+  it("loadDiff() caches the turn checkpoint diff on state", async () => {
+    const { rpc, calls } = fakeRpc((call) => {
+      if (call.method === "workspace/checkpointRestorePreview") {
+        return { canRestore: true, commit: "c", affectedFiles: ["a.ts"] };
+      }
+      return {
+        repoRoot: "/Users/me/repo",
+        fromCheckpointRef: "from",
+        toCheckpointRef: "to",
+        diff: "diff --git a/a.ts b/a.ts",
+      };
+    });
+    await useCheckpointsStore.getState().show(rpc, {
+      threadId: "t1",
+      turnId: "u1",
+      cwd: "/Users/me/repo",
+    });
+    const diff = await useCheckpointsStore.getState().loadDiff(rpc);
+    const cached = await useCheckpointsStore.getState().loadDiff(rpc);
+    expect(diff?.diff).toContain("a.ts");
+    expect(cached).toBe(diff);
+    expect(calls.map((call) => call.method)).toEqual([
+      "workspace/checkpointRestorePreview",
+      "workspace/checkpointDiff",
+    ]);
+  });
+
+  it("loadDiff() captures bridge errors", async () => {
+    const { rpc } = fakeRpc((call) => {
+      if (call.method === "workspace/checkpointRestorePreview") {
+        return { canRestore: true, commit: "c", affectedFiles: ["a.ts"] };
+      }
+      throw Object.assign(new Error("missing"), { userMessage: "No checkpoint." });
+    });
+    await useCheckpointsStore.getState().show(rpc, {
+      threadId: "t1",
+      turnId: "u1",
+      cwd: "/Users/me/repo",
+    });
+    const diff = await useCheckpointsStore.getState().loadDiff(rpc);
+    expect(diff).toBeNull();
+    expect(useCheckpointsStore.getState().diffError).toBe("No checkpoint.");
   });
 
   it("apply() closes the modal on success and exposes restoredFiles", async () => {

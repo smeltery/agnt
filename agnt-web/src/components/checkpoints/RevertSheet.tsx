@@ -8,6 +8,8 @@
 import { useConnectionStore } from "../../state/connection-store";
 import { useCheckpointsStore } from "../../state/checkpoints-store";
 import { useNoticesStore } from "../../state/notices-store";
+import { copyText } from "../../lib/clipboard";
+import { DiffView } from "../git/DiffView";
 import { Sheet } from "../shared/Sheet";
 
 export function RevertSheet() {
@@ -15,8 +17,12 @@ export function RevertSheet() {
   const preview = useCheckpointsStore((state) => state.preview);
   const loading = useCheckpointsStore((state) => state.loading);
   const applying = useCheckpointsStore((state) => state.applying);
+  const loadingDiff = useCheckpointsStore((state) => state.loadingDiff);
   const error = useCheckpointsStore((state) => state.error);
+  const diffError = useCheckpointsStore((state) => state.diffError);
+  const diff = useCheckpointsStore((state) => state.diff);
   const target = useCheckpointsStore((state) => state.target);
+  const loadDiff = useCheckpointsStore((state) => state.loadDiff);
   const apply = useCheckpointsStore((state) => state.apply);
   const hide = useCheckpointsStore((state) => state.hide);
   const connection = useConnectionStore((state) => state.connection);
@@ -38,6 +44,23 @@ export function RevertSheet() {
         message: `${preview?.affectedFiles.length ?? 0} file(s) reverted to the checkpoint.`,
       });
     }
+  }
+
+  async function onViewDiff() {
+    if (!rpc) return;
+    await loadDiff(rpc);
+  }
+
+  async function onCopyDiff() {
+    if (!rpc) return;
+    const current = diff ?? await loadDiff(rpc);
+    if (!current?.diff) return;
+    const ok = await copyText(current.diff);
+    enqueueNotice({
+      severity: ok ? "info" : "error",
+      title: ok ? "Diff copied" : "Copy failed",
+      message: ok ? "Checkpoint diff copied to the clipboard." : "The browser could not write to the clipboard.",
+    });
   }
 
   return (
@@ -73,7 +96,27 @@ export function RevertSheet() {
                 <p className="agnt-settings-hint">No files differ from the checkpoint — nothing to revert.</p>
               ) : (
                 <div className="agnt-revert-section">
-                  <strong>Affected files ({preview.affectedFiles.length})</strong>
+                  <div className="agnt-revert-section-header">
+                    <strong>Affected files ({preview.affectedFiles.length})</strong>
+                    <div className="agnt-revert-actions">
+                      <button
+                        type="button"
+                        className="agnt-button-ghost"
+                        onClick={onViewDiff}
+                        disabled={loadingDiff}
+                      >
+                        {loadingDiff ? "Loading diff…" : "View diff"}
+                      </button>
+                      <button
+                        type="button"
+                        className="agnt-button-ghost"
+                        onClick={onCopyDiff}
+                        disabled={loadingDiff}
+                      >
+                        Copy diff
+                      </button>
+                    </div>
+                  </div>
                   <ul className="agnt-revert-files">
                     {preview.affectedFiles.map((path) => (
                       <li key={path}>
@@ -81,6 +124,15 @@ export function RevertSheet() {
                       </li>
                     ))}
                   </ul>
+                  {diffError && <div className="agnt-revert-error">{diffError}</div>}
+                  {diff?.diff && (
+                    <div className="agnt-revert-diff">
+                      <DiffView patch={diff.diff} />
+                    </div>
+                  )}
+                  {diff && !diff.diff && (
+                    <p className="agnt-settings-hint">The checkpoint diff is empty.</p>
+                  )}
                 </div>
               )}
 

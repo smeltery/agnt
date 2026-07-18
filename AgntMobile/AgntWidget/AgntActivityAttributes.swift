@@ -12,22 +12,49 @@
 import ActivityKit
 import Foundation
 
+enum AgntActivityConversationPhase: String, Codable, Hashable {
+    case running
+    case completed
+    case failed
+}
+
+struct AgntActivityConversation: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String
+    var detail: String
+    var phase: AgntActivityConversationPhase
+    var runningStartedAt: Date?
+
+    var threadURL: URL? {
+        var components = URLComponents()
+        components.scheme = "agnt"
+        components.host = "thread"
+        components.percentEncodedPath = "/" + (id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id)
+        return components.url
+    }
+}
+
 struct AgntActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
-        enum Phase: String, Codable, Hashable {
-            case running
-            case completed
-            case failed
+        var runningConversations: [AgntActivityConversation]
+        var completedConversations: [AgntActivityConversation]
+        var failedConversations: [AgntActivityConversation]
+        var updatedAt: Date
+
+        var isEmpty: Bool {
+            runningConversations.isEmpty
+                && completedConversations.isEmpty
+                && failedConversations.isEmpty
         }
 
-        var phase: Phase
-        // Short status line, e.g. "Working…" / "Done" / "Stopped". Never a prompt
-        // or model name — keep it generic so no provider detail surfaces.
-        var detail: String
-        var updatedAt: Date
+        var primaryThreadURL: URL? {
+            runningConversations.first?.threadURL
+                ?? failedConversations.first?.threadURL
+                ?? completedConversations.first?.threadURL
+        }
     }
 
     // Immutable for the life of the activity.
-    var threadTitle: String
+    var title: String
     var startedAt: Date
 }

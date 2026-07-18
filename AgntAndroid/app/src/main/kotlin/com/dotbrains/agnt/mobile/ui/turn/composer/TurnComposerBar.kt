@@ -1,7 +1,6 @@
 package com.dotbrains.agnt.mobile.ui.turn.composer
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -11,16 +10,13 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -29,7 +25,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -135,97 +130,11 @@ internal fun TurnComposerBar(
             chips = mentionChips,
             onRemove = onRemoveMentionChip,
         )
-        autocomplete?.takeIf { it.isVisible }?.let { state ->
-            val autoShape = MaterialTheme.shapes.small
-            val autoBg =
-                if (agentLightChrome) {
-                    AgentLightColors.Surface.copy(alpha = 0.96f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
-                }
-            val autoModifier =
-                if (agentLightChrome) {
-                    Modifier.border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline,
-                        shape = autoShape,
-                    )
-                } else {
-                    Modifier
-                }
-            Surface(
-                modifier = autoModifier.heightIn(max = 280.dp),
-                shape = autoShape,
-                color = autoBg,
-            ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
-                            .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = state.title,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (state.isLoading && state.items.isEmpty()) {
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                            Text(
-                                text = stringResource(R.string.turn_runtime_loading),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    state.items.forEach { item ->
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clip(MaterialTheme.shapes.extraSmall)
-                                    .clickable { onSelectAutocomplete(item) }
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                painter = painterResource(autocompleteIconRes(item.payload.kind)),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = autocompleteIconTint(item.payload.kind),
-                            )
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = item.title,
-                                    color = autocompleteTitleTint(item.payload.kind),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                item.subtitle?.let { subtitle ->
-                                    Text(
-                                        text = subtitle,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        ComposerAutocompletePopup(
+            state = autocomplete,
+            lightChrome = agentLightChrome,
+            onSelectAutocomplete = onSelectAutocomplete,
+        )
         if (model.voicePhase == TurnVoicePhase.Recording) {
             VoiceRecordingCapsule(
                 audioLevels = voiceAudioLevels,
@@ -475,33 +384,6 @@ internal fun TurnComposerBar(
         composerEnvironment()
     }
 }
-
-@Composable
-private fun autocompleteIconTint(kind: ComposerMentionKind): Color =
-    when (kind) {
-        ComposerMentionKind.Skill -> MaterialTheme.colorScheme.primary
-        ComposerMentionKind.Plugin -> MaterialTheme.colorScheme.tertiary
-        ComposerMentionKind.File -> MaterialTheme.colorScheme.onSurfaceVariant
-        ComposerMentionKind.SlashCommand -> MaterialTheme.colorScheme.secondary
-    }
-
-@Composable
-private fun autocompleteTitleTint(kind: ComposerMentionKind): Color =
-    when (kind) {
-        ComposerMentionKind.Skill -> MaterialTheme.colorScheme.primary
-        ComposerMentionKind.Plugin -> MaterialTheme.colorScheme.onSurface
-        ComposerMentionKind.File,
-        ComposerMentionKind.SlashCommand,
-        -> MaterialTheme.colorScheme.onSurface
-    }
-
-private fun autocompleteIconRes(kind: ComposerMentionKind): Int =
-    when (kind) {
-        ComposerMentionKind.File -> LucideR.drawable.lucide_ic_file
-        ComposerMentionKind.Skill -> LucideR.drawable.lucide_ic_square_asterisk
-        ComposerMentionKind.Plugin -> LucideR.drawable.lucide_ic_blocks
-        ComposerMentionKind.SlashCommand -> LucideR.drawable.lucide_ic_command
-    }
 
 @Composable
 private fun ComposerPlanModeBadge(onClick: () -> Unit) {

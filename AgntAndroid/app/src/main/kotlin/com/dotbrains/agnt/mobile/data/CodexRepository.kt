@@ -12,6 +12,9 @@ import com.dotbrains.agnt.mobile.core.model.CodexRateLimitBucket
 import com.dotbrains.agnt.mobile.core.model.CodexReviewTarget
 import com.dotbrains.agnt.mobile.core.model.CodexServiceTier
 import com.dotbrains.agnt.mobile.core.model.CodexThread
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoal
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalBudgetUpdate
+import com.dotbrains.agnt.mobile.core.model.CodexThreadGoalStatus
 import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRecord
 import com.dotbrains.agnt.mobile.core.model.CodexTurnMention
 import com.dotbrains.agnt.mobile.core.model.CodexTurnSkillMention
@@ -45,6 +48,10 @@ interface CodexRepository {
     /** Per-thread message rows (persisted + live notifications). */
     val messagesByThread: StateFlow<Map<String, List<CodexMessage>>>
 
+    /** Runtime-persisted thread goals mirrored from thread-goal RPCs and notifications. */
+    val threadGoalsByThread: StateFlow<Map<String, CodexThreadGoal>>
+        get() = MutableStateFlow(emptyMap())
+
     /** Cursor-backed history state for large threads. */
     val threadHistoryPaginationByThread: StateFlow<Map<String, ThreadHistoryPaginationState>>
         get() = MutableStateFlow(emptyMap())
@@ -76,6 +83,18 @@ interface CodexRepository {
      * Thread con run attivo ma senza `turnId` ancora noto (parity iOS `protectedRunningFallback` / `runningThreadIDs`).
      */
     val protectedRunningFallbackThreadIds: StateFlow<Set<String>>
+
+    /** Off-screen threads whose latest run failed; cleared when the thread is viewed or starts again. */
+    val failedThreadIds: StateFlow<Set<String>>
+        get() = MutableStateFlow(emptySet())
+
+    /** Off-screen threads whose latest run completed; cleared when the thread is viewed or starts again. */
+    val readyThreadIds: StateFlow<Set<String>>
+        get() = MutableStateFlow(emptySet())
+
+    /** Lightweight title for the latest off-screen completion banner. */
+    val threadCompletionBannerTitle: StateFlow<String?>
+        get() = MutableStateFlow(null)
 
     val availableModels: StateFlow<List<CodexModelOption>>
 
@@ -235,6 +254,9 @@ interface CodexRepository {
     /** Clears [bridgeUpdatePrompt] after the user dismisses the sheet. */
     fun dismissBridgeUpdatePrompt()
 
+    /** Requests the connected desktop bridge to update the npm package and restart itself. */
+    suspend fun updateBridgePackageAndRestart(): Unit = throw UnsupportedOperationException("bridge self-update is not implemented by this repository")
+
     /** Best-effort `thread/list` refresh (active + archived); no-op when disconnected. */
     suspend fun refreshThreads()
 
@@ -243,6 +265,17 @@ interface CodexRepository {
         threadId: String,
         force: Boolean = false,
     )
+
+    suspend fun refreshThreadGoal(threadId: String): CodexThreadGoal? = null
+
+    suspend fun setThreadGoal(
+        threadId: String,
+        objective: String? = null,
+        status: CodexThreadGoalStatus? = null,
+        tokenBudget: CodexThreadGoalBudgetUpdate = CodexThreadGoalBudgetUpdate.Keep,
+    ): CodexThreadGoal = throw UnsupportedOperationException("thread goals are not implemented by this repository")
+
+    suspend fun clearThreadGoal(threadId: String): Boolean = false
 
     /** Loads the next older [thread/read] page when the bridge/runtime exposes a cursor. */
     suspend fun loadOlderThreadHistory(threadId: String) {

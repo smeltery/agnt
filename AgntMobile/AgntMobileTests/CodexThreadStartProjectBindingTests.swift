@@ -103,6 +103,94 @@ final class CodexThreadStartProjectBindingTests: XCTestCase {
         XCTAssertNil(thread.gitWorkingDirectory)
     }
 
+    func testRootThreadsCanShowGitControlsForSharedWorkingDirectory() {
+        let older = CodexThread(
+            id: "old",
+            createdAt: Date(timeIntervalSince1970: 100),
+            updatedAt: Date(timeIntervalSince1970: 200),
+            cwd: "/repo"
+        )
+        let newer = CodexThread(
+            id: "new",
+            createdAt: Date(timeIntervalSince1970: 300),
+            updatedAt: Date(timeIntervalSince1970: 400),
+            cwd: "/repo"
+        )
+
+        XCTAssertTrue(CodexThread.gitControlsVisible(
+            for: older,
+            workingDirectory: "/repo",
+            isConnected: true
+        ))
+        XCTAssertTrue(CodexThread.gitControlsVisible(
+            for: newer,
+            workingDirectory: "/repo",
+            isConnected: true
+        ))
+    }
+
+    func testSubagentThreadsDoNotShowRootThreadGitControls() {
+        let root = CodexThread(
+            id: "root",
+            createdAt: Date(timeIntervalSince1970: 100),
+            updatedAt: Date(timeIntervalSince1970: 200),
+            cwd: "/repo"
+        )
+        let subagent = CodexThread(
+            id: "subagent",
+            createdAt: Date(timeIntervalSince1970: 300),
+            updatedAt: Date(timeIntervalSince1970: 400),
+            cwd: "/repo",
+            parentThreadId: "root"
+        )
+
+        XCTAssertTrue(CodexThread.gitControlsVisible(
+            for: root,
+            workingDirectory: "/repo",
+            isConnected: true
+        ))
+        XCTAssertFalse(CodexThread.gitControlsVisible(
+            for: subagent,
+            workingDirectory: "/repo",
+            isConnected: true
+        ))
+    }
+
+    func testGitControlsRequireConnectedLiveRootThreadWithWorkingDirectory() {
+        let thread = CodexThread(
+            id: "thread",
+            createdAt: Date(timeIntervalSince1970: 100),
+            updatedAt: Date(timeIntervalSince1970: 200),
+            cwd: "/repo"
+        )
+        let archivedThread = CodexThread(
+            id: "archived",
+            cwd: "/repo",
+            syncState: .archivedLocal
+        )
+
+        XCTAssertTrue(CodexThread.gitControlsVisible(
+            for: thread,
+            workingDirectory: "/repo",
+            isConnected: true
+        ))
+        XCTAssertFalse(CodexThread.gitControlsVisible(
+            for: thread,
+            workingDirectory: "/repo",
+            isConnected: false
+        ))
+        XCTAssertFalse(CodexThread.gitControlsVisible(
+            for: thread,
+            workingDirectory: nil,
+            isConnected: true
+        ))
+        XCTAssertFalse(CodexThread.gitControlsVisible(
+            for: archivedThread,
+            workingDirectory: "/repo",
+            isConnected: true
+        ))
+    }
+
     func testProjectlessThreadUsesNoProjectPresentation() {
         let thread = CodexThread(id: "thread-1", cwd: nil)
 

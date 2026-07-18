@@ -11,6 +11,7 @@ const path = require("path");
 const { readDaemonConfig } = require("../daemon-state");
 
 const DEFAULT_DEBOUNCE_MS = 1200;
+const DEFAULT_DESKTOP_IPC_SNAPSHOT_DEBOUNCE_MS = 75;
 
 function readBridgeConfig({
   env = process.env,
@@ -81,6 +82,14 @@ function readBridgeConfig({
       : explicitKeepMacAwakeEnabled,
     codexEndpoint,
     desktopIpcSocketPath: readFirstDefinedEnv(["AGNT_DESKTOP_IPC_SOCKET"], "", env),
+    desktopIpcSnapshotDebounceMs: parseIntegerEnv(
+      readFirstDefinedEnv(
+        ["AGNT_DESKTOP_IPC_SNAPSHOT_DEBOUNCE_MS"],
+        String(DEFAULT_DESKTOP_IPC_SNAPSHOT_DEBOUNCE_MS),
+        env
+      ),
+      DEFAULT_DESKTOP_IPC_SNAPSHOT_DEBOUNCE_MS
+    ),
     refreshCommand,
     providerId: typeof daemonConfig.providerId === "string" ? daemonConfig.providerId : "",
   };

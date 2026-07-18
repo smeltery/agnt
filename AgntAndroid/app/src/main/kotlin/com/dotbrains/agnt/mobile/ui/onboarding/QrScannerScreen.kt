@@ -4,14 +4,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,16 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,15 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -63,14 +49,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dotbrains.agnt.mobile.AppContainer
 import com.dotbrains.agnt.mobile.R
-import com.dotbrains.agnt.mobile.core.config.AppEnvironment
 import com.dotbrains.agnt.mobile.core.model.CodexPairingQRPayload
-import com.dotbrains.agnt.mobile.core.model.CodexTrustedMacRegistry
-import com.dotbrains.agnt.mobile.core.security.CodexSecureKeys
-import com.dotbrains.agnt.mobile.core.transport.validateRelayUrl
 import com.dotbrains.agnt.mobile.data.CodexRepository
 import com.dotbrains.agnt.mobile.data.QrPairingValidationResult
-import com.dotbrains.agnt.mobile.data.resolvePairingCode
 import com.dotbrains.agnt.mobile.data.validatePairingQrCode
 import com.dotbrains.agnt.mobile.pairing.LoopbackRelayException
 import com.dotbrains.agnt.mobile.pairing.applyQrPayloadAndConnect
@@ -369,294 +350,5 @@ fun QrScannerScreen(
                 }
             },
         )
-    }
-}
-
-private data class ManualPairingInput(
-    val codeOrPayload: String,
-    val relayUrl: String?,
-)
-
-private val manualPairingRelayUrlRegex = Regex("""(?i)\b(?:wss?|https?)://[^\s,;)"']+""")
-private val manualPairingCodeLabelRegex =
-    Regex("""(?im)^\s*(?:pairing\s+)?code\s*[:=]\s*([A-Za-z0-9._:-]+)\s*$""")
-private val manualPairingShortCodeRegex = Regex("""\b[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8,12}\b""")
-private val manualPairingTokenRegex = Regex("""[A-Za-z0-9._:-]{4,256}""")
-
-private fun parseManualPairingInput(rawText: String): ManualPairingInput {
-    val trimmed = rawText.trim()
-    if (trimmed.isEmpty()) return ManualPairingInput(codeOrPayload = "", relayUrl = null)
-
-    val relayUrl = extractManualRelayUrl(trimmed)
-    if (trimmed.startsWith("{")) {
-        return ManualPairingInput(codeOrPayload = trimmed, relayUrl = relayUrl)
-    }
-
-    val labeledCode =
-        manualPairingCodeLabelRegex
-            .find(trimmed)
-            ?.groups
-            ?.get(1)
-            ?.value
-    if (!labeledCode.isNullOrBlank()) {
-        return ManualPairingInput(codeOrPayload = labeledCode.trim(), relayUrl = relayUrl)
-    }
-
-    val textWithoutRelay =
-        relayUrl?.let { trimmed.replace(it, " ") } ?: trimmed
-    val shortCode = manualPairingShortCodeRegex.find(textWithoutRelay.uppercase())?.value
-    if (!shortCode.isNullOrBlank()) {
-        return ManualPairingInput(codeOrPayload = shortCode, relayUrl = relayUrl)
-    }
-
-    val token =
-        manualPairingTokenRegex
-            .findAll(textWithoutRelay)
-            .map { it.value.trim() }
-            .firstOrNull { token ->
-                !token.equals("code", ignoreCase = true) &&
-                    !token.equals("pairing", ignoreCase = true)
-            }
-    return ManualPairingInput(codeOrPayload = token ?: textWithoutRelay.trim(), relayUrl = relayUrl)
-}
-
-private fun extractManualRelayUrl(rawText: String): String? =
-    manualPairingRelayUrlRegex
-        .find(rawText)
-        ?.value
-        ?.trim()
-        ?.trimEnd('.', ',', ';', ')', ']', '}', '"', '\'')
-        ?.takeIf { it.isNotBlank() }
-
-private fun manualRelayCandidates(
-    context: android.content.Context,
-    pastedRelayUrl: String?,
-): List<String> {
-    val snapshot = AppContainer.sessionPersistence.loadRelaySnapshot()
-    val registry =
-        AppContainer.secureStore.readCodable<CodexTrustedMacRegistry>(CodexSecureKeys.trustedMacRegistry)
-    val preferredTrustedRelay =
-        snapshot.lastTrustedMacDeviceId
-            ?.let { registry?.records?.get(it) }
-            ?.relayURL
-            ?: registry
-                ?.records
-                ?.values
-                ?.firstOrNull { !it.relayURL.isNullOrBlank() }
-                ?.relayURL
-
-    return listOf(
-        pastedRelayUrl,
-        snapshot.relayUrl,
-        preferredTrustedRelay,
-        AppEnvironment.relayBaseURL(context),
-    ).mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
-        .filter { validateRelayUrl(it) != null }
-        .distinct()
-}
-
-private suspend fun resolveManualPairingCode(
-    context: android.content.Context,
-    code: String,
-    pastedRelayUrl: String? = null,
-): QrPairingValidationResult {
-    val relayCandidates = manualRelayCandidates(context, pastedRelayUrl)
-    if (relayCandidates.isEmpty()) {
-        return QrPairingValidationResult.ScanError(
-            "This device does not know which relay to ask for that pairing code yet. Scan the QR code instead.",
-        )
-    }
-    return resolvePairingCodeWithCandidates(relayCandidates, code)
-}
-
-private suspend fun resolvePairingCodeWithCandidates(
-    relayCandidates: List<String>,
-    code: String,
-): QrPairingValidationResult {
-    var lastScanError: QrPairingValidationResult.ScanError? = null
-    for (relayUrl in relayCandidates) {
-        when (
-            val result =
-                resolvePairingCode(
-                    httpClient = AppContainer.httpCallClient,
-                    relayUrl = relayUrl,
-                    code = code,
-                )
-        ) {
-            is QrPairingValidationResult.Success -> return result
-            is QrPairingValidationResult.BridgeUpdateRequired -> return result
-            is QrPairingValidationResult.ShortCode ->
-                lastScanError =
-                    QrPairingValidationResult.ScanError(
-                        "The relay returned another short pairing code instead of pairing metadata.",
-                    )
-            is QrPairingValidationResult.ScanError -> lastScanError = result
-        }
-    }
-    return lastScanError
-        ?: QrPairingValidationResult.ScanError(
-            "Pairing code could not be resolved. Generate a fresh code from your desktop.",
-        )
-}
-
-@Composable
-private fun QrScannerHeader(onBack: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            onClick = onBack,
-            modifier = Modifier.size(52.dp),
-            shape = CircleShape,
-            color = Color.White,
-            shadowElevation = 1.dp,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.cd_navigate_back),
-                    tint = Color(0xFF151515),
-                )
-            }
-        }
-        Text(
-            text = stringResource(R.string.qr_scanner_title),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            color = Color(0xFF151515),
-        )
-        Spacer(modifier = Modifier.size(52.dp))
-    }
-}
-
-@Composable
-private fun PermissionPrompt(
-    onGrantCamera: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = "Camera access is needed to scan.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-        )
-        Button(onClick = onGrantCamera) {
-            Text(stringResource(R.string.qr_scanner_grant_camera))
-        }
-    }
-}
-
-@Composable
-private fun QrScannerOverlay(
-    connecting: Boolean,
-    statusMessage: String?,
-    errorMessage: String?,
-    onScanAgain: () -> Unit,
-) {
-    val scanSize = 178.dp
-    val scanRadius = 22.dp
-
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.08f),
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.34f),
-                        ),
-                    ),
-                ),
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val scanSizePx = scanSize.toPx()
-            val scanRadiusPx = scanRadius.toPx()
-            val left = (size.width - scanSizePx) / 2f
-            val top = (size.height - scanSizePx) / 2f
-            val dimPath =
-                Path().apply {
-                    fillType = PathFillType.EvenOdd
-                    addRect(
-                        androidx.compose.ui.geometry
-                            .Rect(0f, 0f, size.width, size.height),
-                    )
-                    addRoundRect(
-                        androidx.compose.ui.geometry.RoundRect(
-                            left = left,
-                            top = top,
-                            right = left + scanSizePx,
-                            bottom = top + scanSizePx,
-                            radiusX = scanRadiusPx,
-                            radiusY = scanRadiusPx,
-                        ),
-                    )
-                }
-            drawPath(dimPath, Color.Black.copy(alpha = 0.42f))
-        }
-
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.Center)
-                    .size(scanSize)
-                    .clip(RoundedCornerShape(scanRadius))
-                    .border(2.dp, Color.White.copy(alpha = 0.92f), RoundedCornerShape(scanRadius)),
-        ) {
-            if (connecting) {
-                CircularProgressIndicator(
-                    modifier =
-                        Modifier
-                            .align(Alignment.Center)
-                            .size(42.dp),
-                    color = Color.White,
-                )
-            }
-        }
-
-        Column(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 20.dp, vertical = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text =
-                    when {
-                        connecting -> "Connecting"
-                        errorMessage != null -> "Scan failed"
-                        statusMessage != null -> "Code found"
-                        else -> "Scan Code"
-                    },
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-            Text(
-                text = errorMessage ?: "Scan the pairing QR from your desktop bridge",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.76f),
-                textAlign = TextAlign.Center,
-            )
-            if (errorMessage != null) {
-                Button(
-                    onClick = onScanAgain,
-                    modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    Text(stringResource(R.string.qr_scan_again))
-                }
-            }
-        }
     }
 }

@@ -1,0 +1,216 @@
+/* ── Bridge-PTY terminal route ───────────────────────────────────
+   Full-screen overlay similar to the Settings/About modals but with
+   no max-width so the xterm.js surface gets all the available room. */
+.agnt-terminal-route {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 80;
+  background: var(--agnt-surface);
+  color: var(--agnt-fg);
+}
+.agnt-terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+}
+.agnt-terminal-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  flex: 1;
+}
+.agnt-terminal-title small {
+  color: var(--agnt-muted-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+.agnt-terminal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.agnt-terminal-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.agnt-terminal-status-running { color: #34d399; }
+.agnt-terminal-status-starting { color: #f59e0b; }
+.agnt-terminal-status-error { color: #ef4444; }
+.agnt-terminal-status-closed,
+.agnt-terminal-status-exited,
+.agnt-terminal-status-idle { color: #a3a3a3; }
+.agnt-terminal-tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.03);
+}
+.agnt-terminal-tab {
+  display: grid;
+  grid-template-columns: minmax(96px, 180px) auto;
+  align-items: stretch;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 128px;
+}
+.agnt-terminal-tab-active {
+  background: rgba(0, 159, 255, 0.14);
+  border-color: rgba(0, 159, 255, 0.45);
+}
+.agnt-terminal-tab-main,
+.agnt-terminal-tab-close,
+.agnt-terminal-tab-add {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+.agnt-terminal-tab-main {
+  min-width: 0;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.agnt-terminal-tab-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agnt-terminal-tab-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  color: var(--agnt-muted-fg);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agnt-terminal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: #a3a3a3;
+}
+.agnt-terminal-dot-running { background: #34d399; }
+.agnt-terminal-dot-starting { background: #f59e0b; }
+.agnt-terminal-dot-error { background: #ef4444; }
+.agnt-terminal-dot-exited,
+.agnt-terminal-dot-closed,
+.agnt-terminal-dot-idle { background: #a3a3a3; }
+.agnt-terminal-tab-close {
+  width: 28px;
+  min-height: 100%;
+  cursor: pointer;
+  color: var(--agnt-muted-fg);
+  border-left: 1px solid var(--agnt-border);
+}
+.agnt-terminal-tab-close:hover {
+  color: var(--agnt-fg);
+  background: rgba(255, 255, 255, 0.06);
+}
+.agnt-terminal-tab-add {
+  flex: 0 0 34px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--agnt-muted-fg);
+}
+.agnt-terminal-tab-add:hover {
+  color: var(--agnt-fg);
+  background: rgba(255, 255, 255, 0.06);
+}
+.agnt-terminal-error {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-bottom: 1px solid var(--agnt-border);
+}
+.agnt-terminal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  text-align: center;
+  padding: 32px;
+  gap: 12px;
+  color: var(--agnt-muted-fg);
+}
+.agnt-terminal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 12px 12px;
+}
+.agnt-terminal-surface { display: block; }
+
+/* ── First-use shell-access confirmation overlay ─────────────────
+   Defense-in-depth on top of the bridge gate. Even if the user has
+   enabled the web terminal, the bridge rejects the first open per
+   process so a long-running paired tab can't silently spawn a shell. */
+.agnt-terminal-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.agnt-terminal-confirm-card {
+  background: var(--agnt-surface);
+  color: var(--agnt-fg);
+  padding: 20px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--agnt-border);
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.agnt-terminal-confirm-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.agnt-terminal-confirm-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--agnt-muted-fg);
+  line-height: 1.45;
+}
+.agnt-terminal-confirm-card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.agnt-terminal-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

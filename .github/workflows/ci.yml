@@ -1,0 +1,272 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Checks to run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - packages
+          - bridge
+          - relay
+          - web
+          - host
+          - loc-budgets
+          - ios
+          - android
+          - links
+  schedule:
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}-${{ github.event.inputs.scope || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  AGNT_FLOX_QUIET: "1"
+
+jobs:
+  changes:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+      bridge: ${{ steps.filter.outputs.bridge }}
+      host: ${{ steps.filter.outputs.host }}
+      ios: ${{ steps.filter.outputs.ios }}
+      links: ${{ steps.filter.outputs.links }}
+      loc_budgets: ${{ steps.filter.outputs.loc_budgets }}
+      lint_workflows: ${{ steps.filter.outputs.lint_workflows }}
+      relay: ${{ steps.filter.outputs.relay }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed surfaces
+        id: filter
+        shell: bash
+        env:
+          INPUT_SCOPE: ${{ github.event.inputs.scope || '' }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+        run: |
+          ./.github/scripts/detect-ci-changes.sh
+
+  ci-config:
+    needs: changes
+    if: needs.changes.outputs.lint_workflows == 'true'
+    name: CI config checks
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Lint GitHub Actions workflows
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            -w /repo \
+            rhysd/actionlint:latest \
+            -color
+
+      - name: Test CI change detector
+        run: ./.github/scripts/test-detect-ci-changes.sh
+
+  bridge:
+    needs: changes
+    if: needs.changes.outputs.bridge == 'true'
+    name: Bun package CI (agnt-bridge)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run Bun package CI
+        uses: ./.github/actions/run-bun-package-ci
+        with:
+          name: agnt-bridge
+          working-directory: agnt-bridge
+          frozen-lockfile: "true"
+          audit: "true"
+
+  relay:
+    needs: changes
+    if: needs.changes.outputs.relay == 'true'
+    name: Bun package CI (relay)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run Bun package CI
+        uses: ./.github/actions/run-bun-package-ci
+        with:
+          name: relay
+          working-directory: relay
+          frozen-lockfile: "true"
+          audit: "true"
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    name: Bun package CI (agnt-web)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run Bun package CI
+        uses: ./.github/actions/run-bun-package-ci
+        with:
+          name: agnt-web
+          working-directory: agnt-web
+          frozen-lockfile: "true"
+          audit: "true"
+
+  host:
+    needs: changes
+    if: needs.changes.outputs.host == 'true'
+    name: Bun package CI (agnt-host)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run Bun package CI
+        uses: ./.github/actions/run-bun-package-ci
+        with:
+          name: agnt-host
+          working-directory: agnt-host
+          frozen-lockfile: "false"
+          audit: "false"
+
+  loc_budgets:
+    needs: changes
+    if: needs.changes.outputs.loc_budgets == 'true'
+    name: LOC budget checks
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Flox
+        uses: ./.github/actions/setup-flox
+
+      - name: Check LOC budgets
+        run: flox activate -d "$GITHUB_WORKSPACE" -- node scripts/check-loc-budgets.mjs
+
+  ios_preflight:
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    name: iOS preflight checks
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Flox
+        uses: ./.github/actions/setup-flox
+
+      - name: Test performance script usage
+        run: flox activate -d "$GITHUB_WORKSPACE" -- AgntMobile/scripts/test-performance-script-usage.sh
+
+  android:
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Check and assemble debug
+        uses: ./.github/actions/run-android-ci
+
+      - name: Upload debug APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: agnt-debug-${{ github.event.pull_request.number }}
+          path: AgntAndroid/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  links:
+    needs: changes
+    if: needs.changes.outputs.links == 'true'
+    name: Link check
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run link check
+        uses: ./.github/actions/run-link-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          post-pr-comment: ${{ github.event_name == 'pull_request' }}
+          pr-number: ${{ github.event.pull_request.number }}
+
+  ci-summary:
+    needs:
+      - changes
+      - ci-config
+      - bridge
+      - relay
+      - web
+      - host
+      - loc_budgets
+      - ios_preflight
+      - android
+      - links
+    if: always()
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: Check required jobs
+        run: |
+          set -euo pipefail
+
+          for result in \
+            "${{ needs.changes.result }}" \
+            "${{ needs.ci-config.result }}" \
+            "${{ needs.bridge.result }}" \
+            "${{ needs.relay.result }}" \
+            "${{ needs.web.result }}" \
+            "${{ needs.host.result }}" \
+            "${{ needs.loc_budgets.result }}" \
+            "${{ needs.ios_preflight.result }}" \
+            "${{ needs.android.result }}" \
+            "${{ needs.links.result }}"
+          do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "CI job failed with result: $result" >&2; exit 1 ;;
+            esac
+          done

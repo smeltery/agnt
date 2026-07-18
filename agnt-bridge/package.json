@@ -16,6 +16,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "ci": "bun run test",
     "start": "node ./bin/agnt.js up",
     "test": "node --test",
     "postinstall": "node ./src/bootstrap-provider.js",

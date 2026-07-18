@@ -5,27 +5,11 @@
 // Depends on: child_process, fs, os, path, crypto
 
 const { execFile } = require("child_process");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const { randomBytes } = require("crypto");
 const { promisify } = require("util");
 const { runStructuredCodexJson } = require("./codex-exec-runner");
 const {
-  buildCommitDraftPrompt,
-  buildPullRequestDraftPrompt,
-  buildThreadTitlePrompt,
-  normalizeCommitDraft,
-  normalizePullRequestDraft,
-  normalizeThreadTitleDraft,
-  truncateDraftPatch,
-  wrapDraftGenerationError,
-} = require("./git-draft-helpers");
-const {
   createWorktreeHandoff,
   ensureTrailingNewline,
-  gitPathspecArgs,
-  normalizeGitPathspec,
   resolveWorktreeChangeTransfer,
 } = require("./worktree-handoff");
 const { createPullRequestActions } = require("./pr-creation");
@@ -39,6 +23,21 @@ const {
   normalizeWorktreeBranchRef,
   resolveBaseBranchName,
 } = require("./branch-helpers");
+const {
+  firstNonEmptyString,
+  isExistingDirectory,
+  isManagedWorktreePath,
+  normalizeExistingPath,
+  normalizeNonEmptyLine,
+  normalizeNonEmptyMultilineString,
+  resolveGitCwd: resolveGitCwdPath,
+  resolveLocalCheckoutRoot: resolveLocalCheckoutRootPath,
+  resolveProjectRelativePath,
+  resolveRepoRoot: resolveRepoRootPath,
+  sameFilePath,
+  scopedLocalCheckoutPath,
+  scopedWorktreePath,
+} = require("./git-path-helpers");
 
 const worktreeHandoff = createWorktreeHandoff({
   git: (cwd, ...args) => git(cwd, ...args),
@@ -337,103 +336,6 @@ function threadNameSet(params) {
 
 // ─── Git Status ───────────────────────────────────────────────
 
-function normalizeNonEmptyLine(rawValue) {
-  if (typeof rawValue !== "string") {
-    return "";
-  }
-  return rawValue.split("\n")[0].trim();
-}
-
-function normalizeNonEmptyMultilineString(rawValue) {
-  if (typeof rawValue !== "string") {
-    return "";
-  }
-  const trimmed = rawValue.trim();
-  return trimmed || "";
-}
-
-function sameFilePath(leftPath, rightPath) {
-  const normalizedLeft = normalizeExistingPath(leftPath);
-  const normalizedRight = normalizeExistingPath(rightPath);
-  return normalizedLeft !== null && normalizedLeft === normalizedRight;
-}
-
-function normalizeExistingPath(candidatePath) {
-  if (typeof candidatePath !== "string") {
-    return null;
-  }
-
-  const trimmedPath = candidatePath.trim();
-  if (!trimmedPath) {
-    return null;
-  }
-
-  try {
-    return fs.realpathSync.native(trimmedPath);
-  } catch {
-    return path.resolve(trimmedPath);
-  }
-}
-
-function managedWorktreesRoot() {
-  const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
-  return normalizeExistingPath(path.join(codexHome, "worktrees"));
-}
-
-function isManagedWorktreePath(candidatePath) {
-  const normalizedCandidate = normalizeExistingPath(candidatePath);
-  const normalizedRoot = managedWorktreesRoot();
-  if (!normalizedCandidate || !normalizedRoot) {
-    return false;
-  }
-
-  const relativePath = path.relative(normalizedRoot, normalizedCandidate);
-  return !!relativePath && relativePath !== "." && !relativePath.startsWith("..") && !path.isAbsolute(relativePath);
-}
-
-function resolveProjectRelativePath(cwd, repoRoot) {
-  const normalizedCwd = normalizeExistingPath(cwd);
-  const normalizedRepoRoot = normalizeExistingPath(repoRoot);
-  if (!normalizedCwd || !normalizedRepoRoot) {
-    return "";
-  }
-
-  const relativePath = path.relative(normalizedRepoRoot, normalizedCwd);
-  if (!relativePath || relativePath === ".") {
-    return "";
-  }
-
-  return relativePath;
-}
-
-// Preserves package-scoped threads by reopening the matching subpath inside sibling worktrees.
-function scopedWorktreePath(worktreeRootPath, projectRelativePath) {
-  const normalizedWorktreeRootPath = normalizeExistingPath(worktreeRootPath);
-  if (!normalizedWorktreeRootPath) {
-    return worktreeRootPath;
-  }
-  if (!projectRelativePath) {
-    return normalizedWorktreeRootPath;
-  }
-
-  const candidatePath = path.join(normalizedWorktreeRootPath, projectRelativePath);
-  return isExistingDirectory(candidatePath) ? normalizeExistingPath(candidatePath) ?? candidatePath : normalizedWorktreeRootPath;
-}
-
-// Resolves a Local checkout path only when the matching subpath actually exists there.
-function scopedLocalCheckoutPath(checkoutRootPath, projectRelativePath) {
-  const normalizedCheckoutRootPath = normalizeExistingPath(checkoutRootPath);
-  if (!normalizedCheckoutRootPath) {
-    return null;
-  }
-  if (!projectRelativePath) {
-    return normalizedCheckoutRootPath;
-  }
-
-  const candidatePath = path.join(normalizedCheckoutRootPath, projectRelativePath);
-  return isExistingDirectory(candidatePath) ? normalizeExistingPath(candidatePath) ?? candidatePath : null;
-}
-
 // Computes the local repo delta that still exists on this machine and is not on the remote.
 function git(cwd, ...args) {
   return execFileAsync("git", args, {
@@ -473,72 +375,15 @@ function gitError(errorCode, userMessage) {
 }
 
 async function resolveGitCwd(params) {
-  const requestedCwd = firstNonEmptyString([params.cwd, params.currentWorkingDirectory]);
-
-  if (!requestedCwd) {
-    throw gitError(
-      "missing_working_directory",
-      "Git actions require a bound local working directory."
-    );
-  }
-
-  if (!isExistingDirectory(requestedCwd)) {
-    throw gitError(
-      "missing_working_directory",
-      "The requested local working directory does not exist on this Mac."
-    );
-  }
-
-  return requestedCwd;
-}
-
-function firstNonEmptyString(candidates) {
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") {
-      continue;
-    }
-
-    const trimmed = candidate.trim();
-    if (trimmed) {
-      return trimmed;
-    }
-  }
-
-  return null;
-}
-
-function isExistingDirectory(candidatePath) {
-  try {
-    return fs.statSync(candidatePath).isDirectory();
-  } catch {
-    return false;
-  }
+  return resolveGitCwdPath(params, gitError);
 }
 
 async function resolveRepoRoot(cwd) {
-  const output = await git(cwd, "rev-parse", "--show-toplevel");
-  const repoRoot = output.trim();
-  return repoRoot || null;
+  return resolveRepoRootPath(cwd, git);
 }
 
 async function resolveLocalCheckoutRoot(cwd) {
-  const output = await git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir");
-  const commonDir = output.trim();
-  if (!commonDir) {
-    return null;
-  }
-
-  const normalizedCommonDir = normalizeExistingPath(commonDir);
-  if (!normalizedCommonDir) {
-    return null;
-  }
-
-  if (path.basename(normalizedCommonDir) !== ".git") {
-    return await resolveRepoRoot(cwd);
-  }
-
-  const checkoutRoot = normalizeExistingPath(path.dirname(normalizedCommonDir));
-  return checkoutRoot || null;
+  return resolveLocalCheckoutRootPath(cwd, git);
 }
 
 module.exports = {

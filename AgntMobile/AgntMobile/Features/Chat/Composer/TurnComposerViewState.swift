@@ -42,24 +42,29 @@ struct TurnComposerAccessoryState {
     let composerMentionedPlugins: [TurnComposerMentionedPlugin]
     let composerReviewSelection: TurnComposerReviewSelection?
     let isSubagentsSelectionArmed: Bool
+    let isPlanModeArmed: Bool
     let isVoiceRecording: Bool
     let voiceAudioLevels: [CGFloat]
     let voiceRecordingDuration: TimeInterval
+
+    var hasQueuedDrafts: Bool {
+        !queuedDrafts.isEmpty
+    }
 
     var showsComposerAttachments: Bool {
         !composerAttachments.isEmpty
     }
 
     var showsMentionedFiles: Bool {
-        !composerMentionedFiles.isEmpty
+        !showsVoiceRecordingCapsule && !composerMentionedFiles.isEmpty
     }
 
     var showsMentionedSkills: Bool {
-        !composerMentionedSkills.isEmpty
+        !showsVoiceRecordingCapsule && !composerMentionedSkills.isEmpty
     }
 
     var showsMentionedPlugins: Bool {
-        !composerMentionedPlugins.isEmpty
+        !showsVoiceRecordingCapsule && !composerMentionedPlugins.isEmpty
     }
 
     var reviewTarget: TurnComposerReviewTarget? {
@@ -67,14 +72,40 @@ struct TurnComposerAccessoryState {
     }
 
     var showsSubagentsSelection: Bool {
-        isSubagentsSelectionArmed
+        !showsVoiceRecordingCapsule && isSubagentsSelectionArmed
     }
 
     var showsVoiceRecordingCapsule: Bool {
         isVoiceRecording
     }
 
+    var showsPlanModeSelection: Bool {
+        !showsVoiceRecordingCapsule && isPlanModeArmed
+    }
+
+    var hasTopAccessoryContent: Bool {
+        showsComposerAttachments
+            || showsMentionedFiles
+            || showsMentionedSkills
+            || showsMentionedPlugins
+            || showsSubagentsSelection
+            || showsPlanModeSelection
+            || showsVoiceRecordingCapsule
+            || reviewTarget != nil
+    }
+
+    func hasSendableContent(input: String) -> Bool {
+        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !composerAttachments.isEmpty
+            || !composerMentionedFiles.isEmpty
+            || !composerMentionedSkills.isEmpty
+            || !composerMentionedPlugins.isEmpty
+            || composerReviewSelection != nil
+            || isSubagentsSelectionArmed
+            || isPlanModeArmed
+    }
+
     var topInputPadding: CGFloat {
-        showsComposerAttachments || showsMentionedFiles || showsMentionedSkills || showsMentionedPlugins || showsSubagentsSelection || showsVoiceRecordingCapsule || reviewTarget != nil ? 6 : 10
+        hasTopAccessoryContent ? 6 : 10
     }
 }

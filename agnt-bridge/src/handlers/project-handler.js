@@ -5,16 +5,31 @@
 // Depends on: fs, os, path, ../providers/codex/home
 
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const { createJsonRpcRequestHandler } = require("./handler-utils");
+const {
+  assertPathAllowed,
+  formatRootlessChatDate,
+  isISODateFolderName,
+  normalizeLimit,
+  normalizeNewDirectoryName,
+  normalizeSearchDepth,
+  normalizeSearchLimit,
+  normalizeSearchVisitedLimit,
+  parentPathWithinAllowedRoots,
+  projectError,
+  readDirectoryEntries,
+  readString,
+  requireUsableDirectory,
+  reserveUniqueRootlessChatPath,
+  resolveHomeDir,
+  rootlessChatSlugFromPromptHint,
+  safeRealpath,
+  searchDirectoryEntries,
+  uniqueExistingOrCandidatePaths,
+  validateDirectory,
+} = require("./project-handler-utils");
 const { resolveCodexHome } = require("../providers/codex/home");
-
-const DEFAULT_DIRECTORY_LIMIT = 200;
-const DEFAULT_DIRECTORY_SEARCH_LIMIT = 80;
-const DEFAULT_DIRECTORY_SEARCH_MAX_DEPTH = 8;
-const DEFAULT_DIRECTORY_SEARCH_MAX_VISITED = 5000;
-const DEFAULT_HIDDEN_DIRECTORY_NAMES = new Set(["Library"]);
 
 // ─── ENTRY POINT ─────────────────────────────────────────────
 
@@ -39,6 +54,8 @@ async function handleProjectMethod(method, params, options = {}) {
       return projectValidatePath(params, options);
     case "project/createDirectory":
       return projectCreateDirectory(params, options);
+    case "project/createRootlessChatRoot":
+      return projectCreateRootlessChatRoot(params, options);
     default:
       throw projectError("unknown_method", `Unknown project method: ${method}`);
   }
@@ -175,318 +192,41 @@ async function projectCreateDirectory(params, options = {}) {
   };
 }
 
-// ─── Filesystem Helpers ──────────────────────────────────────
+async function projectCreateRootlessChatRoot(params = {}, options = {}) {
+  const homeDir = resolveHomeDir(options);
+  const desktopDocumentsRoot = path.join(homeDir, "Documents", "Codex");
+  const dateFolder = readString(params.dateFolder) || formatRootlessChatDate(new Date());
+  if (!isISODateFolderName(dateFolder)) {
+    throw projectError("invalid_date_folder", "The chat date folder must be in YYYY-MM-DD format.");
+  }
 
-async function readDirectoryEntries(directoryPath, options = {}) {
-  let dirents;
+  const slugBase = rootlessChatSlugFromPromptHint(params.promptHint);
+  const dateRootPath = path.join(desktopDocumentsRoot, dateFolder);
+
   try {
-    dirents = await fs.promises.readdir(directoryPath, { withFileTypes: true });
+    await fs.promises.mkdir(dateRootPath, { recursive: true });
   } catch (error) {
-    throw projectError("read_failed", error?.message || "Unable to read that folder.");
+    throw projectError("create_failed", error?.message || "Unable to prepare the Codex chats folder.");
   }
 
-  const entries = [];
-  for (const dirent of dirents) {
-    if (!options.includeHidden && isHiddenDirectoryName(dirent.name)) {
-      continue;
-    }
-
-    const childPath = path.join(directoryPath, dirent.name);
-    const directory = await directoryEntryForPath(childPath, dirent, options);
-    if (directory) {
-      entries.push(directory);
+  const targetPath = await reserveUniqueRootlessChatPath(dateRootPath, slugBase);
+  try {
+    await fs.promises.mkdir(targetPath, { recursive: false });
+  } catch (error) {
+    if (error?.code !== "EEXIST") {
+      throw projectError("create_failed", error?.message || "Unable to create the rootless chat folder.");
     }
   }
 
-  return entries
-    .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))
-    .slice(0, options.limit || DEFAULT_DIRECTORY_LIMIT);
-}
-
-async function searchDirectoryEntries(rootPath, query, options = {}) {
-  const tokens = searchTokens(query);
-  if (!tokens.length) {
-    return [];
-  }
-
-  const limit = options.limit || DEFAULT_DIRECTORY_SEARCH_LIMIT;
-  const maxDepth = options.maxDepth ?? DEFAULT_DIRECTORY_SEARCH_MAX_DEPTH;
-  const maxVisited = options.maxVisited || DEFAULT_DIRECTORY_SEARCH_MAX_VISITED;
-  const queue = [{ directoryPath: rootPath, depth: 0 }];
-  const visitedDirectories = new Set([realpathSyncIfAvailable(rootPath) || rootPath]);
-  const matches = [];
-  let visitedCount = 0;
-
-  while (queue.length && matches.length < limit && visitedCount < maxVisited) {
-    const { directoryPath, depth } = queue.shift();
-    visitedCount += 1;
-
-    let dirents;
-    try {
-      dirents = await fs.promises.readdir(directoryPath, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const dirent of sortedDirents(dirents)) {
-      if (!options.includeHidden && isHiddenDirectoryName(dirent.name)) {
-        continue;
-      }
-
-      const childPath = path.join(directoryPath, dirent.name);
-      const directory = await directoryEntryForPath(childPath, dirent, options);
-      if (!directory) {
-        continue;
-      }
-
-      if (directoryMatchesSearch(directory, tokens)) {
-        matches.push(directory);
-        if (matches.length >= limit) {
-          break;
-        }
-      }
-
-      if (!dirent.isSymbolicLink() && depth < maxDepth) {
-        const realPath = directory.path;
-        if (!visitedDirectories.has(realPath)) {
-          visitedDirectories.add(realPath);
-          queue.push({ directoryPath: realPath, depth: depth + 1 });
-        }
-      }
-    }
-  }
-
-  return matches;
-}
-
-async function directoryEntryForPath(candidatePath, dirent, options = {}) {
-  if (!dirent.isDirectory() && !dirent.isSymbolicLink()) {
-    return null;
-  }
-
-  const validation = await validateDirectory(candidatePath, options).catch(() => null);
-  if (!validation?.exists || !validation.isDirectory || !validation.isAllowed) {
-    return null;
-  }
-
+  const resolvedPath = await safeRealpath(targetPath);
   return {
-    name: dirent.name,
-    path: validation.path,
-    isSymlink: dirent.isSymbolicLink(),
+    path: resolvedPath,
+    parentPath: dateRootPath,
+    name: path.basename(resolvedPath),
+    slug: slugBase,
+    dateFolder,
+    root: desktopDocumentsRoot,
   };
-}
-
-async function requireUsableDirectory(candidatePath, options = {}) {
-  const validation = await validateDirectory(candidatePath, options);
-  if (!validation.isAllowed) {
-    throw projectError("path_not_allowed", "That folder is outside the allowed local project locations.");
-  }
-  if (!validation.exists) {
-    throw projectError("missing_directory", "That folder does not exist on this Mac.");
-  }
-  if (!validation.isDirectory) {
-    throw projectError("not_directory", "That path is not a folder.");
-  }
-
-  return validation;
-}
-
-async function validateDirectory(candidatePath, options = {}) {
-  const normalizedPath = normalizeCandidatePath(candidatePath, options);
-  const isAllowed = isPathAllowed(normalizedPath, options);
-  if (!isAllowed) {
-    return {
-      path: normalizedPath,
-      exists: false,
-      isDirectory: false,
-      isAllowed: false,
-    };
-  }
-
-  try {
-    const realPath = await fs.promises.realpath(normalizedPath);
-    const stats = await fs.promises.stat(realPath);
-    return {
-      path: realPath,
-      exists: true,
-      isDirectory: stats.isDirectory(),
-      isAllowed: isPathAllowed(realPath, options),
-    };
-  } catch {
-    return {
-      path: normalizedPath,
-      exists: false,
-      isDirectory: false,
-      isAllowed,
-    };
-  }
-}
-
-function parentPathWithinAllowedRoots(candidatePath, options = {}) {
-  const parentPath = path.dirname(candidatePath);
-  if (!parentPath || parentPath === candidatePath) {
-    return null;
-  }
-
-  return isPathAllowed(parentPath, options) ? parentPath : null;
-}
-
-function assertPathAllowed(candidatePath, options = {}) {
-  if (!isPathAllowed(candidatePath, options)) {
-    throw projectError("path_not_allowed", "That folder is outside the allowed local project locations.");
-  }
-}
-
-function isPathAllowed(candidatePath, options = {}) {
-  const normalizedPath = path.resolve(candidatePath);
-  return allowedProjectRoots(options).some((rootPath) => samePathOrDescendant(normalizedPath, rootPath));
-}
-
-function allowedProjectRoots(options = {}) {
-  const roots = Array.isArray(options.allowedRoots) && options.allowedRoots.length
-    ? options.allowedRoots
-    : [resolveHomeDir(options)];
-
-  return [...new Set(roots.flatMap((rootPath) => {
-    const resolvedRoot = path.resolve(rootPath);
-    return [resolvedRoot, realpathSyncIfAvailable(resolvedRoot)].filter(Boolean);
-  }))];
-}
-
-function samePathOrDescendant(candidatePath, rootPath) {
-  const relative = path.relative(rootPath, candidatePath);
-  return relative === "" || (!!relative && !relative.startsWith("..") && !path.isAbsolute(relative));
-}
-
-function normalizeCandidatePath(candidatePath, options = {}) {
-  const rawPath = readString(candidatePath);
-  if (!rawPath) {
-    throw projectError("missing_path", "A folder path is required.");
-  }
-
-  if (rawPath === "~" || rawPath.startsWith("~/")) {
-    return path.resolve(resolveHomeDir(options), rawPath.slice(2));
-  }
-
-  if (!path.isAbsolute(rawPath)) {
-    throw projectError("invalid_path", "Use an absolute folder path.");
-  }
-
-  return path.resolve(rawPath);
-}
-
-function isHiddenDirectoryName(name) {
-  return name.startsWith(".") || DEFAULT_HIDDEN_DIRECTORY_NAMES.has(name);
-}
-
-function normalizeNewDirectoryName(rawName) {
-  const name = rawName.trim();
-  if (!name || name === "." || name === "..") {
-    throw projectError("invalid_directory_name", "Use a valid folder name.");
-  }
-  if (name.includes("/") || name.includes("\\") || name.includes("\0")) {
-    throw projectError("invalid_directory_name", "Folder names cannot contain path separators.");
-  }
-  if (name.length > 120) {
-    throw projectError("invalid_directory_name", "Use a shorter folder name.");
-  }
-
-  return name;
-}
-
-function normalizeLimit(rawLimit) {
-  const numericLimit = Number(rawLimit);
-  if (!Number.isFinite(numericLimit) || numericLimit <= 0) {
-    return DEFAULT_DIRECTORY_LIMIT;
-  }
-
-  return Math.min(Math.floor(numericLimit), DEFAULT_DIRECTORY_LIMIT);
-}
-
-function normalizeSearchLimit(rawLimit) {
-  const numericLimit = Number(rawLimit);
-  if (!Number.isFinite(numericLimit) || numericLimit <= 0) {
-    return DEFAULT_DIRECTORY_SEARCH_LIMIT;
-  }
-
-  return Math.min(Math.floor(numericLimit), DEFAULT_DIRECTORY_SEARCH_LIMIT);
-}
-
-function normalizeSearchDepth(rawDepth) {
-  const numericDepth = Number(rawDepth);
-  if (!Number.isFinite(numericDepth) || numericDepth < 0) {
-    return DEFAULT_DIRECTORY_SEARCH_MAX_DEPTH;
-  }
-
-  return Math.min(Math.floor(numericDepth), DEFAULT_DIRECTORY_SEARCH_MAX_DEPTH);
-}
-
-function normalizeSearchVisitedLimit(rawLimit) {
-  const numericLimit = Number(rawLimit);
-  if (!Number.isFinite(numericLimit) || numericLimit <= 0) {
-    return DEFAULT_DIRECTORY_SEARCH_MAX_VISITED;
-  }
-
-  return Math.min(Math.floor(numericLimit), DEFAULT_DIRECTORY_SEARCH_MAX_VISITED);
-}
-
-function sortedDirents(dirents) {
-  return [...dirents].sort((left, right) => (
-    left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
-  ));
-}
-
-function searchTokens(query) {
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .map((token) => token.trim())
-    .filter(Boolean);
-}
-
-function directoryMatchesSearch(directory, tokens) {
-  const haystack = directory.name.toLowerCase();
-  return tokens.every((token) => haystack.includes(token));
-}
-
-function resolveHomeDir(options = {}) {
-  return options.homeDir || os.homedir();
-}
-
-function uniqueExistingOrCandidatePaths(paths) {
-  const seen = new Set();
-  const result = [];
-
-  for (const candidatePath of paths) {
-    const normalizedPath = path.resolve(candidatePath);
-    const realPath = realpathSyncIfAvailable(normalizedPath) || normalizedPath;
-    if (seen.has(realPath)) {
-      continue;
-    }
-    seen.add(realPath);
-    result.push(realPath);
-  }
-
-  return result;
-}
-
-function realpathSyncIfAvailable(candidatePath) {
-  try {
-    return fs.realpathSync(candidatePath);
-  } catch {
-    return null;
-  }
-}
-
-function readString(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function projectError(errorCode, userMessage) {
-  const err = new Error(userMessage);
-  err.errorCode = errorCode;
-  err.userMessage = userMessage;
-  return err;
 }
 
 module.exports = {
@@ -498,5 +238,7 @@ module.exports = {
   projectSearchDirectories,
   projectValidatePath,
   projectCreateDirectory,
+  projectCreateRootlessChatRoot,
+  rootlessChatSlugFromPromptHint,
   validateDirectory,
 };

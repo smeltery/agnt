@@ -69,7 +69,7 @@ struct TurnConversationContainerView: View {
                     tint: snapshot.status.tint,
                     title: snapshot.status == .inProgress ? "Plan in progress" : "Plan ready",
                     summary: summary.isEmpty ? "Codex has prepared a plan for this chat." : summary,
-                    detail: "Open the plan card above the composer to review the current steps."
+                    detail: "Open the plan card in the composer carousel to review the current steps."
                 )
             )
         }
@@ -151,15 +151,6 @@ struct TurnConversationContainerView: View {
     // Keeps the active plan discoverable without covering the message timeline.
     private func composerWithPinnedPlanAccessory(for messageLayout: TimelineMessageLayout) -> some View {
         VStack(spacing: 8) {
-            if let pinnedTaskPlanMessage = messageLayout.pinnedTaskPlanMessage {
-                PlanExecutionAccessory(message: pinnedTaskPlanMessage) {
-                    isShowingPinnedPlanSheet = true
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
             if let composerRecoveryAccessory {
                 composerRecoveryAccessory
                     .padding(.horizontal, 12)
@@ -173,7 +164,11 @@ struct TurnConversationContainerView: View {
                 composer
             }
         }
-        .animation(.easeInOut(duration: 0.18), value: messageLayout.pinnedTaskPlanMessage?.id)
+        .environment(\.pinnedPlanAccessory, messageLayout.pinnedTaskPlanMessage.map { message in
+            PinnedPlanAccessoryContext(snapshot: PlanAccessorySnapshot(message: message)) {
+                isShowingPinnedPlanSheet = true
+            }
+        })
         .animation(.easeInOut(duration: 0.18), value: messageLayout.activeStructuredPromptMessage?.id)
     }
 

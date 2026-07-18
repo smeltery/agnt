@@ -1,0 +1,326 @@
+.agnt-sidebar-density-toggle {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.agnt-sidebar-density-toggle:hover { background: var(--agnt-bg-elev-2); color: var(--agnt-fg); }
+
+.agnt-sidebar-group-header-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 6px 10px 4px;
+  margin: 0;
+  text-align: left;
+}
+.agnt-sidebar-group-header-button:hover { color: var(--agnt-fg); }
+.agnt-sidebar-group-chevron {
+  display: inline-block;
+  width: 8px;
+  font-size: 10px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-sidebar-group-count {
+  margin-left: auto;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--agnt-fg-dim);
+}
+.agnt-sidebar-group-collapsed .agnt-sidebar-list { display: none; }
+
+.agnt-sidebar-density-compact .agnt-sidebar-thread {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.agnt-sidebar-density-compact .agnt-sidebar-thread-cwd {
+  font-size: 10px;
+  margin-top: 0;
+}
+.agnt-sidebar-density-compact .agnt-sidebar-group-header,
+.agnt-sidebar-density-compact .agnt-sidebar-group-header-button {
+  padding-top: 3px;
+  padding-bottom: 1px;
+}
+.agnt-sidebar-density-compact .agnt-sidebar-list { gap: 0; }
+
+.agnt-row-action-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+  cursor: default;
+  user-select: none;
+}
+
+.agnt-gitpanel-totals {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+.agnt-gitpanel-stat-add { color: var(--agnt-ok); }
+.agnt-gitpanel-stat-del { color: var(--agnt-danger); }
+.agnt-gitpanel-file-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agnt-md-image-clickable {
+  cursor: zoom-in;
+  transition: filter 120ms ease;
+}
+.agnt-md-image-clickable:hover { filter: brightness(1.05); }
+
+.agnt-settings-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* Session 31 — inline rename, provider color badge, hunk-collapse, prompt
+   history dropdown, composer markdown preview, settings search. */
+
+.agnt-sidebar-thread-rename {
+  font: inherit;
+  color: var(--agnt-fg);
+  background: var(--agnt-bg);
+  border: 1px solid var(--agnt-accent);
+  border-radius: 4px;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+}
+.agnt-sidebar-row-editing .agnt-sidebar-thread { background: var(--agnt-bg-elev-2); }
+
+/* Provider badge color tones — pick distinct hues that survive the
+   light/dark theme swap. We tint the existing `.agnt-row-tag` pill. */
+.agnt-provider-codex { background: rgba(110, 138, 255, 0.18); color: #8aa3ff; }
+.agnt-provider-claude { background: rgba(255, 159, 90, 0.18); color: #f0a36a; }
+.agnt-provider-opencode { background: rgba(105, 200, 130, 0.18); color: #6cd07a; }
+.agnt-provider-cursor { background: rgba(220, 130, 200, 0.18); color: #d893bd; }
+.agnt-provider-other { /* falls through to the default agnt-row-tag tone */ }
+
+[data-theme="light"] .agnt-provider-codex { color: #3257d6; }
+[data-theme="light"] .agnt-provider-claude { color: #b56b07; }
+[data-theme="light"] .agnt-provider-opencode { color: #1d7c3c; }
+[data-theme="light"] .agnt-provider-cursor { color: #8a3173; }
+
+/* Hunk-collapse toggle in DiffView. Header line stays inline so the patch
+   keeps its monospace alignment; chevron flips horizontally on collapse. */
+.agnt-diff-hunk-toggle {
+  cursor: pointer;
+  display: inline;
+}
+.agnt-diff-hunk-toggle:hover { background: var(--agnt-bg-elev-2); }
+.agnt-diff-hunk-chevron {
+  display: inline-block;
+  width: 1ch;
+  margin-right: 4px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-diff-hunk-summary { color: var(--agnt-fg-dim); font-size: 0.92em; }
+
+.agnt-prompt-history { position: relative; display: inline-block; }
+.agnt-prompt-history-popover {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 280px;
+  max-width: 480px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--agnt-bg-elev);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+}
+.agnt-prompt-history-item {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--agnt-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agnt-prompt-history-item:last-child { border-bottom: 0; }
+.agnt-prompt-history-item:hover { background: var(--agnt-bg-elev-2); }
+
+.agnt-button-ghost-active {
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+}
+.agnt-button-ghost-disabled { opacity: 0.45; cursor: not-allowed; }
+
+.agnt-composer-editor { display: flex; flex-direction: column; gap: 0; }
+.agnt-composer-editor-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.agnt-composer-editor-split .agnt-composer-input { resize: vertical; }
+.agnt-composer-preview {
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-size: 13px;
+  /* Keep the preview pane comfortable to read alongside source markdown. */
+  line-height: 1.5;
+}
+.agnt-composer-preview-empty {
+  color: var(--agnt-fg-dim);
+  font-style: italic;
+}
+@media (max-width: 768px) {
+  .agnt-composer-editor-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+}
+
+.agnt-settings-search {
+  flex: 1;
+  margin-right: 8px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--agnt-fg);
+}
+.agnt-settings-search::placeholder { color: var(--agnt-fg-dim); }
+
+/* Session 32 — content-visibility virtualization, undo toast, word-level
+   diff highlighting, copy-as-patch, webhook + diagnostic settings rows. */
+
+/* Browser-native virtualization for long threads: each row's layout +
+   paint is skipped while it's off-screen. The intrinsic-size hint keeps
+   scroll height stable so the bar position is accurate even before rows
+   render their actual height. */
+.agnt-msg-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+.agnt-undo-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+  animation: agnt-undo-toast-in 160ms ease-out;
+}
+@keyframes agnt-undo-toast-in {
+  from { transform: translate(-50%, 8px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+.agnt-undo-toast-label { color: var(--agnt-fg-dim); }
+.agnt-undo-toast-action {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.agnt-undo-toast-action:hover { background: var(--agnt-bg); }
+.agnt-undo-toast-dismiss {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.agnt-undo-toast-dismiss:hover { color: var(--agnt-fg); }
+
+/* Word-level diff highlighting. Tokens marked `same` inherit the line's
+   ambient color (red/green); only the differing tokens get the bold
+   highlight, so a one-character rename in a long line stands out. */
+.agnt-diff-word-same { /* inherits ambient color */ }
+.agnt-diff-word-removed {
+  background: rgba(255, 90, 100, 0.28);
+  color: #ffe0e3;
+  border-radius: 2px;
+}
+.agnt-diff-word-added {
+  background: rgba(95, 200, 122, 0.28);
+  color: #d8ffd8;
+  border-radius: 2px;
+}
+[data-theme="light"] .agnt-diff-word-removed { background: rgba(220, 50, 70, 0.22); color: #4a0a14; }
+[data-theme="light"] .agnt-diff-word-added { background: rgba(40, 140, 70, 0.20); color: #062c10; }
+
+.agnt-gitpanel-file-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.agnt-settings-row-label {
+  min-width: 80px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-settings-input {
+  flex: 1;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--agnt-fg);
+  font-family: var(--agnt-mono);
+}
+.agnt-settings-input-error { border-color: var(--agnt-danger); }

@@ -5,6 +5,7 @@
 // Depends on: XCTest, AgntMobile
 
 import XCTest
+import UIKit
 @testable import AgntMobile
 
 final class TerminalSelectableTextNormalizerTests: XCTestCase {
@@ -30,5 +31,12 @@ final class TerminalSelectableTextNormalizerTests: XCTestCase {
         )
 
         XCTAssertEqual(normalized, "long output part one\npart two")
+    }
+
+    func testGhosttyDrawableViewportRejectsOnlySubCellSizes() {
+        XCTAssertFalse(GhosttyTerminalView.isDrawableViewportSize(CGSize(width: 12, height: 390)))
+        XCTAssertFalse(GhosttyTerminalView.isDrawableViewportSize(CGSize(width: 390, height: 12)))
+        XCTAssertTrue(GhosttyTerminalView.isDrawableViewportSize(CGSize(width: 390, height: 120)))
+        XCTAssertTrue(GhosttyTerminalView.isDrawableViewportSize(CGSize(width: 240, height: 44)))
     }
 }

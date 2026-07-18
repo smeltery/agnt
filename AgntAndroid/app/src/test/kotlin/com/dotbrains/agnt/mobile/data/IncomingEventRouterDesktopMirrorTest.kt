@@ -22,8 +22,8 @@ class IncomingEventRouterDesktopMirrorTest {
     @Test
     fun desktopFinalAgentMessageWithoutTurnId_clearsRunningFallback() =
         runBlocking {
-            val finished = mutableListOf<String>()
-            val router = newRouter(onTurnFinished = { threadId -> finished += threadId })
+            val completed = mutableListOf<String>()
+            val router = newRouter(onTurnCompleted = { threadId -> completed += threadId })
 
             router.dispatchNotification(
                 method = "codex/event/user_message",
@@ -46,14 +46,14 @@ class IncomingEventRouterDesktopMirrorTest {
                     ),
             )
 
-            assertEquals(listOf("thread-1"), finished)
+            assertEquals(listOf("thread-1"), completed)
         }
 
     @Test
     fun desktopAgentMessageWithTurnId_doesNotFinalizeTurn() =
         runBlocking {
-            val finished = mutableListOf<String>()
-            val router = newRouter(onTurnFinished = { threadId -> finished += threadId })
+            val completed = mutableListOf<String>()
+            val router = newRouter(onTurnCompleted = { threadId -> completed += threadId })
 
             router.dispatchNotification(
                 method = "codex/event/agent_message",
@@ -68,12 +68,12 @@ class IncomingEventRouterDesktopMirrorTest {
                     ),
             )
 
-            assertEquals(emptyList(), finished)
+            assertEquals(emptyList(), completed)
         }
 
     private fun newRouter(
         messageTimeline: MessageTimelineStore = MessageTimelineStore(),
-        onTurnFinished: (threadId: String) -> Unit = {},
+        onTurnCompleted: (threadId: String) -> Unit = {},
     ): IncomingEventRouter =
         IncomingEventRouter(
             scope = kotlinx.coroutines.CoroutineScope(Dispatchers.Unconfined),
@@ -83,7 +83,8 @@ class IncomingEventRouterDesktopMirrorTest {
             onRequestThreadSync = {},
             onHydrateThread = {},
             onTurnLifecycle = { _, _ -> },
-            onTurnFinished = onTurnFinished,
+            onTurnFinished = {},
+            onTurnCompleted = onTurnCompleted,
             isTurnStreamingActive = { _, _ -> false },
             shouldAutoApproveRequests = { false },
             onApprovalRequest = { _: PendingApprovalRequest, _: (PendingApprovalDecision) -> Unit -> },

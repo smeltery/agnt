@@ -10,6 +10,49 @@ const assert = require("node:assert/strict");
 const { createPushNotificationTracker } = require("../../src/transport/push-notification-tracker");
 const { createNotificationsHandler } = require("../../src/handlers/notifications-handler");
 
+test("goal push retries failed delivery and dedupes only after success", async () => {
+  const notifications = [];
+  let attempts = 0;
+  const tracker = createPushNotificationTracker({
+    sessionId: "session-goal",
+    goalPushStatePath: null,
+    pushServiceClient: {
+      hasConfiguredBaseUrl: true,
+      async notifyCompletion(payload) {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error("offline");
+        }
+        notifications.push(payload);
+        return { ok: true };
+      },
+    },
+  });
+  const emitGoal = (status, updatedAt) => tracker.handleOutbound(JSON.stringify({
+    method: "thread/goal/updated",
+    params: {
+      threadId: "thread-goal",
+      goal: { threadId: "thread-goal", objective: "Ship", status, updatedAt },
+    },
+  }));
+
+  emitGoal("active", 1);
+  emitGoal("blocked", 2);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  emitGoal("blocked", 2);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  emitGoal("blocked", 2);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  assert.equal(attempts, 2);
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].threadId, "thread-goal");
+  assert.equal(notifications[0].turnId, null);
+  assert.equal(notifications[0].result, "failed");
+  assert.equal(notifications[0].body, "Goal blocked - agnt needs your input");
+  assert.doesNotMatch(JSON.stringify(notifications[0]), /Ship/);
+});
+
 test("push tracker sends one completion push with a stable ready body", async () => {
   const notifications = [];
   const tracker = createPushNotificationTracker({

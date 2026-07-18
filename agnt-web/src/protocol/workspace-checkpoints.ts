@@ -103,7 +103,9 @@ export async function checkpointDiff(
 ): Promise<CheckpointDiff> {
   const result = await rpc.request<Record<string, unknown>>("workspace/checkpointDiff", {
     threadId: target.threadId,
+    fromCheckpointKind: "turnStart",
     fromTurnId: target.turnId,
+    toCheckpointKind: "turnEnd",
     toTurnId,
     cwd: target.cwd,
   });
@@ -151,7 +153,7 @@ export interface RevertPatchResult {
 
 export async function revertPatchPreview(
   rpc: JsonRpcClient,
-  args: { cwd: string; forwardPatch: string }
+  args: { cwd: string; forwardPatch: string } | { cwd: string; patches: Array<{ id: string; forwardPatch: string }> }
 ): Promise<RevertPatchPreview> {
   const raw = await rpc.request<Record<string, unknown>>("workspace/revertPatchPreview", args);
   return decodeRevertPreview(raw ?? {});
@@ -159,7 +161,7 @@ export async function revertPatchPreview(
 
 export async function revertPatchApply(
   rpc: JsonRpcClient,
-  args: { cwd: string; forwardPatch: string }
+  args: { cwd: string; forwardPatch: string } | { cwd: string; patches: Array<{ id: string; forwardPatch: string }> }
 ): Promise<RevertPatchResult> {
   const raw = await rpc.request<Record<string, unknown>>("workspace/revertPatchApply", args);
   return {

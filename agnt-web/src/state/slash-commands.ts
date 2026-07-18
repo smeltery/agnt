@@ -15,6 +15,8 @@ export interface SlashCommandContext {
   threadId: string;
   threads: ThreadsState;
   closeNewChat?: () => void;
+  /** Positional args typed after the slash trigger. */
+  args?: readonly string[];
   /** Variables available to user-defined snippet bodies (`{cwd}`, etc.). */
   variables?: SlashVariableContext;
 }
@@ -45,6 +47,21 @@ export const CUSTOM_SLASH_NAME_RE = /^[a-z][a-z0-9-]{0,31}$/;
  * filter is permissive enough that prefixes like `/com` already work.
  */
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
+  {
+    name: "review",
+    aliases: ["code-review"],
+    description: "Run an inline code review on current changes",
+    canRun: ({ threadId, threads }) =>
+      Boolean(threadId) && threads.threads.some((thread) => thread.id === threadId),
+    async run({ threadId, threads, args }) {
+      const baseBranch = args?.[0]?.trim();
+      if (baseBranch) {
+        await threads.startReview(threadId, { target: "baseBranch", baseBranch });
+        return;
+      }
+      await threads.startReview(threadId, { target: "uncommittedChanges" });
+    },
+  },
   {
     name: "compact",
     description: "Summarize older turns to free context window space",

@@ -78,6 +78,46 @@ class MyDevicesPresentationTest {
     }
 
     @Test
+    fun switcherRows_includeVisibleCurrentAndSwitchingDevicesOnly() {
+        MyDeviceMenuVisibilityStore.setVisible(false, "mac-a")
+        MyDeviceMenuVisibilityStore.setVisible(false, "mac-b")
+        MyDeviceMenuVisibilityStore.setVisible(false, "mac-c")
+        val macC =
+            CodexTrustedMacRecord(
+                macDeviceId = "mac-c",
+                macIdentityPublicKey = "key-c",
+                lastPairedAt = Instant.parse("2026-05-03T10:00:00Z"),
+                displayName = "Mini",
+            )
+        val context =
+            TrustedDevicePresentationContext(
+                records = listOf(macA, macB, macC),
+                currentTrustedMacDeviceId = "mac-a",
+                previousTrustedMacDeviceId = null,
+                relayMacDeviceId = "mac-a",
+                isConnected = true,
+                switchingDeviceId = "mac-b",
+            )
+
+        assertEquals(listOf("mac-a", "mac-b"), MyDevicesPresentation.switcherRows(context).map { it.deviceId })
+    }
+
+    @Test
+    fun activeSwitcherRow_prefersCurrentDevice() {
+        val context =
+            TrustedDevicePresentationContext(
+                records = listOf(macA, macB),
+                currentTrustedMacDeviceId = "mac-a",
+                previousTrustedMacDeviceId = null,
+                relayMacDeviceId = "mac-b",
+                isConnected = true,
+                switchingDeviceId = null,
+            )
+
+        assertEquals("mac-a", MyDevicesPresentation.activeSwitcherRow(context)?.deviceId)
+    }
+
+    @Test
     fun switchingDevice_showsSwitchingStatusAndDetail() {
         val context =
             TrustedDevicePresentationContext(

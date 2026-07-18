@@ -8,6 +8,8 @@ import { makeLogger } from "../lib/log";
 import type { JsonRpcClient } from "../protocol/jsonrpc-client";
 import {
   applyCheckpointRestore,
+  checkpointDiff,
+  type CheckpointDiff,
   type CheckpointRestorePreview,
   previewCheckpointRestore,
 } from "../protocol/workspace-checkpoints";
@@ -26,11 +28,15 @@ interface State {
   preview: CheckpointRestorePreview | null;
   loading: boolean;
   applying: boolean;
+  loadingDiff: boolean;
   error: string | null;
+  diffError: string | null;
+  diff: CheckpointDiff | null;
   /** Latest restored-files list from a successful apply, surfaced briefly to confirm. */
   appliedFiles: string[] | null;
 
   show(rpc: JsonRpcClient, target: RevertTarget): Promise<void>;
+  loadDiff(rpc: JsonRpcClient): Promise<CheckpointDiff | null>;
   apply(rpc: JsonRpcClient): Promise<boolean>;
   hide(): void;
   reset(): void;
@@ -42,7 +48,10 @@ export const useCheckpointsStore = create<State>((set, get) => ({
   preview: null,
   loading: false,
   applying: false,
+  loadingDiff: false,
   error: null,
+  diffError: null,
+  diff: null,
   appliedFiles: null,
 
   async show(rpc, target) {
@@ -52,7 +61,10 @@ export const useCheckpointsStore = create<State>((set, get) => ({
       preview: null,
       loading: true,
       applying: false,
+      loadingDiff: false,
       error: null,
+      diffError: null,
+      diff: null,
       appliedFiles: null,
     });
     try {
@@ -61,6 +73,22 @@ export const useCheckpointsStore = create<State>((set, get) => ({
     } catch (error) {
       log.warn("checkpoint preview failed", error);
       set({ loading: false, error: errorMessage(error) });
+    }
+  },
+
+  async loadDiff(rpc) {
+    const { target, diff } = get();
+    if (!target?.turnId) return null;
+    if (diff) return diff;
+    set({ loadingDiff: true, diffError: null });
+    try {
+      const result = await checkpointDiff(rpc, target, target.turnId);
+      set({ diff: result, loadingDiff: false });
+      return result;
+    } catch (error) {
+      log.warn("checkpoint diff failed", error);
+      set({ loadingDiff: false, diffError: errorMessage(error) });
+      return null;
     }
   },
 
@@ -95,7 +123,10 @@ export const useCheckpointsStore = create<State>((set, get) => ({
       preview: null,
       loading: false,
       applying: false,
+      loadingDiff: false,
       error: null,
+      diffError: null,
+      diff: null,
       appliedFiles: null,
     });
   },

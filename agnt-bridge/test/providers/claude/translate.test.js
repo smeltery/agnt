@@ -14,34 +14,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
 
-const { createClaudeTranslator } = require("../../../src/providers/claude/translate");
-
-function setupTranslator() {
-  const injected = [];
-  const transportCalls = [];
-  const transport = {
-    send() {},
-    describe: () => "fake",
-    setResumeSessionId(id) { transportCalls.push(["resume", id]); },
-    setCwd(cwd) { transportCalls.push(["cwd", cwd]); },
-    setTurnArgs(args) { transportCalls.push(["turnArgs", args.slice()]); },
-    interruptTurn() { transportCalls.push(["interrupt"]); },
-  };
-  const translator = createClaudeTranslator({
-    injectInbound: (line) => injected.push(line),
-    transport,
-    env: process.env,
-  });
-  return { translator, injected, transport, transportCalls };
-}
-
-function parseInjected(injected) {
-  return injected.map((line) => JSON.parse(line));
-}
+const { parseInjected, setupTranslator } = require("./translate-test-helpers");
 
 test("thread/start synthesizes a thread response and emits thread/started", () => {
   const { translator, injected, transportCalls } = setupTranslator();
@@ -321,115 +295,6 @@ test("result frame emits final agent_message + item/completed + turn/completed",
   assert.ok(turnDone);
 });
 
-test("thread/turns/list reconstructs from disk rollout under CLAUDE_HOME", () => {
-  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-claude-shim-"));
-  const projectsDir = path.join(tmpHome, "projects", "-tmp-test");
-  fs.mkdirSync(projectsDir, { recursive: true });
-  const sessionId = "00000000-0000-4000-8000-000000000001";
-  const sessionFile = path.join(projectsDir, `${sessionId}.jsonl`);
-  fs.writeFileSync(sessionFile, [
-    JSON.stringify({ type: "user", message: { role: "user", content: "hello" }, uuid: "u-1" }),
-    JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "hi back" }] }, uuid: "u-2" }),
-  ].join("\n"));
-
-  const injected = [];
-  const translator = createClaudeTranslator({
-    injectInbound: (line) => injected.push(line),
-    transport: { send() {}, describe: () => "fake" },
-    env: { ...process.env, CLAUDE_HOME: tmpHome },
-  });
-
-  translator.outbound(JSON.stringify({
-    id: "list-1",
-    method: "thread/turns/list",
-    params: { threadId: sessionId },
-  }));
-
-  const events = injected.map((line) => JSON.parse(line));
-  assert.equal(events[0].id, "list-1");
-  assert.equal(events[0].result.turns.length, 1);
-  assert.equal(events[0].result.turns[0].input[0].text, "hello");
-  assert.equal(events[0].result.turns[0].items[0].text, "hi back");
-
-  fs.rmSync(tmpHome, { recursive: true, force: true });
-});
-
-test("turn/interrupt calls transport.interruptTurn() AND emits synthetic events", () => {
-  const { translator, injected, transportCalls } = setupTranslator();
-  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
-  translator.outbound(JSON.stringify({
-    id: "tu", method: "turn/start",
-    params: { threadId: "thr_int", input: [{ type: "text", text: "go" }] },
-  }));
-  injected.length = 0;
-  transportCalls.length = 0;
-
-  translator.outbound(JSON.stringify({
-    id: "int-1",
-    method: "turn/interrupt",
-    params: { threadId: "thr_int" },
-  }));
-
-  const events = injected.map((line) => JSON.parse(line));
-  const ack = events.find((e) => e.id === "int-1");
-  const failed = events.find((e) => e.method === "turn/failed");
-  const completed = events.find((e) => e.method === "turn/completed");
-  assert.ok(ack);
-  assert.equal(failed.params.error.message, "interrupted by user");
-  assert.ok(completed);
-  // Critical: the transport must actually be told to kill the active child.
-  assert.deepEqual(transportCalls[0], ["interrupt"]);
-});
-
-test("turn/start params translate to per-turn CLI args (model + effort + plan)", () => {
-  const { translator, transportCalls } = setupTranslator();
-  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
-  transportCalls.length = 0;
-
-  translator.outbound(JSON.stringify({
-    id: "tu-args", method: "turn/start",
-    params: {
-      threadId: "thr_args",
-      input: [{ type: "text", text: "x" }],
-      model: "sonnet",
-      effort: "high",
-      collaborationMode: { mode: "plan" },
-    },
-  }));
-
-  const call = transportCalls.find((c) => c[0] === "turnArgs");
-  assert.ok(call, "expected setTurnArgs to be called");
-  const args = call[1];
-  assert.deepEqual(args, ["--model", "sonnet", "--effort", "high", "--permission-mode", "plan"]);
-});
-
-test("Codex effort `minimal` maps to Claude `low` (the smallest valid level)", () => {
-  const { translator, transportCalls } = setupTranslator();
-  transportCalls.length = 0;
-  translator.outbound(JSON.stringify({
-    id: "tu-eff", method: "turn/start",
-    params: {
-      threadId: "thr_eff",
-      input: [{ type: "text", text: "x" }],
-      effort: "minimal",
-    },
-  }));
-  const call = transportCalls.find((c) => c[0] === "turnArgs");
-  // Effort flag plus the auto-applied default permission-mode for --print mode.
-  assert.deepEqual(call[1], ["--effort", "low", "--permission-mode", "acceptEdits"]);
-});
-
-test("turn/start without explicit permissionMode defaults to --permission-mode acceptEdits", () => {
-  const { translator, transportCalls } = setupTranslator();
-  transportCalls.length = 0;
-  translator.outbound(JSON.stringify({
-    id: "tu-pm", method: "turn/start",
-    params: { threadId: "thr_pm", input: [{ type: "text", text: "x" }] },
-  }));
-  const call = transportCalls.find((c) => c[0] === "turnArgs");
-  assert.deepEqual(call[1], ["--permission-mode", "acceptEdits"]);
-});
-
 test("system.init emits thread/initialized with slash_commands/skills/agents", () => {
   const { translator, injected } = setupTranslator();
   // Clear any prior thread/start so the next system.init is the first.
@@ -541,46 +406,4 @@ test("thread/generateTitle returns a deterministic seed-derived title", () => {
   assert.equal(events[0].id, "title-1");
   assert.equal(events[0].result.title, "Refactor the bridge transport for opencode REST");
   assert.equal(events[0].result.threadId, "thr_t");
-});
-
-test("second turn/start while one is active is rejected", () => {
-  const { translator, injected } = setupTranslator();
-  translator.outbound(JSON.stringify({ id: "ts", method: "thread/start", params: {} }));
-  translator.outbound(JSON.stringify({
-    id: "tu-1", method: "turn/start",
-    params: { threadId: "thr_x", input: [{ type: "text", text: "first" }] },
-  }));
-  injected.length = 0;
-
-  translator.outbound(JSON.stringify({
-    id: "tu-2", method: "turn/start",
-    params: { threadId: "thr_x", input: [{ type: "text", text: "second" }] },
-  }));
-  const events = parseInjected(injected);
-  assert.equal(events[0].id, "tu-2");
-  assert.equal(events[0].error.code, -32003);
-  assert.match(events[0].error.message, /already in flight/);
-});
-
-test("thread/compact acks with compacted:false (Claude CLI does not honor /compact in stream-json)", () => {
-  const { translator, injected } = setupTranslator();
-  translator.outbound(JSON.stringify({
-    id: "compact-1", method: "thread/compact", params: { threadId: "thr_c" },
-  }));
-  const events = parseInjected(injected);
-  assert.equal(events[0].id, "compact-1");
-  assert.equal(events[0].result.compacted, false);
-  assert.equal(events[0].result.reason, "claude_cli_compact_unsupported");
-});
-
-test("unsupported methods get a JSON-RPC error response", () => {
-  const { translator, injected } = setupTranslator();
-  translator.outbound(JSON.stringify({
-    id: "steer-1",
-    method: "turn/steer",
-    params: { threadId: "thr_x" },
-  }));
-  const events = injected.map((line) => JSON.parse(line));
-  assert.equal(events[0].id, "steer-1");
-  assert.equal(events[0].error.code, -32601);
 });

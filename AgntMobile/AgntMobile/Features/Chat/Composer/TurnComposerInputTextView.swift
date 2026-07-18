@@ -1,8 +1,8 @@
 // FILE: TurnComposerInputTextView.swift
 // Purpose: UIViewRepresentable wrapper for the composer text input and paste-image interception.
 // Layer: View Component
-// Exports: TurnComposerInputTextView, TurnComposerPasteInterceptingTextView
-// Depends on: SwiftUI, UIKit, TurnComposerRuntimeMenuBuilder
+// Exports: TurnComposerInputTextView
+// Depends on: SwiftUI, UIKit, TurnComposerPasteTextView
 
 import SwiftUI
 import UIKit
@@ -15,10 +15,11 @@ struct TurnComposerInputTextView: UIViewRepresentable {
     @Binding var dynamicHeight: CGFloat
     let runtimeState: TurnComposerRuntimeState?
     let runtimeActions: TurnComposerRuntimeActions
+    let mentionedSkillNames: [String]
+    let maxVisibleLines: CGFloat
     let onPasteImageData: ([Data]) -> Void
 
     private let minVisibleLines: CGFloat = 1
-    private let maxVisibleLines: CGFloat = 8
     func makeUIView(context: Context) -> TurnComposerPasteInterceptingTextView {
         let textView = TurnComposerPasteInterceptingTextView(frame: .zero, textContainer: nil)
         textView.delegate = context.coordinator
@@ -63,11 +64,17 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             isFocused: $isFocused,
             dynamicHeight: $dynamicHeight
         )
-        let shouldApplyBindingText = context.coordinator.shouldApplyBindingText(text, to: uiView)
-        let textChanged = shouldApplyBindingText && uiView.text != text
+        let maxVisibleLinesChanged = context.coordinator.updateMaxVisibleLines(maxVisibleLines)
+        let canonicalText = TurnComposerInlineSkillToken.canonicalText(from: uiView.attributedText)
+        let shouldApplyBindingText = context.coordinator.shouldApplyBindingText(text, textViewText: canonicalText, textView: uiView)
+        let textChanged = shouldApplyBindingText && canonicalText != text
         if textChanged {
-            uiView.text = text
+            uiView.attributedText = inlineSkillAttributedString(text, font: nextFont)
             context.coordinator.noteAppliedBindingText(text)
+        } else if context.coordinator.shouldRefreshInlineSkillTokens(mentionNames: mentionedSkillNames, font: nextFont, in: uiView) {
+            let selectedRange = uiView.selectedRange
+            uiView.attributedText = inlineSkillAttributedString(canonicalText, font: nextFont)
+            uiView.selectedRange = TurnComposerInlineSkillToken.snappedSelection(selectedRange, in: uiView.attributedText)
         }
         let shouldDeferEditabilityLock = !isEditable && uiView.isEditable && uiView.isFirstResponder
         if !shouldDeferEditabilityLock {
@@ -87,6 +94,7 @@ struct TurnComposerInputTextView: UIViewRepresentable {
         uiView.onPasteImageData = onPasteImageData
         uiView.runtimeState = runtimeState
         uiView.runtimeActions = runtimeActions
+        context.coordinator.updateMentionedSkillNames(mentionedSkillNames)
         uiView.setContentHuggingPriority(.defaultLow, for: .horizontal)
         context.coordinator.syncFocusIfNeeded(
             for: uiView,
@@ -98,7 +106,13 @@ struct TurnComposerInputTextView: UIViewRepresentable {
                 uiView?.isEditable = false
             }
         }
-        context.coordinator.updateHeightIfNeeded(for: uiView, force: textChanged || fontChanged)
+        context.coordinator.updateHeightIfNeeded(
+            for: uiView,
+            force: textChanged || fontChanged || maxVisibleLinesChanged
+        )
+        if maxVisibleLinesChanged {
+            context.coordinator.scheduleDeferredHeightUpdate(for: uiView)
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -119,12 +133,22 @@ struct TurnComposerInputTextView: UIViewRepresentable {
         return AppFont.uiFont(size: 15, textStyle: .body)
     }
 
+    private func inlineSkillAttributedString(_ value: String, font: UIFont) -> NSAttributedString {
+        TurnComposerInlineSkillToken.displayAttributedString(
+            canonicalText: value,
+            mentionNames: mentionedSkillNames,
+            font: font,
+            textColor: .label,
+            tintColor: .systemIndigo
+        )
+    }
+
     final class Coordinator: NSObject, UITextViewDelegate {
         private var text: Binding<String>
         private var isFocused: Binding<Bool>
         private var dynamicHeight: Binding<CGFloat>
         private let minVisibleLines: CGFloat
-        private let maxVisibleLines: CGFloat
+        private var maxVisibleLines: CGFloat
         private var lastFocusBindingValue: Bool
         private var pendingHeightValue: CGFloat?
         private var isHeightCommitScheduled = false
@@ -132,6 +156,7 @@ struct TurnComposerInputTextView: UIViewRepresentable {
         private var lastIsEditable: Bool
         private var pendingUIKitText: String?
         private var staleBindingTextDuringPendingEdit: String?
+        var mentionedSkillNames: [String] = []
 
         init(
             text: Binding<String>,
@@ -159,8 +184,19 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             self.dynamicHeight = dynamicHeight
         }
 
+        fileprivate func updateMaxVisibleLines(_ value: CGFloat) -> Bool {
+            guard abs(maxVisibleLines - value) > 0.1 else {
+                return false
+            }
+            maxVisibleLines = value
+            lastHeightMeasurementSignature = nil
+            return true
+        }
+
         func textViewDidChange(_ textView: UITextView) {
-            let newText = textView.text ?? ""
+            StreamingUIInteractionMonitor.noteComposerKeystroke()
+            TurnComposerInlineSkillToken.normalizeTokenAttributes(in: textView.textStorage)
+            let newText = TurnComposerInlineSkillToken.canonicalText(from: textView.attributedText)
             if text.wrappedValue != newText {
                 pendingUIKitText = newText
                 staleBindingTextDuringPendingEdit = text.wrappedValue
@@ -182,15 +218,19 @@ struct TurnComposerInputTextView: UIViewRepresentable {
 
         // Prevents SwiftUI re-renders from writing an older binding value over
         // fresh UIKit edits while the deferred binding update is still queued.
-        fileprivate func shouldApplyBindingText(_ bindingText: String, to textView: UITextView) -> Bool {
+        fileprivate func shouldApplyBindingText(
+            _ bindingText: String,
+            textViewText: String,
+            textView: UITextView
+        ) -> Bool {
             if hasActiveMarkedText(in: textView) {
-                return shouldApplyBindingTextDuringPendingEdit(bindingText, textViewText: textView.text ?? "")
+                return shouldApplyBindingTextDuringPendingEdit(bindingText, textViewText: textViewText)
             }
 
             guard
                 textView.isFirstResponder,
                 let pendingUIKitText,
-                textView.text == pendingUIKitText
+                textViewText == pendingUIKitText
             else {
                 return true
             }
@@ -242,6 +282,24 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             }
         }
 
+        func textView(
+            _ textView: UITextView,
+            shouldChangeTextIn range: NSRange,
+            replacementText text: String
+        ) -> Bool {
+            let expanded = TurnComposerInlineSkillToken.expandedEditingRange(for: range, in: textView.attributedText)
+            guard expanded != range else { return true }
+            textView.textStorage.replaceCharacters(in: expanded, with: text)
+            textViewDidChange(textView)
+            return false
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            let snapped = TurnComposerInlineSkillToken.snappedSelection(textView.selectedRange, in: textView.attributedText)
+            guard snapped != textView.selectedRange else { return }
+            textView.selectedRange = snapped
+        }
+
         func textViewDidEndEditing(_ textView: UITextView) {
             // Defer binding writes out of UIKit's edit transaction to avoid AttributeGraph cycles.
             DispatchQueue.main.async { [weak self] in
@@ -257,6 +315,13 @@ struct TurnComposerInputTextView: UIViewRepresentable {
             }
             lastHeightMeasurementSignature = signature
             updateHeight(for: textView)
+        }
+
+        fileprivate func scheduleDeferredHeightUpdate(for textView: UITextView) {
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self, let textView else { return }
+                self.updateHeightIfNeeded(for: textView, force: true)
+            }
         }
 
         private func updateHeight(for textView: UITextView) {
@@ -422,181 +487,5 @@ struct TurnComposerInputTextView: UIViewRepresentable {
         let widthBucket: Int
         let lineHeightBucket: Int
         let isScrollEnabled: Bool
-    }
-}
-
-private struct ViewportPaddingSignature: Equatable {
-    let widthBucket: Int
-    let fontName: String
-    let fontPointSizeBucket: Int
-    let topInsetBucket: Int
-    let bottomInsetBucket: Int
-    let lineFragmentPaddingBucket: Int
-}
-
-private struct ViewportPaddingCacheEntry {
-    let signature: ViewportPaddingSignature
-    let value: CGFloat
-}
-
-// Internal (not fileprivate) because UIViewRepresentable protocol methods expose the type.
-// Only used by TurnComposerInputTextView in this file.
-final class TurnComposerPasteInterceptingTextView: UITextView {
-    var onPasteImageData: (([Data]) -> Void)?
-    var runtimeState: TurnComposerRuntimeState?
-    var runtimeActions: TurnComposerRuntimeActions?
-    private var cachedViewportPadding: ViewportPaddingCacheEntry?
-
-    override init(frame: CGRect, textContainer: NSTextContainer?) {
-        super.init(frame: frame, textContainer: textContainer)
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-    }
-
-    // Prevent horizontal expansion when isScrollEnabled is toggled to false.
-    // Without this, SwiftUI uses the full text width as the ideal size.
-    override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: super.intrinsicContentSize.height)
-    }
-
-    // TextKit needs a small viewport allowance beyond raw font line height; measuring it avoids clipped final lines.
-    func viewportPaddingBeyondLineHeight(targetWidth: CGFloat) -> CGFloat {
-        let signature = ViewportPaddingSignature(
-            widthBucket: Int((targetWidth * 2).rounded()),
-            fontName: font?.fontName ?? "",
-            fontPointSizeBucket: Int(((font?.pointSize ?? 0) * 10).rounded()),
-            topInsetBucket: Int((textContainerInset.top * 2).rounded()),
-            bottomInsetBucket: Int((textContainerInset.bottom * 2).rounded()),
-            lineFragmentPaddingBucket: Int((textContainer.lineFragmentPadding * 2).rounded())
-        )
-        if let cachedViewportPadding, cachedViewportPadding.signature == signature {
-            return cachedViewportPadding.value
-        }
-
-        let measuringView = UITextView(frame: CGRect(x: 0, y: 0, width: targetWidth, height: 1))
-        measuringView.font = font
-        measuringView.textContainerInset = textContainerInset
-        measuringView.textContainer.lineFragmentPadding = textContainer.lineFragmentPadding
-        measuringView.textContainer.widthTracksTextView = true
-        measuringView.text = " "
-        let measured = measuringView.sizeThatFits(
-            CGSize(width: targetWidth, height: .greatestFiniteMagnitude)
-        ).height
-        let lineHeight = (font ?? UIFont.preferredFont(forTextStyle: .body)).lineHeight
-        let value = max(0, measured - lineHeight)
-        cachedViewportPadding = ViewportPaddingCacheEntry(signature: signature, value: value)
-        return value
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-
-        guard !isScrollEnabled else { return }
-
-        let pinnedOffset = CGPoint(
-            x: -adjustedContentInset.left,
-            y: -adjustedContentInset.top
-        )
-        guard
-            abs(contentOffset.x - pinnedOffset.x) > 0.5
-                || abs(contentOffset.y - pinnedOffset.y) > 0.5
-        else {
-            return
-        }
-        contentOffset = pinnedOffset
-    }
-
-    // Adds the shared runtime controls directly into the text edit menu.
-    override func buildMenu(with builder: any UIMenuBuilder) {
-        super.buildMenu(with: builder)
-
-        guard let runtimeState, let runtimeActions else {
-            return
-        }
-
-        guard let runtimeMenu = TurnComposerRuntimeMenuBuilder(
-            runtimeState: runtimeState,
-            runtimeActions: runtimeActions
-        ).makeRuntimeMenu() else {
-            return
-        }
-
-        builder.insertChild(runtimeMenu, atEndOfMenu: .standardEdit)
-    }
-
-    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        if action == #selector(UIResponderStandardEditActions.paste(_:)) {
-            let pb = UIPasteboard.general
-            if pb.hasImages { return true }
-        }
-        return super.canPerformAction(action, withSender: sender)
-    }
-
-    override func paste(_ sender: Any?) {
-        let pasteboard = UIPasteboard.general
-        let imageDataItems = imageDataFromPasteboard(pasteboard)
-        if !imageDataItems.isEmpty {
-            onPasteImageData?(imageDataItems)
-            if pasteboard.hasStrings {
-                super.paste(sender)
-            }
-            return
-        }
-        super.paste(sender)
-    }
-
-    private static let maxIntakeDimension: CGFloat = 1600
-    private static let intakeCompressionQuality: CGFloat = 0.8
-
-    private func imageDataFromPasteboard(_ pasteboard: UIPasteboard) -> [Data] {
-        var imageDataItems: [Data] = []
-
-        if let images = pasteboard.images, !images.isEmpty {
-            imageDataItems = images.compactMap { Self.downscaledJPEGData(from: $0) }
-        } else if let image = pasteboard.image {
-            if let data = Self.downscaledJPEGData(from: image) {
-                imageDataItems = [data]
-            }
-        } else {
-            let fallbackTypeIDs = [
-                "public.heic",
-                "public.jpeg",
-                "public.png",
-                "public.tiff",
-                "com.compuserve.gif"
-            ]
-
-            for typeID in fallbackTypeIDs {
-                if let data = pasteboard.data(forPasteboardType: typeID), !data.isEmpty {
-                    imageDataItems.append(data)
-                }
-            }
-        }
-
-        return imageDataItems
-    }
-
-    /// Downscales a UIImage to `maxIntakeDimension` before encoding to JPEG,
-    /// so full-resolution data never enters the attachment pipeline.
-    private static func downscaledJPEGData(from image: UIImage) -> Data? {
-        let size = image.size
-        guard size.width > 0, size.height > 0 else { return nil }
-
-        let longestSide = max(size.width, size.height)
-        let scale = min(1, maxIntakeDimension / longestSide)
-
-        if scale < 1 {
-            let target = CGSize(width: floor(size.width * scale), height: floor(size.height * scale))
-            let format = UIGraphicsImageRendererFormat.default()
-            format.scale = 1
-            let resized = UIGraphicsImageRenderer(size: target, format: format).image { _ in
-                image.draw(in: CGRect(origin: .zero, size: target))
-            }
-            return resized.jpegData(compressionQuality: intakeCompressionQuality)
-        }
-
-        return image.jpegData(compressionQuality: intakeCompressionQuality)
     }
 }

@@ -12,6 +12,7 @@ internal suspend fun AgentService.handleMissingThread(threadId: String) {
     val tid = threadId.trim()
     if (tid.isEmpty()) return
     noteTurnFinished(tid)
+    clearThreadOutcome(tid)
     resumedThreadIds.remove(tid)
     _protectedRunningFallbackThreadIds.value = _protectedRunningFallbackThreadIds.value - tid
     _runningTurnIdByThread.value = _runningTurnIdByThread.value - tid

@@ -14,7 +14,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createHandshakeHandler } = require("../../src/bridge/handshake-handler");
+const {
+  classifyClientDeviceKind,
+  createHandshakeHandler,
+} = require("../../src/bridge/handshake-handler");
 
 const BRIDGE_VERSION = "0.9.0";
 
@@ -28,6 +31,7 @@ function makeHandler({ initialHandshakeWarm = false, bridgePackageVersion = BRID
     macDeviceId: "test-mac-device-id",
     macIdentityPublicKey: "test-mac-pub-key",
     macIdentityPrivateKey: "test-mac-priv-key",
+    lastSeenDeviceKind: null,
     lastSeenPhoneAppVersion: null,
     trustedPhones: {},
   };
@@ -204,6 +208,31 @@ test("compatibility check records the client version on deviceState even when no
   // The bridge remembers the last-seen phone version so subsequent boots can
   // surface a stale-app warning even before the phone reconnects.
   assert.equal(env.getDeviceState().lastSeenPhoneAppVersion, "9.9.9");
+});
+
+test("initialize records the client device kind on deviceState", () => {
+  for (const [clientName, expectedKind] of [
+    ["codexmobile_ios", "iphone"],
+    ["agnt-android", "android"],
+    ["agnt-web", "browser"],
+    ["agnt mac client", "mac"],
+  ]) {
+    const env = makeHandler();
+    env.handler.handlePhoneMessage(JSON.stringify({
+      id: `req-${expectedKind}`,
+      method: "initialize",
+      params: {
+        clientInfo: { name: clientName, version: "9.9.9" },
+      },
+    }));
+
+    assert.equal(env.getDeviceState().lastSeenDeviceKind, expectedKind);
+  }
+});
+
+test("classifyClientDeviceKind ignores unknown clients", () => {
+  assert.equal(classifyClientDeviceKind("unknown-client"), null);
+  assert.equal(classifyClientDeviceKind(""), null);
 });
 
 test("logCompatibilityWarning dedups repeated identical warnings", () => {

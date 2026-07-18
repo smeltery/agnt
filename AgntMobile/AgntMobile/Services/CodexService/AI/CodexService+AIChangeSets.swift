@@ -30,7 +30,7 @@ enum AIChangeSetError: LocalizedError {
     }
 }
 
-private struct AIRevertOverlapAnalysis {
+struct AIRevertOverlapAnalysis {
     let affectedFiles: [String]
     let overlappingFiles: [String]
     let competingChangeSetIDs: [String]
@@ -40,7 +40,7 @@ private struct AIRevertOverlapAnalysis {
     }
 }
 
-private struct AIRevertBridgeRequest {
+struct AIRevertBridgeRequest {
     let previewMethod: String
     let applyMethod: String
     let params: JSONValue
@@ -55,8 +55,8 @@ extension CodexService {
             return changeSet
         }
 
-        if let turnId = normalizedIdentifier(message.turnId),
-           let changeSetId = aiChangeSetIDByTurnID[turnId] {
+        if let turnKey = AIChangeSetTurnKey(threadId: message.threadId, turnId: message.turnId),
+           let changeSetId = aiChangeSetIDByTurnKey[turnKey] {
             return aiChangeSetsByID[changeSetId]
         }
 
@@ -213,7 +213,7 @@ extension CodexService {
             } else {
                 recordChangeSetError(
                     changeSetId: changeSet.id,
-                    message: firstNonEmptyString(
+                    message: firstNonEmptyCandidate(
                         applyResult.unsupportedReasons.first,
                         applyResult.conflicts.first?.message,
                         applyResult.stagedFiles.isEmpty ? nil : "Some targeted files have staged changes. Unstage them first to keep revert predictable."
@@ -305,9 +305,9 @@ extension CodexService {
         turnId: String?,
         assistantMessageId: String
     ) {
-        guard let normalizedTurnId = normalizedIdentifier(turnId),
+        guard let turnKey = AIChangeSetTurnKey(threadId: threadId, turnId: turnId),
               let normalizedAssistantMessageId = normalizedIdentifier(assistantMessageId),
-              let changeSetId = aiChangeSetIDByTurnID[normalizedTurnId],
+              let changeSetId = aiChangeSetIDByTurnKey[turnKey],
               var changeSet = aiChangeSetsByID[changeSetId] else {
             return
         }
@@ -322,9 +322,9 @@ extension CodexService {
     }
 
     // Finalizes the change set once the turn has finished, even if the diff arrives slightly later.
-    func noteTurnFinished(turnId: String?) {
-        guard let normalizedTurnId = normalizedIdentifier(turnId),
-              let changeSetId = aiChangeSetIDByTurnID[normalizedTurnId] else {
+    func noteTurnFinished(threadId: String, turnId: String?) {
+        guard let turnKey = AIChangeSetTurnKey(threadId: threadId, turnId: turnId),
+              let changeSetId = aiChangeSetIDByTurnKey[turnKey] else {
             return
         }
 
@@ -401,351 +401,38 @@ extension CodexService {
     }
 
     // Recovers legacy fallback change-set ledgers from persisted file-change message diff fences.
-    // No-op on agnt for now; full migration helper (depends on persistedFileChangePatches +
-    // unifiedDiffCodeBlocks) is not yet ported. Legacy users will need to recreate change sets.
-    func rehydrateLegacyFallbackChangeSetsFromPersistedMessages() {}
-}
+    func rehydrateLegacyFallbackChangeSetsFromPersistedMessages() {
+        var didChange = false
 
-private extension CodexService {
-    func recordChangeSetPatch(
-        threadId: String,
-        turnId: String,
-        patch: String,
-        source: AIChangeSetSource
-    ) {
-        let normalizedTurnId = turnId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedTurnId.isEmpty,
-              let normalizedPatch = normalizedUnifiedPatchPayload(patch) else {
-            return
-        }
-
-        let analysis = AIUnifiedPatchParser.analyze(normalizedPatch)
-        let changeSetId = aiChangeSetIDByTurnID[normalizedTurnId] ?? UUID().uuidString
-        var changeSet = aiChangeSetsByID[changeSetId] ?? AIChangeSet(
-            id: changeSetId,
-            repoRoot: gitWorkingDirectory(for: threadId),
-            threadId: threadId,
-            turnId: normalizedTurnId,
-            assistantMessageId: latestAssistantMessageId(for: threadId, turnId: normalizedTurnId),
-            source: source
-        )
-
-        guard shouldReplaceChangeSetPatch(source: source, existing: changeSet) else {
-            return
-        }
-
-        changeSet.threadId = threadId
-        changeSet.repoRoot = changeSet.repoRoot ?? gitWorkingDirectory(for: threadId)
-        changeSet.assistantMessageId = changeSet.assistantMessageId ?? latestAssistantMessageId(for: threadId, turnId: normalizedTurnId)
-        changeSet.source = source
-
-        if source == .fileChangeFallback {
-            appendFallbackPatchBatch(
-                patch: normalizedPatch,
-                analysis: analysis,
-                to: &changeSet
-            )
-        } else {
-            // Aggregate turn/checkpoint diffs stay authoritative; fallback batches remain only as audit breadcrumbs.
-            changeSet.forwardUnifiedPatch = normalizedPatch
-            changeSet.patchHash = AIUnifiedPatchParser.hash(for: normalizedPatch)
-            changeSet.fileChanges = analysis.fileChanges
-            changeSet.unsupportedReasons = analysis.unsupportedReasons
-        }
-
-        changeSet.status = .collecting
-
-        aiChangeSetsByID[changeSetId] = changeSet
-        aiChangeSetIDByTurnID[normalizedTurnId] = changeSetId
-        if let assistantMessageId = changeSet.assistantMessageId {
-            aiChangeSetIDByAssistantMessageID[assistantMessageId] = changeSetId
-        }
-
-        finalizeChangeSetIfPossible(changeSetId: changeSetId)
-        persistAIChangeSets()
-        invalidateAssistantRevertStates()
-    }
-
-    // Prefers checkpoint-derived diffs when available, while runtime diffs cover turns without checkpoints.
-    func shouldReplaceChangeSetPatch(
-        source: AIChangeSetSource,
-        existing changeSet: AIChangeSet
-    ) -> Bool {
-        if !hasRevertPatchPayload(changeSet) {
-            return true
-        }
-
-        switch source {
-        case .turnDiff:
-            return changeSet.source != .workspaceCheckpoint
-        case .workspaceCheckpoint:
-            return true
-        case .fileChangeFallback:
-            return changeSet.source == .fileChangeFallback
-        }
-    }
-
-    // Appends a patch_apply_end batch once; repeated lifecycle echoes share the same patch hash.
-    func appendFallbackPatchBatch(
-        patch: String,
-        analysis: AIUnifiedPatchAnalysis,
-        to changeSet: inout AIChangeSet
-    ) {
-        let patchHash = AIUnifiedPatchParser.hash(for: patch)
-        if !changeSet.fallbackPatchBatches.contains(where: { $0.patchHash == patchHash }) {
-            changeSet.fallbackPatchBatches.append(
-                AIPatchBatch(
-                    forwardUnifiedPatch: patch,
-                    patchHash: patchHash,
-                    fileChanges: analysis.fileChanges,
-                    unsupportedReasons: analysis.unsupportedReasons
-                )
-            )
-        }
-
-        changeSet.fallbackPatchCount = changeSet.fallbackPatchBatches.count
-        changeSet.forwardUnifiedPatch = fallbackPatchBatchesForwardPatch(changeSet.fallbackPatchBatches)
-        changeSet.patchHash = AIUnifiedPatchParser.hash(for: fallbackPatchBatchesRevertPatch(changeSet.fallbackPatchBatches))
-        changeSet.fileChanges = mergedFileChanges(from: changeSet.fallbackPatchBatches.flatMap(\.fileChanges))
-        changeSet.unsupportedReasons = Array(Set(changeSet.fallbackPatchBatches.flatMap(\.unsupportedReasons))).sorted()
-    }
-
-    func hasRevertPatchPayload(_ changeSet: AIChangeSet) -> Bool {
-        if changeSet.source == .fileChangeFallback, !changeSet.fallbackPatchBatches.isEmpty {
-            return true
-        }
-        return !changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    func fallbackPatchBatchesForwardPatch(_ batches: [AIPatchBatch]) -> String {
-        batches
-            .map(\.forwardUnifiedPatch)
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .joined(separator: "\n")
-    }
-
-    func fallbackPatchBatchesRevertPatch(_ batches: [AIPatchBatch]) -> String {
-        batches
-            .reversed()
-            .map(\.forwardUnifiedPatch)
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .joined(separator: "\n")
-    }
-
-    func mergedFileChanges(from fileChanges: [AIFileChange]) -> [AIFileChange] {
-        var changesByPath: [String: AIFileChange] = [:]
-
-        for change in fileChanges {
-            guard let existing = changesByPath[change.path] else {
-                changesByPath[change.path] = change
+        for changeSetId in Array(aiChangeSetsByID.keys) {
+            guard var changeSet = aiChangeSetsByID[changeSetId],
+                  changeSet.source == .fileChangeFallback,
+                  changeSet.fallbackPatchBatches.isEmpty,
+                  changeSet.status != .reverted else {
                 continue
             }
 
-            let mergedKind: AIFileChangeKind = existing.kind == change.kind ? existing.kind : .update
-            changesByPath[change.path] = AIFileChange(
-                path: change.path,
-                kind: mergedKind,
-                additions: existing.additions + change.additions,
-                deletions: existing.deletions + change.deletions,
-                isBinary: existing.isBinary || change.isBinary,
-                isRenameOrModeOnly: existing.isRenameOrModeOnly || change.isRenameOrModeOnly,
-                beforeContentHash: existing.beforeContentHash ?? change.beforeContentHash,
-                afterContentHash: change.afterContentHash ?? existing.afterContentHash
-            )
-        }
+            let patches = persistedFileChangePatches(threadId: changeSet.threadId, turnId: changeSet.turnId)
+            guard !patches.isEmpty else { continue }
 
-        return changesByPath.values.sorted { $0.path < $1.path }
-    }
-
-    func finalizeChangeSetIfPossible(changeSetId: String) {
-        guard var changeSet = aiChangeSetsByID[changeSetId] else {
-            return
-        }
-
-        guard turnTerminalState(for: changeSet.turnId) != nil else {
-            aiChangeSetsByID[changeSetId] = changeSet
-            return
-        }
-
-        guard changeSet.status != .reverted else {
-            return
-        }
-
-        changeSet.repoRoot = changeSet.repoRoot ?? gitWorkingDirectory(for: changeSet.threadId)
-        changeSet.assistantMessageId = changeSet.assistantMessageId ?? latestAssistantMessageId(
-            for: changeSet.threadId,
-            turnId: changeSet.turnId
-        )
-
-        if changeSet.forwardUnifiedPatch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            changeSet.status = .notRevertable
-            changeSet.unsupportedReasons = ["This response cannot be auto-reverted because no exact patch was captured."]
-        } else if changeSet.source == .fileChangeFallback && changeSet.fallbackPatchCount > 1 {
-            changeSet.status = .notRevertable
-            changeSet.unsupportedReasons = ["This response emitted multiple file-change patches, so v1 cannot safely auto-revert it."]
-        } else if !changeSet.unsupportedReasons.isEmpty || changeSet.fileChanges.isEmpty {
-            changeSet.status = .notRevertable
-        } else {
-            changeSet.status = .ready
-        }
-
-        if changeSet.finalizedAt == nil {
-            changeSet.finalizedAt = Date()
-        }
-
-        aiChangeSetsByID[changeSetId] = changeSet
-        if let assistantMessageId = changeSet.assistantMessageId {
-            aiChangeSetIDByAssistantMessageID[assistantMessageId] = changeSetId
-        }
-    }
-
-    func persistAIChangeSets() {
-        aiChangeSetPersistence.save(
-            aiChangeSetsByID.values.sorted {
-                if $0.createdAt != $1.createdAt {
-                    return $0.createdAt < $1.createdAt
-                }
-                return $0.id < $1.id
-            },
-            macDeviceId: currentMacScopedPersistenceDeviceId
-        )
-    }
-
-    func latestAssistantMessageId(for threadId: String, turnId: String) -> String? {
-        messagesByThread[threadId]?.last(where: { message in
-            message.role == .assistant && message.turnId == turnId
-        })?.id
-    }
-
-    func normalizedWorkingDirectory(_ rawValue: String?) -> String? {
-        guard let rawValue else {
-            return nil
-        }
-
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    func bridgeError(from error: CodexServiceError) -> AIChangeSetError {
-        switch error {
-        case .disconnected:
-            return .bridgeError(code: "disconnected", message: "Not connected to bridge.")
-        case .rpcError(let rpcError):
-            let errorCode = rpcError.data?.objectValue?["errorCode"]?.stringValue
-            return .bridgeError(code: errorCode, message: rpcError.message)
-        default:
-            return .bridgeError(code: nil, message: error.errorDescription)
-        }
-    }
-
-    func markRevertAttempt(changeSetId: String) {
-        guard var changeSet = aiChangeSetsByID[changeSetId] else { return }
-        changeSet.revertMetadata.revertAttemptedAt = Date()
-        changeSet.revertMetadata.lastRevertError = nil
-        aiChangeSetsByID[changeSetId] = changeSet
-        persistAIChangeSets()
-        invalidateAssistantRevertStates()
-    }
-
-    func markChangeSetReverted(changeSetId: String) {
-        guard var changeSet = aiChangeSetsByID[changeSetId] else { return }
-        changeSet.status = .reverted
-        changeSet.revertMetadata.revertedAt = Date()
-        changeSet.revertMetadata.lastRevertError = nil
-        aiChangeSetsByID[changeSetId] = changeSet
-        persistAIChangeSets()
-        invalidateAssistantRevertStates()
-    }
-
-    func recordChangeSetError(changeSetId: String, message: String) {
-        guard var changeSet = aiChangeSetsByID[changeSetId] else { return }
-        changeSet.revertMetadata.lastRevertError = message
-        aiChangeSetsByID[changeSetId] = changeSet
-        persistAIChangeSets()
-        invalidateAssistantRevertStates()
-    }
-
-    // Computes file-level overlap for one change set against same-repo responses that are still active/revertable.
-    func revertOverlapAnalysis(
-        for changeSet: AIChangeSet,
-        workingDirectory: String?
-    ) -> AIRevertOverlapAnalysis {
-        let affectedFiles = changeSet.fileChanges.map(\.path).sorted()
-        guard let repoIdentifier = canonicalRepoIdentifier(for: changeSet.repoRoot ?? workingDirectory)
-            ?? normalizedWorkingDirectory(changeSet.repoRoot ?? workingDirectory),
-            !affectedFiles.isEmpty else {
-            return AIRevertOverlapAnalysis(
-                affectedFiles: affectedFiles,
-                overlappingFiles: [],
-                competingChangeSetIDs: []
-            )
-        }
-
-        let affectedFileSet = Set(affectedFiles)
-        var overlappingFiles: Set<String> = []
-        var competingChangeSetIDs: [String] = []
-
-        for candidate in aiChangeSetsByID.values {
-            guard candidate.id != changeSet.id else { continue }
-            guard candidate.status == .ready || candidate.status == .collecting else { continue }
-
-            let candidateRepoIdentifier = canonicalRepoIdentifier(for: candidate.repoRoot ?? gitWorkingDirectory(for: candidate.threadId))
-                ?? normalizedWorkingDirectory(candidate.repoRoot ?? gitWorkingDirectory(for: candidate.threadId))
-            guard candidateRepoIdentifier == repoIdentifier else { continue }
-
-            let overlap = Set(candidate.fileChanges.map(\.path)).intersection(affectedFileSet)
-            guard !overlap.isEmpty else { continue }
-
-            overlappingFiles.formUnion(overlap)
-            competingChangeSetIDs.append(candidate.id)
-        }
-
-        return AIRevertOverlapAnalysis(
-            affectedFiles: affectedFiles,
-            overlappingFiles: overlappingFiles.sorted(),
-            competingChangeSetIDs: competingChangeSetIDs.sorted()
-        )
-    }
-
-    func firstNonEmptyString(_ candidates: String?...) -> String? {
-        for candidate in candidates {
-            guard let candidate else { continue }
-            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                return trimmed
+            for patch in patches {
+                let analysis = AIUnifiedPatchParser.analyze(patch)
+                appendFallbackPatchBatch(
+                    patch: patch,
+                    analysis: analysis,
+                    to: &changeSet
+                )
             }
-        }
-        return nil
-    }
 
-    func repositoriesOverlap(_ lhs: String?, _ rhs: String?) -> Bool {
-        guard let left = normalizedWorkingDirectory(lhs),
-              let right = normalizedWorkingDirectory(rhs) else {
-            return false
+            changeSet.status = .collecting
+            aiChangeSetsByID[changeSetId] = changeSet
+            finalizeChangeSetIfPossible(changeSetId: changeSetId)
+            didChange = true
         }
 
-        let canonicalLeft = canonicalRepoIdentifier(for: left) ?? left
-        let canonicalRight = canonicalRepoIdentifier(for: right) ?? right
-        if canonicalLeft == canonicalRight {
-            return true
+        if didChange {
+            persistAIChangeSets()
+            invalidateAssistantRevertStatesWithoutRefresh()
         }
-
-        return isSameOrDescendantPath(left, root: right)
-            || isSameOrDescendantPath(right, root: left)
-            || isSameOrDescendantPath(canonicalLeft, root: canonicalRight)
-            || isSameOrDescendantPath(canonicalRight, root: canonicalLeft)
-    }
-
-    func isSameOrDescendantPath(_ candidate: String, root: String) -> Bool {
-        guard !candidate.isEmpty, !root.isEmpty else {
-            return false
-        }
-        if candidate == root {
-            return true
-        }
-        if root == "/" {
-            return candidate.hasPrefix("/")
-        }
-        return candidate.hasPrefix(root + "/")
     }
 }

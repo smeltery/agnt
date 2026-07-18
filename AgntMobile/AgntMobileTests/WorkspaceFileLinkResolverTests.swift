@@ -17,12 +17,40 @@ final class WorkspaceFileLinkResolverTests: XCTestCase {
         )
     }
 
+    func testResolvesAbsolutePathURLString() throws {
+        let url = try XCTUnwrap(URL(string: "/Users/dev/project/Sources/App.swift"))
+
+        XCTAssertEqual(
+            WorkspaceFileLinkResolver.localPath(from: url),
+            "/Users/dev/project/Sources/App.swift"
+        )
+    }
+
     func testResolvesRelativeMarkdownPathAndStripsLineSuffix() throws {
         let url = try XCTUnwrap(URL(string: "Sources/App.swift:12"))
 
         XCTAssertEqual(
             WorkspaceFileLinkResolver.localPath(from: url),
             "Sources/App.swift"
+        )
+    }
+
+    func testStripsLineColumnFragmentAndQuerySuffixes() throws {
+        let lineColumnURL = try XCTUnwrap(URL(string: "Sources/App.swift:42:7"))
+        let fragmentURL = try XCTUnwrap(URL(string: "Sources/App.swift#L42"))
+        let queryURL = try XCTUnwrap(URL(string: "Sources/App.swift?plain=1"))
+
+        XCTAssertEqual(WorkspaceFileLinkResolver.localPath(from: lineColumnURL), "Sources/App.swift")
+        XCTAssertEqual(WorkspaceFileLinkResolver.localPath(from: fragmentURL), "Sources/App.swift")
+        XCTAssertEqual(WorkspaceFileLinkResolver.localPath(from: queryURL), "Sources/App.swift")
+    }
+
+    func testResolvesExtensionlessKnownFileName() throws {
+        let url = try XCTUnwrap(URL(string: "Dockerfile"))
+
+        XCTAssertEqual(
+            WorkspaceFileLinkResolver.localPath(from: url),
+            "Dockerfile"
         )
     }
 

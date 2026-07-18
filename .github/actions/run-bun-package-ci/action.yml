@@ -1,0 +1,75 @@
+name: Run Bun package CI
+description: Install and run CI for one selected Bun package surface.
+
+inputs:
+  name:
+    description: Package name to show in GitHub Actions groups.
+    required: true
+  working-directory:
+    description: Package working directory.
+    required: true
+  frozen-lockfile:
+    description: Whether bun install should use --frozen-lockfile.
+    required: true
+  audit:
+    description: Whether to run bun audit before package CI.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Flox
+      uses: ./.github/actions/setup-flox
+
+    - name: Run Bun package CI
+      shell: bash
+      env:
+        PACKAGE_NAME: ${{ inputs.name }}
+        PACKAGE_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        PACKAGE_FROZEN_LOCKFILE: ${{ inputs.frozen-lockfile }}
+        PACKAGE_AUDIT: ${{ inputs.audit }}
+      run: |
+        set -euo pipefail
+
+        flox activate -d "$GITHUB_WORKSPACE" -- bun --version
+
+        if [[ ! "$PACKAGE_WORKING_DIRECTORY" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+          echo "Unsafe package working directory: $PACKAGE_WORKING_DIRECTORY" >&2
+          exit 1
+        fi
+
+        install_args=()
+        if [[ "$PACKAGE_FROZEN_LOCKFILE" == "true" ]]; then
+          install_args+=(--frozen-lockfile)
+        fi
+
+        echo "::group::$PACKAGE_NAME install"
+        for attempt in 1 2 3; do
+          if (
+            cd "$PACKAGE_WORKING_DIRECTORY"
+            timeout --kill-after=30s 240s flox activate -d "$GITHUB_WORKSPACE" -- bun install "${install_args[@]}"
+          ); then
+            break
+          fi
+          if [[ "$attempt" == "3" ]]; then
+            exit 1
+          fi
+          sleep $((attempt * 10))
+        done
+        echo "::endgroup::"
+
+        if [[ "$PACKAGE_AUDIT" == "true" ]]; then
+          echo "::group::$PACKAGE_NAME audit"
+          (
+            cd "$PACKAGE_WORKING_DIRECTORY"
+            timeout --kill-after=30s 120s flox activate -d "$GITHUB_WORKSPACE" -- bun audit
+          ) || true
+          echo "::endgroup::"
+        fi
+
+        echo "::group::$PACKAGE_NAME ci"
+        (
+          cd "$PACKAGE_WORKING_DIRECTORY"
+          flox activate -d "$GITHUB_WORKSPACE" -- bun run ci
+        )
+        echo "::endgroup::"

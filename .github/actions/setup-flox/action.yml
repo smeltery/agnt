@@ -1,0 +1,8 @@
+name: Setup Flox
+description: Install Flox for CI jobs that run commands through the pinned environment.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Flox
+      uses: flox/install-flox-action@v2

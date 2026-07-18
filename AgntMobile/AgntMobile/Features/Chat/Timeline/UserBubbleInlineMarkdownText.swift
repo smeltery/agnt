@@ -162,15 +162,7 @@ enum UserBubbleCollapsedMarkdownPreview {
         if let openFenceCloser {
             return preview + "\n" + openFenceCloser
         }
-        return autoClosedInlineMarkup(preview)
-    }
-
-    private static func autoClosedInlineMarkup(_ preview: String) -> String {
-        var closed = preview
-        if preview.components(separatedBy: "**").count.isMultiple(of: 2) {
-            closed += "**"
-        }
-        return closed
+        return StreamingInlineMarkupAutoCloser.autoClosed(preview)
     }
 }
 

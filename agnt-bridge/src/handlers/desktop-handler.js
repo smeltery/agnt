@@ -52,6 +52,7 @@ async function handleDesktopMethod(method, params, options = {}) {
 
   switch (method) {
     case "desktop/continueOnMac":
+    case "desktop/continueOnDesktop":
       return continueOnMac(params, {
         bundleId,
         appPath,
@@ -73,6 +74,8 @@ async function handleDesktopMethod(method, params, options = {}) {
       return readBridgePreferences(options);
     case "desktop/preferences/update":
       return updateBridgePreferences(params, options);
+    case "desktop/bridge/updateAndRestart":
+      return updateBridgePackageAndRestart(options);
     default:
       throw desktopError("unknown_method", `Unknown desktop method: ${method}`);
   }
@@ -262,6 +265,17 @@ async function updateBridgePreferences(params, options = {}) {
   return options.updateBridgePreferences({
     keepMacAwake: params.keepMacAwake,
   });
+}
+
+async function updateBridgePackageAndRestart(options = {}) {
+  if (typeof options.updateBridgePackageAndRestart !== "function") {
+    throw desktopError(
+      "unsupported_bridge_update",
+      "This bridge does not support iPhone-triggered bridge updates yet."
+    );
+  }
+
+  return options.updateBridgePackageAndRestart();
 }
 
 function resolveThreadId(params) {

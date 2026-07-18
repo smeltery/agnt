@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { collectAssistantChangeSet } from "../../../lib/assistant-change-set";
 import { copyText } from "../../../lib/clipboard";
-import { computeDiffStats } from "../../../lib/git-diff-stats";
 import { formatRelativeWithAbsolute } from "../../../lib/relative-time";
 import { isSpeaking, isTtsSupported, speak, stop as stopSpeaking } from "../../../lib/tts";
 import { quoteAsMarkdown } from "../../../lib/quote";
+import { autoCloseStreamingInlineMarkup } from "../../../lib/streaming-inline-markup";
 import { formatCostUsd, formatTokens, totalTokens } from "../../../lib/token-usage";
 import type { CodexMessage } from "../../../models";
 import { useCheckpointsStore } from "../../../state/checkpoints-store";
@@ -13,14 +14,23 @@ import { useConnectionStore } from "../../../state/connection-store";
 import { useThreadsStore } from "../../../state/threads-store";
 import { formatTurnDuration, useTurnTimingStore } from "../../../state/turn-timing-store";
 import { useTurnTokenUsageStore } from "../../../state/turn-token-usage-store";
+import { revertPatchApply, revertPatchPreview } from "../../../protocol/workspace-checkpoints";
 import { ArrowshapeTurnUpLeft, ArrowUturnLeft, Clock } from "../../shared/Icon";
 import { BookmarkButton } from "./BookmarkButton";
 import { RowLinkButton } from "./RowLinkButton";
 import { MarkdownContent } from "../MarkdownContent";
 
+type ChangeSetRevertState =
+  | { phase: "idle" }
+  | { phase: "checking" }
+  | { phase: "applying" }
+  | { phase: "blocked"; reason: string }
+  | { phase: "done"; files: string[] };
+
 export function AssistantRow({ message }: { message: CodexMessage }) {
   const [justCopied, setJustCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [changeSetRevert, setChangeSetRevert] = useState<ChangeSetRevertState>({ phase: "idle" });
   const showCheckpoints = useCheckpointsStore((state) => state.show);
   const connection = useConnectionStore((state) => state.connection);
   const thread = useThreadsStore((state) => {
@@ -53,20 +63,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
     if (!message.turnId || !message.threadId) return null;
     const messages = state.reducerStates[message.threadId]?.messages;
     if (!messages) return null;
-    let count = 0;
-    let firstId: string | null = null;
-    let insertions = 0;
-    let deletions = 0;
-    for (const m of messages) {
-      if (m.turnId !== message.turnId || m.kind !== "fileChange" || !m.fileChange?.diff) continue;
-      if (firstId === null) firstId = m.id;
-      count += 1;
-      const stats = computeDiffStats(m.fileChange.diff);
-      insertions += stats.insertions;
-      deletions += stats.deletions;
-    }
-    if (count === 0) return null;
-    return { count, firstId, insertions, deletions };
+    return collectAssistantChangeSet(messages, message);
   }));
 
   function scrollToFirstChange() {
@@ -113,6 +110,37 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
     });
   }
 
+  async function handleChangeSetRevert() {
+    if (!connection?.rpc || !thread?.cwd || !turnChanges) return;
+    setChangeSetRevert({ phase: "checking" });
+    try {
+      const patches = turnChanges.patches.map((patch) => ({
+        id: patch.id,
+        forwardPatch: patch.forwardPatch,
+      }));
+      const preview = await revertPatchPreview(connection.rpc, {
+        cwd: thread.cwd,
+        patches,
+      });
+      if (!preview.canRevert) {
+        setChangeSetRevert({ phase: "blocked", reason: revertBlockReason(preview) });
+        return;
+      }
+      setChangeSetRevert({ phase: "applying" });
+      const result = await revertPatchApply(connection.rpc, {
+        cwd: thread.cwd,
+        patches,
+      });
+      if (result.success) {
+        setChangeSetRevert({ phase: "done", files: result.revertedFiles });
+      } else {
+        setChangeSetRevert({ phase: "blocked", reason: revertBlockReason(result) });
+      }
+    } catch (error) {
+      setChangeSetRevert({ phase: "blocked", reason: (error as Error).message });
+    }
+  }
+
   function handleReply() {
     if (!message.threadId) return;
     const quoted = quoteAsMarkdown(message.text);
@@ -128,6 +156,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
   // without cwd the bridge errors with missing_working_directory anyway, so
   // hiding the button beats showing a broken one.
   const canRevert = !message.isStreaming && Boolean(message.turnId) && Boolean(thread?.cwd);
+  const renderedText = message.isStreaming ? autoCloseStreamingInlineMarkup(message.text) : message.text;
 
   return (
     <div
@@ -135,7 +164,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       title={formatRelativeWithAbsolute(message.createdAt)}
     >
       <div className="agnt-row-bubble">
-        <MarkdownContent text={message.text} cwd={thread?.cwd} />
+        <MarkdownContent text={renderedText} cwd={thread?.cwd} />
         {message.isStreaming && <span className="agnt-cursor-blink" aria-hidden />}
       </div>
       {!message.isStreaming && message.text && (
@@ -158,17 +187,46 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
             </span>
           )}
           {turnChanges && (
-            <button
-              type="button"
-              className="agnt-row-action agnt-row-action-changes"
-              onClick={scrollToFirstChange}
-              title={`This turn touched ${turnChanges.count} file${turnChanges.count === 1 ? "" : "s"} (+${turnChanges.insertions} −${turnChanges.deletions}). Click to scroll to the changes.`}
-            >
-              {turnChanges.count} file{turnChanges.count === 1 ? "" : "s"}{" "}
-              <span className="agnt-gitpanel-stat-add">+{turnChanges.insertions}</span>
-              {" "}
-              <span className="agnt-gitpanel-stat-del">−{turnChanges.deletions}</span>
-            </button>
+            <>
+              <button
+                type="button"
+                className="agnt-row-action agnt-row-action-changes"
+                onClick={scrollToFirstChange}
+                title={`This message changed ${turnChanges.count} file${turnChanges.count === 1 ? "" : "s"} (+${turnChanges.insertions} −${turnChanges.deletions}). Click to scroll to the first file diff.`}
+              >
+                {turnChanges.count} file{turnChanges.count === 1 ? "" : "s"}{" "}
+                <span className="agnt-gitpanel-stat-add">+{turnChanges.insertions}</span>
+                {" "}
+                <span className="agnt-gitpanel-stat-del">−{turnChanges.deletions}</span>
+              </button>
+              {connection?.rpc && thread?.cwd && changeSetRevert.phase !== "done" && (
+                <button
+                  type="button"
+                  className="agnt-row-action"
+                  onClick={handleChangeSetRevert}
+                  disabled={changeSetRevert.phase === "checking" || changeSetRevert.phase === "applying"}
+                  title="Reverse all file patches tied to this assistant message"
+                >
+                  <ArrowUturnLeft />{" "}
+                  {changeSetRevert.phase === "checking"
+                    ? "Checking changes..."
+                    : changeSetRevert.phase === "applying"
+                      ? "Reverting changes..."
+                      : "Revert changes"}
+                </button>
+              )}
+              {changeSetRevert.phase === "blocked" && (
+                <span className="agnt-row-action-meta agnt-row-action-warning" title={changeSetRevert.reason}>
+                  Can't revert changes — {changeSetRevert.reason}
+                </span>
+              )}
+              {changeSetRevert.phase === "done" && (
+                <span className="agnt-row-action-meta agnt-row-action-done" title="Reverse-applied this message's patches">
+                  Reverted {changeSetRevert.files.length || turnChanges.count} file
+                  {(changeSetRevert.files.length || turnChanges.count) === 1 ? "" : "s"}
+                </span>
+              )}
+            </>
           )}
           <BookmarkButton threadId={message.threadId} messageId={message.id} />
           <RowLinkButton threadId={message.threadId} messageId={message.id} />
@@ -214,6 +272,18 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       )}
     </div>
   );
+}
+
+function revertBlockReason(result: {
+  stagedFiles: string[];
+  conflicts: Array<{ file?: string; reason?: string }>;
+  unsupportedReasons: string[];
+}): string {
+  if (result.stagedFiles.length > 0) {
+    return `Unstage ${result.stagedFiles.length} file${result.stagedFiles.length === 1 ? "" : "s"} first.`;
+  }
+  if (result.conflicts.length > 0) return "Conflicts with later edits.";
+  return result.unsupportedReasons[0] ?? "Bridge can't reverse these patches.";
 }
 
 function cssEscape(value: string): string {

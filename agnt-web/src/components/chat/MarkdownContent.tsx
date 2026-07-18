@@ -8,11 +8,16 @@
 // nested lists, or HTML inline tags — bundle stays small and the output
 // stays predictable.
 
-import { Fragment, lazy, Suspense, type ReactNode, useEffect, useMemo, useState } from "react";
-import { copyText } from "../../lib/clipboard";
+import { Fragment, lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import { useConnectionStore } from "../../state/connection-store";
 import { useLightboxStore } from "../../state/lightbox-store";
 import { selectImageState, useWorkspaceImageCache } from "../../state/workspace-image-cache";
+import { decodeSvgDataUrl, isSvgDataUrl, isSvgPath } from "../../lib/workspace-svg-preview";
+import { isLocalWorkspaceLink } from "../../lib/workspace-text-preview";
+import { CodeBlock } from "./CodeBlock";
+import { WorkspaceSvgPreview } from "./WorkspaceSvgPreview";
+import { WorkspaceTextFilePreview } from "./WorkspaceTextFilePreview";
+import { tokenizeInline } from "./markdown-inline-tokens";
 
 // Mermaid lives in its own chunk via React.lazy so the mermaid library
 // (~150 KB gzip) only downloads when a diagram actually appears.
@@ -27,22 +32,6 @@ const MathBlock = lazy(() =>
   import("./MathBlock").then((m) => ({ default: m.MathBlock }))
 );
 import { lexMarkdownBlocks, type MarkdownBlock } from "./markdown-blocks";
-import { ensureLanguage, escapeHtml, highlightCode, isLanguageReady, knownLanguage } from "./syntax-highlight";
-
-const INLINE_CODE_PATTERN = /`([^`\n]+)`/g;
-const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
-const ITALIC_PATTERN = /(?<!\w)\*([^*\n]+)\*(?!\w)/g;
-const IMAGE_PATTERN = /!\[([^\]\n]*)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
-const LINK_PATTERN = /(?<!!)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"([^"\n]*)")?\)/g;
-// Bare-URL autolinks. Recognises http(s) URLs not already inside a `[](…)`
-// or `![](…)` construct (the explicit-link patterns above run first and
-// consume those positions via the dedup step in the cursor walk). Trailing
-// punctuation (.,;:!?]) ) is excluded from the match so a sentence like
-// "Visit https://example.com." doesn't link the period. We deliberately
-// don't add `(` to the negative lookbehind because URLs frequently appear
-// in parentheses ("see (https://example.com)") and the dedup against
-// LINK_PATTERN already prevents double-wrapping inside `[](…)`.
-const AUTOLINK_PATTERN = /(?<![\w@:/])\bhttps?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?\]\)]/g;
 
 export interface MarkdownContentProps {
   text: string;
@@ -135,105 +124,6 @@ function renderFence(language: string | null, body: string): ReactNode {
   return <CodeBlock language={language} body={body} />;
 }
 
-/**
- * Code-fence renderer that lazy-loads the requested Prism language. While the
- * grammar is being fetched we render plain (HTML-escaped) text — same shape
- * as the highlighted output so the layout doesn't shift when the chunk lands.
- */
-function CodeBlock({ language, body }: { language: string | null; body: string }) {
-  const canonical = knownLanguage(language ?? undefined);
-  const [ready, setReady] = useState(canonical ? isLanguageReady(canonical) : false);
-  const [justCopied, setJustCopied] = useState(false);
-  const [showLineNumbers, setShowLineNumbers] = useState(false);
-
-  // Line count: split on `\n` and drop the trailing empty produced by a
-  // body that ends with a newline (every block does in practice).
-  const lineCount = useMemo(() => {
-    if (!body) return 0;
-    const lines = body.split("\n");
-    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-    return lines.length;
-  }, [body]);
-
-  useEffect(() => {
-    if (!canonical || ready) return;
-    let cancelled = false;
-    void ensureLanguage(canonical).then((ok) => {
-      if (!cancelled && ok) setReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [canonical, ready]);
-
-  async function handleCopy() {
-    const ok = await copyText(body);
-    if (!ok) return;
-    setJustCopied(true);
-    window.setTimeout(() => setJustCopied(false), 1200);
-  }
-
-  return (
-    <pre
-      className={
-        "agnt-md-pre"
-        + (canonical ? " agnt-md-lang-" + canonical : "")
-        + (showLineNumbers ? " agnt-md-pre-numbered" : "")
-      }
-    >
-      {/* Line-number gutter renders as a sibling so the highlighted code
-          can stay a single dangerously-set-innerHTML blob. Line height
-          on the gutter must match the `<code>` exactly (CSS handles it)
-          or a 200-line block will drift visibly toward the bottom. */}
-      {showLineNumbers && lineCount > 0 && (
-        <span className="agnt-md-pre-gutter" aria-hidden>
-          {Array.from({ length: lineCount }, (_, i) => (
-            <span key={i}>{i + 1}</span>
-          ))}
-        </span>
-      )}
-      {canonical && ready ? (
-        <code
-          className={"language-" + canonical}
-          dangerouslySetInnerHTML={{ __html: highlightCode(body, canonical) }}
-        />
-      ) : (
-        <code
-          className={canonical ? "language-" + canonical : undefined}
-          dangerouslySetInnerHTML={{ __html: escapeHtml(body) }}
-        />
-      )}
-      {canonical && (
-        <span className="agnt-md-pre-lang" aria-hidden>
-          {canonical}
-        </span>
-      )}
-      {/* Line-numbers toggle only renders for blocks that have at least
-          two lines — toggling a one-liner adds noise without value. */}
-      {lineCount > 1 && (
-        <button
-          type="button"
-          className={"agnt-md-pre-lines" + (showLineNumbers ? " agnt-md-pre-lines-on" : "")}
-          onClick={() => setShowLineNumbers((open) => !open)}
-          aria-pressed={showLineNumbers}
-          title={showLineNumbers ? "Hide line numbers" : "Show line numbers"}
-        >
-          #
-        </button>
-      )}
-      <button
-        type="button"
-        className={"agnt-md-pre-copy" + (justCopied ? " agnt-md-pre-copy-done" : "")}
-        onClick={handleCopy}
-        aria-label={justCopied ? "Copied" : "Copy code"}
-        title={justCopied ? "Copied" : "Copy code block"}
-      >
-        {justCopied ? "Copied" : "Copy"}
-      </button>
-    </pre>
-  );
-}
-
 function renderHeading(level: 1 | 2 | 3 | 4 | 5 | 6, text: string, cwd: string | undefined): ReactNode {
   const className = "agnt-md-heading agnt-md-h" + level;
   const children = renderInlineFragments(text, cwd);
@@ -306,6 +196,17 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
           </Suspense>
         );
       case "link":
+        if (isLocalWorkspaceLink(token.url)) {
+          return (
+            <WorkspaceTextFileLink
+              key={index}
+              cwd={cwd}
+              path={token.url}
+              label={token.label}
+              title={token.title}
+            />
+          );
+        }
         return (
           <a key={index} href={token.url} target="_blank" rel="noreferrer noopener" title={token.title}>
             {token.label}
@@ -314,6 +215,19 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
       case "image":
         // Direct http/data sources go straight to <img>; non-web paths route
         // through workspace/readImage if we have a cwd to resolve against.
+        if (isSvgDataUrl(token.url)) {
+          const svgSource = decodeSvgDataUrl(token.url);
+          if (svgSource) {
+            return (
+              <WorkspaceSvgPreview
+                key={index}
+                source={svgSource}
+                alt={token.label || token.title || "SVG image"}
+                title={token.title ?? token.label}
+              />
+            );
+          }
+        }
         if (token.url.startsWith("http") || token.url.startsWith("data:")) {
           return (
             <img
@@ -341,6 +255,48 @@ function renderInlineFragments(text: string, cwd: string | undefined): ReactNode
         );
     }
   });
+}
+
+interface WorkspaceTextFileLinkProps {
+  cwd: string | undefined;
+  path: string;
+  label: string;
+  title?: string;
+}
+
+function WorkspaceTextFileLink({ cwd, path, label, title }: WorkspaceTextFileLinkProps) {
+  const [open, setOpen] = useState(false);
+  const text = label || path;
+
+  if (!cwd) {
+    return (
+      <span className="agnt-md-file-link-disabled" title={`No workspace cwd; can't fetch ${path}`}>
+        {text}
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="agnt-md-file-link"
+        title={title ?? path}
+        onClick={() => setOpen(true)}
+      >
+        {text}
+      </button>
+      {open && (
+        <WorkspaceTextFilePreview
+          cwd={cwd}
+          path={path}
+          label={text}
+          open={open}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
 }
 
 interface WorkspaceImageProps {
@@ -377,6 +333,16 @@ function WorkspaceImage({ cwd, path, label, title }: WorkspaceImageProps) {
     );
   }
   if (cached && typeof cached === "object" && "dataUrl" in cached) {
+    const svgSource = isSvgPath(path) || isSvgDataUrl(cached.dataUrl) ? decodeSvgDataUrl(cached.dataUrl) : null;
+    if (svgSource) {
+      return (
+        <WorkspaceSvgPreview
+          source={svgSource}
+          alt={label || title || path}
+          title={title ?? path}
+        />
+      );
+    }
     return (
       <img
         src={cached.dataUrl}
@@ -397,145 +363,4 @@ function WorkspaceImage({ cwd, path, label, title }: WorkspaceImageProps) {
       Loading {label || path}…
     </span>
   );
-}
-
-type InlineToken =
-  | { kind: "text"; value: string }
-  | { kind: "code"; value: string }
-  | { kind: "bold"; value: string }
-  | { kind: "italic"; value: string }
-  | { kind: "math"; value: string; displayMode: boolean }
-  | { kind: "link"; label: string; url: string; title?: string }
-  | { kind: "image"; label: string; url: string; title?: string };
-
-interface InlineHit {
-  kind: InlineToken["kind"];
-  start: number;
-  end: number;
-  // Token-shape fields. `value` is used by the simple kinds; richer kinds
-  // populate label/url/title. `displayMode` is math-only.
-  value?: string;
-  label?: string;
-  url?: string;
-  title?: string;
-  displayMode?: boolean;
-}
-
-// Inline math heuristics:
-//   - `$$...$$` mid-paragraph → display-mode math (rare but supported)
-//   - `$...$` → inline math, but ONLY when the body contains a math-like
-//     character (\, ^, _, {, }) so prose like "$5 and $10" doesn't get
-//     pulled into the renderer.
-const DISPLAY_INLINE_MATH = /\$\$([^$\n]+?)\$\$/g;
-const INLINE_MATH = /(?<![\w$])\$([^$\n\s][^$\n]*?[^$\n\s]|[^$\n\s])\$(?![\w$])/g;
-const MATH_HINT = /[\\^_{}]/;
-
-const SAFE_LINK_SCHEMES = /^(https?:|mailto:|#)/i;
-const SAFE_IMAGE_SCHEMES = /^(https?:|data:image\/)/i;
-// Plain paths with no scheme (`screenshot.png`, `.tmp/cap.png`) are accepted
-// and resolved against a thread cwd via workspace/readImage. The render layer
-// double-checks before fetching.
-const HAS_URL_SCHEME = /^[a-z][a-z0-9+\-.]*:/i;
-
-function tokenizeInline(text: string): InlineToken[] {
-  const hits: InlineHit[] = [];
-  // Image first so its leading `!` consumes the position before the link
-  // matcher can — we can't rely on regex alternation since each pattern is
-  // matched independently then deduped by start.
-  IMAGE_PATTERN.lastIndex = 0;
-  for (const match of text.matchAll(IMAGE_PATTERN)) {
-    if (match.index === undefined) continue;
-    const url = match[2];
-    // Either the URL has a safe image scheme, or it has no scheme at all
-    // (= relative/absolute filesystem path → workspace fetch).
-    if (HAS_URL_SCHEME.test(url) && !SAFE_IMAGE_SCHEMES.test(url)) continue;
-    hits.push({
-      kind: "image",
-      start: match.index,
-      end: match.index + match[0].length,
-      label: match[1],
-      url,
-      title: match[3],
-    });
-  }
-  LINK_PATTERN.lastIndex = 0;
-  for (const match of text.matchAll(LINK_PATTERN)) {
-    if (match.index === undefined) continue;
-    const url = match[2];
-    if (!SAFE_LINK_SCHEMES.test(url)) continue;
-    hits.push({
-      kind: "link",
-      start: match.index,
-      end: match.index + match[0].length,
-      label: match[1],
-      url,
-      title: match[3],
-    });
-  }
-  AUTOLINK_PATTERN.lastIndex = 0;
-  for (const match of text.matchAll(AUTOLINK_PATTERN)) {
-    if (match.index === undefined) continue;
-    hits.push({
-      kind: "link",
-      start: match.index,
-      end: match.index + match[0].length,
-      label: match[0],
-      url: match[0],
-    });
-  }
-  for (const [kind, pattern] of [
-    ["code", INLINE_CODE_PATTERN] as const,
-    ["bold", BOLD_PATTERN] as const,
-    ["italic", ITALIC_PATTERN] as const,
-  ]) {
-    pattern.lastIndex = 0;
-    for (const match of text.matchAll(pattern)) {
-      if (match.index === undefined) continue;
-      hits.push({ kind, start: match.index, end: match.index + match[0].length, value: match[1] });
-    }
-  }
-  // Math: display-form first ($$…$$) so its outer $-pair doesn't get
-  // mis-claimed by the inline `$…$` matcher.
-  DISPLAY_INLINE_MATH.lastIndex = 0;
-  for (const match of text.matchAll(DISPLAY_INLINE_MATH)) {
-    if (match.index === undefined) continue;
-    hits.push({
-      kind: "math",
-      start: match.index,
-      end: match.index + match[0].length,
-      value: match[1],
-      displayMode: true,
-    });
-  }
-  INLINE_MATH.lastIndex = 0;
-  for (const match of text.matchAll(INLINE_MATH)) {
-    if (match.index === undefined) continue;
-    // Skip dollar-amount false positives — only emit a math token when
-    // the body looks math-like.
-    if (!MATH_HINT.test(match[1])) continue;
-    hits.push({
-      kind: "math",
-      start: match.index,
-      end: match.index + match[0].length,
-      value: match[1],
-      displayMode: false,
-    });
-  }
-  hits.sort((a, b) => a.start - b.start);
-  const tokens: InlineToken[] = [];
-  let cursor = 0;
-  for (const hit of hits) {
-    if (hit.start < cursor) continue;
-    if (hit.start > cursor) tokens.push({ kind: "text", value: text.slice(cursor, hit.start) });
-    if (hit.kind === "link" || hit.kind === "image") {
-      tokens.push({ kind: hit.kind, label: hit.label ?? "", url: hit.url ?? "", title: hit.title });
-    } else if (hit.kind === "math") {
-      tokens.push({ kind: "math", value: hit.value ?? "", displayMode: hit.displayMode ?? false });
-    } else {
-      tokens.push({ kind: hit.kind, value: hit.value ?? "" } as InlineToken);
-    }
-    cursor = hit.end;
-  }
-  if (cursor < text.length) tokens.push({ kind: "text", value: text.slice(cursor) });
-  return tokens;
 }

@@ -84,6 +84,7 @@ struct SecureServerHello: Codable, Sendable {
     let macEphemeralPublicKey: String
     let serverNonce: String
     let keyEpoch: Int
+    let bridgeReplayEpoch: String?
     let expiresAtForTranscript: Int64
     let macSignature: String
     let clientNonce: String?
@@ -109,6 +110,7 @@ struct SecureResumeState: Encodable, Sendable {
     let sessionId: String
     let keyEpoch: Int
     let lastAppliedBridgeOutboundSeq: Int
+    let bridgeReplayEpoch: String?
 }
 
 struct SecureErrorMessage: Codable, Sendable {

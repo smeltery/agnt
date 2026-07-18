@@ -7,10 +7,10 @@ The point of keeping this code in the repo is transparency: anyone forking agnt 
 ## What It Does
 
 - accepts WebSocket connections at `/relay/{sessionId}`
-- pairs one Mac host with one live iPhone client for a session
+- pairs one Mac host with one live mobile/browser client for a session
 - keeps an in-memory index of the current live session for each trusted Mac
-- resolves the current live session for a previously trusted iPhone through an authenticated HTTP lookup
-- forwards secure control messages and encrypted payloads between Mac and iPhone
+- resolves the current live session for a previously trusted mobile client through an authenticated HTTP lookup
+- forwards secure control messages and encrypted payloads between Mac and mobile/browser clients
 - exposes optional HTTP endpoints for push registration and run-completion alerts only when push is enabled explicitly
 - logs only connection metadata and payload sizes, not plaintext prompts or responses
 
@@ -27,9 +27,9 @@ The agent CLI, git, and local file operations all run on the user's Mac.
 
 agnt uses the relay as a transport hop, not as a trusted application server.
 
-- The pairing QR gives the iPhone the bridge identity public key plus short-lived session details.
-- After the first successful QR bootstrap, the relay can help the iPhone find the Mac's current live session again through a signed trusted-session resolve request.
-- The iPhone and bridge perform a signed handshake, derive shared AES-256-GCM keys with X25519 + HKDF-SHA256, and then encrypt application payloads end to end.
+- The pairing QR gives the mobile/browser client the bridge identity public key plus short-lived session details.
+- After the first successful QR bootstrap, the relay can help the client find the Mac's current live session again through a signed trusted-session resolve request.
+- The client and bridge perform a signed handshake, derive shared AES-256-GCM keys with X25519 + HKDF-SHA256, and then encrypt application payloads end to end.
 - The relay can still observe connection metadata and the plaintext secure control messages needed to establish the encrypted session.
 - The relay does not receive plaintext agnt application payloads after the secure session is active.
 
@@ -43,45 +43,45 @@ flowchart TD
     D --> E[Relay creates in-memory session room]
     D --> E2[Relay records macDeviceId plus trusted phone metadata for live-session resolve]
 
-    C --> F[iPhone scans QR]
-    F --> G[iPhone opens WebSocket to /relay/{sessionId}<br/>x-role: iphone]
+    C --> F[Client scans or enters QR payload]
+    F --> G[Client opens WebSocket to /relay/{sessionId}<br/>x-role: iphone or android<br/>browser may use ?role=iphone]
     G --> H{Mac session live?}
-    H -- No --> I[Relay closes iPhone socket<br/>4002 session unavailable]
-    H -- Yes --> J[Relay binds iPhone to that session]
+    H -- No --> I[Relay closes client socket<br/>4002 session unavailable]
+    H -- Yes --> J[Relay binds client to that session]
 
     E --> K[Relay forwards secure control messages]
     J --> K
-    K --> L[Mac and iPhone exchange signed handshake]
+    K --> L[Mac and client exchange signed handshake]
     L --> M[Both sides derive AES-256-GCM session keys]
 
-    M --> N[iPhone sends encrypted app messages]
+    M --> N[Client sends encrypted app messages]
     M --> O[Mac sends encrypted agent CLI and bridge responses]
     N --> P[Relay forwards ciphertext to Mac]
-    O --> Q[Relay forwards ciphertext to iPhone]
+    O --> Q[Relay forwards ciphertext to client]
 
     P --> R[Bridge decrypts and routes locally]
     R --> S[Active provider transport / git / workspace handlers]
     S --> O
 
-    Q --> T[iPhone decrypts and renders timeline]
+    Q --> T[Client decrypts and renders timeline]
 
     D --> U[Relay stores per-session notification secret]
     U --> V[Push registration/completion endpoints only work while live Mac session exists]
 
     D --> W{Mac reconnects?}
     W -- Yes --> X[Relay replaces older Mac socket<br/>4001 to old connection]
-    G --> Y{iPhone reconnects?}
-    Y -- Yes --> Z[Relay replaces older iPhone socket<br/>4003 to old connection]
+    G --> Y{Client reconnects?}
+    Y -- Yes --> Z[Relay replaces older client socket<br/>4003 to old connection]
 
     X --> E
     Z --> J
 
     D --> AA{Mac disconnects?}
-    AA -- Yes --> AB[Relay closes iPhone socket(s)<br/>4002 Mac disconnected]
+    AA -- Yes --> AB[Relay closes client socket(s)<br/>4002 Mac disconnected]
     AB --> AC[Empty session cleaned up after delay]
 
     T --> AD[Later app reopen]
-    AD --> AE[iPhone calls POST /v1/trusted/session/resolve]
+    AD --> AE[Client calls POST /v1/trusted/session/resolve]
     AE --> AF[Relay verifies trusted-device signature, nonce, and freshness]
     AF --> AG[Relay returns current live sessionId for that Mac]
     AG --> G
@@ -90,11 +90,12 @@ flowchart TD
 ## Protocol Notes
 
 - WebSocket path: `/relay/{sessionId}`
-- required header: `x-role: mac` or `x-role: iphone`
+- required header: `x-role: mac`, `x-role: iphone`, or `x-role: android`
+- browser clients may use `?role=iphone` because browsers cannot set custom WebSocket headers
 - close code `4000`: invalid session or role
 - close code `4001`: previous Mac connection replaced
 - close code `4002`: session unavailable / Mac disconnected
-- close code `4003`: previous iPhone connection replaced
+- close code `4003`: previous mobile/browser client connection replaced
 
 Optional HTTP endpoints:
 

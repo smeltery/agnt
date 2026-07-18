@@ -1,0 +1,466 @@
+.agnt-flagbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--agnt-border);
+  background: var(--agnt-bg-elev);
+  font-size: 12px;
+}
+.agnt-flagbar-field { display: flex; gap: 6px; align-items: center; color: var(--agnt-fg-dim); }
+.agnt-flagbar-field span { white-space: nowrap; }
+.agnt-flagbar-field select {
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font: inherit;
+}
+.agnt-flagbar-toggle { display: flex; gap: 6px; align-items: center; color: var(--agnt-fg-dim); cursor: pointer; }
+.agnt-flagbar-toggle input { cursor: pointer; }
+
+/* iOS sheet treatment: dimmed backdrop, secondarySystemBackground card,
+   18pt continuous corner radius, no visible 1px border (the elevation does
+   the work). Title3 medium for the header. */
+.agnt-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  backdrop-filter: saturate(160%) blur(2px);
+}
+.agnt-modal {
+  background: var(--agnt-bg-elev);
+  border: 0;
+  border-radius: var(--agnt-radius-sheet);
+  max-width: 560px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+[data-theme="light"] .agnt-modal { box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18); }
+.agnt-modal-header h2 { margin: 4px 0 0; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; }
+.agnt-modal-body { display: flex; flex-direction: column; gap: 8px; }
+.agnt-modal-command {
+  margin: 0;
+  padding: 10px;
+  background: var(--agnt-bg);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  font-family: var(--agnt-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+}
+.agnt-modal-reason { margin: 0; color: var(--agnt-fg-dim); }
+.agnt-modal-footer { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.agnt-modal-queue-hint { font-size: 11px; color: var(--agnt-fg-dim); text-align: right; }
+.agnt-modal-batch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--agnt-border);
+  border-radius: 6px;
+  background: var(--agnt-bg-elev);
+}
+.agnt-modal-batch-label { font-size: 12px; color: var(--agnt-fg-dim); }
+.agnt-modal-batch-actions { display: flex; gap: 6px; }
+.agnt-modal-batch-actions .agnt-button-ghost { padding: 2px 8px; font-size: 11px; }
+
+.agnt-notice-stack {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 360px;
+  z-index: 90;
+}
+.agnt-notice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--agnt-bg-elev);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+.agnt-notice-info { border-color: var(--agnt-accent); }
+.agnt-notice-warn { border-color: var(--agnt-warn); }
+.agnt-notice-error { border-color: var(--agnt-danger); }
+.agnt-notice-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 13px; }
+.agnt-notice-close {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.agnt-notice-close:hover { color: var(--agnt-fg); }
+
+/* iOS-style chat header: thin separator instead of a colored bar, the
+   primary navigation title sits at 17pt semibold, cwd renders monospace. */
+.agnt-chat-header {
+  border-bottom: 1px solid var(--agnt-border);
+  background: var(--agnt-bg);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.agnt-chat-header > * { width: 100%; }
+.agnt-chat-header-titles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+.agnt-chat-header-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.agnt-chat-header-cwd {
+  color: var(--agnt-fg-dim);
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+}
+.agnt-chat-header-provider { text-transform: capitalize; }
+.agnt-chat-header-model {
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  white-space: nowrap;
+}
+.agnt-chat-header-branch {
+  cursor: pointer;
+  border: 1px solid var(--agnt-border);
+  background: transparent;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  white-space: nowrap;
+}
+.agnt-chat-header-branch:hover { color: var(--agnt-fg); border-color: var(--agnt-fg-dim); }
+.agnt-chat-header-branch-dirty { color: var(--agnt-warn, #d3893b); border-color: var(--agnt-warn, #d3893b); }
+
+.agnt-sidebar-row { display: flex; align-items: stretch; gap: 4px; padding: 0; }
+.agnt-sidebar-row-selected { background: var(--agnt-bg-elev-2); }
+.agnt-sidebar-row .agnt-sidebar-thread { flex: 1; }
+
+.agnt-thread-menu { position: relative; display: flex; align-items: stretch; }
+.agnt-thread-menu-trigger {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  padding: 0 8px;
+  cursor: pointer;
+  font-size: 16px;
+}
+.agnt-thread-menu-trigger:hover { color: var(--agnt-fg); }
+.agnt-thread-menu-popover {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 80;
+  min-width: 180px;
+  background: var(--agnt-bg-elev);
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.agnt-thread-menu-popover button {
+  background: transparent;
+  border: 0;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--agnt-fg);
+  font: inherit;
+  cursor: pointer;
+}
+.agnt-thread-menu-popover button:hover { background: var(--agnt-bg-elev-2); }
+
+.agnt-composer-attachments {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 6px 0;
+}
+.agnt-composer-attachment {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--agnt-border);
+  background: var(--agnt-bg-elev-2);
+  /* Multi-attachment rows get a grab cursor so the affordance is
+     discoverable. Single attachments aren't draggable; CSS leaves them
+     at default. */
+  cursor: grab;
+}
+.agnt-composer-attachment img { width: 100%; height: 100%; object-fit: cover; }
+.agnt-composer-attachment-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.agnt-composer-attachment-droptarget {
+  outline: 2px solid var(--agnt-accent);
+  outline-offset: 1px;
+}
+.agnt-composer-attachment-remove {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+.agnt-composer-attach-error {
+  font-size: 11px;
+  color: var(--agnt-danger);
+  padding: 2px 8px;
+}
+.agnt-composer-drop { box-shadow: inset 0 0 0 2px var(--agnt-accent); }
+.agnt-row-attachments {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.agnt-row-attachment-thumb {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 6px;
+  border: 1px solid var(--agnt-border);
+}
+.agnt-row-user-text { display: block; }
+
+.agnt-input-field { border: 0; padding: 0; margin: 0 0 12px; }
+.agnt-input-field legend { font-size: 13px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px; }
+.agnt-input-field-header { color: var(--agnt-fg-dim); font-size: 11px; text-transform: uppercase; }
+.agnt-input-text {
+  width: 100%;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--agnt-fg);
+  font: inherit;
+}
+.agnt-input-options { display: flex; flex-direction: column; gap: 4px; }
+.agnt-input-option { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; padding: 4px; border-radius: 6px; }
+.agnt-input-option:hover { background: var(--agnt-bg-elev-2); }
+.agnt-input-option-desc { display: block; color: var(--agnt-fg-dim); font-size: 11px; margin-top: 2px; }
+
+/* iOS UISegmentedControl: filled background, equal-width segments, soft
+   inner pill for the active state. Spaced from the surrounding form so it
+   reads as a control, not a tab strip. */
+.agnt-pairing-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 16px 0;
+  padding: 2px;
+  background: var(--agnt-bg-elev-2);
+  border-radius: var(--agnt-radius-control);
+}
+.agnt-pairing-tab {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  padding: 6px 10px;
+  border-radius: calc(var(--agnt-radius-control) - 2px);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 120ms ease, color 120ms ease;
+}
+.agnt-pairing-tab:hover { color: var(--agnt-fg); }
+.agnt-pairing-tab-active {
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.agnt-pairing-input {
+  background: var(--agnt-bg-elev-2);
+  border: 0;
+  border-radius: var(--agnt-radius-control);
+  padding: 10px 12px;
+  color: var(--agnt-fg);
+  font: inherit;
+  font-size: 14px;
+  width: 100%;
+}
+.agnt-pairing-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--agnt-accent) 30%, transparent);
+}
+.agnt-pairing-input-code {
+  font-family: var(--agnt-mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* QR scanner: rounded card with a soft camera preview frame and a corner-
+   bracket reticule (instead of the dashed full-rect outline) so it reads
+   as the iOS camera viewfinder. */
+.agnt-qr-scanner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  border: 0;
+  border-radius: var(--agnt-radius-card);
+  background: var(--agnt-bg-elev);
+}
+.agnt-qr-scanner-frame {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  background: black;
+  border-radius: var(--agnt-radius-card);
+  overflow: hidden;
+}
+.agnt-qr-scanner-video { width: 100%; height: 100%; object-fit: cover; }
+/* iOS-style corner brackets at 12% inset. We draw four L-shaped corners
+   using gradients on a single ::before so the JSX stays unchanged. */
+.agnt-qr-scanner-reticule {
+  position: absolute;
+  inset: 12%;
+  pointer-events: none;
+  --bracket: 24px;
+  --bracket-w: 3px;
+  background:
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) top left / var(--bracket) var(--bracket-w) no-repeat,
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) top left / var(--bracket-w) var(--bracket) no-repeat,
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) top right / var(--bracket) var(--bracket-w) no-repeat,
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) top right / var(--bracket-w) var(--bracket) no-repeat,
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) bottom left / var(--bracket) var(--bracket-w) no-repeat,
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) bottom left / var(--bracket-w) var(--bracket) no-repeat,
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) bottom right / var(--bracket) var(--bracket-w) no-repeat,
+    linear-gradient(var(--agnt-accent), var(--agnt-accent)) bottom right / var(--bracket-w) var(--bracket) no-repeat;
+}
+.agnt-qr-scanner-status { color: var(--agnt-fg-dim); font-size: 13px; text-align: center; }
+
+.agnt-settings-modal { max-width: 640px; max-height: 90vh; overflow: auto; }
+.agnt-settings-header { display: flex; justify-content: space-between; align-items: center; }
+/* iOS Settings sections: each group is a card with its own
+   secondarySystemBackground, 12pt continuous radius, 16pt padding. The
+   header is a small uppercase grouping label rendered above the card,
+   matching the way iOS Settings labels its rows. */
+.agnt-settings-section {
+  background: var(--agnt-bg-elev-2);
+  border-radius: var(--agnt-radius-card);
+  padding: 14px 16px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agnt-settings-section:first-of-type { margin-top: 0; }
+.agnt-settings-section h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--agnt-fg);
+  text-transform: none;
+}
+.agnt-settings-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.agnt-settings-kv dt { color: var(--agnt-fg-dim); }
+.agnt-settings-kv dd { margin: 0; }
+.agnt-settings-hint { color: var(--agnt-fg-dim); font-size: 12px; margin: 0; }
+.agnt-settings-macs { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.agnt-settings-mac {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  background: var(--agnt-bg);
+}
+.agnt-settings-mac-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.agnt-settings-mac-detail { color: var(--agnt-fg-dim); font-size: 11px; }
+
+.agnt-about-modal { max-width: 420px; }
+
+.agnt-md-pre code[class*="language-"] {
+  text-shadow: none;
+  background: transparent;
+  font-family: var(--agnt-mono);
+  font-size: 12px;
+}
+/* Prism's prism-tomorrow theme is dark-only. The light overrides below give
+   readable token colors when the user picks a light theme; we keep tomorrow
+   for dark because it's still the most legible default. */
+[data-theme="light"] .agnt-md-pre code[class*="language-"] { color: #1b1d22; }
+[data-theme="light"] .token.comment,
+[data-theme="light"] .token.prolog,
+[data-theme="light"] .token.doctype,
+[data-theme="light"] .token.cdata { color: #6a737d; }
+[data-theme="light"] .token.punctuation { color: #1b1d22; }
+[data-theme="light"] .token.keyword,
+[data-theme="light"] .token.tag { color: #b1284c; }
+[data-theme="light"] .token.string,
+[data-theme="light"] .token.attr-value,
+[data-theme="light"] .token.char { color: #1d7c3c; }
+[data-theme="light"] .token.number,
+[data-theme="light"] .token.constant,
+[data-theme="light"] .token.builtin { color: #b56b07; }
+[data-theme="light"] .token.function,
+[data-theme="light"] .token.class-name { color: #3257d6; }
+[data-theme="light"] .token.operator,
+[data-theme="light"] .token.entity,
+[data-theme="light"] .token.url { color: #5b6271; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .agnt-md-pre code[class*="language-"] { color: #1b1d22; }
+  :root:not([data-theme]) .token.comment,
+  :root:not([data-theme]) .token.prolog,
+  :root:not([data-theme]) .token.doctype,
+  :root:not([data-theme]) .token.cdata { color: #6a737d; }
+  :root:not([data-theme]) .token.keyword,
+  :root:not([data-theme]) .token.tag { color: #b1284c; }
+  :root:not([data-theme]) .token.string,
+  :root:not([data-theme]) .token.attr-value,
+  :root:not([data-theme]) .token.char { color: #1d7c3c; }
+  :root:not([data-theme]) .token.number,
+  :root:not([data-theme]) .token.constant,
+  :root:not([data-theme]) .token.builtin { color: #b56b07; }
+  :root:not([data-theme]) .token.function,
+  :root:not([data-theme]) .token.class-name { color: #3257d6; }
+}

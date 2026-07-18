@@ -5,3 +5,9 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ktlint) apply false
 }
+
+tasks.register("ciDebug") {
+    group = "verification"
+    description = "Run the Android debug checks used by GitHub Actions."
+    dependsOn(":app:ktlintCheck", ":app:testDebugUnitTest", ":app:assembleDebug")
+}

@@ -1,7 +1,6 @@
 package com.dotbrains.agnt.mobile.data
 
 import com.dotbrains.agnt.mobile.core.model.CodexImageAttachment
-import com.dotbrains.agnt.mobile.core.model.CodexMessage
 import com.dotbrains.agnt.mobile.core.model.CodexMessageDeliveryState
 import com.dotbrains.agnt.mobile.core.model.CodexMessageKind
 import com.dotbrains.agnt.mobile.core.model.CodexMessageRole
@@ -358,7 +357,6 @@ class HistoryMessageMergeTest {
             )
 
         val merged = HistoryMessageMerge.merge(existing, incoming)
-
         assertEquals(2, merged.size)
         assertEquals(listOf("diff-1", "diff-2"), merged.map { it.id })
     }
@@ -499,30 +497,4 @@ class HistoryMessageMergeTest {
         assertEquals(2, merged.size)
         assertEquals(listOf("command-1", "command-2"), merged.map { it.id })
     }
-
-    private fun message(
-        id: String,
-        role: CodexMessageRole = CodexMessageRole.system,
-        kind: CodexMessageKind = CodexMessageKind.fileChange,
-        text: String,
-        turnId: String?,
-        itemId: String?,
-        isStreaming: Boolean,
-        createdAt: Instant,
-        deliveryState: CodexMessageDeliveryState = CodexMessageDeliveryState.confirmed,
-        attachments: List<CodexImageAttachment> = emptyList(),
-    ): CodexMessage =
-        CodexMessage(
-            id = id,
-            threadId = "thread-1",
-            role = role,
-            kind = kind,
-            text = text,
-            createdAt = createdAt,
-            turnId = turnId,
-            itemId = itemId,
-            isStreaming = isStreaming,
-            deliveryState = deliveryState,
-            attachments = attachments,
-        )
 }

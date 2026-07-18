@@ -4,6 +4,58 @@ The web client is being built across a series of focused sessions. Each session
 delivers an end-to-end-usable slice; the foundation never gets restructured by a
 later session because the protocol and storage layers are already complete.
 
+## Session 46 — Streaming inline markdown polish ✅ DONE
+
+- ✅ **Streaming inline marker auto-close.** Assistant rows now render a
+  virtual close for incomplete streaming inline code / bold spans, and hold
+  back bare trailing openers for a frame, so raw markdown markers do not flash
+  while a response is still arriving. Completed messages keep the normal
+  markdown renderer path unchanged.
+- New `streaming-inline-markup.test.ts` covers open spans, bare openers,
+  fenced-code exclusions, escaped markers, and prose operators.
+
+## Session 44 — Inline review slash command ✅ DONE
+
+- ✅ **Inline review start.** The web slash-command catalog now exposes
+  `/review` for live threads. It inserts the same optimistic user row as a
+  normal send and calls `review/start` with `{ delivery: "inline" }` for
+  uncommitted changes, while `/review <base-branch>` sends a base-branch
+  target. This matches the provider protocol without adding a parallel review
+  thread UI.
+- New `slash-commands.test.ts` coverage verifies command routing plus the
+  review/start payload shape for both uncommitted-change and base-branch
+  targets.
+
+## Session 43 — Fast Mode service tier ✅ DONE
+
+- ✅ **Fast Mode runtime flag.** Web `model/list` decoding now preserves fast
+  capability metadata across known field spellings and static fallback model
+  ids. The turn flag bar exposes Fast Mode only when the selected/default model
+  supports it, persists `serviceTier: "fast"`, and includes it in `thread/start`
+  / `turn/start` params through the same guarded path used for retries.
+- New `service-tier.test.ts` covers model metadata decoding, persistence, and
+  supported-model gating.
+
+## Session 42 — Workspace text-file previews ✅ DONE
+
+- ✅ **Syntax-highlighted workspace text previews.** Assistant markdown links to
+  repo-local text files now open a read-only sheet backed by `workspace/readFile`,
+  with cached metadata revalidation, Prism highlighting, selectable text, copy,
+  and line numbers enabled by default.
+- 7 new vitest assertions across `workspace-text-preview.test.ts` and
+  `markdown-inline.test.tsx`; focused tests, `tsc`, and Vite build pass.
+
+## Session 41 — Hardened SVG workspace previews ✅ DONE
+
+- ✅ **Sandboxed SVG previews.** Workspace `.svg` artifacts and SVG data URLs now
+  render through `WorkspaceSvgPreview`, a sandboxed iframe backed by an offline
+  CSP document. External `href` / `xlink:href` / `src` references pointing at
+  `http(s)`, protocol-relative URLs, or `file:` are stripped before render, so
+  generated vector artifacts preview as artwork without inheriting the normal
+  browser image path's SVG execution surface.
+- 6 new vitest assertions across `workspace-svg-preview.test.ts` and
+  `markdown-inline.test.tsx`; focused tests, `tsc`, and Vite build pass.
+
 ## Session 1 — Foundation (this branch)
 
 - Faithful port of secure transport + handshake + JSON-RPC framing

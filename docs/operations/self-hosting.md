@@ -72,6 +72,14 @@ Pass a hostname or IP address that the phone can actually reach:
 ./scripts/run-local-agnt.sh --hostname 192.168.1.10
 ```
 
+For temporary tunnel or reverse-proxy testing, advertise the tunnel URL directly.
+The helper accepts `http(s)` URLs and normalizes them to `ws(s)` with `/relay`
+when no path is provided:
+
+```sh
+./scripts/run-local-agnt.sh --relay-url https://example-tunnel.trycloudflare.com
+```
+
 ### Health check
 
 By default the local relay listens on port `9000`.

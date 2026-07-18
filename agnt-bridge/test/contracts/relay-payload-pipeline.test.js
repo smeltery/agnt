@@ -15,13 +15,16 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
-  augmentRelayThreadWithJsonlMetadata,
   sanitizeLiveContextualUserItemForRelay,
+  sanitizeLiveUserNotification,
   sanitizeThreadHistoryImagesForRelay,
   sanitizeThreadTurnsListForRelay,
   sanitizeRelayHistoryTurns,
   sanitizeRelayHistoryTurn,
 } = require("../../src/bridge/relay-payload-pipeline");
+const {
+  RELAY_HISTORY_RECENT_TURN_TARGET,
+} = require("../../src/bridge/relay-payload-trimmer");
 
 // ─── dispatcher behaviour ───────────────────────────────────────────────────
 
@@ -91,6 +94,15 @@ test("sanitizeThreadHistoryImagesForRelay drops injected context user items from
             }],
           },
           {
+            id: "ctx-internal-goal",
+            type: "message",
+            role: "user",
+            content: [{
+              type: "input_text",
+              text: "<codex_internal_context source=\"goal\">\nhidden goal state\n</codex_internal_context>",
+            }],
+          },
+          {
             id: "real-user",
             type: "user_message",
             content: [{ type: "input_text", text: "Summarize the diff" }],
@@ -111,6 +123,38 @@ test("sanitizeThreadHistoryImagesForRelay drops injected context user items from
     out.result.thread.turns[0].items.map((item) => item.id),
     ["real-user", "assistant"]
   );
+});
+
+test("sanitizeThreadHistoryImagesForRelay sanitizes mixed user content entry-by-entry", () => {
+  const raw = JSON.stringify({
+    id: "r-mixed-context",
+    result: { thread: {
+      id: "thread-mixed-context",
+      turns: [{
+        id: "turn-1",
+        items: [{
+          id: "item-mixed",
+          type: "user_message",
+          content: [
+            { type: "input_text", text: "<environment_context>secret</environment_context>" },
+            {
+              type: "input_text",
+              text: "## Code review guidelines:\ninternal review text\n## My request for Codex:\nReview this file",
+            },
+            { type: "input_text", text: "<image name=[Image #1] path=\"/tmp/private.png\">" },
+            { type: "input_image", image_url: "data:image/png;base64,AAAA" },
+            { type: "input_text", text: "</image>" },
+          ],
+        }],
+      }],
+    } },
+  });
+
+  const out = JSON.parse(sanitizeThreadHistoryImagesForRelay(raw, "thread/read"));
+  assert.deepEqual(out.result.thread.turns[0].items[0].content, [
+    { type: "input_text", text: "Review this file" },
+    { type: "input_image", url: "agnt://history-image-elided" },
+  ]);
 });
 
 test("sanitizeThreadTurnsListForRelay drops injected context user items from pages", () => {
@@ -141,6 +185,52 @@ test("sanitizeThreadTurnsListForRelay drops injected context user items from pag
 
   const out = JSON.parse(sanitizeThreadTurnsListForRelay(raw));
   assert.deepEqual(out.result.data[0].items.map((item) => item.id), ["real-user"]);
+});
+
+test("sanitizeThreadHistoryImagesForRelay converts historical apply_patch calls to fileChange items", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: src/app.js",
+    "@@",
+    "-old",
+    "+new",
+    "*** End Patch",
+  ].join("\n");
+  const raw = JSON.stringify({
+    id: "r-apply-patch-history",
+    result: { thread: {
+      id: "thread-apply-patch-history",
+      turns: [{
+        id: "turn-1",
+        items: [{
+          id: "call-apply-patch",
+          type: "custom_tool_call",
+          name: "apply_patch",
+          call_id: "call-1",
+          input: patch,
+          status: "completed",
+        }],
+      }],
+    } },
+  });
+
+  const out = JSON.parse(sanitizeThreadHistoryImagesForRelay(raw, "thread/read"));
+  const item = out.result.thread.turns[0].items[0];
+  assert.equal(item.id, "call-1");
+  assert.equal(item.type, "fileChange");
+  assert.equal(item.status, "completed");
+  assert.deepEqual(item.changes.map((change) => ({
+    path: change.path,
+    kind: change.kind,
+    additions: change.additions,
+    deletions: change.deletions,
+  })), [{
+    path: "src/app.js",
+    kind: "update",
+    additions: 1,
+    deletions: 1,
+  }]);
+  assert.match(item.changes[0].diff, /diff --git a\/src\/app\.js b\/src\/app\.js/);
 });
 
 test("sanitizeLiveContextualUserItemForRelay drops injected live user item notifications", () => {
@@ -176,6 +266,45 @@ test("sanitizeLiveContextualUserItemForRelay preserves real live user item notif
   });
 
   assert.equal(sanitizeLiveContextualUserItemForRelay(raw), raw);
+});
+
+test("sanitizeLiveUserNotification filters fallback context and rewrites visible envelopes", () => {
+  assert.equal(sanitizeLiveUserNotification({
+    method: "codex/event/user_message",
+    params: {
+      threadId: "t",
+      message: "<codex_internal_context source=\"goal\">secret</codex_internal_context>",
+    },
+  }), null);
+
+  const heartbeat = sanitizeLiveUserNotification({
+    method: "codex/event/user_message",
+    params: {
+      threadId: "t",
+      message: "<heartbeat><automation_id>private</automation_id><instructions>Check CI.</instructions></heartbeat>",
+    },
+  });
+  assert.equal(heartbeat.params.message, "Check CI.");
+
+  const mixedItem = sanitizeLiveUserNotification({
+    method: "item/completed",
+    params: {
+      threadId: "t",
+      item: {
+        id: "mixed",
+        type: "userMessage",
+        content: [
+          { type: "input_text", text: "<environment_context>secret</environment_context>" },
+          { type: "input_text", text: "keep me" },
+          { type: "input_image", image_url: "data:image/png;base64,AAAA" },
+        ],
+      },
+    },
+  });
+  assert.deepEqual(mixedItem.params.item.content, [
+    { type: "input_text", text: "keep me" },
+    { type: "input_image", image_url: "data:image/png;base64,AAAA" },
+  ]);
 });
 
 test("sanitizeThreadHistoryImagesForRelay elides inline data: image URLs in history content", () => {
@@ -236,108 +365,18 @@ test("sanitizeThreadHistoryImagesForRelay pre-trims oversized old image turns be
     "old oversized image turns should be omitted instead of sanitized and kept"
   );
   assert.equal(rewritten.result.thread.agntHistoryCompacted, true);
-  assert.equal(rewritten.result.thread.agntOmittedTurnCount, 5);
-  assert.equal(rewritten.result.thread.agntKeptTurnCount, 40);
+  assert.equal(
+    rewritten.result.thread.agntOmittedTurnCount,
+    turns.length - RELAY_HISTORY_RECENT_TURN_TARGET
+  );
+  assert.equal(rewritten.result.thread.agntKeptTurnCount, RELAY_HISTORY_RECENT_TURN_TARGET);
   assert.deepEqual(
     rewritten.result.thread.turns.map((turn) => turn.id),
     [
       "agnt-history-compacted-old-turn-1",
-      ...turns.slice(5).map((turn) => turn.id),
+      ...turns.slice(-RELAY_HISTORY_RECENT_TURN_TARGET).map((turn) => turn.id),
     ]
   );
-});
-
-test("sanitizeThreadHistoryImagesForRelay augments Codex thread cwd from matching JSONL metadata", () => {
-  const raw = JSON.stringify({
-    id: "r-jsonl-cwd",
-    result: { thread: {
-      id: "thread-jsonl-cwd",
-      turns: [{ id: "turn-1", items: [{ id: "item-1", type: "message", text: "hi" }] }],
-    } },
-  });
-  const fsModule = makeJsonlFs({
-    "/sessions/rollout-thread-jsonl-cwd.jsonl": {
-      mtimeMs: 1,
-      content: `${JSON.stringify({
-        type: "session_meta",
-        payload: { id: "thread-jsonl-cwd", cwd: "/Users/me/project" },
-      })}\n`,
-    },
-  });
-
-  const out = sanitizeThreadHistoryImagesForRelay(raw, "thread/read", {
-    activeProviderId: "codex",
-    resolveSessionsRootImpl: () => "/sessions",
-    findRecentRolloutFileForContextReadImpl: () => "/sessions/rollout-thread-jsonl-cwd.jsonl",
-    fsModule,
-  });
-  const rewritten = JSON.parse(out);
-
-  assert.equal(rewritten.result.thread.cwd, "/Users/me/project");
-  assert.equal(rewritten.result.thread.current_working_directory, "/Users/me/project");
-});
-
-test("sanitizeThreadHistoryImagesForRelay skips JSONL cwd augmentation for non-Codex providers", () => {
-  const raw = JSON.stringify({
-    id: "r-jsonl-cwd-noncodex",
-    result: { thread: {
-      id: "thread-jsonl-cwd-noncodex",
-      turns: [{ id: "turn-1", items: [{ id: "item-1", type: "message", text: "hi" }] }],
-    } },
-  });
-
-  assert.equal(
-    sanitizeThreadHistoryImagesForRelay(raw, "thread/read", {
-      activeProviderId: "claude",
-      resolveSessionsRootImpl: () => {
-        throw new Error("must not inspect Codex rollout files");
-      },
-    }),
-    raw
-  );
-});
-
-test("augmentRelayThreadWithJsonlMetadata refreshes cwd when rollout identity changes", () => {
-  let currentPath = "/sessions/rollout-thread-jsonl-cwd-refresh-old.jsonl";
-  let nowValue = 1_000;
-  const fsModule = makeJsonlFs({
-    "/sessions/rollout-thread-jsonl-cwd-refresh-old.jsonl": {
-      mtimeMs: 1,
-      content: `${JSON.stringify({
-        type: "session_meta",
-        payload: { id: "thread-jsonl-cwd-refresh", cwd: "/Users/me/old" },
-      })}\n`,
-    },
-    "/sessions/rollout-thread-jsonl-cwd-refresh-new.jsonl": {
-      mtimeMs: 2,
-      content: `${JSON.stringify({
-        type: "session_meta",
-        payload: { id: "thread-jsonl-cwd-refresh", cwd: "/Users/me/new" },
-      })}\n`,
-    },
-  });
-  const deps = {
-    resolveSessionsRootImpl: () => "/sessions",
-    findRecentRolloutFileForContextReadImpl: () => currentPath,
-    fsModule,
-    now: () => nowValue,
-  };
-
-  const first = augmentRelayThreadWithJsonlMetadata(
-    { id: "thread-jsonl-cwd-refresh", turns: [] },
-    "thread-jsonl-cwd-refresh",
-    deps
-  );
-  assert.equal(first.thread.cwd, "/Users/me/old");
-
-  currentPath = "/sessions/rollout-thread-jsonl-cwd-refresh-new.jsonl";
-  nowValue += 1;
-  const second = augmentRelayThreadWithJsonlMetadata(
-    { id: "thread-jsonl-cwd-refresh", turns: [] },
-    "thread-jsonl-cwd-refresh",
-    deps
-  );
-  assert.equal(second.thread.cwd, "/Users/me/new");
 });
 
 test("sanitizeThreadTurnsListForRelay returns rawMessage when no turns key is present", () => {
@@ -427,25 +466,3 @@ test("sanitizeRelayHistoryTurn falls back to turn.threadId when the outer thread
   assert.equal(item.result, undefined);
   assert.equal(item.result_elided_for_relay, true);
 });
-
-function makeJsonlFs(files) {
-  return {
-    statSync(filePath) {
-      const file = files[filePath];
-      if (!file) {
-        throw new Error(`missing file ${filePath}`);
-      }
-      return {
-        mtimeMs: file.mtimeMs,
-        size: Buffer.byteLength(file.content, "utf8"),
-      };
-    },
-    readFileSync(filePath) {
-      const file = files[filePath];
-      if (!file) {
-        throw new Error(`missing file ${filePath}`);
-      }
-      return file.content;
-    },
-  };
-}

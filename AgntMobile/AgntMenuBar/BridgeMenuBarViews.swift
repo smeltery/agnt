@@ -2,10 +2,8 @@
 // Purpose: Renders the menu bar "control center" UI, including the global-CLI blocker, status cards, relay controls, and action buttons.
 // Layer: Companion app view
 // Exports: BridgeMenuBarContentView, BridgeMenuBarLabel
-// Depends on: SwiftUI, AppKit, CoreImage, BridgeMenuBarStore, BridgeControlModels
+// Depends on: SwiftUI, BridgeMenuBarStore, BridgeControlModels, BridgeMenuBarComponents
 
-import AppKit
-import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct BridgeMenuBarContentView: View {
@@ -458,126 +456,4 @@ struct BridgeMenuBarLabel: View {
             }
         }
     }
-}
-
-// MARK: - Shared components
-
-private struct LabelValueRow: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.tertiary)
-            Text(value)
-                .font(.system(size: 10, weight: .regular, design: .monospaced))
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-        }
-    }
-}
-
-private struct CompactActionButton: View {
-    let title: String
-    let style: Style
-    let action: () -> Void
-
-    enum Style { case primary, secondary, destructive }
-
-    init(_ title: String, style: Style = .secondary, action: @escaping () -> Void) {
-        self.title = title
-        self.style = style
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(foregroundColor)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(backgroundColor, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(borderColor, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var backgroundColor: Color {
-        switch style {
-        case .primary, .secondary, .destructive: return .clear
-        }
-    }
-
-    private var foregroundColor: Color {
-        switch style {
-        case .primary: return .primary
-        case .secondary: return .primary
-        case .destructive: return .red
-        }
-    }
-
-    private var borderColor: Color {
-        switch style {
-        case .primary: return .primary.opacity(0.18)
-        case .secondary: return .primary.opacity(0.08)
-        case .destructive: return .red.opacity(0.15)
-        }
-    }
-}
-
-private struct PairingQRCodeView: View {
-    let payload: BridgePairingPayload
-    private let context = CIContext()
-    private let filter = CIFilter.qrCodeGenerator()
-
-    var body: some View {
-        Group {
-            if let image = qrImage {
-                Image(nsImage: image)
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(8)
-            } else {
-                Text("QR unavailable")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    private var qrImage: NSImage? {
-        let payloadObject = PairingQRPayloadEnvelope(
-            v: payload.v,
-            relay: payload.relay,
-            sessionId: payload.sessionId,
-            macDeviceId: payload.macDeviceId,
-            macIdentityPublicKey: payload.macIdentityPublicKey,
-            expiresAt: payload.expiresAt
-        )
-        guard let data = try? JSONEncoder().encode(payloadObject) else { return nil }
-
-        filter.setValue(data, forKey: "inputMessage")
-        filter.correctionLevel = "M"
-
-        guard let outputImage = filter.outputImage else { return nil }
-        let scaledImage = outputImage.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
-        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
-        return NSImage(cgImage: cgImage, size: .zero)
-    }
-}
-
-private struct PairingQRPayloadEnvelope: Encodable {
-    let v: Int
-    let relay: String
-    let sessionId: String
-    let macDeviceId: String
-    let macIdentityPublicKey: String
-    let expiresAt: Int64
 }

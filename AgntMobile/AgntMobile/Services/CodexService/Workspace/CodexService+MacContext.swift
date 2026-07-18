@@ -62,6 +62,9 @@ extension CodexService {
                 macDeviceId: normalizedMacDeviceId,
                 includeLegacyFallback: includeLegacyFallback
             )
+            composerDraftMergeRevisionByThreadID.removeAll()
+            composerDraftPendingAttachmentIDsByThreadID.removeAll()
+            composerDraftMergeEpoch += 1
             messageRevisionByThread = Dictionary(uniqueKeysWithValues: loadedMessages.keys.map { ($0, 0) })
             messageIndexCacheByThread.removeAll()
             latestAssistantOutputByThread.removeAll()
@@ -78,8 +81,10 @@ extension CodexService {
             aiChangeSetsByID = loadedChangeSets.reduce(into: [:]) { partialResult, changeSet in
                 partialResult[changeSet.id] = changeSet
             }
-            aiChangeSetIDByTurnID = loadedChangeSets.reduce(into: [:]) { partialResult, changeSet in
-                partialResult[changeSet.turnId] = changeSet.id
+            aiChangeSetIDByTurnKey = loadedChangeSets.reduce(into: [:]) { partialResult, changeSet in
+                if let turnKey = AIChangeSetTurnKey(threadId: changeSet.threadId, turnId: changeSet.turnId) {
+                    partialResult[turnKey] = changeSet.id
+                }
             }
             aiChangeSetIDByAssistantMessageID = loadedChangeSets.reduce(into: [:]) { partialResult, changeSet in
                 if let assistantMessageId = changeSet.assistantMessageId {
@@ -181,6 +186,7 @@ extension CodexService {
             } else {
                 terminalStateByTurnID = [:]
             }
+            projectedTerminalStateByThreadID = [:]
             latestTurnTerminalStateByThread = [:]
 
             if let savedThreadHistoryPaginationState = defaults.data(
@@ -244,6 +250,9 @@ extension CodexService {
             activeTurnIdByThread.removeAll()
             messagesByThread.removeAll()
             composerDraftsByThreadID.removeAll()
+            composerDraftMergeEpoch += 1
+            composerDraftMergeRevisionByThreadID.removeAll()
+            composerDraftPendingAttachmentIDsByThreadID.removeAll()
             messageRevisionByThread.removeAll()
             threadIdByTurnID.removeAll()
             queuedTurnDraftsByThread.removeAll()
@@ -252,7 +261,7 @@ extension CodexService {
             recentActivityLineByThread.removeAll()
             contextWindowUsageByThread.removeAll()
             aiChangeSetsByID.removeAll()
-            aiChangeSetIDByTurnID.removeAll()
+            aiChangeSetIDByTurnKey.removeAll()
             aiChangeSetIDByAssistantMessageID.removeAll()
             clearAllRunningState()
             readyThreadIDs.removeAll()
@@ -266,6 +275,7 @@ extension CodexService {
             currentOutput = ""
             latestTurnTerminalStateByThread.removeAll()
             terminalStateByTurnID.removeAll()
+            projectedTerminalStateByThreadID.removeAll()
             olderThreadHistoryCursorByThreadID.removeAll()
             exhaustedOlderThreadHistoryCursorByThreadID.removeAll()
             loadingOlderThreadHistoryIDs.removeAll()

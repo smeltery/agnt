@@ -13,13 +13,21 @@
 import {
   appendCommandOutput,
   type CodexMessage,
-  compareMessages,
   createMessage,
-  type MessageKind,
-  type PlanState,
-  type PlanStep,
 } from "../models";
 import { replayDeduper } from "./replay-deduper";
+import {
+  appendOrUpdate,
+  compositeKey,
+  filterByValueNotIn,
+  idsForTurn,
+  inferKindFromType,
+  mutateMessage,
+  removeKey,
+} from "./turn-reducer/helpers";
+import { beginStructuredItem, completeStructuredItem } from "./turn-reducer/structured";
+export { applyPlanDelta, applyPlanUpdated } from "./turn-reducer/plan";
+export type { PlanDeltaEvent, PlanUpdatedEvent } from "./turn-reducer/plan";
 
 /** Per-thread mutable state the reducer maintains alongside the messages list. */
 export interface ThreadReducerState {
@@ -308,8 +316,21 @@ function findLateReplayTarget(messages: CodexMessage[], event: AgentDeltaEvent):
 // ─── completeAssistantMessage ──────────────────────────────────────────────────
 
 function completeAssistantMessage(state: ThreadReducerState, event: ItemCompletedEvent): ThreadReducerState {
-  if (!event.turnId) return state;
   const text = (event.text ?? "").trim();
+  if (!event.turnId) {
+    if (!text) return state;
+    return appendOrUpdate(state, (messages) => [
+      ...messages,
+      createMessage({
+        threadId: event.threadId,
+        role: "assistant",
+        kind: "chat",
+        text,
+        itemId: event.itemId,
+        assistantPhase: event.assistantPhase,
+      }),
+    ]);
+  }
   if (!text) {
     // Nothing to set, but still close the streaming row.
     return closeStreamingAssistantRow(state, event);
@@ -427,127 +448,6 @@ function completeReasoningRow(state: ThreadReducerState, event: ItemCompletedEve
   return { ...closed, streamingReasoningByItem: removeKey(closed.streamingReasoningByItem, itemKey) };
 }
 
-// ─── Plan mode ────────────────────────────────────────────────────────────────
-//   Mirrors handleTurnPlanUpdated + appendPlanDelta in CodexService+IncomingPlanMode.swift.
-//   `turn/plan/updated` snapshots the structured step list; `item/plan/delta` streams
-//   the plan's prose into a per-item row that lives alongside the structured snapshot.
-
-export interface PlanUpdatedEvent extends ReducerEvent {
-  explanation?: string;
-  steps: PlanStep[];
-}
-
-export function applyPlanUpdated(state: ThreadReducerState, event: PlanUpdatedEvent): ThreadReducerState {
-  if (!event.turnId) return state;
-  const key = compositeKey(event.turnId, "_progress");
-  return upsertPlanRow(state, event, key, () => ({
-    explanation: event.explanation,
-    steps: event.steps,
-    presentation: "progress",
-  }));
-}
-
-export interface PlanDeltaEvent extends ReducerEvent {
-  delta: string;
-}
-
-export function applyPlanDelta(state: ThreadReducerState, event: PlanDeltaEvent): ThreadReducerState {
-  if (!event.turnId || !event.itemId || !event.delta) return state;
-  const key = compositeKey(event.turnId, event.itemId);
-  const existingId = state.streamingPlanByKey[key];
-  if (existingId) {
-    return mutateMessage(state, existingId, (m) => ({
-      ...m,
-      text: m.text + event.delta,
-      isStreaming: true,
-      plan: { ...(m.plan ?? { steps: [] as PlanStep[], presentation: "resultStreaming" }), presentation: "resultStreaming" },
-    }));
-  }
-  return upsertPlanRow(
-    state,
-    event,
-    key,
-    (existing) => existing ?? { steps: [], presentation: "resultStreaming" as const },
-    event.delta
-  );
-}
-
-function upsertPlanRow(
-  state: ThreadReducerState,
-  event: ReducerEvent,
-  key: string,
-  buildPlan: (existing: PlanState | undefined) => PlanState,
-  appendText?: string
-): ThreadReducerState {
-  if (!event.turnId) return state;
-  const existingId = state.streamingPlanByKey[key];
-  if (existingId) {
-    return mutateMessage(state, existingId, (m) => ({
-      ...m,
-      text: appendText ? m.text + appendText : m.text,
-      isStreaming: true,
-      plan: buildPlan(m.plan),
-    }));
-  }
-  const message = createMessage({
-    threadId: event.threadId,
-    role: "system",
-    kind: "plan",
-    text: appendText ?? "",
-    turnId: event.turnId,
-    itemId: event.itemId,
-    isStreaming: true,
-    plan: buildPlan(undefined),
-  });
-  const next = appendOrUpdate(state, (messages) => [...messages, message]);
-  return { ...next, streamingPlanByKey: { ...next.streamingPlanByKey, [key]: message.id } };
-}
-
-// ─── Structured items: tool calls, file changes, command executions ────────────
-
-function beginStructuredItem(state: ThreadReducerState, event: ItemStartedEvent, kind: MessageKind): ThreadReducerState {
-  if (!event.turnId || !event.itemId) return state;
-  const itemKey = compositeKey(event.turnId, event.itemId);
-  if (state.streamingStructuredByItem[itemKey]) return state;
-  const message = createMessage({
-    threadId: event.threadId,
-    role: "system",
-    kind,
-    turnId: event.turnId,
-    itemId: event.itemId,
-    isStreaming: true,
-    command:
-      kind === "commandExecution"
-        ? { fullCommand: "", outputTail: "" }
-        : undefined,
-    fileChange: kind === "fileChange" ? { diff: "" } : undefined,
-  });
-  const next = appendOrUpdate(state, (messages) => [...messages, message]);
-  return { ...next, streamingStructuredByItem: { ...next.streamingStructuredByItem, [itemKey]: message.id } };
-}
-
-function completeStructuredItem(state: ThreadReducerState, event: ItemCompletedEvent, kind: MessageKind): ThreadReducerState {
-  if (!event.turnId || !event.itemId) return state;
-  const itemKey = compositeKey(event.turnId, event.itemId);
-  const messageId = state.streamingStructuredByItem[itemKey];
-  if (!messageId) return state;
-  const closed = mutateMessage(state, messageId, (m) => ({
-    ...m,
-    isStreaming: false,
-    text: event.text ?? m.text,
-    kind,
-    command:
-      m.command && kind === "commandExecution"
-        ? { ...m.command, exitCode: event.exitCode ?? m.command.exitCode, durationMs: event.durationMs ?? m.command.durationMs }
-        : m.command,
-    fileChange:
-      kind === "fileChange"
-        ? { path: event.filePath ?? m.fileChange?.path, diff: event.diff ?? m.fileChange?.diff ?? m.text }
-        : m.fileChange,
-  }));
-  return { ...closed, streamingStructuredByItem: removeKey(closed.streamingStructuredByItem, itemKey) };
-}
-
 // ─── Closing helpers ───────────────────────────────────────────────────────────
 
 function closeStreamingRowsForTurn(state: ThreadReducerState, turnId: string): ThreadReducerState {
@@ -573,76 +473,7 @@ function closeStreamingRowsForTurn(state: ThreadReducerState, turnId: string): T
   };
 }
 
-function idsForTurn(messages: CodexMessage[], turnId: string): Set<string> {
-  return new Set(messages.filter((m) => m.turnId === turnId).map((m) => m.id));
-}
-
 function removeFallbackForTurn(state: ThreadReducerState, turnId: string): ThreadReducerState {
   if (!state.streamingFallbackByTurn[turnId]) return state;
   return { ...state, streamingFallbackByTurn: removeKey(state.streamingFallbackByTurn, turnId) };
-}
-
-// ─── Pure-state helpers ────────────────────────────────────────────────────────
-
-function appendOrUpdate(
-  state: ThreadReducerState,
-  mutator: (messages: CodexMessage[]) => CodexMessage[]
-): ThreadReducerState {
-  const messages = mutator(state.messages).sort(compareMessages);
-  return { ...state, messages };
-}
-
-function mutateMessage(
-  state: ThreadReducerState,
-  messageId: string,
-  patch: (message: CodexMessage) => CodexMessage
-): ThreadReducerState {
-  const index = state.messages.findIndex((m) => m.id === messageId);
-  if (index < 0) return state;
-  const messages = state.messages.slice();
-  messages[index] = patch(messages[index]);
-  return { ...state, messages };
-}
-
-function compositeKey(turnId: string, itemId?: string): string {
-  return `${turnId}::${itemId ?? "_"}`;
-}
-
-function removeKey<T extends Record<string, V>, V>(record: T, key: string): T {
-  if (!(key in record)) return record;
-  const next = { ...record } as Record<string, V>;
-  delete next[key];
-  return next as T;
-}
-
-function filterByValueNotIn<T extends Record<string, string>>(record: T, exclude: Set<string>): T {
-  const next: Record<string, string> = {};
-  for (const [key, value] of Object.entries(record)) if (!exclude.has(value)) next[key] = value;
-  return next as T;
-}
-
-// ─── iOS type → kind map ───────────────────────────────────────────────────────
-
-function inferKindFromType(type: string | undefined): MessageKind {
-  switch ((type ?? "").toLowerCase()) {
-    case "agentmessage":
-    case "assistantmessage":
-      return "chat";
-    case "reasoning":
-      return "thinking";
-    case "filechange":
-      return "fileChange";
-    case "commandexecution":
-      return "commandExecution";
-    case "toolcall":
-    case "collabtoolcall":
-    case "collabagenttoolcall":
-      return "toolActivity";
-    case "plan":
-      return "plan";
-    case "userinputprompt":
-      return "userInputPrompt";
-    default:
-      return "chat";
-  }
 }

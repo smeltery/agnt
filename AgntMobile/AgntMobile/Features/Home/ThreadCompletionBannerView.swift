@@ -1,7 +1,7 @@
 // FILE: ThreadCompletionBannerView.swift
 // Purpose: Shows reusable in-app toast banners, including thread-completion notifications.
 // Layer: View
-// Exports: InAppToastBannerView, ThreadCompletionBannerView
+// Exports: InAppToastBannerView, ThreadCompletionBannerView, SystemNoticeBannerView
 // Depends on: SwiftUI, CodexThreadCompletionBanner
 
 import SwiftUI
@@ -131,6 +131,73 @@ struct ThreadCompletionBannerView: View {
                     Circle()
                         .stroke(Color(.systemBackground), lineWidth: 1)
                 )
+        }
+    }
+}
+
+struct SystemNoticeBannerView: View {
+    let notice: CodexSystemNotice
+    let onDismiss: () -> Void
+
+    var body: some View {
+        InAppToastBannerView(
+            title: notice.title ?? fallbackTitle,
+            subtitle: notice.title == nil ? nil : notice.message,
+            detailLines: detailLines,
+            accessibilityHint: nil,
+            isDismissable: true,
+            onTap: nil,
+            onDismiss: onDismiss
+        ) {
+            Image(systemName: iconName)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(iconColor)
+                .frame(width: 28, height: 28)
+                .background(iconColor.opacity(0.14), in: Circle())
+        }
+    }
+
+    private var fallbackTitle: String {
+        switch notice.severity {
+        case .info:
+            return "Notice"
+        case .warn:
+            return "Warning"
+        case .error:
+            return "Error"
+        }
+    }
+
+    private var detailLines: [String] {
+        var lines: [String] = []
+        if notice.title == nil, let message = notice.message {
+            lines.append(message)
+        }
+        if let provider = notice.provider {
+            lines.append(provider)
+        }
+        return lines
+    }
+
+    private var iconName: String {
+        switch notice.severity {
+        case .info:
+            return "info"
+        case .warn:
+            return "exclamationmark.triangle.fill"
+        case .error:
+            return "xmark.octagon.fill"
+        }
+    }
+
+    private var iconColor: Color {
+        switch notice.severity {
+        case .info:
+            return .blue
+        case .warn:
+            return .orange
+        case .error:
+            return .red
         }
     }
 }

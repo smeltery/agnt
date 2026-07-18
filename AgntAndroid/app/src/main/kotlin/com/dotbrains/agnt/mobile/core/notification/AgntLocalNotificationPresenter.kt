@@ -27,6 +27,41 @@ class AgntLocalNotificationPresenter(
     private val dedupeStructured = ConcurrentHashMap<String, Long>()
     private val dedupeApproval = ConcurrentHashMap<String, Long>()
 
+    fun showOngoingRun(
+        threadId: String,
+        turnId: String?,
+        displayTitle: String,
+    ) {
+        val th = OngoingRunNotificationLogic.normalizedThreadId(threadId) ?: return
+        val tag = OngoingRunNotificationLogic.tag(th) ?: return
+        val notificationId = stableNotificationId(NOTIFICATION_ID_ACTIVE_RUN_BASE, th)
+        if (!OngoingRunNotificationLogic.shouldPost(th, AppForegroundTracker.isInForeground, canPostNotifications())) {
+            cancelNotification(tag, notificationId)
+            return
+        }
+
+        showNotification(
+            notificationId = notificationId,
+            tag = tag,
+            title = displayTitle.ifBlank { appContext.getString(R.string.app_name) },
+            body = appContext.getString(R.string.notification_run_running_body),
+            contentIntent =
+                contentIntent(
+                    threadId = th,
+                    turnId = turnId?.trim()?.takeIf { it.isNotEmpty() },
+                    source = OngoingRunNotificationLogic.SOURCE_RUN_ACTIVE,
+                ),
+            ongoing = true,
+            priority = NotificationCompat.PRIORITY_LOW,
+        )
+    }
+
+    fun cancelOngoingRun(threadId: String) {
+        val th = OngoingRunNotificationLogic.normalizedThreadId(threadId) ?: return
+        val tag = OngoingRunNotificationLogic.tag(th) ?: return
+        cancelNotification(tag, stableNotificationId(NOTIFICATION_ID_ACTIVE_RUN_BASE, th))
+    }
+
     fun maybeNotifyRunCompletion(
         threadId: String,
         turnId: String?,
@@ -155,6 +190,8 @@ class AgntLocalNotificationPresenter(
         title: String,
         body: String,
         contentIntent: PendingIntent,
+        ongoing: Boolean = false,
+        priority: Int = NotificationCompat.PRIORITY_DEFAULT,
     ) {
         val notification =
             NotificationCompat
@@ -163,9 +200,11 @@ class AgntLocalNotificationPresenter(
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(priority)
                 .setContentIntent(contentIntent)
-                .setAutoCancel(true)
+                .setOnlyAlertOnce(ongoing)
+                .setOngoing(ongoing)
+                .setAutoCancel(!ongoing)
                 .build()
         // canPostNotifications() gates the caller, but POST_NOTIFICATIONS can be
         // revoked between that check and this call (e.g. user toggled it in
@@ -178,6 +217,13 @@ class AgntLocalNotificationPresenter(
         } catch (e: SecurityException) {
             Log.w(TAG, "notify($tag) denied — POST_NOTIFICATIONS revoked at runtime: ${e.message}")
         }
+    }
+
+    private fun cancelNotification(
+        tag: String,
+        notificationId: Int,
+    ) {
+        NotificationManagerCompat.from(appContext).cancel(tag, notificationId)
     }
 
     private fun runCompletionDedupeKey(
@@ -212,6 +258,7 @@ class AgntLocalNotificationPresenter(
         private const val NOTIFICATION_ID_RUN_BASE = 10_000
         private const val NOTIFICATION_ID_APPROVAL_BASE = 20_000
         private const val NOTIFICATION_ID_INPUT_BASE = 30_000
+        private const val NOTIFICATION_ID_ACTIVE_RUN_BASE = 40_000
         private const val LAUNCH_TOKEN_PREFS = "agnt_notification_launch_tokens"
         private const val LAUNCH_TOKEN_BYTES = 32
         private val launchThreadIdRegex = Regex("^[A-Za-z0-9_-]{1,128}$")

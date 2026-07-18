@@ -34,7 +34,7 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Incoming` | ✅ | 2 (item/agentMessage/delta, item/reasoning/textDelta, item/*/outputDelta, item/started, item/completed, turn lifecycle, thread/tokenUsage/updated) |
 | `IncomingAssistant` | ✅ | 2 |
 | `IncomingPlanMode` | ✅ | 3 (turn/plan/updated, item/plan/delta, presentation transitions) |
-| `IncomingSupport` | ✅ | 3 + 9 (context-window + approvals + system/notice + thread/status/changed + turn/diff/updated) |
+| `IncomingSupport` | ✅ | 3 + 9 + desktop mirror (context-window + approvals + system/notice + thread/status/changed + turn/diff/updated + turnless `codex/event/agent_message` completions) |
 | `ThreadsTurns` | ✅ | 2 + 4 + 9 (thread/list, turns/list, turn/start/interrupt, fork, name/set, archive, unarchive, generateTitle, contextWindow/read) |
 | `ThreadHistoryPagination` | ✅ | 2 |
 | `ThreadFork` + `ThreadForkCompatibility` | ✅ | 4 (no per-target-project routing yet) |
@@ -49,12 +49,12 @@ status. Update it as part of every session that touches `agnt-web/`.
 | `Terminal` (bridge-PTY) | 🟡 | 32 (different shape from iOS — browser cannot open raw SSH; instead the bridge spawns its login shell via `node-pty` and proxies bytes over `terminal/*` JSON-RPC + `terminal/output` notifications. xterm.js + addon-fit on the front-end. Off by default; opt-in via `enableWebTerminal` bridge preference. Single session, single PTY for now — multi-tab sessions UI deferred.) |
 | `Pets` | ⛔ dropped | iOS-specific UX (animations / haptics / Live Activities). Use the iOS app for pets. |
 | `LiveActivity` / Dynamic Island | ⛔ dropped | iOS-only — done on iOS (`AgntMobile/AgntWidget`; Live Activity + Dynamic Island surface an in-flight turn on the Lock Screen, driven by local ActivityKit updates). No browser equivalent (no Lock Screen / Dynamic Island host). Use the iOS app. |
-| `Review` | ⛔ | future (`review/start` UI; bridge supports the RPC, no clear web surface yet) |
+| `Review` | 🟡 | `/review` starts inline `review/start` for uncommitted changes; `/review <base-branch>` starts an inline base-branch review. Visual target picker still future. |
 | `AIChangeSets` | ⛔ deferred | per-turn `RevertSheet` (Session 10) covers the practical "undo what this turn did" workflow; finer-grained per-message patch revert needs reducer to track forward patches captured during streaming |
-| `WorkspaceCheckpoints` | ✅ | 10 (preview + apply per turn; checkpointDiff + Copy not yet wired in UI but bridge-ready) |
+| `WorkspaceCheckpoints` | ✅ | 10 + checkpoint diff (preview + apply per turn; Revert sheet can load/render/copy the checkpoint diff before restore) |
 | `WorkspaceImages` | ✅ | 18 + 30 (workspace/readImage wrapper + cache; MarkdownContent resolves non-http image refs against thread cwd; click any inline image to open in the shared Lightbox) |
-| Workspace SVG preview (hardened) | 🟡 | iOS renders `.svg` workspace artifacts as artwork in a sandboxed offline WebKit view (strict CSP + external-`href`/`src` sanitizer; `AgntMobile/.../WorkspaceSVGPreview.swift`). On web the browser renders SVG natively via the image/Lightbox path, but agent-generated SVG should be sandboxed (CSP / isolated `<img>`) before inline rendering to avoid script execution / data exfil — follow-up. |
-| Syntax-highlighted code preview | 🟡 | iOS renders workspace text files via Runestone + TreeSitter grammars (highlighting, line numbers, selection; `AgntMobile/.../WorkspaceRunestoneCodeView.swift`). Web shows linked text files without syntax highlighting; wiring a browser highlighter (e.g. Shiki/Prism) into the file preview is a follow-up. |
+| Workspace SVG preview (hardened) | ✅ | `components/chat/WorkspaceSvgPreview.tsx` renders workspace `.svg` artifacts and SVG data URLs in a sandboxed iframe with an offline CSP document, while `lib/workspace-svg-preview.ts` strips external `href`/`xlink:href`/`src` references before render. Covered by `workspace-svg-preview.test.ts` + `markdown-inline.test.tsx`. |
+| Syntax-highlighted code preview | ✅ | `MarkdownContent` routes workspace-local text links through `workspace/readFile`; `WorkspaceTextFilePreview` renders the read-only sheet with Prism highlighting, selectable text, copy, and line numbers by default. Covered by `workspace-text-preview.test.ts` + `markdown-inline.test.tsx`. |
 | `ProjectFolders` | ✅ | 9 (project/quickLocations + listDirectory + searchDirectories + folder picker UI) |
 | `TrustedPairPresentation` | ✅ | 5 + multi-Mac (Settings lists trusted Macs with per-Mac forget; sidebar `MacSwitcher` row surfaces the active Mac + lets the user switch between paired Macs via `useConnectionStore.switchMac` → `pairingStore.setLastTrustedMac` → `resolveTrustedSession` → reconnect. Threads stay shared across Macs by design.) |
 | `Helpers` | n/a | utility — port functions on demand |
@@ -88,7 +88,7 @@ The iOS `Models/` folder maps to TypeScript in two places: protocol-level types
 | `CodexReasoningEffortOption` | ✅ | 3 (per-turn flag) |
 | `CodexFuzzyFileMatch` | ⛔ bridge-blocked | bridge translators don't expose `fuzzyFileSearch` |
 | `CodexRateLimitStatus` | ⛔ bridge-blocked | bridge translators don't expose `account/rateLimits` |
-| `CodexServiceTier` | ⛔ | future |
+| `CodexServiceTier` | ✅ | Fast Mode toggle decodes model speed metadata, persists `serviceTier: "fast"`, and sends it only when the selected/default model supports it. |
 | `GitActionModels` | 🟡 | sync/diff/commit/push/branches/checkout/createBranch/createWorktree (Sessions 4 + 8 + 11); managed-worktree handoff + stacked actions still deferred |
 | `AIChangeSetModels` | ⛔ | future |
 | `PetCompanionModels` | ⛔ | future |
@@ -105,8 +105,8 @@ iOS `Views/` mirrors `agnt-web/src/components/`.
 | Project picker | `components/project/ProjectPicker.tsx` + `state/project-store.ts` + `protocol/project.ts` | ✅ (quick locations, browse, search, ascend, select cwd) |
 | New chat modal | `components/chat/NewChatModal.tsx` | ✅ (prompt + project selector + flag-aware turn/start) |
 | Home (chat) | `components/chat/{ChatView,Composer,MarkdownContent}.tsx` + `rows/*.tsx` | ✅ (kind-aware rendering: assistant/user/reasoning/command/file-change/tool) |
-| Markdown | `components/chat/MarkdownContent.tsx` + `markdown-blocks.ts` + `syntax-highlight.ts` | ✅ (fenced code w/ Prism, inline code, bold/italic, headings 1–6, ordered/bullet/task lists, tables w/ column alignment, links + images w/ scheme allowlist, autolinks, blockquotes, horizontal rules) |
-| Composer slash commands | `components/chat/Composer.tsx` + `state/slash-commands.ts` | ✅ (Session 17; `/compact`, `/fork`, `/archive`, `/unarchive`, `/stop`; ↑/↓ navigate, Enter runs, Tab autocompletes, Esc dismisses) |
+| Markdown | `components/chat/MarkdownContent.tsx` + `markdown-blocks.ts` + `syntax-highlight.ts` | ✅ (fenced code w/ Prism, inline code, bold/italic, headings 1–6, ordered/bullet/task lists, tables w/ column alignment, links + images w/ scheme allowlist, autolinks, blockquotes, horizontal rules, and streaming inline marker auto-close for assistant rows) |
+| Composer slash commands | `components/chat/Composer.tsx` + `state/slash-commands.ts` | ✅ (Session 17 + review slice; `/review`, `/compact`, `/fork`, `/archive`, `/unarchive`, `/stop`; ↑/↓ navigate, Enter runs, Tab autocompletes, Esc dismisses) |
 | Composer draft autosave | `storage/drafts-store.ts` + `components/chat/Composer.tsx` | ✅ (Session 19; per-thread draft persisted to IndexedDB with 400 ms debounce; hydrates on thread switch and beforeunload, clears on send) |
 | Pinned threads | `storage/prefs-store.ts:loadPinnedThreadIds` + `state/threads-store.ts:togglePinThread` + sidebar | ✅ (Session 19; pinned threads sort to top of the live tab, ★ glyph in the row, Pin/Unpin in the context menu) |
 | Power-user keyboard shortcuts | `components/workspace/Workspace.tsx` | ✅ (Session 19 + 21; `e` exports, `r` reverts last turn, `n` opens New Chat, `p` toggles pin, ⌘/Ctrl+K opens cross-thread palette) |

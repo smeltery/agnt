@@ -11,7 +11,20 @@ const path = require("path");
 const { startBridge } = require("../bridge/bridge");
 const { readBridgeConfig } = require("../bridge/bridge-config");
 const { printQR } = require("../transport/qr");
-const { resetBridgeDeviceState } = require("../transport/secure-device-state");
+const {
+  readBridgeDeviceState,
+  resetBridgeDeviceState,
+} = require("../transport/secure-device-state");
+const {
+  assertDarwinPlatform,
+  assertRelayConfigured,
+  bootoutLaunchAgent,
+  buildLaunchAgentPlist,
+  readLaunchAgentState,
+  resolveLaunchAgentPlistPath,
+  restartLaunchAgent,
+  sleep,
+} = require("./macos-launch-agent-launchd");
 const {
   clearBridgeStatus,
   clearPairingSession,
@@ -221,6 +234,7 @@ function getMacOSBridgeServiceStatus({
     daemonConfig: readDaemonConfig({ env, fsImpl }),
     bridgeStatus: readBridgeStatus({ env, fsImpl }),
     pairingSession: readPairingSession({ env, fsImpl }),
+    trustedDevice: buildTrustedDeviceSummary(readBridgeDeviceState()),
     stdoutLogPath: resolveBridgeStdoutLogPath({ env }),
     stderrLogPath: resolveBridgeStderrLogPath({ env }),
   };
@@ -231,12 +245,18 @@ function printMacOSBridgeServiceStatus(options = {}) {
   const bridgeState = status.bridgeStatus?.state || "unknown";
   const connectionStatus = status.bridgeStatus?.connectionStatus || "unknown";
   const pairingCreatedAt = status.pairingSession?.createdAt || "none";
+  const activeDevice = status.bridgeStatus?.activeDevice || status.bridgeStatus?.activePhone;
+  const trustedPhoneCount = status.trustedDevice?.trustedPhoneCount || 0;
+  const activeDeviceName = formatDeviceKind(activeDevice?.deviceKind) || "device";
+  const trustedDeviceName = formatDeviceKind(status.trustedDevice?.lastSeenDeviceKind) || "device";
   console.log(`[agnt] Service label: ${status.label}`);
   console.log(`[agnt] Installed: ${status.installed ? "yes" : "no"}`);
   console.log(`[agnt] Launchd loaded: ${status.launchdLoaded ? "yes" : "no"}`);
   console.log(`[agnt] PID: ${status.launchdPid || status.bridgeStatus?.pid || "unknown"}`);
   console.log(`[agnt] Bridge state: ${bridgeState}`);
   console.log(`[agnt] Connection: ${connectionStatus}`);
+  console.log(`[agnt] Active ${activeDeviceName}: ${activeDevice?.connected ? activeDevice.phoneFingerprint || "yes" : "no"}`);
+  console.log(`[agnt] Trusted ${trustedDeviceName}: ${trustedPhoneCount > 0 ? "yes" : "no"}`);
   console.log(`[agnt] Pairing payload: ${pairingCreatedAt}`);
   console.log(`[agnt] Stdout log: ${status.stdoutLogPath}`);
   console.log(`[agnt] Stderr log: ${status.stderrLogPath}`);
@@ -280,224 +300,6 @@ function writeLaunchAgentPlist({
   return plistPath;
 }
 
-function buildLaunchAgentPlist({
-  homeDir,
-  pathEnv,
-  stateDir,
-  stdoutLogPath,
-  stderrLogPath,
-  nodePath,
-  cliPath,
-}) {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${escapeXml(SERVICE_LABEL)}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>${escapeXml(nodePath)}</string>
-    <string>${escapeXml(cliPath)}</string>
-    <string>run-service</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <dict>
-    <key>SuccessfulExit</key>
-    <false/>
-  </dict>
-  <key>WorkingDirectory</key>
-  <string>${escapeXml(homeDir)}</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>HOME</key>
-    <string>${escapeXml(homeDir)}</string>
-    <key>PATH</key>
-    <string>${escapeXml(pathEnv)}</string>
-    <key>AGNT_DEVICE_STATE_DIR</key>
-    <string>${escapeXml(stateDir)}</string>
-  </dict>
-  <key>StandardOutPath</key>
-  <string>${escapeXml(stdoutLogPath)}</string>
-  <key>StandardErrorPath</key>
-  <string>${escapeXml(stderrLogPath)}</string>
-</dict>
-</plist>
-`;
-}
-
-async function waitForFreshPairingSession({
-  env = process.env,
-  fsImpl = fs,
-  startedAt = Date.now(),
-  timeoutMs = DEFAULT_PAIRING_WAIT_TIMEOUT_MS,
-  intervalMs = DEFAULT_PAIRING_WAIT_INTERVAL_MS,
-} = {}) {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() <= deadline) {
-    const pairingSession = readPairingSession({ env, fsImpl });
-    const createdAt = Date.parse(pairingSession?.createdAt || "");
-    if (pairingSession?.pairingPayload && Number.isFinite(createdAt) && createdAt >= startedAt) {
-      return pairingSession;
-    }
-    await sleep(intervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for the macOS bridge service to publish a pairing QR. `
-    + `Check ${resolveBridgeStderrLogPath({ env })}.`
-  );
-}
-
-function restartLaunchAgent({
-  env = process.env,
-  execFileSyncImpl = execFileSync,
-  plistPath,
-} = {}) {
-  bootoutLaunchAgent({
-    env,
-    execFileSyncImpl,
-    ignoreMissing: true,
-  });
-  execFileSyncImpl("launchctl", [
-    "bootstrap",
-    launchAgentDomain(env),
-    plistPath,
-  ], { stdio: ["ignore", "ignore", "pipe"] });
-  execFileSyncImpl("launchctl", [
-    "kickstart",
-    "-k",
-    launchAgentLabelDomain(env),
-  ], { stdio: ["ignore", "ignore", "pipe"] });
-}
-
-function bootoutLaunchAgent({
-  env = process.env,
-  execFileSyncImpl = execFileSync,
-  ignoreMissing = false,
-} = {}) {
-  const bootoutTargets = [
-    // Some macOS setups only fully unload the agent when bootout targets the plist path.
-    [launchAgentDomain(env), resolveLaunchAgentPlistPath({ env })],
-    [launchAgentLabelDomain(env)],
-  ];
-  let lastError = null;
-
-  for (const targetArgs of bootoutTargets) {
-    try {
-      execFileSyncImpl("launchctl", [
-        "bootout",
-        ...targetArgs,
-      ], { stdio: ["ignore", "ignore", "pipe"] });
-      return;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  if (ignoreMissing && isMissingLaunchAgentError(lastError)) {
-    return;
-  }
-  throw lastError;
-}
-
-function readLaunchAgentState({
-  env = process.env,
-  execFileSyncImpl = execFileSync,
-} = {}) {
-  try {
-    const output = execFileSyncImpl("launchctl", [
-      "print",
-      launchAgentLabelDomain(env),
-    ], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    return {
-      loaded: true,
-      pid: parseLaunchdPid(output),
-      raw: output,
-    };
-  } catch (error) {
-    if (isMissingLaunchAgentError(error)) {
-      return {
-        loaded: false,
-        pid: null,
-        raw: "",
-      };
-    }
-    throw error;
-  }
-}
-
-function resolveLaunchAgentPlistPath({ env = process.env, osImpl = os } = {}) {
-  const homeDir = env.HOME || osImpl.homedir();
-  return path.join(homeDir, "Library", "LaunchAgents", `${SERVICE_LABEL}.plist`);
-}
-
-function assertDarwinPlatform(platform = process.platform) {
-  if (platform !== "darwin") {
-    throw new Error("macOS bridge service management is only available on macOS.");
-  }
-}
-
-function assertRelayConfigured(config) {
-  if (typeof config?.relayUrl === "string" && config.relayUrl.trim()) {
-    return;
-  }
-  throw new Error("No relay URL configured. Run ./scripts/run-local-agnt.sh or set AGNT_RELAY before enabling the macOS bridge service.");
-}
-
-function launchAgentDomain(env) {
-  return `gui/${resolveUid(env)}`;
-}
-
-function launchAgentLabelDomain(env) {
-  return `${launchAgentDomain(env)}/${SERVICE_LABEL}`;
-}
-
-function resolveUid(env) {
-  if (typeof process.getuid === "function") {
-    return process.getuid();
-  }
-
-  const uid = Number.parseInt(env.UID || "", 10);
-  if (Number.isFinite(uid)) {
-    return uid;
-  }
-
-  throw new Error("Could not determine the current macOS user id for launchctl.");
-}
-
-function parseLaunchdPid(output) {
-  const match = typeof output === "string" ? output.match(/\bpid = (\d+)/) : null;
-  return match ? Number.parseInt(match[1], 10) : null;
-}
-
-function isMissingLaunchAgentError(error) {
-  const combined = [
-    error?.message,
-    error?.stderr?.toString?.("utf8"),
-    error?.stdout?.toString?.("utf8"),
-  ].filter(Boolean).join("\n").toLowerCase();
-  return combined.includes("could not find service")
-    || combined.includes("service could not be found")
-    || combined.includes("no such process");
-}
-
-function escapeXml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function mergeBridgeStatusForDaemon(nextStatus, persistedStatus) {
   if (!nextStatus || typeof nextStatus !== "object") {
     return nextStatus;
@@ -530,8 +332,55 @@ function normalizeNonEmptyString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
+function buildTrustedDeviceSummary(deviceState) {
+  const trustedPhoneEntries = Object.entries(deviceState?.trustedPhones || {})
+    .filter(([phoneDeviceId, publicKey]) => (
+      normalizeNonEmptyString(phoneDeviceId) && normalizeNonEmptyString(publicKey)
+    ));
+  const firstTrustedPhoneId = trustedPhoneEntries[0]?.[0] || "";
+  const lastSeenPhoneAppVersion = normalizeNonEmptyString(deviceState?.lastSeenPhoneAppVersion) || null;
+  return {
+    macDeviceFingerprint: shortFingerprint(deviceState?.macDeviceId),
+    trustedPhoneCount: trustedPhoneEntries.length,
+    trustedPhoneFingerprint: shortFingerprint(firstTrustedPhoneId),
+    lastSeenDeviceKind: normalizeNonEmptyString(deviceState?.lastSeenDeviceKind)
+      || (lastSeenPhoneAppVersion ? "iphone" : null),
+    lastSeenPhoneAppVersion,
+  };
+}
+
+function formatDeviceKind(deviceKind) {
+  const normalized = normalizeNonEmptyString(deviceKind).toLowerCase();
+  if (normalized === "iphone") {
+    return "iPhone";
+  }
+  if (normalized === "android") {
+    return "Android";
+  }
+  if (normalized === "browser") {
+    return "Browser";
+  }
+  if (normalized === "mac") {
+    return "Mac";
+  }
+  return "";
+}
+
+function shortFingerprint(value) {
+  const normalized = normalizeNonEmptyString(value);
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= 12) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
+}
+
 module.exports = {
   buildLaunchAgentPlist,
+  buildTrustedDeviceSummary,
+  formatDeviceKind,
   getMacOSBridgeServiceStatus,
   mergeBridgeStatusForDaemon,
   printMacOSBridgePairingQr,

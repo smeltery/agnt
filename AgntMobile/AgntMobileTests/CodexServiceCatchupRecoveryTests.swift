@@ -11,6 +11,46 @@ import XCTest
 final class CodexServiceCatchupRecoveryTests: XCTestCase {
     private static var retainedServices: [CodexService] = []
 
+    func testReplayGapDuringHandshakeLatchesCanonicalRefreshUntilInitialization() {
+        let service = makeService()
+        let threadID = "thread-replay-gap"
+        service.activeThreadId = threadID
+        service.hydratedThreadIDs.insert(threadID)
+        service.lastAppliedBridgeOutboundSeq = 10
+        service.isConnected = false
+        service.isInitialized = false
+
+        service.handleNotification(
+            method: "agnt/bufferedReplay/gap",
+            params: .object([
+                "agntBufferedReplayGap": .bool(true),
+                "lastDiscardedBridgeOutboundSeq": .int(25),
+            ])
+        )
+
+        XCTAssertEqual(service.lastAppliedBridgeOutboundSeq, 25)
+        XCTAssertFalse(service.hydratedThreadIDs.contains(threadID))
+        XCTAssertTrue(service.pendingCanonicalHistoryRefreshAfterReplayDiscontinuity)
+    }
+
+    func testReplayResetCanMoveStaleCursorBackToCurrentBridgeEpoch() {
+        let service = makeService()
+        service.lastAppliedBridgeOutboundSeq = 999
+
+        service.handleNotification(
+            method: "agnt/bufferedReplay/reset",
+            params: .object([
+                "agntBufferedReplayReset": .bool(true),
+                "resetBridgeOutboundSeqTo": .int(0),
+                "bridgeReplayEpoch": .string("bridge-epoch-current"),
+            ])
+        )
+
+        XCTAssertEqual(service.lastAppliedBridgeOutboundSeq, 0)
+        XCTAssertEqual(service.lastAppliedBridgeReplayEpoch, "bridge-epoch-current")
+        XCTAssertTrue(service.pendingCanonicalHistoryRefreshAfterReplayDiscontinuity)
+    }
+
     func testRunningCatchupEscalatesExistingLightweightTaskIntoForcedResume() async {
         let service = makeService()
         let threadID = "thread-running"
@@ -171,6 +211,256 @@ final class CodexServiceCatchupRecoveryTests: XCTestCase {
         XCTAssertLessThan(elapsed, 0.1)
         XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
         XCTAssertLessThanOrEqual(canonicalHistoryReadCount, 1)
+    }
+
+    func testMarkingNewCanonicalReconcileClearsStaleRetryAttempt() {
+        let service = makeService()
+        let threadID = "thread-retry-attempt"
+
+        service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID] = 4
+
+        service.markThreadNeedingCanonicalHistoryReconcile(threadID)
+
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+        XCTAssertNil(service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID])
+    }
+
+    func testCancelPerThreadRefreshWorkClearsCanonicalRetryAttempt() {
+        let service = makeService()
+        let threadID = "thread-retry-cancel"
+
+        service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID] = 3
+        service.canonicalHistoryReconcileRetryTaskByThreadID[threadID] = Task { @MainActor in }
+
+        service.cancelPerThreadRefreshWork(for: threadID)
+
+        XCTAssertNil(service.canonicalHistoryReconcileRetryAttemptByThreadID[threadID])
+        XCTAssertNil(service.canonicalHistoryReconcileRetryTaskByThreadID[threadID])
+    }
+
+    func testJsonlFallbackFirstPaintSchedulesCanonicalPaginatedRetry() async throws {
+        let service = makeService()
+        let threadID = "thread-jsonl-first-paint"
+        let turnID = "turn-jsonl-first-paint"
+        service.isConnected = true
+        service.isInitialized = true
+        service.supportsTurnPagination = true
+        service.activeThreadId = threadID
+        service.activeTurnIdByThread[threadID] = "turn-running-guard"
+        service.upsertThread(CodexThread(id: threadID, title: "Large chat", preview: "Existing history"))
+
+        var requireCanonicalValues: [Bool] = []
+        service.requestTransportOverride = { method, params in
+            switch method {
+            case "thread/read":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "thread": .object([
+                            "id": .string(threadID),
+                            "title": .string("Large chat"),
+                            "preview": .string("Existing history"),
+                        ]),
+                    ]),
+                    includeJSONRPC: false
+                )
+            case "thread/turns/list":
+                let requiresCanonical = params?.objectValue?["agntRequireCanonical"]?.boolValue == true
+                requireCanonicalValues.append(requiresCanonical)
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "data": .array([
+                            .object([
+                                "id": .string(turnID),
+                                "status": .string("completed"),
+                                "items": .array([
+                                    .object([
+                                        "id": .string("assistant-jsonl-first-paint"),
+                                        "type": .string("agentMessage"),
+                                        "text": .string(requiresCanonical ? "Canonical history" : "Fast local history"),
+                                    ]),
+                                ]),
+                            ]),
+                        ]),
+                        "nextCursor": requiresCanonical
+                            ? .string("canonical-older-cursor")
+                            : .string("agnt-jsonl-handoff-v1:test"),
+                        "agntJsonlFallback": .bool(!requiresCanonical),
+                    ]),
+                    includeJSONRPC: false
+                )
+            default:
+                return RPCMessage(id: .string(UUID().uuidString), result: .object([:]), includeJSONRPC: false)
+            }
+        }
+
+        let provisionalOutcome = try await service.loadThreadHistoryIfNeeded(
+            threadId: threadID,
+            forceRefresh: true
+        )
+
+        XCTAssertEqual(provisionalOutcome, .loadedProvisionalPaginatedWindow)
+        XCTAssertEqual(requireCanonicalValues, [false])
+        XCTAssertTrue(service.provisionalPaginatedHistoryThreadIDs.contains(threadID))
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+        XCTAssertFalse(service.hasRemoteOlderThreadHistoryCursor(threadId: threadID))
+        XCTAssertEqual(service.messages(for: threadID).last?.text, "Fast local history")
+
+        service.activeTurnIdByThread.removeValue(forKey: threadID)
+        let canonicalOutcome = try await service.loadThreadHistoryIfNeeded(
+            threadId: threadID,
+            forceRefresh: true
+        )
+
+        XCTAssertEqual(canonicalOutcome, .loadedPaginatedWindow)
+        XCTAssertEqual(requireCanonicalValues, [false, true])
+        XCTAssertFalse(service.provisionalPaginatedHistoryThreadIDs.contains(threadID))
+        XCTAssertFalse(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+        XCTAssertTrue(service.hasRemoteOlderThreadHistoryCursor(threadId: threadID))
+        XCTAssertEqual(service.messages(for: threadID).last?.text, "Canonical history")
+    }
+
+    func testEmptyInitialPaginationForExistingThreadStaysLoadingAndRetryable() async throws {
+        let service = makeService()
+        let threadID = "thread-empty-existing"
+        service.isConnected = true
+        service.isInitialized = true
+        service.supportsTurnPagination = true
+        service.activeThreadId = threadID
+        service.upsertThread(CodexThread(id: threadID, title: "Existing chat", preview: "Older message"))
+        service.requestTransportOverride = { method, _ in
+            switch method {
+            case "thread/read":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "thread": .object([
+                            "id": .string(threadID),
+                            "title": .string("Existing chat"),
+                            "preview": .string("Older message"),
+                        ]),
+                    ]),
+                    includeJSONRPC: false
+                )
+            case "thread/turns/list":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object(["data": .array([]), "nextCursor": .null]),
+                    includeJSONRPC: false
+                )
+            default:
+                return RPCMessage(id: .string(UUID().uuidString), result: .object([:]), includeJSONRPC: false)
+            }
+        }
+
+        let outcome = try await service.loadThreadHistoryIfNeeded(threadId: threadID, forceRefresh: true)
+        service.isConnected = false
+        service.canonicalHistoryReconcileTaskByThreadID[threadID]?.cancel()
+        service.canonicalHistoryReconcileRetryTaskByThreadID[threadID]?.cancel()
+
+        XCTAssertEqual(outcome, .deferredAfterEmptyPage)
+        XCTAssertFalse(service.initialTurnsLoadedByThreadID.contains(threadID))
+        XCTAssertFalse(service.hydratedThreadIDs.contains(threadID))
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+        XCTAssertEqual(service.threadDisplayPhase(threadId: threadID), .loading)
+    }
+
+    func testEmptyCanonicalSourceReplacementKeepsCachedRowsAndRetries() async throws {
+        let service = makeService()
+        let threadID = "thread-empty-replacement"
+        service.isConnected = true
+        service.isInitialized = true
+        service.supportsTurnPagination = true
+        service.activeThreadId = threadID
+        service.pendingCanonicalSourceReplacementThreadIDs.insert(threadID)
+        service.upsertThread(CodexThread(id: threadID, title: "Existing chat"))
+        service.messagesByThread[threadID] = [
+            CodexMessage(id: "cached", threadId: threadID, role: .assistant, text: "Cached replacement source"),
+        ]
+        service.requestTransportOverride = { method, _ in
+            switch method {
+            case "thread/read":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "thread": .object([
+                            "id": .string(threadID),
+                            "title": .string("Existing chat"),
+                        ]),
+                    ]),
+                    includeJSONRPC: false
+                )
+            case "thread/turns/list":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object(["data": .array([]), "nextCursor": .null]),
+                    includeJSONRPC: false
+                )
+            default:
+                return RPCMessage(id: .string(UUID().uuidString), result: .object([:]), includeJSONRPC: false)
+            }
+        }
+
+        let outcome = try await service.loadThreadHistoryIfNeeded(threadId: threadID, forceRefresh: true)
+        service.isConnected = false
+        service.canonicalHistoryReconcileTaskByThreadID[threadID]?.cancel()
+        service.canonicalHistoryReconcileRetryTaskByThreadID[threadID]?.cancel()
+
+        XCTAssertEqual(outcome, .deferredAfterEmptyPage)
+        XCTAssertEqual(service.messages(for: threadID).map(\.text), ["Cached replacement source"])
+        XCTAssertTrue(service.pendingCanonicalSourceReplacementThreadIDs.contains(threadID))
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
+        XCTAssertFalse(service.hydratedThreadIDs.contains(threadID))
+    }
+
+    func testBridgePaginationFailureKeepsCachedRowsAndRetries() async throws {
+        let service = makeService()
+        let threadID = "thread-bridge-retry"
+        service.isConnected = true
+        service.isInitialized = true
+        service.supportsTurnPagination = true
+        service.activeThreadId = threadID
+        service.upsertThread(CodexThread(id: threadID, title: "Large chat", preview: "Existing history"))
+        service.messagesByThread[threadID] = [
+            CodexMessage(id: "cached", threadId: threadID, role: .assistant, text: "Cached history"),
+        ]
+
+        service.requestTransportOverride = { method, _ in
+            switch method {
+            case "thread/read":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "thread": .object([
+                            "id": .string(threadID),
+                            "title": .string("Large chat"),
+                            "preview": .string("Existing history"),
+                        ]),
+                    ]),
+                    includeJSONRPC: false
+                )
+            case "thread/turns/list":
+                throw CodexServiceError.rpcError(RPCError(
+                    code: -32000,
+                    message: "The newest chat turn is too large to relay safely.",
+                    data: .object(["errorCode": .string("thread_turns_list_failed")])
+                ))
+            default:
+                return RPCMessage(id: .string(UUID().uuidString), result: .object([:]), includeJSONRPC: false)
+            }
+        }
+
+        let outcome = try await service.loadThreadHistoryIfNeeded(threadId: threadID, forceRefresh: true)
+        service.isConnected = false
+        service.canonicalHistoryReconcileTaskByThreadID[threadID]?.cancel()
+        service.canonicalHistoryReconcileRetryTaskByThreadID[threadID]?.cancel()
+
+        XCTAssertEqual(outcome, .deferredAfterUnavailablePage)
+        XCTAssertEqual(service.messages(for: threadID).map(\.text), ["Cached history"])
+        XCTAssertTrue(service.hydratedThreadIDs.contains(threadID))
+        XCTAssertTrue(service.initialTurnsLoadedByThreadID.contains(threadID))
+        XCTAssertTrue(service.threadsNeedingCanonicalHistoryReconcile.contains(threadID))
     }
 
     private func makeService() -> CodexService {

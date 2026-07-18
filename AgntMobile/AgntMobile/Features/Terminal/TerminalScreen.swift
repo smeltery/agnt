@@ -71,7 +71,7 @@ struct TerminalScreen: View {
     }
 
     private var currentWorkingDirectory: String {
-        firstNonEmpty([
+        terminalFirstNonEmpty([
             activeSnapshot.cwd,
             profileResolvedFromConnection.cwd,
             preferredWorkingDirectory,
@@ -79,7 +79,7 @@ struct TerminalScreen: View {
     }
 
     private var terminalHostTitle: String {
-        firstNonEmpty([
+        terminalFirstNonEmpty([
             profileResolvedFromConnection.nickname,
             codex.trustedPairPresentation?.name,
             profileResolvedFromConnection.displayTarget,
@@ -89,7 +89,7 @@ struct TerminalScreen: View {
     private var navigationTopLine: String {
         let topLine = [
             terminalHostTitle,
-            projectDisplayName(for: currentWorkingDirectory),
+            terminalProjectDisplayName(for: currentWorkingDirectory),
         ]
         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty }
@@ -99,7 +99,7 @@ struct TerminalScreen: View {
     }
 
     private var navigationBottomLine: String {
-        firstNonEmpty([
+        terminalFirstNonEmpty([
             currentWorkingDirectory,
             profileResolvedFromConnection.connectionString,
             "SSH terminal",
@@ -107,20 +107,7 @@ struct TerminalScreen: View {
     }
 
     private var statusLabel: String {
-        switch activeSnapshot.status {
-        case .running:
-            return "Running"
-        case .starting:
-            return "Starting"
-        case .error:
-            return "Error"
-        case .exited:
-            return "Exited"
-        case .closed:
-            return "Closed"
-        case .idle:
-            return "Idle"
-        }
+        terminalStatusLabel(for: activeSnapshot.status)
     }
 
     private var terminalErrorDetail: String? {
@@ -130,46 +117,11 @@ struct TerminalScreen: View {
     }
 
     private var statusTone: TerminalStatusTone {
-        switch activeSnapshot.status {
-        case .running:
-            return TerminalStatusTone(tint: "#34d399", text: "#a3a3a3")
-        case .starting:
-            return TerminalStatusTone(tint: "#f59e0b", text: "#a3a3a3")
-        case .error:
-            return TerminalStatusTone(tint: "#ef4444", text: "#fca5a5")
-        case .idle, .closed, .exited:
-            return TerminalStatusTone(tint: "#ef4444", text: "#a3a3a3")
-        }
+        terminalStatusTone(for: activeSnapshot.status)
     }
 
     private var terminalToolbarActions: [TerminalToolbarAction] {
-        let modifierActions: [TerminalToolbarAction]
-        switch hostPlatform {
-        case .mac:
-            modifierActions = [
-                TerminalToolbarAction(kind: .modifier(.meta), key: "cmd", label: "cmd"),
-                TerminalToolbarAction(kind: .modifier(.ctrl), key: "ctrl", label: "ctrl"),
-            ]
-        case .linux, .windows, .unknown:
-            modifierActions = [
-                TerminalToolbarAction(kind: .modifier(.ctrl), key: "ctrl", label: "ctrl"),
-                TerminalToolbarAction(kind: .modifier(.meta), key: "alt", label: "alt"),
-            ]
-        }
-
-        return [
-            TerminalToolbarAction(kind: .send("\u{1B}"), key: "esc", label: "esc"),
-        ] + modifierActions + [
-            TerminalToolbarAction(kind: .send("\t"), key: "tab", label: "tab"),
-            TerminalToolbarAction(kind: .send("\u{1B}[A"), key: "up", label: "↑"),
-            TerminalToolbarAction(kind: .send("\u{1B}[B"), key: "down", label: "↓"),
-            TerminalToolbarAction(kind: .send("\u{1B}[D"), key: "left", label: "←"),
-            TerminalToolbarAction(kind: .send("\u{1B}[C"), key: "right", label: "→"),
-            TerminalToolbarAction(kind: .send("~"), key: "tilde", label: "~"),
-            TerminalToolbarAction(kind: .send("|"), key: "pipe", label: "|"),
-            TerminalToolbarAction(kind: .send("/"), key: "slash", label: "/"),
-            TerminalToolbarAction(kind: .send("-"), key: "dash", label: "-"),
-        ]
+        buildTerminalToolbarActions(for: hostPlatform)
     }
 
     private var terminalMenuSessions: [TerminalMenuSessionItem] {
@@ -177,17 +129,7 @@ struct TerminalScreen: View {
         if !snapshots.contains(where: { $0.terminalId == activeTerminalId }) {
             snapshots.append(activeSnapshot)
         }
-
-        return snapshots.filter { snapshot in
-            snapshot.terminalId == activeTerminalId || snapshot.status.isRunning
-        }.map { snapshot in
-            TerminalMenuSessionItem(
-                terminalId: snapshot.terminalId,
-                displayLabel: terminalDisplayLabel(snapshot.terminalId),
-                status: snapshot.status,
-                cwd: snapshot.cwd
-            )
-        }
+        return buildTerminalMenuSessions(from: snapshots, activeTerminalId: activeTerminalId)
     }
 
     private var canPasteIntoActiveTerminal: Bool {
@@ -289,41 +231,22 @@ struct TerminalScreen: View {
 
     @ViewBuilder
     private var terminalRouteBody: some View {
-        if !hasConnectionConfiguration {
-            TerminalRouteUnavailableView(
-                title: "Terminal unavailable",
-                detail: "SSH connection and key are required before opening a shell.",
-                theme: theme,
-                action: showConnectionEditor
-            )
-        } else {
-            if isNativeTerminalAvailable {
-                GhosttyTerminalSurface(
-                    terminalKey: terminalKey,
-                    buffer: activeSnapshot.bufferData,
-                    fontSize: CGFloat(terminalFontSize),
-                    colorScheme: colorScheme,
-                    theme: theme,
-                    onInput: handleTerminalDataInput,
-                    onResize: resizeTerminal,
-                    onNativeAvailabilityChanged: { isAvailable in
-                        isNativeTerminalAvailable = isAvailable
-                    },
-                    textReader: terminalTextReader
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(8)
-            } else {
-                TerminalFallbackSurface(
-                    snapshot: activeSnapshot,
-                    fontSize: CGFloat(terminalFontSize),
-                    theme: theme,
-                    isRunning: isRunning,
-                    onInput: handleTerminalTextInput,
-                    onResize: resizeTerminal
-                )
-            }
-        }
+        TerminalRouteSurface(
+            hasConnectionConfiguration: hasConnectionConfiguration,
+            isNativeTerminalAvailable: isNativeTerminalAvailable,
+            terminalKey: terminalKey,
+            snapshot: activeSnapshot,
+            fontSize: CGFloat(terminalFontSize),
+            colorScheme: colorScheme,
+            theme: theme,
+            isRunning: isRunning,
+            textReader: terminalTextReader,
+            onShowConnectionEditor: showConnectionEditor,
+            onDataInput: handleTerminalDataInput,
+            onTextInput: handleTerminalTextInput,
+            onResize: resizeTerminal,
+            onNativeAvailabilityChanged: { isNativeTerminalAvailable = $0 }
+        )
     }
 
     private func bootstrapTerminalRoute() async {
@@ -439,7 +362,7 @@ struct TerminalScreen: View {
                 rows: activeSnapshot.rows
             )
         } catch {
-            actionErrorMessage = terminalErrorText(error)
+            actionErrorMessage = terminalErrorText(from: error)
         }
     }
 
@@ -449,7 +372,7 @@ struct TerminalScreen: View {
         do {
             try await codex.closeTerminal(terminalId: activeTerminalId)
         } catch {
-            actionErrorMessage = terminalErrorText(error)
+            actionErrorMessage = terminalErrorText(from: error)
         }
     }
 
@@ -468,7 +391,7 @@ struct TerminalScreen: View {
             do {
                 try await codex.clearTerminalBuffer(terminalId: activeTerminalId)
             } catch {
-                actionErrorMessage = terminalErrorText(error)
+                actionErrorMessage = terminalErrorText(from: error)
             }
         }
     }
@@ -499,7 +422,7 @@ struct TerminalScreen: View {
             do {
                 try await codex.changeTerminalWorkingDirectory(trimmedCWD, terminalId: activeTerminalId)
             } catch {
-                actionErrorMessage = terminalErrorText(error)
+                actionErrorMessage = terminalErrorText(from: error)
             }
         }
     }
@@ -571,118 +494,7 @@ struct TerminalScreen: View {
         )
     }
 
-    private func terminalErrorText(_ error: Error) -> String {
-        if case CodexServiceError.rpcError(let rpcError) = error {
-            return rpcError.message
-        }
-        if let localizedError = error as? LocalizedError,
-           let description = localizedError.errorDescription {
-            return description
-        }
-        return error.localizedDescription
-    }
-
-    private func firstNonEmpty(_ values: [String?]) -> String? {
-        for value in values {
-            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if !trimmed.isEmpty {
-                return trimmed
-            }
-        }
-        return nil
-    }
-
-    private func projectDisplayName(for path: String) -> String? {
-        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        return URL(fileURLWithPath: trimmed).lastPathComponent
-    }
-
-    private func terminalDisplayLabel(_ terminalId: String) -> String {
-        let index = terminalIndex(terminalId)
-        guard index > 1 else { return "Terminal" }
-        return "Terminal \(index)"
-    }
-
     private func nextOpenTerminalId() -> String {
-        let existingIndexes = terminalMenuSessions.map { terminalIndex($0.terminalId) }
-        let nextIndex = (existingIndexes.max() ?? 0) + 1
-        return "term-\(max(1, nextIndex))"
-    }
-
-    private func terminalIndex(_ terminalId: String) -> Int {
-        guard terminalId.hasPrefix("term-"),
-              let value = Int(terminalId.dropFirst(5)) else {
-            return 1
-        }
-        return value
-    }
-
-    private static func applyCtrlModifier(_ input: String) -> String {
-        guard let firstCharacter = input.first else {
-            return input
-        }
-
-        let lowerCharacter = Character(firstCharacter.lowercased())
-        if let scalar = lowerCharacter.unicodeScalars.first,
-           lowerCharacter >= "a",
-           lowerCharacter <= "z" {
-            return String(UnicodeScalar(scalar.value - 96) ?? scalar)
-        }
-
-        switch firstCharacter {
-        case "@": return "\u{0}"
-        case "[": return "\u{1B}"
-        case "\\": return "\u{1C}"
-        case "]": return "\u{1D}"
-        case "^": return "\u{1E}"
-        case "_": return "\u{1F}"
-        case "?": return "\u{7F}"
-        default: return input
-        }
-    }
-
-    static func terminalPasteInputChunks(
-        for text: String,
-        bracketedPasteEnabled: Bool,
-        maxChunkBytes: Int = 8_192
-    ) -> [Data] {
-        let normalizedText = normalizedTerminalPasteText(text)
-        let wrappedText = bracketedPasteEnabled
-            ? "\u{1B}[200~\(normalizedText)\u{1B}[201~"
-            : normalizedText
-
-        return Data(wrappedText.utf8).terminalPasteChunks(maxChunkBytes: maxChunkBytes)
-    }
-
-    private static func normalizedTerminalPasteText(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "\r\n", with: "\r")
-            .replacingOccurrences(of: "\n", with: "\r")
-            .replacingOccurrences(of: "\u{0}", with: "")
-            // Strip embedded bracketed-paste delimiters so clipboard content cannot
-            // prematurely close the wrapper and turn the rest into typed commands.
-            .replacingOccurrences(of: "\u{1B}[200~", with: "")
-            .replacingOccurrences(of: "\u{1B}[201~", with: "")
-    }
-}
-
-private extension Data {
-    func terminalPasteChunks(maxChunkBytes: Int) -> [Data] {
-        guard !isEmpty else { return [] }
-        let safeChunkSize = Swift.max(1, maxChunkBytes)
-        guard count > safeChunkSize else { return [self] }
-
-        var chunks: [Data] = []
-        chunks.reserveCapacity((count + safeChunkSize - 1) / safeChunkSize)
-
-        var offset = 0
-        while offset < count {
-            let end = Swift.min(offset + safeChunkSize, count)
-            chunks.append(subdata(in: offset..<end))
-            offset = end
-        }
-
-        return chunks
+        terminalNextOpenTerminalId(from: terminalMenuSessions.map(\.terminalId))
     }
 }

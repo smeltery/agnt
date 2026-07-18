@@ -316,6 +316,19 @@ test("maybeBuildJsonlThreadTurnsListFallback returns null when a relay cursor is
   assert.equal(result, null);
 });
 
+test("maybeBuildJsonlThreadTurnsListFallback returns null when canonical history is required", () => {
+  let ioCalled = false;
+  const canonicalRequest = {
+    id: "req-canonical",
+    params: { threadId: "thr-1", limit: 5, agntRequireCanonical: true },
+  };
+  const result = maybeBuildJsonlThreadTurnsListFallback(codexProvider, canonicalRequest, emptyResponse, makeFallbackDeps({
+    resolveSessionsRootImpl: () => { ioCalled = true; return "/fake"; },
+  }));
+  assert.equal(result, null);
+  assert.equal(ioCalled, false, "canonical retries must skip local JSONL fallback before any IO");
+});
+
 test("maybeBuildJsonlThreadTurnsListFallback returns null when no rollout file is found on disk", () => {
   const result = maybeBuildJsonlThreadTurnsListFallback(codexProvider, baseRequest, emptyResponse, makeFallbackDeps({
     findRecentRolloutFileForContextReadImpl: () => "",

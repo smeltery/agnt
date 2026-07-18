@@ -48,6 +48,26 @@ test("workspace/readImage returns base64 image data for a file inside cwd", asyn
   assert.equal(result.dataBase64, bytes.toString("base64"));
 });
 
+test("workspace/readImage returns SVG source as image data", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
+  execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
+  const imagePath = path.join(tempDir, "icon.svg");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>`;
+  fs.writeFileSync(imagePath, svg);
+
+  const result = await handleWorkspaceMethod("workspace/readImage", {
+    cwd: tempDir,
+    path: imagePath,
+    maxPixelDimension: 1600,
+  });
+
+  assert.equal(result.path, fs.realpathSync(imagePath));
+  assert.equal(result.fileName, "icon.svg");
+  assert.equal(result.mimeType, "image/svg+xml");
+  assert.equal(result.byteLength, Buffer.byteLength(svg));
+  assert.equal(result.dataBase64, Buffer.from(svg).toString("base64"));
+});
+
 test("workspace/readImage can return metadata without image bytes", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-image-"));
   execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
@@ -419,6 +439,26 @@ test("workspace/readImage allows macOS shared /tmp screenshot images", { skip: p
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("workspace/readImage allows CleanShot media screenshots on macOS", async (t) => {
+  useProcessPlatform(t, "darwin");
+  const cleanShotRoot = path.join(os.homedir(), "Library", "Application Support", "CleanShot X", "media");
+  fs.mkdirSync(cleanShotRoot, { recursive: true });
+  const testDir = fs.mkdtempSync(path.join(cleanShotRoot, "agnt-image-"));
+  const imagePath = path.join(testDir, "capture.png");
+  const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  fs.writeFileSync(imagePath, bytes);
+  t.after(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  const result = await handleWorkspaceMethod("workspace/readImage", {
+    path: imagePath,
+  });
+
+  assert.equal(result.path, fs.realpathSync(imagePath));
+  assert.equal(result.dataBase64, bytes.toString("base64"));
 });
 
 test("workspace/readImage rejects cwd widening outside a repository", async () => {

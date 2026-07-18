@@ -34,7 +34,7 @@ final class WorkspaceSVGPreviewSecurityTests: XCTestCase {
 
     func testKeepsLocalFragmentReferences() {
         // In-document references (e.g. gradients) must survive sanitization.
-        let source = #"<svg><rect fill="url(#grad)"/><use href="#icon"/></svg>"#
+        let source = ##"<svg><rect fill="url(#grad)"/><use href="#icon"/></svg>"##
 
         let sanitized = WorkspaceSVGPreviewSecurity.sanitizedSVGSource(source)
 

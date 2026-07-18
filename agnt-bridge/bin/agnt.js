@@ -52,7 +52,7 @@ const defaultDeps = {
 };
 
 if (require.main === module) {
-  void main();
+  void runCli();
 }
 
 // ─── ENTRY POINT ─────────────────────────────────────────────
@@ -133,7 +133,7 @@ async function main({
         currentVersion: version,
         plistPath: result?.plistPath,
         unitPath: result?.unitPath,
-        pairingSession: result?.pairingSession,
+        pairingSession: sanitizePairingSessionForOutput(result?.pairingSession),
       },
       message: platform === "darwin"
         ? "[agnt] macOS bridge service is running."
@@ -156,7 +156,7 @@ async function main({
         currentVersion: version,
         plistPath: result?.plistPath,
         unitPath: result?.unitPath,
-        pairingSession: result?.pairingSession,
+        pairingSession: sanitizePairingSessionForOutput(result?.pairingSession),
       },
       message: platform === "darwin"
         ? "[agnt] macOS bridge service restarted."
@@ -188,11 +188,37 @@ async function main({
     return;
   }
 
+  if (command === "qr" || command === "pair") {
+    assertServiceCommand(command, { platform, consoleImpl, exitImpl });
+    const result = platform === "darwin"
+      ? await deps.startMacOSBridgeService({ waitForPairing: true, providerId })
+      : await deps.startLinuxBridgeService({ waitForPairing: true, providerId });
+
+    if (jsonOutput) {
+      emitJson({
+        ok: true,
+        currentVersion: version,
+        plistPath: result?.plistPath,
+        unitPath: result?.unitPath,
+        pairingSession: sanitizePairingSessionForOutput(result?.pairingSession),
+      });
+      return;
+    }
+
+    consoleImpl.log("[agnt] Refreshing bridge pairing QR...");
+    if (platform === "darwin") {
+      deps.printMacOSBridgePairingQr({ pairingSession: result.pairingSession });
+    } else {
+      deps.printLinuxBridgePairingQr({ pairingSession: result.pairingSession });
+    }
+    return;
+  }
+
   if (command === "status") {
     assertServiceCommand(command, { platform, consoleImpl, exitImpl });
     if (jsonOutput) {
       emitJson({
-        ...(platform === "darwin"
+        ...sanitizeBridgeServiceStatusForOutput(platform === "darwin"
           ? deps.getMacOSBridgeServiceStatus()
           : deps.getLinuxBridgeServiceStatus()),
         currentVersion: version,
@@ -305,11 +331,24 @@ async function main({
 
   consoleImpl.error(`Unknown command: ${command}`);
   consoleImpl.error(
-    "Usage: agnt up | agnt run | agnt start | agnt restart | agnt stop | agnt status | "
+    "Usage: agnt up | agnt run | agnt qr | agnt pair | agnt start | agnt restart | agnt stop | agnt status | "
     + "agnt reset-pairing | agnt resume | agnt watch [threadId] | agnt --version | "
-    + "append --json to start/restart/stop/status/reset-pairing/resume for machine-readable output"
+    + "append --json to qr/pair/start/restart/stop/status/reset-pairing/resume for machine-readable output"
   );
   exitImpl(1);
+}
+
+async function runCli({
+  mainImpl = main,
+  consoleImpl = console,
+  exitImpl = process.exit,
+} = {}) {
+  try {
+    await mainImpl({ consoleImpl, exitImpl });
+  } catch (error) {
+    consoleImpl.error(`[agnt] ${(error && error.message) || "Unexpected failure."}`);
+    exitImpl(1);
+  }
 }
 
 function parseCliArgs(rawArgs) {
@@ -375,6 +414,47 @@ function emitJson(payload) {
   process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
+function sanitizeBridgeServiceStatusForOutput(status = {}) {
+  return {
+    ...status,
+    daemonConfig: sanitizeDaemonConfigForOutput(status.daemonConfig),
+    pairingSession: sanitizePairingSessionForOutput(status.pairingSession),
+  };
+}
+
+function sanitizeDaemonConfigForOutput(config) {
+  if (!config || typeof config !== "object") {
+    return config || null;
+  }
+
+  const { relayUrl, pushServiceUrl, ...rest } = config;
+  return {
+    ...rest,
+    relayConfigured: Boolean(relayUrl),
+    pushServiceConfigured: Boolean(pushServiceUrl),
+  };
+}
+
+function sanitizePairingSessionForOutput(pairingSession) {
+  if (!pairingSession || typeof pairingSession !== "object") {
+    return pairingSession || null;
+  }
+
+  const payload = pairingSession.pairingPayload || {};
+  return {
+    createdAt: pairingSession.createdAt,
+    pairingCode: pairingSession.pairingCode,
+    pairingPayload: {
+      v: payload.v,
+      expiresAt: payload.expiresAt,
+      hasRelay: Boolean(payload.relay),
+      hasSessionId: Boolean(payload.sessionId),
+      hasMacIdentityPublicKey: Boolean(payload.macIdentityPublicKey),
+      displayName: payload.displayName,
+    },
+  };
+}
+
 function assertServiceCommand(name, {
   platform = process.platform,
   consoleImpl = console,
@@ -413,4 +493,8 @@ function isVersionCommand(value) {
 module.exports = {
   isVersionCommand,
   main,
+  runCli,
+  sanitizeBridgeServiceStatusForOutput,
+  sanitizeDaemonConfigForOutput,
+  sanitizePairingSessionForOutput,
 };

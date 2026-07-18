@@ -1,0 +1,285 @@
+.agnt-command-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 80vh;
+}
+.agnt-command-palette-saved {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.agnt-command-palette-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.agnt-command-palette-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.agnt-command-palette-filter-label {
+  color: var(--agnt-fg-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.agnt-command-palette-segments {
+  display: inline-flex;
+  border: 1px solid var(--agnt-border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.agnt-command-palette-segment {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--agnt-fg-dim);
+  border: none;
+  border-right: 1px solid var(--agnt-border);
+  cursor: pointer;
+}
+.agnt-command-palette-segment:last-child { border-right: none; }
+.agnt-command-palette-segment:hover { color: var(--agnt-fg); }
+.agnt-command-palette-segment-active {
+  background: var(--agnt-accent);
+  color: var(--agnt-fg-inverse, var(--agnt-bg));
+}
+.agnt-command-palette-filter-select {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--agnt-bg);
+  color: var(--agnt-fg);
+  border: 1px solid var(--agnt-border);
+  border-radius: 5px;
+}
+.agnt-command-palette-filter-reset {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--agnt-fg-dim);
+  border: 1px solid var(--agnt-border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.agnt-command-palette-filter-reset:hover { color: var(--agnt-fg); border-color: var(--agnt-fg-dim); }
+.agnt-command-palette-saved-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--agnt-bg-elev-2);
+  border-radius: 999px;
+  padding: 2px 4px 2px 10px;
+  font-size: 12px;
+}
+.agnt-command-palette-saved-apply {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg);
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.agnt-command-palette-saved-remove {
+  background: transparent;
+  border: 0;
+  color: var(--agnt-fg-dim);
+  padding: 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.agnt-command-palette-saved-remove:hover { color: var(--agnt-fg); background: var(--agnt-bg-elev); }
+.agnt-command-palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--agnt-border);
+}
+.agnt-command-palette-input-row .agnt-command-palette-input {
+  flex: 1;
+  border: 0;
+  border-bottom: 0;
+  padding: 6px 6px;
+}
+.agnt-command-palette-input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--agnt-border);
+  padding: 14px 18px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--agnt-fg);
+  outline: none;
+}
+.agnt-command-palette-hits {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.agnt-command-palette-hit {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--agnt-border);
+  padding: 8px 18px;
+  text-align: left;
+  font: inherit;
+  color: var(--agnt-fg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agnt-command-palette-hit:last-child { border-bottom: 0; }
+.agnt-command-palette-hit:hover { background: var(--agnt-bg-elev-2); }
+.agnt-command-palette-hit-active { background: var(--agnt-bg-elev-2); box-shadow: inset 2px 0 0 var(--agnt-accent); }
+.agnt-command-palette-hit-thread { color: var(--agnt-accent); font-size: 11px; font-weight: 600; }
+.agnt-command-palette-hit-snippet { color: var(--agnt-fg-dim); font-size: 12px; }
+.agnt-command-palette-empty { padding: 24px 18px; color: var(--agnt-fg-dim); font-size: 13px; text-align: center; }
+.agnt-command-palette-footer {
+  border-top: 1px solid var(--agnt-border);
+  padding: 8px 18px;
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+  display: flex;
+  justify-content: space-between;
+}
+.agnt-command-palette-hint { font-family: var(--agnt-mono); }
+
+.agnt-help-modal { max-width: 540px; }
+.agnt-help-body { display: flex; flex-direction: column; gap: 16px; }
+.agnt-help-search {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-radius: 6px;
+  color: var(--agnt-fg);
+  font: inherit;
+  font-size: 13px;
+}
+.agnt-help-empty {
+  padding: 16px 0;
+  color: var(--agnt-fg-dim);
+  font-size: 13px;
+  text-align: center;
+}
+.agnt-help-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-help-section ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.agnt-help-section li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.agnt-help-keys { display: inline-flex; gap: 4px; min-width: 140px; }
+.agnt-help-keys kbd {
+  background: var(--agnt-bg-elev-2);
+  border: 1px solid var(--agnt-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--agnt-mono);
+  font-size: 11px;
+}
+.agnt-help-description { color: var(--agnt-fg-dim); }
+
+/* iOS-y connection pill: filled tint that matches the surrounding chrome
+   instead of the previous outlined look. The tint color reads as semantic
+   (green=ok, blue=working, etc.) without competing with the brand title. */
+.agnt-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--agnt-bg-elev-2);
+  color: var(--agnt-fg-dim);
+}
+.agnt-status-pill::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.agnt-status-ok { color: var(--agnt-ok); background: color-mix(in srgb, var(--agnt-ok) 15%, transparent); }
+.agnt-status-info { color: var(--agnt-accent); background: color-mix(in srgb, var(--agnt-accent) 15%, transparent); }
+.agnt-status-warn { color: var(--agnt-warn); background: color-mix(in srgb, var(--agnt-warn) 18%, transparent); }
+.agnt-status-error { color: var(--agnt-danger); background: color-mix(in srgb, var(--agnt-danger) 16%, transparent); }
+.agnt-status-idle { color: var(--agnt-fg-dim); }
+.agnt-status-rtt { font-weight: 400; opacity: 0.75; margin-left: 2px; font-variant-numeric: tabular-nums; }
+.agnt-status-rtt-warn .agnt-status-rtt { color: var(--agnt-warn); opacity: 1; }
+.agnt-status-rtt-slow .agnt-status-rtt { color: var(--agnt-danger); opacity: 1; }
+
+/* Thread color palette — one variable per swatch so the same `--c` value
+   drives both the swatch fill in the picker and the row's left border. */
+.agnt-thread-color-red    { --agnt-thread-color: #d44; }
+.agnt-thread-color-orange { --agnt-thread-color: #e8941d; }
+.agnt-thread-color-yellow { --agnt-thread-color: #d4b800; }
+.agnt-thread-color-green  { --agnt-thread-color: #3aa75a; }
+.agnt-thread-color-blue   { --agnt-thread-color: #3d7bd9; }
+.agnt-thread-color-purple { --agnt-thread-color: #9a4fc7; }
+
+.agnt-sidebar-row-color { box-shadow: inset 3px 0 0 0 var(--agnt-thread-color); }
+.agnt-chat-header-color-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--agnt-thread-color);
+  display: inline-block;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.agnt-thread-menu-colors {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--agnt-fg-dim);
+}
+.agnt-thread-menu-colors-label { margin-right: 4px; }
+.agnt-thread-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--agnt-border);
+  background: var(--agnt-thread-color);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.agnt-thread-color-swatch:hover { transform: scale(1.1); }
+.agnt-thread-color-swatch-active { box-shadow: 0 0 0 2px var(--agnt-accent); }
+.agnt-thread-color-clear {
+  background: var(--agnt-bg);
+  color: var(--agnt-fg-dim);
+  font-size: 10px;
+  line-height: 1;
+}

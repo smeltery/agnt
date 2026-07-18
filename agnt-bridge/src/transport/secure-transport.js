@@ -5,30 +5,43 @@
 // Depends on: crypto, ./secure-device-state
 
 const {
-  createCipheriv,
-  createDecipheriv,
   createHash,
   createPrivateKey,
   createPublicKey,
   diffieHellman,
   generateKeyPairSync,
-  hkdfSync,
   randomBytes,
-  sign,
-  verify,
 } = require("crypto");
 const {
   getTrustedPhonePublicKey,
   rememberTrustedPhone,
 } = require("./secure-device-state");
+const {
+  HANDSHAKE_TAG,
+  SECURE_SENDER_IPHONE,
+  base64ToBase64Url,
+  base64ToBuffer,
+  base64UrlToBase64,
+  buildTranscriptBytes,
+  debugSecureLog,
+  decryptEnvelopeBuffer,
+  deriveAesKey,
+  encodeLengthPrefixedUTF8,
+  nonceForDirection,
+  normalizeNonEmptyString,
+  safeParseJSON,
+  shortFingerprint,
+  shortId,
+  signTranscript,
+  transcriptDigest,
+  verifyTranscript,
+} = require("./secure-transport-crypto");
+const { createSecureTransportReplayBuffer } = require("./secure-transport-replay-buffer");
 
 const PAIRING_QR_VERSION = 2;
 const SECURE_PROTOCOL_VERSION = 1;
-const HANDSHAKE_TAG = "agnt-e2ee-v1";
 const HANDSHAKE_MODE_QR_BOOTSTRAP = "qr_bootstrap";
 const HANDSHAKE_MODE_TRUSTED_RECONNECT = "trusted_reconnect";
-const SECURE_SENDER_MAC = "mac";
-const SECURE_SENDER_IPHONE = "iphone";
 const MAX_PAIRING_AGE_MS = 5 * 60 * 1000;
 const MAX_BRIDGE_OUTBOUND_MESSAGES = 500;
 const MAX_BRIDGE_OUTBOUND_BYTES = 10 * 1024 * 1024;
@@ -50,9 +63,17 @@ function createBridgeSecureTransport({
   let lastRelayedBridgeOutboundSeq = 0;
   let currentPairingExpiresAt = Date.now() + MAX_PAIRING_AGE_MS;
   let nextKeyEpoch = 1;
-  let nextBridgeOutboundSeq = 1;
-  let outboundBufferBytes = 0;
-  const outboundBuffer = [];
+  const bridgeReplayEpoch = randomBytes(16).toString("hex");
+  const replayBuffer = createSecureTransportReplayBuffer({
+    bridgeReplayEpoch,
+    getActiveSession: () => activeSession,
+    getLastRelayedBridgeOutboundSeq: () => lastRelayedBridgeOutboundSeq,
+    getSessionId: () => sessionId,
+    maxOutboundBytes: MAX_BRIDGE_OUTBOUND_BYTES,
+    maxOutboundMessages: MAX_BRIDGE_OUTBOUND_MESSAGES,
+    protocolVersion: SECURE_PROTOCOL_VERSION,
+    setLastRelayedBridgeOutboundSeq: (value) => { lastRelayedBridgeOutboundSeq = value; },
+  });
 
   function createPairingPayload() {
     currentPairingExpiresAt = Date.now() + MAX_PAIRING_AGE_MS;
@@ -107,24 +128,7 @@ function createBridgeSecureTransport({
     if (!normalizedPayload) {
       return;
     }
-
-    const bufferEntry = {
-      bridgeOutboundSeq: nextBridgeOutboundSeq,
-      payloadText: normalizedPayload,
-      sizeBytes: Buffer.byteLength(normalizedPayload, "utf8"),
-    };
-    nextBridgeOutboundSeq += 1;
-    outboundBuffer.push(bufferEntry);
-    outboundBufferBytes += bufferEntry.sizeBytes;
-    trimOutboundBuffer();
-
-    const liveSessionSender = activeSession?.sendWireMessage;
-    const effectiveSendWireMessage = typeof liveSessionSender === "function"
-      ? liveSessionSender
-      : sendWireMessage;
-    if (activeSession?.isResumed && typeof effectiveSendWireMessage === "function") {
-      sendBufferedEntry(bufferEntry, effectiveSendWireMessage);
-    }
+    replayBuffer.queueOutboundApplicationMessage(normalizedPayload, sendWireMessage);
   }
 
   function isSecureChannelReady() {
@@ -259,6 +263,7 @@ function createBridgeSecureTransport({
       macEphemeralPublicKey: pendingHandshake.macEphemeralPublicKey,
       serverNonce: serverNonce.toString("base64"),
       keyEpoch,
+      bridgeReplayEpoch,
       expiresAtForTranscript,
       macSignature,
       clientNonce: clientNonceBase64,
@@ -350,7 +355,7 @@ function createBridgeSecureTransport({
       nextOutboundCounter: 0,
       isResumed: false,
       sendWireMessage: liveSendWireMessage,
-      firstOutboundSeq: nextBridgeOutboundSeq,
+      firstOutboundSeq: replayBuffer.nextSeq(),
     };
 
     nextKeyEpoch = pendingHandshake.keyEpoch + 1;
@@ -373,8 +378,8 @@ function createBridgeSecureTransport({
       }
     }
     if (pendingHandshake.handshakeMode === HANDSHAKE_MODE_QR_BOOTSTRAP) {
-      resetOutboundReplayState();
-      activeSession.firstOutboundSeq = nextBridgeOutboundSeq;
+      replayBuffer.resetOutboundReplayState();
+      activeSession.firstOutboundSeq = replayBuffer.nextSeq();
     }
 
     pendingHandshake = null;
@@ -398,16 +403,12 @@ function createBridgeSecureTransport({
     }
 
     const lastAppliedBridgeOutboundSeq = Number(message.lastAppliedBridgeOutboundSeq) || 0;
-    lastRelayedBridgeOutboundSeq = lastAppliedBridgeOutboundSeq;
-    const missingEntries = replayableOutboundEntries(lastAppliedBridgeOutboundSeq, {
-      includeCurrentSessionEntries: true,
+    const phoneReplayEpoch = normalizeNonEmptyString(message.bridgeReplayEpoch);
+    replayBuffer.handleResumeState({
+      activeSession,
+      lastAppliedBridgeOutboundSeq,
+      phoneReplayEpoch,
     });
-    activeSession.isResumed = true;
-    for (const entry of missingEntries) {
-      if (!sendBufferedEntry(replayTaggedEntryIfHistorical(entry), activeSession.sendWireMessage)) {
-        break;
-      }
-    }
   }
 
   function handleEncryptedEnvelope(message, sendControlMessage, onApplicationMessage) {
@@ -465,123 +466,8 @@ function createBridgeSecureTransport({
     liveSendWireMessage = sendWireMessage;
     if (activeSession) {
       activeSession.sendWireMessage = sendWireMessage;
-      replayBufferedOutboundMessages();
+      replayBuffer.replayBufferedOutboundMessages();
     }
-  }
-
-  function trimOutboundBuffer() {
-    let removeCount = 0;
-    let removedBytes = 0;
-    while (
-      (outboundBuffer.length - removeCount) > MAX_BRIDGE_OUTBOUND_MESSAGES
-      || (outboundBufferBytes - removedBytes) > MAX_BRIDGE_OUTBOUND_BYTES
-    ) {
-      const entry = outboundBuffer[removeCount];
-      if (!entry) {
-        break;
-      }
-      removedBytes += entry.sizeBytes;
-      removeCount += 1;
-    }
-    if (removeCount > 0) {
-      outboundBuffer.splice(0, removeCount);
-      outboundBufferBytes = Math.max(0, outboundBufferBytes - removedBytes);
-    }
-  }
-
-  // Starts each fresh QR bootstrap with a clean catch-up window for the single trusted phone.
-  function resetOutboundReplayState() {
-    outboundBuffer.length = 0;
-    outboundBufferBytes = 0;
-    lastRelayedBridgeOutboundSeq = 0;
-    nextBridgeOutboundSeq = 1;
-  }
-
-  function sendBufferedEntry(entry, sendWireMessage) {
-    if (!activeSession?.isResumed || typeof sendWireMessage !== "function") {
-      return false;
-    }
-
-    const envelope = encryptEnvelopePayload(
-      {
-        bridgeOutboundSeq: entry.bridgeOutboundSeq,
-        payloadText: entry.payloadText,
-      },
-      activeSession.macToPhoneKey,
-      SECURE_SENDER_MAC,
-      activeSession.nextOutboundCounter,
-      sessionId,
-      activeSession.keyEpoch
-    );
-    activeSession.nextOutboundCounter += 1;
-    return sendWireMessage(JSON.stringify(envelope)) !== false;
-  }
-
-  function replayableOutboundEntries(
-    lastAppliedBridgeOutboundSeq,
-    { includeCurrentSessionEntries = false } = {}
-  ) {
-    return outboundBuffer.filter((entry) => {
-      if (entry.bridgeOutboundSeq > lastAppliedBridgeOutboundSeq) {
-        return true;
-      }
-
-      // Stale cursors from a previous Mac/session must not suppress responses
-      // produced after this secure channel became active, including initialize.
-      return includeCurrentSessionEntries
-        && activeSession
-        && entry.bridgeOutboundSeq >= activeSession.firstOutboundSeq;
-    });
-  }
-
-  // Replays from the last phone ack instead of local socket writes, so a relay
-  // flap cannot make the bridge skip output the phone never actually received.
-  function replayBufferedOutboundMessages() {
-    if (!activeSession?.isResumed || typeof activeSession.sendWireMessage !== "function") {
-      return;
-    }
-
-    for (const entry of replayableOutboundEntries(lastRelayedBridgeOutboundSeq)) {
-      if (!sendBufferedEntry(replayTaggedEntryIfHistorical(entry), activeSession.sendWireMessage)) {
-        break;
-      }
-    }
-  }
-
-  // Only prior secure-session backlog is catch-up history; same-session retries
-  // may be the phone's first delivery of a still-live turn.
-  function replayTaggedEntryIfHistorical(entry) {
-    if (
-      !activeSession
-      || entry.bridgeOutboundSeq >= activeSession.firstOutboundSeq
-    ) {
-      return entry;
-    }
-
-    return replayTaggedEntry(entry);
-  }
-
-  // Marks replayed notifications so clients hydrate them as catch-up content
-  // instead of live activity. RPC responses and non-object params pass through.
-  function replayTaggedEntry(entry) {
-    const parsed = safeParseJSON(entry.payloadText);
-    if (
-      !parsed
-      || typeof parsed.method !== "string"
-      || parsed.id !== undefined
-      || !parsed.params
-      || typeof parsed.params !== "object"
-      || Array.isArray(parsed.params)
-    ) {
-      return entry;
-    }
-
-    parsed.params.agntReplayedEvent = true;
-    return {
-      bridgeOutboundSeq: entry.bridgeOutboundSeq,
-      payloadText: JSON.stringify(parsed),
-      sizeBytes: entry.sizeBytes,
-    };
   }
 
   return {
@@ -595,199 +481,12 @@ function createBridgeSecureTransport({
   };
 }
 
-function debugSecureLog(message) {
-  console.log(`[agnt][secure] ${message}`);
-}
-
-function shortId(value) {
-  const normalized = normalizeNonEmptyString(value);
-  return normalized ? createHash("sha256").update(normalized).digest("hex").slice(0, 8) : "none";
-}
-
-function shortFingerprint(publicKeyBase64) {
-  const bytes = base64ToBuffer(publicKeyBase64);
-  if (!bytes || bytes.length === 0) {
-    return "invalid";
-  }
-  return createHash("sha256").update(bytes).digest("hex").slice(0, 12);
-}
-
-function transcriptDigest(transcriptBytes) {
-  return createHash("sha256").update(transcriptBytes).digest("hex").slice(0, 16);
-}
-
-function encryptEnvelopePayload(payloadObject, key, sender, counter, sessionId, keyEpoch) {
-  const nonce = nonceForDirection(sender, counter);
-  const cipher = createCipheriv("aes-256-gcm", key, nonce);
-  const ciphertext = Buffer.concat([
-    cipher.update(Buffer.from(JSON.stringify(payloadObject), "utf8")),
-    cipher.final(),
-  ]);
-  const tag = cipher.getAuthTag();
-
-  return {
-    kind: "encryptedEnvelope",
-    v: SECURE_PROTOCOL_VERSION,
-    sessionId,
-    keyEpoch,
-    sender,
-    counter,
-    ciphertext: ciphertext.toString("base64"),
-    tag: tag.toString("base64"),
-  };
-}
-
-function decryptEnvelopeBuffer(envelope, key, sender, counter) {
-  try {
-    const nonce = nonceForDirection(sender, counter);
-    const decipher = createDecipheriv("aes-256-gcm", key, nonce);
-    decipher.setAuthTag(base64ToBuffer(envelope.tag));
-    return Buffer.concat([
-      decipher.update(base64ToBuffer(envelope.ciphertext)),
-      decipher.final(),
-    ]);
-  } catch {
-    return null;
-  }
-}
-
-function deriveAesKey(sharedSecret, salt, infoLabel) {
-  return Buffer.from(hkdfSync("sha256", sharedSecret, salt, Buffer.from(infoLabel, "utf8"), 32));
-}
-
-function signTranscript(privateKeyBase64, publicKeyBase64, transcriptBytes) {
-  const signature = sign(
-    null,
-    transcriptBytes,
-    createPrivateKey({
-      key: {
-        crv: "Ed25519",
-        d: base64ToBase64Url(privateKeyBase64),
-        kty: "OKP",
-        x: base64ToBase64Url(publicKeyBase64),
-      },
-      format: "jwk",
-    })
-  );
-  return signature.toString("base64");
-}
-
-function verifyTranscript(publicKeyBase64, transcriptBytes, signatureBase64) {
-  try {
-    return verify(
-      null,
-      transcriptBytes,
-      createPublicKey({
-        key: {
-          crv: "Ed25519",
-          kty: "OKP",
-          x: base64ToBase64Url(publicKeyBase64),
-        },
-        format: "jwk",
-      }),
-      base64ToBuffer(signatureBase64)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function buildTranscriptBytes({
-  sessionId,
-  protocolVersion,
-  handshakeMode,
-  keyEpoch,
-  macDeviceId,
-  phoneDeviceId,
-  macIdentityPublicKey,
-  phoneIdentityPublicKey,
-  macEphemeralPublicKey,
-  phoneEphemeralPublicKey,
-  clientNonce,
-  serverNonce,
-  expiresAtForTranscript,
-}) {
-  return Buffer.concat([
-    encodeLengthPrefixedUTF8(HANDSHAKE_TAG),
-    encodeLengthPrefixedUTF8(sessionId),
-    encodeLengthPrefixedUTF8(String(protocolVersion)),
-    encodeLengthPrefixedUTF8(handshakeMode),
-    encodeLengthPrefixedUTF8(String(keyEpoch)),
-    encodeLengthPrefixedUTF8(macDeviceId),
-    encodeLengthPrefixedUTF8(phoneDeviceId),
-    encodeLengthPrefixedBuffer(base64ToBuffer(macIdentityPublicKey)),
-    encodeLengthPrefixedBuffer(base64ToBuffer(phoneIdentityPublicKey)),
-    encodeLengthPrefixedBuffer(base64ToBuffer(macEphemeralPublicKey)),
-    encodeLengthPrefixedBuffer(base64ToBuffer(phoneEphemeralPublicKey)),
-    encodeLengthPrefixedBuffer(clientNonce),
-    encodeLengthPrefixedBuffer(serverNonce),
-    encodeLengthPrefixedUTF8(String(expiresAtForTranscript)),
-  ]);
-}
-
-function encodeLengthPrefixedUTF8(value) {
-  return encodeLengthPrefixedBuffer(Buffer.from(String(value), "utf8"));
-}
-
-function encodeLengthPrefixedBuffer(buffer) {
-  const lengthBuffer = Buffer.allocUnsafe(4);
-  lengthBuffer.writeUInt32BE(buffer.length, 0);
-  return Buffer.concat([lengthBuffer, buffer]);
-}
-
-function nonceForDirection(sender, counter) {
-  const nonce = Buffer.alloc(12, 0);
-  nonce.writeUInt8(sender === SECURE_SENDER_MAC ? 1 : 2, 0);
-  let value = BigInt(counter);
-  for (let index = 11; index >= 1; index -= 1) {
-    nonce[index] = Number(value & 0xffn);
-    value >>= 8n;
-  }
-  return nonce;
-}
-
 function createSecureError({ code, message }) {
   return {
     kind: "secureError",
     code,
     message,
   };
-}
-
-function normalizeNonEmptyString(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value.trim();
-}
-
-function safeParseJSON(value) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function base64ToBuffer(value) {
-  try {
-    return Buffer.from(value, "base64");
-  } catch {
-    return null;
-  }
-}
-
-function base64UrlToBase64(value) {
-  const padded = `${value}${"=".repeat((4 - (value.length % 4 || 4)) % 4)}`;
-  return padded.replace(/-/g, "+").replace(/_/g, "/");
-}
-
-function base64ToBase64Url(value) {
-  return value.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 module.exports = {

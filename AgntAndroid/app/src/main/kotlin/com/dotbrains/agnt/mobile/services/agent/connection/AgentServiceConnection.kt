@@ -3,6 +3,7 @@ package com.dotbrains.agnt.mobile.services.agent.connection
 import com.dotbrains.agnt.mobile.core.transport.ConnectionState
 import com.dotbrains.agnt.mobile.core.transport.SecureControlMultiplexer
 import com.dotbrains.agnt.mobile.services.agent.AgentService
+import com.dotbrains.agnt.mobile.services.agent.notifications.cancelAllRunOngoingNotifications
 import com.dotbrains.agnt.mobile.services.agent.notifications.clearPendingServerRequests
 import com.dotbrains.agnt.mobile.services.agent.runtime.refreshModelsInternal
 import com.dotbrains.agnt.mobile.services.agent.runtime.refreshRateLimitsInternal
@@ -99,6 +100,9 @@ internal suspend fun AgentService.disconnectImpl(preservePresentationState: Bool
 internal suspend fun AgentService.setActiveThreadIdImpl(threadId: String?) {
     _activeThreadId.value = threadId?.trim()?.takeIf { it.isNotEmpty() }
     val id = _activeThreadId.value
+    if (id != null) {
+        clearThreadOutcome(id)
+    }
     sessionPersistence.saveLastActiveThreadId(id)
     if (id != null && sessionReady) {
         scope.launch(Dispatchers.IO) {
@@ -123,8 +127,13 @@ internal suspend fun AgentService.resetBridgeSession(preservePresentationState: 
         _threads.value = emptyList()
         _activeThreadId.value = null
     }
+    cancelAllRunOngoingNotifications()
     _runningTurnIdByThread.value = emptyMap()
     _protectedRunningFallbackThreadIds.value = emptySet()
+    _readyThreadIds.value = emptySet()
+    _failedThreadIds.value = emptySet()
+    _threadCompletionBannerThreadId.value = null
+    _threadCompletionBannerTitle.value = null
     clearPendingServerRequests()
     hydratedThreadIds.clear()
     resumedThreadIds.clear()

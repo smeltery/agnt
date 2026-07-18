@@ -9,12 +9,15 @@
     "node": ">=18"
   },
   "scripts": {
+    "ci": "bun run test && bun run typecheck && bun run build:vite && bun run size",
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:vite": "vite build",
     "preview": "vite preview --port 4173",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit -p tsconfig.json",
+    "lint": "bun run typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "size": "size-limit"
   },
   "dependencies": {

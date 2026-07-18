@@ -1,8 +1,8 @@
 // FILE: TurnComposerSecondaryBar.swift
-// Purpose: Owns the secondary composer controls shown above the main input card.
+// Purpose: Owns the compact context controls shown above the main input card.
 // Layer: View Component
 // Exports: TurnComposerSecondaryBar
-// Depends on: SwiftUI, UIKit, TurnGitBranchSelector, ContextWindowProgressRing, CodexWorktreeIcon
+// Depends on: SwiftUI, UIKit, TurnGitBranchSelector, CodexWorktreeIcon, PlanAccessoryCard, QueuedStatusCapsule
 
 import SwiftUI
 import UIKit
@@ -13,13 +13,14 @@ struct TurnComposerSecondaryBar: View {
     let hasWorkingDirectory: Bool
     let isWorktreeProject: Bool
     var activeFileChangeStatus: FileChangeStatusSnapshot? = nil
-
-    let selectedAccessMode: CodexAccessMode
-    let contextWindowUsage: ContextWindowUsage?
-    let rateLimitBuckets: [CodexRateLimitBucket]
-    let isLoadingRateLimits: Bool
-    let rateLimitsErrorMessage: String?
-    let shouldAutoRefreshUsageStatus: Bool
+    var threadGoal: CodexThreadGoal? = nil
+    var isThreadRunning = false
+    var onEditGoal: () -> Void = {}
+    var onResumeGoal: () -> Void = {}
+    var onPauseGoal: () -> Void = {}
+    var onRemoveGoal: () -> Void = {}
+    var queuedDraftCount: Int = 0
+    var onTapQueuedDrafts: () -> Void = {}
 
     let showsGitBranchSelector: Bool
     let isGitBranchSelectorEnabled: Bool
@@ -37,14 +38,18 @@ struct TurnComposerSecondaryBar: View {
     let onCreateGitBranch: (String) -> Void
     let onSelectGitBaseBranch: (String) -> Void
     let onRefreshGitBranches: () -> Void
-    let onRefreshUsageStatus: () async -> Void
-    let onSelectAccessMode: (CodexAccessMode) -> Void
     let canHandOffToWorktree: Bool
     let onTapCreateWorktree: () -> Void
+
+    @Environment(\.pinnedPlanAccessory) private var pinnedPlanAccessory
 
     private let branchLabelColor = Color(.secondaryLabel)
     private var branchTextFont: Font { AppFont.footnote() }
     private var branchChevronFont: Font { AppFont.system(size: 9, weight: .regular) }
+    private var hasContextContent: Bool {
+        hasWorkingDirectory || threadGoal != nil || pinnedPlanAccessory != nil || queuedDraftCount > 0
+    }
+
     private var runtimeLabelTitle: String {
         if !hasWorkingDirectory {
             return "Quick Chat"
@@ -54,81 +59,78 @@ struct TurnComposerSecondaryBar: View {
 
     // ─── ENTRY POINT ─────────────────────────────────────────────
     var body: some View {
-        Group {
-            if !isInputFocused {
-                HStack(spacing: 8) {
-                    runtimePicker
-
-                    accessMenuLabel
-                    Spacer()
-
-                    if let activeFileChangeStatus {
-                        FileChangeStatusCapsule(snapshot: activeFileChangeStatus)
-                            .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .trailing)))
-                    }
-
-                    if showsGitBranchSelector {
-                        TurnGitBranchSelector(
-                            isEnabled: isGitBranchSelectorEnabled,
-                            availableGitBranchTargets: availableGitBranchTargets,
-                            gitBranchesCheckedOutElsewhere: gitBranchesCheckedOutElsewhere,
-                            gitWorktreePathsByBranch: gitWorktreePathsByBranch,
-                            selectedGitBaseBranch: selectedGitBaseBranch,
-                            currentGitBranch: currentGitBranch,
-                            defaultBranch: gitDefaultBranch,
-                            isLoadingGitBranchTargets: isLoadingGitBranchTargets,
-                            isSwitchingGitBranch: isSwitchingGitBranch,
-                            onSelectGitBranch: onSelectGitBranch,
-                            onCreateGitBranch: onCreateGitBranch,
-                            onSelectGitBaseBranch: onSelectGitBaseBranch,
-                            onRefreshGitBranches: onRefreshGitBranches
-                        )
-                        .equatable()
-                    }
-
-                    statusControlCircle
+        if !isInputFocused, hasContextContent || activeFileChangeStatus != nil {
+            VStack(spacing: 8) {
+                if let activeFileChangeStatus {
+                    FileChangeStatusCapsule(snapshot: activeFileChangeStatus)
+                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
                 }
 
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.spring(response: 0.28, dampingFraction: 0.88), value: activeFileChangeStatus)
+                if hasContextContent {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            if hasWorkingDirectory {
+                                runtimePicker
+
+                                if showsGitBranchSelector {
+                                    TurnGitBranchSelector(
+                                        isEnabled: isGitBranchSelectorEnabled,
+                                        availableGitBranchTargets: availableGitBranchTargets,
+                                        gitBranchesCheckedOutElsewhere: gitBranchesCheckedOutElsewhere,
+                                        gitWorktreePathsByBranch: gitWorktreePathsByBranch,
+                                        selectedGitBaseBranch: selectedGitBaseBranch,
+                                        currentGitBranch: currentGitBranch,
+                                        defaultBranch: gitDefaultBranch,
+                                        isLoadingGitBranchTargets: isLoadingGitBranchTargets,
+                                        isSwitchingGitBranch: isSwitchingGitBranch,
+                                        onSelectGitBranch: onSelectGitBranch,
+                                        onCreateGitBranch: onCreateGitBranch,
+                                        onSelectGitBaseBranch: onSelectGitBaseBranch,
+                                        onRefreshGitBranches: onRefreshGitBranches
+                                    )
+                                    .equatable()
+                                }
+                            }
+
+                            if let pinnedPlanAccessory {
+                                PlanAccessoryCard(
+                                    snapshot: pinnedPlanAccessory.snapshot,
+                                    onTap: pinnedPlanAccessory.onTap
+                                )
+                                .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                            }
+
+                            if let threadGoal {
+                                GoalStatusChip(
+                                    goal: threadGoal,
+                                    isThreadRunning: isThreadRunning,
+                                    onEdit: onEditGoal,
+                                    onResume: onResumeGoal,
+                                    onPause: onPauseGoal,
+                                    onRemove: onRemoveGoal
+                                )
+                                .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                            }
+
+                            if queuedDraftCount > 0 {
+                                QueuedStatusCapsule(count: queuedDraftCount, onTap: onTapQueuedDrafts)
+                                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                            }
+                        }
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollClipDisabled()
+                }
             }
+            .frame(maxWidth: .infinity)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.28, dampingFraction: 0.88), value: activeFileChangeStatus)
+            .animation(.spring(response: 0.28, dampingFraction: 0.88), value: threadGoal != nil)
+            .animation(.spring(response: 0.28, dampingFraction: 0.88), value: queuedDraftCount > 0)
         }
     }
 
     // ─── Menus ───────────────────────────────────────────────────
-
-    private var accessMenuLabel: some View {
-        Menu {
-            ForEach(CodexAccessMode.allCases, id: \.rawValue) { mode in
-                Button {
-                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                    onSelectAccessMode(mode)
-                } label: {
-                    if selectedAccessMode == mode {
-                        Label(mode.menuTitle, systemImage: "checkmark")
-                    } else {
-                        Text(mode.menuTitle)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: selectedAccessMode == .fullAccess
-                      ? "hand.thumbsup"
-                      : "hand.raised")
-                    .font(branchTextFont)
-
-                Image(systemName: "chevron.down")
-                    .font(branchChevronFont)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .adaptiveGlass(.regular, in: Capsule())
-            .foregroundStyle(branchLabelColor)
-            .contentShape(Capsule())
-        }
-        .tint(branchLabelColor)
-    }
 
     private var runtimePicker: some View {
         Menu {
@@ -192,17 +194,6 @@ struct TurnComposerSecondaryBar: View {
             .contentShape(Capsule())
         }
         .tint(branchLabelColor)
-    }
-
-    private var statusControlCircle: some View {
-        ContextWindowProgressRing(
-            usage: contextWindowUsage,
-            rateLimitBuckets: rateLimitBuckets,
-            isLoadingRateLimits: isLoadingRateLimits,
-            rateLimitsErrorMessage: rateLimitsErrorMessage,
-            shouldAutoRefreshStatus: shouldAutoRefreshUsageStatus,
-            onRefreshStatus: onRefreshUsageStatus
-        )
     }
 }
 

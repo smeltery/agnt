@@ -10,6 +10,7 @@ import com.dotbrains.agnt.mobile.pairing.buildWebSocketConnectParams
 import com.dotbrains.agnt.mobile.services.agent.AgentService
 import com.dotbrains.agnt.mobile.services.agent.connection.connectImpl
 import com.dotbrains.agnt.mobile.services.agent.connection.disconnectImpl
+import com.dotbrains.agnt.mobile.services.agent.notifications.cancelAllRunOngoingNotifications
 import com.dotbrains.agnt.mobile.services.agent.threads.interruptTurnForRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
@@ -228,6 +229,7 @@ internal suspend fun AgentService.clearInMemoryMacScopedState() {
         _activeThreadId.value = null
         persistedThreadRenameById.clear()
         associatedManagedWorktreePathByThreadId.clear()
+        cancelAllRunOngoingNotifications()
         _runningTurnIdByThread.value = emptyMap()
         _protectedRunningFallbackThreadIds.value = emptySet()
         turnDraftQueueStore.clear()

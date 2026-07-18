@@ -22,6 +22,7 @@ const macHostMetadata = {
     displayWake: true,
     keepAwake: true,
     hostBrowserLogin: true,
+    bridgeSelfUpdate: true,
     terminal: true,
     terminalLocal: false,
   },
@@ -135,6 +136,97 @@ test("composeAccountStatus reports reauth when auth status explicitly requires C
     tokenReady: false,
     expiresAt: null,
     requiresOpenaiAuth: true,
+    bridgeVersion: bridgePackageVersion,
+    bridgeLatestVersion: "9.9.9",
+    ...macHostMetadata,
+  });
+});
+
+test("composeAccountStatus keeps voice-ready ChatGPT token authenticated despite requiresOpenaiAuth", () => {
+  const status = composeAccountStatus(withMacHost({
+    accountRead: {
+      account: {
+        type: "chatgpt",
+        email: "user@example.com",
+      },
+      requiresOpenaiAuth: true,
+    },
+    authStatus: {
+      authMethod: "chatgpt",
+      authToken: "chatgpt-token",
+      requiresOpenaiAuth: true,
+    },
+    bridgeVersionInfo: {
+      bridgeVersion: bridgePackageVersion,
+      bridgeLatestVersion: "9.9.9",
+    },
+  }));
+
+  assert.deepEqual(status, {
+    status: "authenticated",
+    authMethod: "chatgpt",
+    email: "user@example.com",
+    planType: null,
+    loginInFlight: false,
+    needsReauth: false,
+    tokenReady: true,
+    expiresAt: null,
+    requiresOpenaiAuth: true,
+    bridgeVersion: bridgePackageVersion,
+    bridgeLatestVersion: "9.9.9",
+    ...macHostMetadata,
+  });
+});
+
+test("composeAccountStatus accepts snake-case ChatGPT auth methods as voice-ready", () => {
+  const status = composeAccountStatus(withMacHost({
+    accountRead: {
+      account: null,
+      requiresOpenaiAuth: true,
+    },
+    authStatus: {
+      authMethod: "chatgpt_auth_tokens",
+      authToken: "chatgpt-token",
+      requiresOpenaiAuth: true,
+    },
+    bridgeVersionInfo: {
+      bridgeVersion: bridgePackageVersion,
+      bridgeLatestVersion: "9.9.9",
+    },
+  }));
+
+  assert.equal(status.status, "authenticated");
+  assert.equal(status.needsReauth, false);
+  assert.equal(status.tokenReady, true);
+});
+
+test("composeAccountStatus does not advertise API-key auth as voice-ready", () => {
+  const status = composeAccountStatus(withMacHost({
+    accountRead: {
+      account: null,
+      requiresOpenaiAuth: false,
+    },
+    authStatus: {
+      authMethod: "apiKey",
+      authToken: "sk-test",
+      requiresOpenaiAuth: false,
+    },
+    bridgeVersionInfo: {
+      bridgeVersion: bridgePackageVersion,
+      bridgeLatestVersion: "9.9.9",
+    },
+  }));
+
+  assert.deepEqual(status, {
+    status: "not_logged_in",
+    authMethod: "apiKey",
+    email: null,
+    planType: null,
+    loginInFlight: false,
+    needsReauth: false,
+    tokenReady: false,
+    expiresAt: null,
+    requiresOpenaiAuth: false,
     bridgeVersion: bridgePackageVersion,
     bridgeLatestVersion: "9.9.9",
     ...macHostMetadata,

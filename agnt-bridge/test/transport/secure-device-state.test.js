@@ -12,6 +12,7 @@ const assert = require("node:assert/strict");
 const {
   loadOrCreateBridgeDeviceState,
   readBridgeDeviceState,
+  rememberLastSeenClientDeviceKind,
   rememberLastSeenPhoneAppVersion,
   rememberTrustedPhone,
   resetBridgeDeviceState,
@@ -60,6 +61,46 @@ test("rememberLastSeenPhoneAppVersion stores the latest App Store version", () =
   );
 
   assert.equal(nextState.lastSeenPhoneAppVersion, "1.0");
+});
+
+test("rememberLastSeenClientDeviceKind normalizes and stores the latest client kind", () => {
+  const state = makeDeviceState();
+
+  const nextState = rememberLastSeenClientDeviceKind(
+    state,
+    "iOS",
+    { persist: false }
+  );
+
+  assert.equal(nextState.lastSeenDeviceKind, "iphone");
+});
+
+test("rememberLastSeenClientDeviceKind persists across reloads", () => {
+  withTempDeviceStateEnv(() => {
+    rememberLastSeenClientDeviceKind(
+      makeDeviceState(),
+      "android",
+      { persist: true }
+    );
+
+    const reloaded = loadOrCreateBridgeDeviceState();
+    assert.equal(reloaded.lastSeenDeviceKind, "android");
+  });
+});
+
+test("loadOrCreateBridgeDeviceState infers iPhone for legacy version-only state", () => {
+  withTempDeviceStateEnv(({ canonicalStateFile }) => {
+    const state = makeDeviceState({
+      lastSeenPhoneAppVersion: "1.5",
+    });
+    delete state.lastSeenDeviceKind;
+    fs.mkdirSync(path.dirname(canonicalStateFile), { recursive: true });
+    fs.writeFileSync(canonicalStateFile, JSON.stringify(state, null, 2));
+
+    const loadedState = loadOrCreateBridgeDeviceState();
+
+    assert.equal(loadedState.lastSeenDeviceKind, "iphone");
+  });
 });
 
 test("loadOrCreateBridgeDeviceState writes and reloads the canonical file state", () => {
@@ -243,6 +284,7 @@ function makeDeviceState(overrides = {}) {
     macIdentityPublicKey: "mac-public-key",
     macIdentityPrivateKey: "mac-private-key",
     trustedPhones: {},
+    lastSeenDeviceKind: null,
     lastSeenPhoneAppVersion: null,
     ...overrides,
   };

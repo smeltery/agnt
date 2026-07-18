@@ -5,3 +5,4 @@ export * from "./order-counter";
 export * from "./message";
 export * from "./thread";
 export * from "./context-window";
+export * from "./thread-goal";

@@ -74,6 +74,15 @@ into Codex-shaped JSON-RPC), but a few surfaces need targeted work.
 
 ### P2 — provider-flag plumbing
 
+- [x] **Thread goal controls.** Android now matches iOS/web for
+      runtime-persisted thread goals: `CodexThreadGoal` decodes the
+      `thread/goal/*` envelope, `AgentService` exposes
+      `threadGoalsByThread` plus `refreshThreadGoal` / `setThreadGoal` /
+      `clearThreadGoal`, `IncomingEventRouter` mirrors
+      `thread/goal/updated|cleared`, and `ThreadGoalControl` adds a compact
+      composer-adjacent chip/dialog for create, edit, pause, resume, token
+      budget, and clear. Coverage: `CodexThreadGoalTest`,
+      `IncomingEventRouterNotificationTest`; local gate: `./gradlew ciDebug`.
 - [x] **Plan mode for Claude**. Already wired end-to-end via the existing
       `collaborationMode` mechanism: the composer's plan-mode toggle
       (`TurnComposerBar.isPlanModeEnabled`, in the attachment-menu dropdown)
@@ -338,8 +347,8 @@ Open follow-ups:
           a dedicated `agnt_pet` SharedPreferences file, exposes
           `availablePets` / `renderedPet` / `isLoading` / `errorMessage` flows,
           and resets in-memory state on disconnect. `PetCompanionStatus.kt` holds
-          a pure `derivePetStatusSnapshot` (idle / running / waiting) over the
-          pet-relevant repo state slice.
+          a pure `derivePetStatusSnapshot` (idle / running / waiting / failed /
+          review) over the pet-relevant repo state slice.
         - `ui/pet/PetCompanionOverlay.kt` — decodes the base64 atlas to a
           `Bitmap`, crops 192×208 cells into cached `ImageBitmap` frames, runs the
           play-3×-then-idle animation loop, supports drag-to-reposition + tap-to-jump,
@@ -348,8 +357,9 @@ Open follow-ups:
           `MainShell` (interaction limited to Home).
         - Settings gains a `Companion pet` card (enable switch + pet picker +
           refresh).
-      Status: iOS's `failed` / `review` / completion-banner phases degrade to
-      idle until Android exposes per-thread failed/ready/completion state.
+      Status: `AgentService` feeds `failed` / `review` / completion-banner
+      phases from turn lifecycle notifications and clears stale outcomes when a
+      thread is viewed or starts another run.
       Coverage: `PetCompanionTest` (atlas math + layout), `PetCompanionStatusTest`
       (snapshot derivation + prompt sanitizing), `AgentServicePetsTest` (parsing).
       `:app:ktlintCheck` + `:app:testDebugUnitTest` + `:app:lintDebug` green.
@@ -438,6 +448,12 @@ built on QR pairing + the phone/Mac identity keys, not any ChatGPT token.
       as nav route `AppRoutes.MyDevices` in `AppNavHost`, opened from a sidebar
       icon button (`lucide_ic_monitor_smartphone`) in `SidebarDrawerContent`. Scan
       QR / Pair with Code both route through the existing single QR scanner screen.
+- [x] **Sidebar quick-switch dropdown** — `SidebarDrawerContent` now surfaces the
+      active device row whenever `MyDevicesPresentation.shouldShowDeviceSwitcher`
+      says at least two menu-eligible devices exist. It reuses
+      `switcherRows` / `activeSwitcherRow`, confirms before switching, calls the
+      existing `switchToTrustedDevice`, and keeps the full My Devices screen for
+      visibility and forget-device management.
 - [x] **`CodexRepository` device-switch surface** — flows + actions added with
       defaulted bodies so existing test fakes keep compiling.
 - [x] **Tests** — `ui/mydevices/MyDevicesPresentationTest`,
@@ -452,19 +468,35 @@ built on QR pairing + the phone/Mac identity keys, not any ChatGPT token.
 - [ ] **Composer-draft scoping (deferred).** Upstream's `MacScopedSessionStore`
       has a composer-draft column; agnt has no per-thread composer-draft store yet,
       so that surface is omitted.
-- [ ] **`SidebarDevicesMenuButton` quick-switch dropdown (deferred).** The iOS
-      inline sidebar device-switch dropdown (`shouldShowDeviceSwitcher`) is not yet
-      surfaced; the helper exists in `MyDevicesPresentation` for a follow-up.
 
-`:app:ktlintCheck` + `:app:testDebugUnitTest` green (607 tests, 0 failures).
+`:app:ktlintCheck` + `:app:testDebugUnitTest` green (619 tests, 0 failures).
 Banned-identifier sweep clean over added/changed files.
 
-## Finishing the upstream parity audit
+### P3.1 — workspace artifact previews
 
-Per `ios-android-parity-plan.md`, the reasonable code-inspection parity gaps
-for Android/iOS surface chrome have been closed for the main chat, sidebar,
-project picker, settings, onboarding, and terminal editor flows. Two items
-remain:
+- [x] **SVG workspace preview.** `WorkspaceTextFilePreviewDialog` now detects
+      `.svg` workspace files and renders them through `WorkspaceSvgPreview`, an
+      offline WebView with JavaScript disabled, network/file access blocked, a
+      strict CSP, and external `href`/`src` stripping. This keeps using
+      `workspace/readFile`, so no bridge or image-RPC change is required.
+      Coverage: `WorkspaceSvgPreviewSecurityTest`.
+- [x] **Syntax-highlighted code preview.** `WorkspaceCodePreview` now renders
+      non-SVG workspace text previews with line numbers, selectable text, common
+      language-token highlighting, and a 512 KB highlight cap that falls back to
+      plain monospace for large files. Coverage: `WorkspaceCodePreviewTest`.
+
+### P3.2 — launcher quick actions
+
+- [x] **Home Screen quick actions.** Android now publishes dynamic launcher
+      shortcuts for New Chat plus the two most recent live threads. Shortcut
+      taps are parsed by `MainActivity`, buffered through `AppContainer`, and
+      routed by `MainShell` to either the new-chat draft screen or the selected
+      thread. Coverage: `AgntShortcutCatalogTest`.
+
+## Finishing the upstream parity audit
+Per `ios-android-parity-plan.md`, code-inspection parity gaps are closed for
+the main chat, sidebar, project picker, settings, onboarding, and terminal
+editor flows. Two items remain:
 
 - [ ] Final markdown/message pixel polish (upstream commit c7843aa).
       Collapsible search citation rows are ported; finish the rest from
@@ -474,16 +506,4 @@ remain:
       paired iOS/Android screenshots instead of more inferred code-only tweaks.
 
 ## Known upstream divergences
-
-The following constants were tightened during import; nothing else should
-diverge from upstream silently:
-
-| File                                                                                  | Upstream                                 | This module                              |
-| ---                                                                                   | ---                                      | ---                                      |
-| `core/model/SecureTransportModels.kt::CODEX_SECURE_HANDSHAKE_TAG`                     | `remodex-e2ee-v1`                        | `agnt-e2ee-v1`                           |
-| `core/model/SecureTransportModels.kt::CODEX_TRUSTED_SESSION_RESOLVE_TAG`              | `remodex-trusted-session-resolve-v1`     | `agnt-trusted-session-resolve-v1`        |
-| `core/model/SecureTransportModels.kt::CODEX_TRUSTED_SESSION_RESOLVE_RESPONSE_TAG`     | `remodex-trusted-session-resolve-response-v1` | `agnt-trusted-session-resolve-response-v1` |
-| `app/build.gradle.kts` `defaultConfig`                                                | `sionCode = 7` orphan line + `versionCode = 8` | clean `versionCode = 1`, `versionName = "0.1.0"` |
-| Bridge checkpoint ref prefix (test fixtures)                                          | `refs/remodex/checkpoints`               | `refs/agnt/checkpoints`                  |
-| Bridge update command (test fixture)                                                  | `npm install -g remodex@latest`          | `bun install -g @dotbrains/agnt`         |
-| `AndroidManifest.xml` optional default-relay meta-data key                            | `PHODEX_DEFAULT_RELAY_URL`               | `AGNT_DEFAULT_RELAY_URL`                 |
+Import-time divergence table: [`UPSTREAM_DIVERGENCES.md`](UPSTREAM_DIVERGENCES.md).

@@ -1,6 +1,6 @@
 # Testing
 
-agnt has 386 unit tests using Node's built-in test runner (`node:test`). No Jest, no Mocha — just `node --test`. Tests live in `agnt-bridge/test/*.test.js`.
+agnt bridge and relay tests use Node's built-in test runner (`node:test`). No Jest, no Mocha — just `node --test`.
 
 ## Running
 
@@ -15,9 +15,10 @@ node --test agnt-bridge/test/cursor-translate.test.js
 node --test agnt-bridge/test/*-translate.test.js
 ```
 
-The bridge-check CI workflow (`.github/workflows/bridge-check.yml`) runs `npm test` on every push and PR that touches `agnt-bridge/**`.
+The main CI workflow (`.github/workflows/ci.yml`) runs package checks for bridge, relay, web, host, Android, iOS, and Markdown links when their owned surfaces change.
 
-The Build Unsigned IPA workflow (`.github/workflows/build-unsigned-ipa.yml`) archives the iOS app on every push to main and on PRs that touch `AgntMobile/**`.
+The main CI workflow also owns scheduled and manual link-rot checks; use the
+`links` manual dispatch scope to run only Markdown link validation.
 
 ## Conventions
 
@@ -78,7 +79,7 @@ function createCursorTransport({
 | `push-notification-service-client.test.js` | `push-notification-service-client.js` | self-hosted push delivery client |
 | `push-notification-completion-dedupe.test.js` | (cross-cutting) | end-of-turn push dedupe |
 
-Total: 386 tests across 32 files.
+This list is a starting map, not a generated inventory; use `find agnt-bridge/test -name '*.test.js'` for the current bridge test set.
 
 ## Adding tests
 
@@ -94,21 +95,22 @@ Bridge-core tests (`bridge.test.js`, `bridge-relay-helpers.test.js`) export modu
 Honest list:
 
 - **End-to-end iOS-to-bridge flows.** The iOS app has its own unit tests (`AgntMobileTests/`) but there's no full-stack integration test that drives the WebSocket from a fake iOS client through the bridge to a fake provider. This would catch protocol drift but is currently absent.
-- **The relay server.** `relay/server.js` has no tests. It's small and inspection is the primary defense.
+- **Full relay deployment behavior.** Relay unit tests cover the server core, but CI does not exercise a real deployed relay.
 - **Manual smoke tests.** Verifying QR pairing actually works requires a real iPhone. The CI badge can't tell you the secure transport is healthy on real iOS hardware.
 
 ## Running tests in CI
 
-The bridge-check workflow:
+The main CI workflow uses one change detector and only runs jobs for changed surfaces:
 
-```yaml
-- run: bun install --frozen-lockfile
-- run: |
-    node -e "
-    const mod = require('./src');
-    for (const name of ['startBridge', 'openLastActiveThread', 'watchThreadRollout']) {
-      if (typeof mod[name] !== 'function') throw new Error('Missing export: ' + name);
-    }"
-```
+| Surface | CI command |
+|---|---|
+| Bridge | `cd agnt-bridge && bun run ci` |
+| Relay | `cd relay && bun run ci` |
+| Web | `cd agnt-web && bun run ci` |
+| Host | `cd agnt-host && bun run ci` |
+| Android | `cd AgntAndroid && ./gradlew ciDebug --no-daemon` |
+| iOS | `xcodebuild ... archive CODE_SIGNING_ALLOWED=NO` |
+| Markdown links | `lycheeverse/lychee` over `./**/*.md` |
 
-Note that the CI currently only verifies the bridge entrypoints **load** — it doesn't run the test suite. If you want full test coverage in CI, add `bun run test` to the workflow. (Open question: that would catch behavioral regressions, but the entrypoint check is faster and catches the most common breakage — broken imports.)
+Scheduled/manual link checks and PR/push link checks run inside main CI so each
+change gets one CI suite.

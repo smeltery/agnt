@@ -1,7 +1,8 @@
 // FILE: qr.js
 // Purpose: Prints the bridge pairing payload as both QR and a short terminal-friendly pairing code.
 // Layer: CLI helper
-// Exports: SHORT_PAIRING_CODE_ALPHABET, SHORT_PAIRING_CODE_LENGTH, createShortPairingCode, printQR
+// Exports: SHORT_PAIRING_CODE_ALPHABET, SHORT_PAIRING_CODE_LENGTH, createShortPairingCode,
+//          formatTerminalSessionId, printQR, shouldPrintPairingJson
 // Depends on: crypto, qrcode-terminal
 
 const { randomBytes } = require("crypto");
@@ -40,9 +41,17 @@ function normalizePairingSession(pairingSessionOrPayload) {
   };
 }
 
-function printQR(pairingSessionOrPayload) {
+function formatTerminalSessionId(sessionId) {
+  if (typeof sessionId !== "string" || !sessionId.trim()) {
+    return "(none)";
+  }
+  return sessionId.length > 12 ? `${sessionId.slice(0, 8)}...` : sessionId;
+}
+
+function printQR(pairingSessionOrPayload, options = {}) {
   const { pairingPayload, pairingCode } = normalizePairingSession(pairingSessionOrPayload);
   const payload = JSON.stringify(pairingPayload);
+  const env = options.env || process.env;
 
   console.log("\nScan this QR with the iPhone:\n");
   qrcode.generate(payload, { small: true });
@@ -50,14 +59,29 @@ function printQR(pairingSessionOrPayload) {
     console.log("Or paste this pairing code in the iPhone app:\n");
     console.log(pairingCode);
   }
-  console.log(`\nSession ID: ${pairingPayload.sessionId}`);
+  console.log(`\nSession ID: ${formatTerminalSessionId(pairingPayload.sessionId)}`);
   console.log(`Device ID: ${pairingPayload.macDeviceId}`);
   console.log(`Expires: ${new Date(pairingPayload.expiresAt).toISOString()}\n`);
+
+  if (shouldPrintPairingJson({ env, explicitValue: options.printPairingJson })) {
+    console.log("Pairing JSON debug output is disabled because the payload contains private relay metadata.\n");
+  }
+}
+
+function shouldPrintPairingJson({ env = process.env, explicitValue } = {}) {
+  if (typeof explicitValue === "boolean") {
+    return explicitValue;
+  }
+
+  const rawValue = env?.AGNT_PRINT_PAIRING_JSON || "";
+  return ["1", "true", "yes", "on"].includes(String(rawValue).trim().toLowerCase());
 }
 
 module.exports = {
   SHORT_PAIRING_CODE_ALPHABET,
   SHORT_PAIRING_CODE_LENGTH,
   createShortPairingCode,
+  formatTerminalSessionId,
   printQR,
+  shouldPrintPairingJson,
 };

@@ -41,23 +41,19 @@
 //     decide whether to emit Codex exec_command_* events (shell) or the
 //     item/* family (file ops + everything else).
 
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-
 const {
   buildTurnOverlapError,
   createFrameEmitter,
   createTurnLifecycleEmitter,
   deriveTitleFromSeed,
-  emitAssistantItemStarted,
-  generateItemId,
   generateThreadId,
   generateTurnId,
   readString,
   safeParseJson,
 } = require("../_shared/translator-utils");
 const { reconstructThreadFromJsonl } = require("../_shared/thread-jsonl-reconstructor");
+const { createCursorSessionStore } = require("./session-store");
+const { createCursorStreamHandlers } = require("./stream-handlers");
 
 const PROTO_VERSION = "1.0.0-cursor-shim";
 
@@ -84,6 +80,35 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
   let didEmitThreadStarted = false;
   /** Track whether we have already emitted turn/started for the active turn. */
   let didEmitTurnStarted = false;
+  const state = {
+    get threadId() { return threadId; },
+    set threadId(value) { threadId = value; },
+    get sessionId() { return sessionId; },
+    set sessionId(value) { sessionId = value; },
+    get sessionCwd() { return sessionCwd; },
+    set sessionCwd(value) { sessionCwd = value; },
+    get activeTurnId() { return activeTurnId; },
+    set activeTurnId(value) { activeTurnId = value; },
+    get activeAssistantItemId() { return activeAssistantItemId; },
+    set activeAssistantItemId(value) { activeAssistantItemId = value; },
+    get assistantTextAccumulator() { return assistantTextAccumulator; },
+    set assistantTextAccumulator(value) { assistantTextAccumulator = value; },
+    get didEmitThreadStarted() { return didEmitThreadStarted; },
+    set didEmitThreadStarted(value) { didEmitThreadStarted = value; },
+    get didEmitTurnStarted() { return didEmitTurnStarted; },
+    set didEmitTurnStarted(value) { didEmitTurnStarted = value; },
+    pendingToolCalls,
+  };
+  const sessionStore = createCursorSessionStore({ env });
+  const streamHandlers = createCursorStreamHandlers({
+    emitNotification,
+    emitTurnCompleted,
+    emitTurnStarted,
+    emitErrorNotification,
+    resetTurnState,
+    state,
+    transport,
+  });
 
   return {
     outbound,
@@ -209,10 +234,10 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
       try { transport?.setResumeSessionId?.(sessionId); } catch { /* best-effort */ }
     }
 
-    if (type === "system") return handleSystem(parsed);
-    if (type === "assistant") return handleAssistant(parsed);
-    if (type === "tool_call") return handleToolCall(parsed);
-    if (type === "result") return handleResult(parsed);
+    if (type === "system") return streamHandlers.handleSystem(parsed);
+    if (type === "assistant") return streamHandlers.handleAssistant(parsed);
+    if (type === "tool_call") return streamHandlers.handleToolCall(parsed);
+    if (type === "result") return streamHandlers.handleResult(parsed);
     if (type === "user") return null; // echo of our own prompt
     return null;
   }
@@ -327,7 +352,7 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
 
     const reconstructed = reconstructThreadFromJsonl({
       targetThreadId,
-      sessionFile: locateSessionFile(targetThreadId),
+      sessionFile: sessionStore.locateSessionFile(targetThreadId),
       fallbackCwd: sessionCwd,
     });
     if (request?.id != null) {
@@ -351,7 +376,7 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
       || threadId;
     const reconstructed = reconstructThreadFromJsonl({
       targetThreadId,
-      sessionFile: locateSessionFile(targetThreadId),
+      sessionFile: sessionStore.locateSessionFile(targetThreadId),
       fallbackCwd: sessionCwd,
     });
     const turns = reconstructed?.turns || [];
@@ -370,7 +395,7 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
 
   function handleThreadList(request) {
     if (request?.id == null) return;
-    const summaries = listThreadSummaries();
+    const summaries = sessionStore.listThreadSummaries();
     injectResponse(request.id, {
       data: summaries,
       threads: summaries,
@@ -395,455 +420,6 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
   }
 
   // ── inbound handlers ───────────────────────────────────────────────────
-  function handleSystem(message) {
-    const subtype = readString(message.subtype);
-    if (subtype !== "init") return null;
-
-    const initCwd = readString(message.cwd);
-    if (initCwd) sessionCwd = initCwd;
-
-    if (!threadId) threadId = generateThreadId();
-
-    if (!didEmitThreadStarted) {
-      didEmitThreadStarted = true;
-      emitNotification("thread/started", {
-        threadId,
-        thread_id: threadId,
-        thread: {
-          id: threadId,
-          threadId,
-          thread_id: threadId,
-          cwd: sessionCwd,
-        },
-      });
-      emitNotification("thread/initialized", {
-        threadId,
-        thread_id: threadId,
-        provider: "cursor",
-        model: readString(message.model),
-        permissionMode: readString(message.permissionMode),
-        cwd: sessionCwd,
-        // cursor-agent does not advertise its tool list in the init frame;
-        // surface a default set so the iOS UI has something to render.
-        tools: ["read", "write", "edit", "shell", "grep", "glob", "ls"],
-        slashCommands: [],
-        skills: [],
-        agents: [],
-      });
-    }
-
-    if (activeTurnId && !didEmitTurnStarted) emitTurnStarted(activeTurnId);
-    return null;
-  }
-
-  function handleAssistant(message) {
-    const inner = message.message;
-    if (!inner || typeof inner !== "object") return null;
-    const content = Array.isArray(inner.content) ? inner.content : [];
-    if (content.length === 0) return null;
-
-    if (!activeTurnId) activeTurnId = generateTurnId();
-    if (!didEmitTurnStarted) emitTurnStarted(activeTurnId);
-
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      if (readString(part.type) !== "text") continue;
-      const text = readString(part.text);
-      if (!text) continue;
-
-      // cursor-agent emits assistant frames as it streams; each frame's text
-      // is the latest snapshot. To produce stable deltas, slice off whatever
-      // we already emitted. If the new text doesn't start with the previous
-      // accumulator (e.g. the model rewrote a chunk), treat the whole frame
-      // as a new delta — losing a pretty rendering once is better than
-      // dropping content silently.
-      let delta = text;
-      if (assistantTextAccumulator && text.startsWith(assistantTextAccumulator)) {
-        delta = text.slice(assistantTextAccumulator.length);
-      }
-      if (!delta) continue;
-
-      const itemId = ensureAssistantItemId();
-      emitNotification("item/agentMessage/delta", {
-        threadId,
-        turnId: activeTurnId,
-        itemId,
-        delta,
-      });
-      assistantTextAccumulator = text.startsWith(assistantTextAccumulator)
-        ? text
-        : assistantTextAccumulator + delta;
-    }
-    return null;
-  }
-
-  function handleToolCall(message) {
-    const subtype = readString(message.subtype);
-    const callId = readString(message.call_id) || generateItemId("tool");
-    const payload = message.tool_call && typeof message.tool_call === "object"
-      ? message.tool_call
-      : {};
-
-    if (!threadId) threadId = generateThreadId();
-    if (!activeTurnId) activeTurnId = generateTurnId();
-    if (!didEmitTurnStarted) emitTurnStarted(activeTurnId);
-
-    const descriptor = describeToolCall(payload);
-    if (!descriptor) return null;
-
-    if (subtype === "started") {
-      if (pendingToolCalls.has(callId)) return null; // de-dup
-      pendingToolCalls.set(callId, descriptor);
-      emitToolStart(callId, descriptor);
-      return null;
-    }
-
-    if (subtype === "completed") {
-      const stored = pendingToolCalls.get(callId) || descriptor;
-      const errored = readString(descriptor.status) === "error" || descriptor.errored === true;
-      emitToolEnd(callId, stored, descriptor.output || "", errored);
-      pendingToolCalls.delete(callId);
-      return null;
-    }
-
-    return null;
-  }
-
-  function handleResult(message) {
-    const finalText = readString(message.result);
-
-    if (activeTurnId && threadId) {
-      const agentText = assistantTextAccumulator || finalText || "";
-      if (agentText) {
-        const itemId = activeAssistantItemId || generateItemId("assistant");
-        emitNotification("codex/event/agent_message", {
-          threadId,
-          turnId: activeTurnId,
-          itemId,
-          message: agentText,
-        });
-        emitNotification("item/completed", {
-          threadId,
-          turnId: activeTurnId,
-          itemId,
-          item: {
-            id: itemId,
-            itemId,
-            type: "assistant_message",
-            role: "assistant",
-            text: agentText,
-            content: [{ type: "text", text: agentText }],
-          },
-        });
-      }
-
-      if (message.is_error === true || readString(message.subtype) === "error") {
-        emitErrorNotification(activeTurnId, finalText || "cursor reported a turn error");
-      }
-
-      emitTurnCompleted(activeTurnId);
-    }
-
-    resetTurnState();
-    return null;
-  }
-
-  // ── tool_call mapping ──────────────────────────────────────────────────
-  // cursor-agent's tool_call payload is a discriminated union. We pluck the
-  // first non-empty key (readToolCall, writeToolCall, ...) and produce a
-  // descriptor the bridge knows how to render.
-  function describeToolCall(payload) {
-    const entries = Object.entries(payload || {});
-    for (const [key, value] of entries) {
-      if (!value || typeof value !== "object") continue;
-      const args = value.args && typeof value.args === "object" ? value.args : value;
-      switch (key) {
-        case "readToolCall":
-          return {
-            kind: "file_read",
-            toolName: "read",
-            filePath: readString(args.path),
-            output: readString(value.result) || readString(value.output),
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        case "writeToolCall":
-          return {
-            kind: "file_change",
-            toolName: "write",
-            filePath: readString(args.path),
-            output: "",
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        case "editToolCall":
-          return {
-            kind: "file_change",
-            toolName: "edit",
-            filePath: readString(args.path),
-            output: "",
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        case "shellToolCall": {
-          const cmd = readString(args.command);
-          return {
-            kind: "shell",
-            toolName: "shell",
-            command: cmd,
-            cwd: readString(args.cwd) || sessionCwd || "",
-            output: readString(value.result) || readString(value.output),
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        }
-        case "grepToolCall":
-          return {
-            kind: "tool_call",
-            toolName: "grep",
-            displayName: `grep ${readString(args.pattern) || ""}`.trim(),
-            filePath: readString(args.path),
-            query: readString(args.pattern),
-            output: readString(value.result) || readString(value.output),
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        case "globToolCall":
-          return {
-            kind: "tool_call",
-            toolName: "glob",
-            displayName: `glob ${readString(args.globPattern) || ""}`.trim(),
-            filePath: readString(args.targetDirectory),
-            query: readString(args.globPattern),
-            output: readString(value.result) || readString(value.output),
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        case "lsToolCall":
-          return {
-            kind: "tool_call",
-            toolName: "ls",
-            displayName: `ls ${readString(args.path) || ""}`.trim(),
-            filePath: readString(args.path),
-            output: readString(value.result) || readString(value.output),
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        case "function":
-          return {
-            kind: "background",
-            toolName: readString(value.name) || "function",
-            displayName: `Running ${readString(value.name) || "function"}`,
-            output: readString(value.result) || readString(value.output),
-            status: readString(value.status),
-            errored: value.is_error === true,
-          };
-        default:
-          continue;
-      }
-    }
-    return null;
-  }
-
-  function emitToolStart(callId, descriptor) {
-    if (descriptor.kind === "shell") {
-      emitNotification("codex/event/exec_command_begin", {
-        threadId,
-        turnId: activeTurnId,
-        call_id: callId,
-        command: descriptor.command || "",
-        cwd: descriptor.cwd || "",
-        status: "running",
-      });
-      return;
-    }
-
-    if (descriptor.kind === "file_read") {
-      emitNotification("item/started", {
-        threadId,
-        turnId: activeTurnId,
-        itemId: callId,
-        item: {
-          id: callId,
-          itemId: callId,
-          type: "file_read",
-          tool: descriptor.toolName,
-          name: descriptor.toolName,
-          file_path: descriptor.filePath || "",
-          path: descriptor.filePath || "",
-        },
-      });
-      return;
-    }
-
-    if (descriptor.kind === "file_change") {
-      emitNotification("item/started", {
-        threadId,
-        turnId: activeTurnId,
-        itemId: callId,
-        item: {
-          id: callId,
-          itemId: callId,
-          type: "file_change",
-          tool: descriptor.toolName,
-          name: descriptor.toolName,
-          file_path: descriptor.filePath || "",
-          path: descriptor.filePath || "",
-        },
-      });
-      return;
-    }
-
-    if (descriptor.kind === "tool_call") {
-      emitNotification("item/started", {
-        threadId,
-        turnId: activeTurnId,
-        itemId: callId,
-        item: {
-          id: callId,
-          itemId: callId,
-          type: "tool_call",
-          tool: descriptor.toolName,
-          name: descriptor.toolName,
-          file_path: descriptor.filePath || "",
-          path: descriptor.filePath || "",
-          query: descriptor.query || "",
-        },
-      });
-      return;
-    }
-
-    emitNotification("codex/event/background_event", {
-      threadId,
-      turnId: activeTurnId,
-      call_id: callId,
-      message: descriptor.displayName || `Running ${descriptor.toolName || "tool"}`,
-    });
-  }
-
-  function emitToolEnd(callId, descriptor, output, errored) {
-    if (descriptor.kind === "shell") {
-      if (output) {
-        emitNotification("codex/event/exec_command_output_delta", {
-          threadId,
-          turnId: activeTurnId,
-          call_id: callId,
-          command: descriptor.command || "",
-          cwd: descriptor.cwd || "",
-          chunk: output,
-        });
-      }
-      emitNotification("codex/event/exec_command_end", {
-        threadId,
-        turnId: activeTurnId,
-        call_id: callId,
-        command: descriptor.command || "",
-        cwd: descriptor.cwd || "",
-        status: errored ? "error" : "completed",
-        output: output || "",
-      });
-      return;
-    }
-
-    if (descriptor.kind === "file_read") {
-      if (output) {
-        emitNotification("item/toolCall/outputDelta", {
-          threadId,
-          turnId: activeTurnId,
-          itemId: callId,
-          delta: output,
-        });
-      }
-      emitNotification("item/completed", {
-        threadId,
-        turnId: activeTurnId,
-        itemId: callId,
-        item: {
-          id: callId,
-          itemId: callId,
-          type: "file_read",
-          tool: descriptor.toolName,
-          name: descriptor.toolName,
-          file_path: descriptor.filePath || "",
-          path: descriptor.filePath || "",
-          status: errored ? "error" : "completed",
-          output: output || "",
-        },
-      });
-      return;
-    }
-
-    if (descriptor.kind === "file_change") {
-      emitNotification("item/completed", {
-        threadId,
-        turnId: activeTurnId,
-        itemId: callId,
-        item: {
-          id: callId,
-          itemId: callId,
-          type: "file_change",
-          tool: descriptor.toolName,
-          name: descriptor.toolName,
-          file_path: descriptor.filePath || "",
-          path: descriptor.filePath || "",
-          status: errored ? "error" : "completed",
-        },
-      });
-      return;
-    }
-
-    if (descriptor.kind === "tool_call") {
-      if (output) {
-        emitNotification("item/toolCall/outputDelta", {
-          threadId,
-          turnId: activeTurnId,
-          itemId: callId,
-          delta: output,
-        });
-      }
-      emitNotification("item/completed", {
-        threadId,
-        turnId: activeTurnId,
-        itemId: callId,
-        item: {
-          id: callId,
-          itemId: callId,
-          type: "tool_call",
-          tool: descriptor.toolName,
-          name: descriptor.toolName,
-          file_path: descriptor.filePath || "",
-          path: descriptor.filePath || "",
-          query: descriptor.query || "",
-          status: errored ? "error" : "completed",
-          output: output || "",
-        },
-      });
-      return;
-    }
-
-    // background
-    emitNotification("codex/event/background_event", {
-      threadId,
-      turnId: activeTurnId,
-      call_id: callId,
-      message: errored
-        ? `Failed: ${descriptor.displayName || descriptor.toolName || "tool"}`
-        : `Done: ${descriptor.displayName || descriptor.toolName || "tool"}`,
-    });
-  }
-
-  function ensureAssistantItemId() {
-    if (activeAssistantItemId) return activeAssistantItemId;
-    activeAssistantItemId = generateItemId("assistant");
-    emitAssistantItemStarted({
-      emitNotification,
-      threadId,
-      turnId: activeTurnId,
-      itemId: activeAssistantItemId,
-    });
-    return activeAssistantItemId;
-  }
-
   // ── per-turn CLI flag publishing ───────────────────────────────────────
   function publishTurnArgsForParams(params) {
     const args = [];
@@ -865,49 +441,6 @@ function createCursorTranslator({ injectInbound, transport, env = process.env } 
       text += text ? `\n${fragment}` : fragment;
     }
     return text;
-  }
-
-  function locateSessionFile(targetThreadId) {
-    if (!targetThreadId) return "";
-    const chatsDir = path.join(cursorHome(), "chats");
-    const candidate = path.join(chatsDir, `${targetThreadId}.jsonl`);
-    if (fs.existsSync(candidate)) return candidate;
-    return "";
-  }
-
-  function listThreadSummaries() {
-    const chatsDir = path.join(cursorHome(), "chats");
-    let files;
-    try {
-      files = fs.readdirSync(chatsDir, { withFileTypes: true });
-    } catch {
-      return [];
-    }
-    const summaries = [];
-    for (const file of files) {
-      if (!file.isFile() || !file.name.endsWith(".jsonl")) continue;
-      const id = file.name.slice(0, -".jsonl".length);
-      let stat;
-      try {
-        stat = fs.statSync(path.join(chatsDir, file.name));
-      } catch {
-        continue;
-      }
-      summaries.push({
-        id,
-        threadId: id,
-        thread_id: id,
-        status: "idle",
-        updatedAt: stat.mtimeMs,
-        createdAt: stat.birthtimeMs || stat.ctimeMs,
-      });
-    }
-    summaries.sort((a, b) => b.updatedAt - a.updatedAt);
-    return summaries.slice(0, 200);
-  }
-
-  function cursorHome() {
-    return env.CURSOR_HOME || path.join(os.homedir(), ".cursor");
   }
 
   // ── helpers ────────────────────────────────────────────────────────────

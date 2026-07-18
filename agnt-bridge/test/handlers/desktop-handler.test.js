@@ -113,6 +113,52 @@ test("desktop/continueOnMac boots Codex before deep-linking unknown threads", as
   assert.equal(responses[0].result?.relaunched, false);
 });
 
+test("desktop/continueOnDesktop aliases Codex Mac handoff for compatibility", async () => {
+  const executorCalls = [];
+  const responses = [];
+
+  handleDesktopRequest(JSON.stringify({
+    id: "request-1-alias",
+    method: "desktop/continueOnDesktop",
+    params: {
+      threadId: "thread-desktop-alias",
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  }, {
+    platform: "darwin",
+    bundleId: "com.openai.codex",
+    appPath: "/Applications/Codex.app",
+    executor: async (...args) => {
+      executorCalls.push(args);
+      return { stdout: "", stderr: "" };
+    },
+    isAppRunning: async () => false,
+    sleepFn: async () => {},
+    threadMaterializeWaitMs: 0,
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(executorCalls.length, 2);
+  assert.equal(executorCalls[1][0], "open");
+  assert.deepEqual(executorCalls[1][1], [
+    "-b",
+    "com.openai.codex",
+    "codex://threads/thread-desktop-alias",
+  ]);
+  assert.deepEqual(responses, [{
+    id: "request-1-alias",
+    result: {
+      success: true,
+      relaunched: false,
+      targetUrl: "codex://threads/thread-desktop-alias",
+      threadId: "thread-desktop-alias",
+      desktopKnown: false,
+    },
+  }]);
+});
+
 test("desktop/continueOnMac relaunches when a desktop-known thread is requested and Codex is already open", async () => {
   const executorCalls = [];
   const responses = [];
@@ -378,4 +424,60 @@ test("desktop/preferences/update rejects invalid bridge preference payloads", as
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(responses[0].error?.data?.errorCode, "invalid_bridge_preferences");
+});
+
+test("desktop/bridge/updateAndRestart forwards bridge package update requests", async () => {
+  const responses = [];
+  let updateCallCount = 0;
+
+  const handled = handleDesktopRequest(JSON.stringify({
+    id: "request-7",
+    method: "desktop/bridge/updateAndRestart",
+    params: {},
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  }, {
+    platform: "darwin",
+    updateBridgePackageAndRestart() {
+      updateCallCount += 1;
+      return {
+        success: true,
+        command: "npm install -g @dotbrains/agnt@latest",
+        restartScheduled: true,
+        restartDelayMs: 750,
+      };
+    },
+  });
+
+  assert.equal(handled, true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(updateCallCount, 1);
+  assert.deepEqual(responses, [{
+    id: "request-7",
+    result: {
+      success: true,
+      command: "npm install -g @dotbrains/agnt@latest",
+      restartScheduled: true,
+      restartDelayMs: 750,
+    },
+  }]);
+});
+
+test("desktop/bridge/updateAndRestart rejects when update support is unavailable", async () => {
+  const responses = [];
+
+  handleDesktopRequest(JSON.stringify({
+    id: "request-8",
+    method: "desktop/bridge/updateAndRestart",
+    params: {},
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  }, {
+    platform: "darwin",
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(responses[0].error?.data?.errorCode, "unsupported_bridge_update");
 });
