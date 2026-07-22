@@ -4,9 +4,15 @@ extension TurnView {
     var composerRecoveryAccessory: AnyView? {
         if let voiceRecoveryPresentation {
             return AnyView(
-                ConnectionRecoveryCard(snapshot: voiceRecoveryPresentation.snapshot) {
-                    handleVoiceRecoveryAction(voiceRecoveryPresentation.action)
-                }
+                ConnectionRecoveryCard(
+                    snapshot: voiceRecoveryPresentation.snapshot,
+                    onTap: {
+                        handleVoiceRecoveryAction(voiceRecoveryPresentation.action)
+                    },
+                    onDismiss: {
+                        clearVoiceRecovery()
+                    }
+                )
             )
         }
 

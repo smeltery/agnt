@@ -77,6 +77,7 @@ struct ConnectionRecoverySnapshot: Equatable {
 struct ConnectionRecoveryCard: View {
     let snapshot: ConnectionRecoverySnapshot
     let onTap: () -> Void
+    var onDismiss: (() -> Void)? = nil
 
     var body: some View {
         GlassAccessoryCard(onTap: {
@@ -90,6 +91,11 @@ struct ConnectionRecoveryCard: View {
             summaryRow
         } trailing: {
             trailingContent
+        }
+        .overlay(alignment: .topTrailing) {
+            if let onDismiss {
+                dismissButton(action: onDismiss)
+            }
         }
         .opacity(snapshot.isActionable ? 1 : 0.94)
         .accessibilityLabel(snapshot.title)
@@ -159,5 +165,20 @@ struct ConnectionRecoveryCard: View {
             }
         }
         .frame(minWidth: 58, alignment: .trailing)
+    }
+
+    private func dismissButton(action: @escaping () -> Void) -> some View {
+        Button {
+            HapticFeedback.shared.triggerImpactFeedback(style: .light)
+            action()
+        } label: {
+            Image(systemName: "xmark")
+                .font(AppFont.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Dismiss")
     }
 }
