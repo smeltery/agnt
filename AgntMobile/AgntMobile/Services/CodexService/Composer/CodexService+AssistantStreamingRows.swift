@@ -278,6 +278,8 @@ extension CodexService {
             return "Planning..."
         case .userInputPrompt:
             return "Waiting for input..."
+        case .autoApprovalReview:
+            return "Reviewing approval..."
         case .chat:
             return "Updating..."
         }

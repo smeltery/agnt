@@ -37,6 +37,12 @@ extension MessageRow {
             } else {
                 defaultSystemView(text: text)
             }
+        case .autoApprovalReview:
+            if let review = message.autoApprovalReview {
+                AutoApprovalReviewRow(review: review, actionSummary: text)
+            } else {
+                defaultSystemView(text: text)
+            }
         case .chat:
             defaultSystemView(text: text)
         }

@@ -178,7 +178,7 @@ extension TurnTimelineRenderProjection {
     static func isPriorityVisibleMessage(_ message: CodexMessage, finalMessage: CodexMessage? = nil) -> Bool {
         if message.role == .system {
             switch message.kind {
-            case .fileChange, .subagentAction, .userInputPrompt:
+            case .fileChange, .subagentAction, .userInputPrompt, .autoApprovalReview:
                 return true
             case .plan:
                 return message.shouldDisplayInlinePlanResult

@@ -27,6 +27,7 @@ enum CodexMessageKind: String, Codable, Hashable, Sendable {
     case subagentAction
     case plan
     case userInputPrompt
+    case autoApprovalReview
 }
 
 struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
@@ -51,6 +52,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
     var proposedPlan: CodexProposedPlan?
     var subagentAction: CodexSubagentAction?
     var structuredUserInputRequest: CodexStructuredUserInputRequest?
+    var autoApprovalReview: CodexAutoApprovalReview?
 
     /// Monotonically increasing counter that preserves insertion order.
     /// Used as primary sort key so messages are never reordered by timestamp drift.
@@ -78,6 +80,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         proposedPlan: CodexProposedPlan? = nil,
         subagentAction: CodexSubagentAction? = nil,
         structuredUserInputRequest: CodexStructuredUserInputRequest? = nil,
+        autoApprovalReview: CodexAutoApprovalReview? = nil,
         orderIndex: Int? = nil
     ) {
         self.id = id
@@ -115,6 +118,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         )
         self.subagentAction = subagentAction
         self.structuredUserInputRequest = structuredUserInputRequest
+        self.autoApprovalReview = autoApprovalReview
         self.orderIndex = orderIndex ?? CodexMessageOrderCounter.next()
     }
 
@@ -140,6 +144,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         case proposedPlan
         case subagentAction
         case structuredUserInputRequest
+        case autoApprovalReview
         case orderIndex
     }
 
@@ -187,6 +192,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
             CodexStructuredUserInputRequest.self,
             forKey: .structuredUserInputRequest
         )
+        autoApprovalReview = try container.decodeIfPresent(CodexAutoApprovalReview.self, forKey: .autoApprovalReview)
         orderIndex = try container.decodeIfPresent(Int.self, forKey: .orderIndex) ?? CodexMessageOrderCounter.next()
     }
 

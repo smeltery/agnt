@@ -253,6 +253,9 @@ extension CodexService {
              "item/command_execution/terminalInteraction":
             handleCommandExecutionTerminalInteraction(from: paramsObject)
 
+        case "item/autoApprovalReview":
+            handleAutoApprovalReviewNotification(paramsObject)
+
         case "codex/event/exec_command_begin",
              "codex/event/exec_command_output_delta",
              "codex/event/exec_command_end",

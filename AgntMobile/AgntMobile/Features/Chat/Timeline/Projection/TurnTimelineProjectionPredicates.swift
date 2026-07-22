@@ -14,7 +14,7 @@ extension TurnTimelineRenderProjection {
         switch message.kind {
         case .toolActivity, .commandExecution:
             return true
-        case .thinking, .chat, .plan, .userInputPrompt, .fileChange, .subagentAction:
+        case .thinking, .chat, .plan, .userInputPrompt, .fileChange, .subagentAction, .autoApprovalReview:
             return false
         }
     }
