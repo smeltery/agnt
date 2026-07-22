@@ -14,7 +14,8 @@ class SidebarThreadGroupingTestCase: XCTestCase {
         cwd: String?,
         syncState: CodexThreadSyncState = .live,
         parentThreadId: String? = nil,
-        forkedFromThreadId: String? = nil
+        forkedFromThreadId: String? = nil,
+        ephemeral: Bool = false
     ) -> CodexThread {
         CodexThread(
             id: id,
@@ -23,6 +24,7 @@ class SidebarThreadGroupingTestCase: XCTestCase {
             cwd: cwd,
             forkedFromThreadId: forkedFromThreadId,
             parentThreadId: parentThreadId,
+            ephemeral: ephemeral,
             syncState: syncState
         )
     }

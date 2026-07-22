@@ -83,6 +83,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
     var agentRole: String?
     var model: String?
     var modelProvider: String?
+    var ephemeral: Bool
     var syncState: CodexThreadSyncState
 
     // --- Public initializer ---------------------------------------------------
@@ -103,6 +104,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         agentRole: String? = nil,
         model: String? = nil,
         modelProvider: String? = nil,
+        ephemeral: Bool = false,
         syncState: CodexThreadSyncState = .live
     ) {
         self.id = id
@@ -120,6 +122,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         self.agentRole = Self.normalizeIdentifier(agentRole)
         self.model = Self.normalizeIdentifier(model)
         self.modelProvider = Self.normalizeIdentifier(modelProvider)
+        self.ephemeral = ephemeral
         self.syncState = syncState
     }
 
@@ -153,6 +156,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         case model
         case modelProvider
         case modelProviderSnake = "model_provider"
+        case ephemeral
         case syncState
     }
 
@@ -211,6 +215,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
             keys: [.modelProvider, .modelProviderSnake],
             metadataKeys: ["modelProvider", "model_provider", "modelProviderId", "model_provider_id"]
         )
+        ephemeral = try container.decodeIfPresent(Bool.self, forKey: .ephemeral) ?? false
         syncState = try container.decodeIfPresent(CodexThreadSyncState.self, forKey: .syncState) ?? .live
     }
 
@@ -234,6 +239,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         try container.encodeIfPresent(Self.normalizeIdentifier(agentRole), forKey: .agentRole)
         try container.encodeIfPresent(Self.normalizeIdentifier(model), forKey: .model)
         try container.encodeIfPresent(Self.normalizeIdentifier(modelProvider), forKey: .modelProvider)
+        try container.encode(ephemeral, forKey: .ephemeral)
         try container.encode(syncState, forKey: .syncState)
     }
 }

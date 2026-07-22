@@ -258,4 +258,18 @@ final class CodexThreadStartProjectBindingTests: XCTestCase {
 
         XCTAssertEqual(thread.agentDisplayLabel, "Locke [explorer]")
     }
+
+    func testDecodesEphemeralThreadFlag() throws {
+        let payload = """
+        {
+          "id": "thread-ephemeral",
+          "title": "Temporary side conversation",
+          "ephemeral": true
+        }
+        """.data(using: .utf8)!
+
+        let thread = try JSONDecoder().decode(CodexThread.self, from: payload)
+
+        XCTAssertTrue(thread.ephemeral)
+    }
 }

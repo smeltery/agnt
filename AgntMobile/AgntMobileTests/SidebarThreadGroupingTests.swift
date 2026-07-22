@@ -92,6 +92,32 @@ final class SidebarThreadGroupingTests: SidebarThreadGroupingTestCase {
         XCTAssertEqual(groups[0].threads.map(\.id), ["thread-a", "thread-b"])
     }
 
+    func testMakeGroupsExcludesEphemeralThreadsFromSavedChatSections() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "project-thread", updatedAt: now, cwd: "/Users/me/work/app"),
+            makeThread(
+                id: "ephemeral-thread",
+                updatedAt: now.addingTimeInterval(60),
+                cwd: "/Users/me/work/app",
+                ephemeral: true
+            ),
+            makeThread(
+                id: "ephemeral-rootless",
+                updatedAt: now.addingTimeInterval(120),
+                cwd: nil,
+                ephemeral: true
+            ),
+        ]
+
+        let projectGroups = SidebarThreadGrouping.makeGroups(from: threads, now: now)
+        XCTAssertEqual(projectGroups.map(\.id), ["project:/Users/me/work/app"])
+        XCTAssertEqual(projectGroups[0].threads.map(\.id), ["project-thread"])
+
+        let chatGroups = SidebarThreadGrouping.makeGroups(from: threads, scope: .chats, now: now)
+        XCTAssertTrue(chatGroups.isEmpty)
+    }
+
     func testMakeGroupsKeepsArchivedThreadsInDedicatedTrailingSection() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let threads = [

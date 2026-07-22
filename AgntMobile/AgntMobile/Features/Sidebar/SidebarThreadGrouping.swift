@@ -87,7 +87,11 @@ enum SidebarThreadGrouping {
     ) -> [SidebarThreadGroup] {
         var groups: [SidebarThreadGroup] = []
         var archivedThreads: [CodexThread] = []
-        let scopedThreads = threadsForScope(scope, from: threads, projectlessRootPaths: projectlessRootPaths)
+        let scopedThreads = threadsForScope(
+            scope,
+            from: threads,
+            projectlessRootPaths: projectlessRootPaths
+        )
         let pinnedThreads = collectPinnedThreads(from: scopedThreads, pinnedRootThreadIDs: pinnedThreadIDs)
         let pinnedThreadIDSet = Set(pinnedThreads.map(\.id))
 
@@ -149,13 +153,14 @@ enum SidebarThreadGrouping {
         from threads: [CodexThread],
         projectlessRootPaths: [String] = []
     ) -> [CodexThread] {
+        let visibleThreads = threads.filter { !$0.ephemeral }
         switch scope {
         case .all:
-            return threads
+            return visibleThreads
         case .projects:
-            return threads.filter { !isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths) }
+            return visibleThreads.filter { !isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths) }
         case .chats:
-            return threads.filter { isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths) }
+            return visibleThreads.filter { isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths) }
         }
     }
 
@@ -187,7 +192,9 @@ enum SidebarThreadGrouping {
         projectlessRootPaths: [String] = []
     ) -> [SidebarProjectChoice] {
         makeProjectGroups(
-            from: threads.filter { !isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths) },
+            from: threads.filter {
+                !$0.ephemeral && !isProjectlessChatThread($0, projectlessRootPaths: projectlessRootPaths)
+            },
             projectlessRootPaths: projectlessRootPaths
         ).compactMap { group in
             guard let projectPath = group.projectPath else {
@@ -216,7 +223,8 @@ enum SidebarThreadGrouping {
 
         return sortThreadsByRecentActivity(
             threads.filter { thread in
-                thread.syncState != .archivedLocal
+                !thread.ephemeral
+                    && thread.syncState != .archivedLocal
                     && projectGroupID(for: thread, projectlessRootPaths: projectlessRootPaths) == group.id
             }
         ).map(\.id)
@@ -234,7 +242,8 @@ enum SidebarThreadGrouping {
 
         return sortThreadsByRecentActivity(
             threads.filter { thread in
-                projectGroupID(for: thread, projectlessRootPaths: projectlessRootPaths) == group.id
+                !thread.ephemeral
+                    && projectGroupID(for: thread, projectlessRootPaths: projectlessRootPaths) == group.id
             }
         ).map(\.id)
     }
@@ -271,6 +280,9 @@ enum SidebarThreadGrouping {
             guard !pinnedThreadIDs.contains(thread.id) else {
                 continue
             }
+            guard !thread.ephemeral else {
+                continue
+            }
             liveThreadsByProject[projectKey(for: thread, projectlessRootPaths: projectlessRootPaths), default: []]
                 .append(thread)
         }
@@ -296,7 +308,7 @@ enum SidebarThreadGrouping {
         from threads: [CodexThread],
         pinnedRootThreadIDs: [String]
     ) -> [CodexThread] {
-        let liveThreads = threads.filter { $0.syncState != .archivedLocal }
+        let liveThreads = threads.filter { $0.syncState != .archivedLocal && !$0.ephemeral }
         let threadsByID = Dictionary(uniqueKeysWithValues: liveThreads.map { ($0.id, $0) })
         let childrenByParentID = liveThreads.reduce(into: [String: [CodexThread]]()) { partialResult, thread in
             guard let parentThreadID = thread.parentThreadId else {
