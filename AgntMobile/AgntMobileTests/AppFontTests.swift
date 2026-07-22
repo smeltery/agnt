@@ -11,6 +11,7 @@ final class AppFontTests: XCTestCase {
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: AppFont.storageKey)
         UserDefaults.standard.removeObject(forKey: AppFont.legacyStorageKey)
+        UserDefaults.standard.removeObject(forKey: UserBubbleColor.storageKey)
         super.tearDown()
     }
 
@@ -24,5 +25,30 @@ final class AppFontTests: XCTestCase {
         UserDefaults.standard.set(AppFont.Style.systemRounded.rawValue, forKey: AppFont.storageKey)
 
         XCTAssertEqual(AppFont.currentStyle, .systemRounded)
+    }
+
+    func testUserBubbleColorDefaultStorageValue() {
+        XCTAssertEqual(UserBubbleColor.defaultStoredRawValue, "default")
+        XCTAssertEqual(UserBubbleColor.storageKey, "agnt.userBubbleColor")
+        XCTAssertEqual(UserBubbleColor(rawValue: ""), nil)
+    }
+
+    func testUserBubbleColorIncludesRemodexPaletteOptions() {
+        XCTAssertEqual(UserBubbleColor.allCases.map(\.rawValue), [
+            "default",
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "mint",
+            "blue",
+            "indigo",
+            "teal",
+            "cyan",
+            "pink",
+            "purple",
+            "brown",
+            "black",
+        ])
     }
 }

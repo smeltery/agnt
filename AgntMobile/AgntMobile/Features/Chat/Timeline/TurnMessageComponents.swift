@@ -62,6 +62,8 @@ struct MessageRow: View, Equatable {
     @State var pendingAssistantDisplayText: String?
     @State var assistantDisplayUpdateTask: Task<Void, Never>?
     @State var assistantDisplaySyncTask: Task<Void, Never>?
+    @AppStorage(UserBubbleColor.storageKey) var userBubbleColorRawValue = UserBubbleColor.defaultStoredRawValue
+    @Environment(\.colorScheme) var colorScheme
 
     static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
         lhs.message == rhs.message

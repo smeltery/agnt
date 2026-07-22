@@ -71,6 +71,7 @@ struct SettingsUsageCard: View {
 struct SettingsAppearanceCard: View {
     @Binding var appFontStyle: AppFont.Style
     @AppStorage("codex.useLiquidGlass") private var useLiquidGlass = true
+    @AppStorage(UserBubbleColor.storageKey) private var userBubbleColorRawValue = UserBubbleColor.defaultStoredRawValue
     let settingsAccentColor = Color(.plan)
 
     var body: some View {
@@ -92,6 +93,37 @@ struct SettingsAppearanceCard: View {
                 .font(AppFont.caption())
                 .foregroundStyle(.secondary)
 
+            HStack {
+                Text("Message Bubble")
+                Spacer()
+                Menu {
+                    ForEach(UserBubbleColor.allCases) { color in
+                        Button {
+                            HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                            userBubbleColorRawValue = color.rawValue
+                        } label: {
+                            Label {
+                                Text(color.title)
+                            } icon: {
+                                Circle()
+                                    .fill(color.swatchColor)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(selectedUserBubbleColor.swatchColor)
+                            .frame(width: 14, height: 14)
+                        Text(selectedUserBubbleColor.title)
+                            .font(AppFont.callout())
+                    }
+                    .foregroundStyle(.primary)
+                }
+                .accessibilityLabel("Message bubble color")
+                .accessibilityValue(selectedUserBubbleColor.title)
+            }
+
             if GlassPreference.isSupported {
                 Divider()
 
@@ -109,6 +141,10 @@ struct SettingsAppearanceCard: View {
 
             SettingsPetCompanionSection(settingsAccentColor: settingsAccentColor)
         }
+    }
+
+    private var selectedUserBubbleColor: UserBubbleColor {
+        UserBubbleColor(rawValue: userBubbleColorRawValue) ?? .default
     }
 }
 

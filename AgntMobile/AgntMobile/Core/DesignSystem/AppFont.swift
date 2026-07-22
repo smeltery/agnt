@@ -390,3 +390,118 @@ enum AppFont {
         return .system(size: size, weight: weight)
     }
 }
+
+enum UserBubbleColor: String, CaseIterable, Identifiable {
+    case `default`
+    case red
+    case orange
+    case yellow
+    case green
+    case mint
+    case blue
+    case indigo
+    case teal
+    case cyan
+    case pink
+    case purple
+    case brown
+    case black
+
+    static let storageKey = "agnt.userBubbleColor"
+    static let defaultStoredRawValue = Self.default.rawValue
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .default: return "Default"
+        case .red: return "Red"
+        case .orange: return "Orange"
+        case .yellow: return "Yellow"
+        case .green: return "Green"
+        case .mint: return "Mint"
+        case .blue: return "Blue"
+        case .indigo: return "Indigo"
+        case .teal: return "Teal"
+        case .cyan: return "Cyan"
+        case .pink: return "Pink"
+        case .purple: return "Purple"
+        case .brown: return "Brown"
+        case .black: return "Primary"
+        }
+    }
+
+    var swatchColor: Color {
+        Color(uiColor)
+    }
+
+    var uiColor: UIColor {
+        switch self {
+        case .default:
+            return .tertiarySystemFill
+        case .red:
+            return .systemRed
+        case .orange:
+            return .systemOrange
+        case .yellow:
+            return .systemYellow
+        case .green:
+            return .systemGreen
+        case .mint:
+            return .systemMint
+        case .blue:
+            return .systemBlue
+        case .indigo:
+            return .systemIndigo
+        case .teal:
+            return .systemTeal
+        case .cyan:
+            return .systemCyan
+        case .pink:
+            return .systemPink
+        case .purple:
+            return .systemPurple
+        case .brown:
+            return .systemBrown
+        case .black:
+            return .label
+        }
+    }
+
+    var ctaPalette: (foreground: Color, background: Color) {
+        switch self {
+        case .default:
+            return (Color(.systemBackground), Color(.label))
+        case .black:
+            return (Color(.systemBackground), Color(.label))
+        default:
+            return (Color(.systemBackground), swatchColor)
+        }
+    }
+
+    func bubbleForeground(for colorScheme: ColorScheme) -> Color {
+        switch self {
+        case .default:
+            return .primary
+        case .black:
+            return Color(.systemBackground)
+        default:
+            return colorScheme == .dark ? Color(.systemBackground) : swatchColor
+        }
+    }
+
+    func bubbleBackground(for colorScheme: ColorScheme) -> Color {
+        switch self {
+        case .default:
+            return Color(.tertiarySystemFill).opacity(0.8)
+        case .black:
+            return Color(.label)
+        default:
+            return swatchColor.opacity(colorScheme == .dark ? 0.4 : 0.1)
+        }
+    }
+
+    func mentionForeground(for colorScheme: ColorScheme, fallback: Color) -> Color {
+        self == .default ? fallback : bubbleForeground(for: colorScheme)
+    }
+}

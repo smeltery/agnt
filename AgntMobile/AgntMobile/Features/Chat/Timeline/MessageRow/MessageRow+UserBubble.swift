@@ -8,6 +8,8 @@ import UIKit
 extension MessageRow {
     func userBubble(text: String) -> some View {
         let renderModel = UserBubbleRenderModelCache.model(for: message, text: text)
+        let bubbleColor = selectedUserBubbleColor
+        let foreground = bubbleColor.bubbleForeground(for: colorScheme)
         return HStack {
             Spacer(minLength: 60)
             VStack(alignment: .trailing, spacing: 4) {
@@ -30,14 +32,19 @@ extension MessageRow {
                         contentResetKey: renderModel.textFingerprint,
                         collapsesWithLineLimit: !renderModel.usesBlockMarkdown
                     ) { isCollapsed in
-                        userBubbleText(renderModel, isCollapsed: isCollapsed)
+                        userBubbleText(
+                            renderModel,
+                            isCollapsed: isCollapsed,
+                            bubbleColor: bubbleColor,
+                            foreground: foreground
+                        )
                             .font(AppFont.body())
                     }
                         .padding(.vertical, 12)
                         .padding(.horizontal, 16)
                         .background {
                             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .fill(Color(.tertiarySystemFill).opacity(0.8))
+                                .fill(bubbleColor.bubbleBackground(for: colorScheme))
                         }
                 }
 
@@ -80,8 +87,17 @@ extension MessageRow {
             && Date().timeIntervalSince(message.createdAt) < 3
     }
 
+    private var selectedUserBubbleColor: UserBubbleColor {
+        UserBubbleColor(rawValue: userBubbleColorRawValue) ?? .default
+    }
+
     @ViewBuilder
-    private func userBubbleText(_ renderModel: UserBubbleRenderModel, isCollapsed: Bool) -> some View {
+    private func userBubbleText(
+        _ renderModel: UserBubbleRenderModel,
+        isCollapsed: Bool,
+        bubbleColor: UserBubbleColor,
+        foreground: Color
+    ) -> some View {
         if renderModel.usesBlockMarkdown {
             MarkdownTextView(
                 text: isCollapsed
@@ -90,18 +106,21 @@ extension MessageRow {
                 profile: .userProse,
                 constrainsToAvailableWidth: true
             )
-            .foregroundStyle(.primary)
-            .tint(.primary)
+            .foregroundStyle(foreground)
+            .tint(foreground)
         } else if renderModel.text.contains("@") || renderModel.text.contains("$") {
-            userBubbleMentionText(renderModel.text)
+            userBubbleMentionText(renderModel.text, bubbleColor: bubbleColor)
         } else {
-            UserBubbleInlineMarkdownText(renderModel.text, foreground: .primary)
+            UserBubbleInlineMarkdownText(renderModel.text, foreground: foreground)
         }
     }
 
     // Renders inline @file/plugin and $skill mentions inside one AttributedString so large
     // messages do not build an arbitrarily deep SwiftUI Text concatenation chain.
-    private func userBubbleMentionText(_ normalizedRawText: String) -> Text {
+    private func userBubbleMentionText(
+        _ normalizedRawText: String,
+        bubbleColor: UserBubbleColor
+    ) -> Text {
         let confirmedFileMentions = Set(
             message.fileMentions
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -125,7 +144,8 @@ extension MessageRow {
                 from: normalizedRawText,
                 matches: matches,
                 nsText: nsText,
-                confirmedFileMentions: confirmedFileMentions
+                confirmedFileMentions: confirmedFileMentions,
+                bubbleColor: bubbleColor
             )
         )
     }
@@ -152,7 +172,8 @@ extension MessageRow {
         from text: String,
         matches: [NSTextCheckingResult],
         nsText: NSString,
-        confirmedFileMentions: Set<String>
+        confirmedFileMentions: Set<String>,
+        bubbleColor: UserBubbleColor
     ) -> AttributedString {
         var attributed = AttributedString()
         var cursor = 0
@@ -192,13 +213,13 @@ extension MessageRow {
 
                 if trigger == "@", isConfirmedFileMention {
                     displayName = normalizedToken.pathDisplayName
-                    color = .blue
+                    color = bubbleColor.mentionForeground(for: colorScheme, fallback: .blue)
                 } else if trigger == "@" {
                     displayName = SkillDisplayNameFormatter.displayName(for: normalizedToken)
-                    color = .blue
+                    color = bubbleColor.mentionForeground(for: colorScheme, fallback: .blue)
                 } else {
                     displayName = SkillDisplayNameFormatter.displayName(for: normalizedToken)
-                    color = .indigo
+                    color = bubbleColor.mentionForeground(for: colorScheme, fallback: .indigo)
                 }
 
                 var highlightedSegment = AttributedString(displayName)

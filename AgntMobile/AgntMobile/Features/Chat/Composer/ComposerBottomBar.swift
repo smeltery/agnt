@@ -9,6 +9,7 @@ import SwiftUI
 struct ComposerBottomBar: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showsAllModelsSheet = false
+    @AppStorage(UserBubbleColor.storageKey) private var userBubbleColorRawValue = UserBubbleColor.defaultStoredRawValue
 
     // Data
     let orderedModelOptions: [CodexModelOption]
@@ -59,12 +60,16 @@ struct ComposerBottomBar: View {
 
     private var sendButtonIconColor: Color {
         if isSendDisabled { return Color(.systemGray2) }
-        return Color(.systemBackground)
+        return selectedUserBubbleColor.ctaPalette.foreground
     }
 
     private var sendButtonBackgroundColor: Color {
         if isSendDisabled { return Color(.systemGray5) }
-        return Color(.label)
+        return selectedUserBubbleColor.ctaPalette.background
+    }
+
+    private var selectedUserBubbleColor: UserBubbleColor {
+        UserBubbleColor(rawValue: userBubbleColorRawValue) ?? .default
     }
 
     // MARK: - Body
