@@ -450,7 +450,6 @@
 				FA571E0004000000000000F7 /* StreamingMarkdownBlockSplitterTests.swift */,
 				FA571E0005000000000000F9 /* StreamingUIInteractionMonitorTests.swift */,
 				FA571E0003000000000000F5 /* TerminalPasteTests.swift */,
-				8B4A2F5E7D1C4B9AA1234568 /* TurnComposerAttachmentIntakePlanTests.swift */,
 				74BE370810CFD7A76DC2A264 /* Composer */,
 				AB1C2D3E4F5061728394A5B6 /* TurnComposerReviewModeTests.swift */,
 				9D7C9A8B7E6D5C4B3A29181F /* Queue */,
@@ -506,6 +505,7 @@
 				74BE370810CFD7A76DC2A261 /* TurnComposerAttachmentMergeTests.swift */,
 				74BE370810CFD7A76DC2A262 /* TurnComposerSubagentsPromptTests.swift */,
 				74BE370810CFD7A76DC2A263 /* TurnComposerSendTestSupport.swift */,
+				8B4A2F5E7D1C4B9AA1234568 /* TurnComposerAttachmentIntakePlanTests.swift */,
 			);
 			path = Composer;
 			sourceTree = "<group>";
