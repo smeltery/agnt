@@ -25,7 +25,7 @@ enum CodexAutoApprovalReviewStatus: Codable, Hashable, Sendable {
         }
     }
 
-    var rawValue: String {
+    nonisolated var rawValue: String {
         switch self {
         case .inProgress: return "inProgress"
         case .approved: return "approved"
@@ -46,7 +46,7 @@ enum CodexAutoApprovalReviewStatus: Codable, Hashable, Sendable {
         try container.encode(rawValue)
     }
 
-    var isTerminal: Bool {
+    nonisolated var isTerminal: Bool {
         switch self {
         case .inProgress:
             return false
@@ -75,8 +75,13 @@ struct CodexAutoApprovalReview: Codable, Hashable, Sendable {
     var action: JSONValue
     var retryApproved: Bool
     var retryUnavailableReason: String?
+    var persistedActionSummary: String? = nil
 
     var actionSummary: String {
+        if let persistedActionSummary,
+           !persistedActionSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return persistedActionSummary
+        }
         guard let object = action.objectValue,
               let type = object["type"]?.stringValue else {
             return "Requested action"

@@ -418,6 +418,16 @@ extension CodexService {
         if value.kind == .chat && serverMessage.kind != .chat {
             value.kind = serverMessage.kind
         }
+        if var serverReview = serverMessage.autoApprovalReview {
+            if let localReview = localMessage.autoApprovalReview {
+                serverReview.retryApproved = localReview.retryApproved
+                if localReview.retryApproved || localReview.retryUnavailableReason != nil {
+                    serverReview.retryUnavailableReason = localReview.retryUnavailableReason
+                }
+            }
+            value.autoApprovalReview = serverReview
+            value.text = serverMessage.text
+        }
         if value.attachments.isEmpty && !serverMessage.attachments.isEmpty {
             value.attachments = serverMessage.attachments
         }

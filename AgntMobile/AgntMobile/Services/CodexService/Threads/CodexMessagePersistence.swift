@@ -135,14 +135,21 @@ nonisolated struct CodexMessagePersistence {
     private func sanitizedForPersistence(_ value: [String: [CodexMessage]]) -> [String: [CodexMessage]] {
         value.mapValues { messages in
             messages.map { message in
-                guard !message.attachments.isEmpty else {
-                    return message
-                }
-
                 var sanitizedMessage = message
-                let shouldPreservePayloadDataURL = message.deliveryState == .pending
-                sanitizedMessage.attachments = message.attachments.map {
-                    $0.sanitizedForStorage(preservingPayloadDataURL: shouldPreservePayloadDataURL)
+                if !message.attachments.isEmpty {
+                    let shouldPreservePayloadDataURL = message.deliveryState == .pending
+                    sanitizedMessage.attachments = message.attachments.map {
+                        $0.sanitizedForStorage(preservingPayloadDataURL: shouldPreservePayloadDataURL)
+                    }
+                }
+                if var review = message.autoApprovalReview {
+                    review.persistedActionSummary = message.text
+                    review.action = .null
+                    if review.status.rawValue == "denied", !review.retryApproved,
+                       review.retryUnavailableReason == nil {
+                        review.retryUnavailableReason = "Retry approvals are available only during the live session."
+                    }
+                    sanitizedMessage.autoApprovalReview = review
                 }
                 return sanitizedMessage
             }

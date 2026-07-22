@@ -214,6 +214,27 @@ extension CodexService {
                         timeZoneIdentifier: timeZoneIdentifier
                     )
 
+                case "automaticapprovalreview":
+                    guard let turnID, !turnID.isEmpty else { continue }
+                    var reviewParams = itemObject
+                    reviewParams["threadId"] = .string(threadId)
+                    reviewParams["turnId"] = .string(turnID)
+                    guard let review = decodeAutoApprovalReview(from: reviewParams) else { continue }
+                    appendHistoryMessage(
+                        to: &result,
+                        role: .system,
+                        kind: .autoApprovalReview,
+                        text: review.actionSummary,
+                        threadId: threadId,
+                        turnId: turnID,
+                        itemId: "auto-approval-review:\(review.reviewId)",
+                        createdAt: review.startedAtMs > 0
+                            ? Date(timeIntervalSince1970: Double(review.startedAtMs) / 1_000)
+                            : timestamp,
+                        timeZoneIdentifier: timeZoneIdentifier,
+                        autoApprovalReview: review
+                    )
+
                 case "contextcompaction":
                     appendHistoryMessage(
                         to: &result,

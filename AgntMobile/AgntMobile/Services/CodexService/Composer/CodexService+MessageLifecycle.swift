@@ -154,6 +154,12 @@ extension CodexService {
                 let belongsToTurn = belongsToCompletedTurn(threadMessages[index])
                 guard belongsToTurn else { continue }
                 threadMessages[index].isStreaming = false
+                if var review = threadMessages[index].autoApprovalReview,
+                   review.status == .inProgress {
+                    review.status = .aborted
+                    review.completedAtMs = Int(Date().timeIntervalSince1970 * 1_000)
+                    threadMessages[index].autoApprovalReview = review
+                }
                 didMutate = true
             }
 
@@ -275,6 +281,12 @@ extension CodexService {
             var localChanged = false
             for index in threadMessages.indices where threadMessages[index].isStreaming {
                 threadMessages[index].isStreaming = false
+                if var review = threadMessages[index].autoApprovalReview,
+                   review.status == .inProgress {
+                    review.status = .aborted
+                    review.completedAtMs = Int(Date().timeIntervalSince1970 * 1_000)
+                    threadMessages[index].autoApprovalReview = review
+                }
                 localChanged = true
             }
 
