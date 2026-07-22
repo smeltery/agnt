@@ -260,6 +260,86 @@ test("desktop IPC follower completes either parallel active turn across normaliz
   assert.equal(outbound.some((message) => message.method === "turn/started"), false);
 });
 
+test("desktop IPC follower reannounces older parallel turn when newest completes", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-parallel-restoration-");
+  let serverSocket = null;
+  const nowValue = Date.now();
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "desktop",
+          result: { clientId: "agnt-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+  t.after(() => {
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const follower = createDesktopIpcActionFollower({
+    socketPath,
+    now: () => nowValue,
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    requestTimeoutMs: 500,
+  });
+  t.after(() => follower.stopAll());
+
+  const threadId = "thread-parallel-restoration";
+  const sendSnapshot = (firstStatus, secondStatus) => {
+    writeFrame(serverSocket, desktopConversationSnapshot(
+      threadId,
+      normalizedConversationState([
+        { id: "turn-parallel-older", status: firstStatus, text: "" },
+        { id: "turn-parallel-newer", status: secondStatus, text: "" },
+      ], {
+        turns: [],
+        threadRuntimeStatus: { type: "active", activeFlags: [] },
+      })
+    ));
+  };
+
+  follower.observeInbound(JSON.stringify({ method: "thread/resume", params: { threadId } }));
+  await waitFor(() => serverSocket);
+
+  sendSnapshot("inProgress", "inProgress");
+  await waitFor(() => outbound.filter((message) => message.method === "turn/started").length === 2);
+  outbound.length = 0;
+
+  sendSnapshot("inProgress", "completed");
+  await waitFor(() => outbound.some((message) => (
+    message.method === "turn/completed"
+      && message.params?.turnId === "turn-parallel-newer"
+  )));
+
+  assert.deepEqual(
+    outbound
+      .filter((message) => message.method?.startsWith("turn/"))
+      .map((message) => ({
+        method: message.method,
+        turnId: message.params?.turnId,
+        continuity: message.params?.agntTurnIdentityContinuity === true,
+      })),
+    [
+      { method: "turn/completed", turnId: "turn-parallel-newer", continuity: false },
+      { method: "turn/started", turnId: "turn-parallel-older", continuity: true },
+    ]
+  );
+});
+
 test("desktop IPC follower coalesces stale normalized snapshot bursts before publishing lifecycle", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-snapshot-coalesce-");
   let serverSocket = null;

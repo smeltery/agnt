@@ -84,7 +84,11 @@ function createProjectionSync({
       sendApplicationResponse(JSON.stringify(desktopThreadReplacedNotification(threadId)));
     }
     for (const notification of output.notifications || []) {
-      sendApplicationResponse(JSON.stringify(notification));
+      const notificationTurnId = String(notification?.params?.turnId || "");
+      const projectedNotification = output.turnIdentityContinuityTurnIds?.includes(notificationTurnId)
+        ? notificationWithTurnIdentityContinuity(notification)
+        : notification;
+      sendApplicationResponse(JSON.stringify(projectedNotification));
     }
   }
 
@@ -96,6 +100,19 @@ function createProjectionSync({
     syncProjectedActions,
     syncProjectedActionsFromState,
     syncProjectedConversationState,
+  };
+}
+
+function notificationWithTurnIdentityContinuity(notification) {
+  if (notification?.method !== "turn/started") {
+    return notification;
+  }
+  return {
+    ...notification,
+    params: {
+      ...(notification.params || {}),
+      agntTurnIdentityContinuity: true,
+    },
   };
 }
 

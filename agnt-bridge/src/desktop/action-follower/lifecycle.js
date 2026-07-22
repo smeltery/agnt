@@ -24,6 +24,8 @@ function createDesktopLifecycleSync({
   function syncCanonicalSnapshotLifecycle(threadId, liveState) {
     const previousTurns = canonicalActiveTurnsByThreadId.get(threadId) || new Map();
     const nextTurns = activeCanonicalTurnsById(liveState);
+    const completedTurnIds = new Set();
+    const startedTurnIds = new Set();
 
     for (const [turnId, previousTurn] of previousTurns.entries()) {
       if (nextTurns.has(turnId)) {
@@ -42,6 +44,7 @@ function createDesktopLifecycleSync({
             : "completed",
         }
       )));
+      completedTurnIds.add(turnId);
     }
 
     for (const [turnId, nextTurn] of nextTurns.entries()) {
@@ -53,8 +56,16 @@ function createDesktopLifecycleSync({
         threadId,
         nextTurn
       )));
+      startedTurnIds.add(turnId);
     }
 
+    reannounceRemainingCanonicalTurn(
+      threadId,
+      previousTurns,
+      nextTurns,
+      completedTurnIds,
+      startedTurnIds
+    );
     rememberCanonicalActiveTurns(threadId, liveState);
   }
 
@@ -142,6 +153,41 @@ function createDesktopLifecycleSync({
     }
     clearTimeout(timer);
     backgroundDisconnectTimersByThreadId.delete(threadId);
+  }
+
+  function reannounceRemainingCanonicalTurn(
+    threadId,
+    previousTurns,
+    nextTurns,
+    completedTurnIds,
+    startedTurnIds
+  ) {
+    const previousVisibleTurn = [...previousTurns.values()].at(-1);
+    if (!previousVisibleTurn || !completedTurnIds.has(previousVisibleTurn.id)) {
+      return;
+    }
+    const nextVisibleTurn = [...nextTurns.values()].at(-1);
+    if (!nextVisibleTurn
+      || !previousTurns.has(nextVisibleTurn.id)
+      || startedTurnIds.has(nextVisibleTurn.id)) {
+      return;
+    }
+    sendApplicationResponse(JSON.stringify(notificationWithTurnIdentityContinuity(
+      backgroundTurnLifecycleNotification("turn/started", threadId, nextVisibleTurn)
+    )));
+  }
+
+  function notificationWithTurnIdentityContinuity(notification) {
+    if (notification?.method !== "turn/started") {
+      return notification;
+    }
+    return {
+      ...notification,
+      params: {
+        ...(notification.params || {}),
+        agntTurnIdentityContinuity: true,
+      },
+    };
   }
 
   function syncThreadArchiveBroadcast(envelope) {

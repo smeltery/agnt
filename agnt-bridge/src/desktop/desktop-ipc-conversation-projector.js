@@ -31,6 +31,7 @@ const {
   bootstrapNotifications,
   diffProjections,
   threadStartedNotification,
+  turnStartedNotification,
 } = require("./conversation-projector/notifications");
 
 // --- Projector lifecycle --------------------------------------
@@ -116,6 +117,18 @@ function createDesktopConversationProjector({
         previousProjection,
         nextProjection
       );
+      const parallelRestorationTurnId = remainingParallelTurnRestorationId(
+        previousProjection.turns,
+        nextProjection.turns,
+        notifications
+      );
+      if (parallelRestorationTurnId) {
+        const restorationTurn = nextProjection.turns.find((turn) => turn.id === parallelRestorationTurnId);
+        if (restorationTurn) {
+          notifications.push(turnStartedNotification(normalizedThreadId, restorationTurn));
+          turnIdentityContinuityTurnIds.push(parallelRestorationTurnId);
+        }
+      }
     }
 
     cacheByThreadId.set(normalizedThreadId, {
@@ -177,6 +190,32 @@ function createDesktopConversationProjector({
     remove,
     reset,
   };
+}
+
+function remainingParallelTurnRestorationId(previousTurns, nextTurns, notifications) {
+  const completedTurnIds = new Set(notifications
+    .filter((notification) => notification.method === "turn/completed")
+    .map((notification) => readString(notification.params?.turnId))
+    .filter(Boolean));
+  const startedTurnIds = new Set(notifications
+    .filter((notification) => notification.method === "turn/started")
+    .map((notification) => readString(notification.params?.turnId))
+    .filter(Boolean));
+  const previousVisibleTurn = [...previousTurns]
+    .filter((turn) => isActiveTurnStatus(turn.status))
+    .at(-1);
+  if (!previousVisibleTurn || !completedTurnIds.has(previousVisibleTurn.id)) {
+    return "";
+  }
+  const nextVisibleTurn = [...nextTurns]
+    .filter((turn) => isActiveTurnStatus(turn.status))
+    .at(-1);
+  if (!nextVisibleTurn
+    || !previousTurns.some((turn) => turn.id === nextVisibleTurn.id)
+    || startedTurnIds.has(nextVisibleTurn.id)) {
+    return "";
+  }
+  return nextVisibleTurn.id;
 }
 
 // --- Projection model ------------------------------------------
