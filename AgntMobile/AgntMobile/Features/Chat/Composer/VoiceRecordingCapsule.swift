@@ -34,15 +34,14 @@ struct VoiceRecordingCapsule: View {
         .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        // Keeps the recording UI in the same accessory family as the pinned plan card.
-        .background(
-            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                .fill(Color.clear)
+        // Keep glass isolated from the pulsing dot and waveform redraws.
+        .background {
+            Color.clear
                 .adaptiveGlass(
                     .regular,
                     in: RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                 )
-        )
+        }
         .padding(.horizontal, 4)
     }
 
