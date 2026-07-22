@@ -70,6 +70,7 @@ class MacScopedSessionStoreTest {
                 agentRole = "reviewer",
                 model = "gpt-5",
                 modelProvider = "openai",
+                ephemeral = true,
             )
 
         val encoded = MacScopedSessionStore.encodeCachedThreadSnapshot(listOf(original))

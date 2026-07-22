@@ -320,6 +320,7 @@ class MacScopedSessionStore(
                     thread.agentRole.orEmpty(),
                     thread.model.orEmpty(),
                     thread.modelProvider.orEmpty(),
+                    thread.ephemeral.toString(),
                 ).joinToString("\t") { urlEncode(it) }
             }
 
@@ -352,6 +353,7 @@ class MacScopedSessionStore(
                         agentRole = CodexThread.normalizeIdentifier(parts.getOrNull(12)),
                         model = CodexThread.normalizeIdentifier(parts.getOrNull(13)),
                         modelProvider = CodexThread.normalizeIdentifier(parts.getOrNull(14)),
+                        ephemeral = parts.getOrNull(15)?.toBooleanStrictOrNull() ?: false,
                     )
                 }.toList()
     }

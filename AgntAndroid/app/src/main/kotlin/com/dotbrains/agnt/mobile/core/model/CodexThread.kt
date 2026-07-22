@@ -2,6 +2,7 @@ package com.dotbrains.agnt.mobile.core.model
 
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -28,6 +29,7 @@ data class CodexThread(
     val agentRole: String? = null,
     val model: String? = null,
     val modelProvider: String? = null,
+    val ephemeral: Boolean = false,
     val syncState: CodexThreadSyncState = CodexThreadSyncState.live,
 ) {
     companion object {
@@ -127,6 +129,7 @@ data class CodexThread(
                 obj.stringOrNull("syncState")?.let { raw ->
                     runCatching { CodexThreadSyncState.valueOf(raw) }.getOrNull()
                 } ?: CodexThreadSyncState.live
+            val ephemeral = obj["ephemeral"]?.jsonPrimitive?.booleanOrNull ?: false
 
             return CodexThread(
                 id = id,
@@ -144,6 +147,7 @@ data class CodexThread(
                 agentRole = normalizeIdentifier(agentRoleVal),
                 model = normalizeIdentifier(modelVal),
                 modelProvider = normalizeIdentifier(modelProv),
+                ephemeral = ephemeral,
                 syncState = sync,
             )
         }
@@ -282,6 +286,7 @@ data class CodexThread(
             agentRole = agentRole ?: existing.agentRole,
             model = model ?: existing.model,
             modelProvider = modelProvider ?: existing.modelProvider,
+            ephemeral = ephemeral || existing.ephemeral,
         )
 
     private val noProjectGroupKey = "__no_project__"

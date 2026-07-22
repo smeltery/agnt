@@ -15,6 +15,7 @@ class SidebarThreadGroupingTest {
         parentThreadId: String? = null,
         syncState: CodexThreadSyncState = CodexThreadSyncState.live,
         updatedAt: Instant = Instant.EPOCH.plusSeconds(1000),
+        ephemeral: Boolean = false,
     ): CodexThread =
         CodexThread(
             id = id,
@@ -23,6 +24,7 @@ class SidebarThreadGroupingTest {
             parentThreadId = parentThreadId,
             syncState = syncState,
             updatedAt = updatedAt,
+            ephemeral = ephemeral,
         )
 
     @Test
@@ -176,6 +178,41 @@ class SidebarThreadGroupingTest {
         assertEquals("t1", projectGroup.threads.first().id)
         assertEquals(1, archivedGroup.threads.size)
         assertEquals("t2", archivedGroup.threads.first().id)
+    }
+
+    @Test
+    fun makeGroups_excludesEphemeralThreadsFromSavedChatSections() {
+        val live = thread("t1", cwd = "/Users/test/project-a")
+        val temporaryProject =
+            thread(
+                "t2",
+                cwd = "/Users/test/project-a",
+                updatedAt = Instant.EPOCH.plusSeconds(3000),
+                ephemeral = true,
+            )
+        val temporaryChat =
+            thread(
+                "t3",
+                cwd = null,
+                updatedAt = Instant.EPOCH.plusSeconds(4000),
+                ephemeral = true,
+            )
+        val temporaryArchived =
+            thread(
+                "t4",
+                cwd = "/Users/test/project-a",
+                syncState = CodexThreadSyncState.archivedLocal,
+                ephemeral = true,
+            )
+
+        val groups = SidebarThreadGrouping.makeGroups(listOf(live, temporaryProject, temporaryChat, temporaryArchived))
+
+        assertEquals(listOf(SidebarThreadGroupKind.Project), groups.map { it.kind })
+        assertEquals(listOf("t1"), groups.single().threads.map { it.id })
+        assertEquals(
+            listOf("t1"),
+            SidebarThreadGrouping.liveThreadIdsForGroup(groups.single(), listOf(live, temporaryProject)),
+        )
     }
 
     @Test

@@ -29,9 +29,10 @@ object SidebarThreadGrouping {
     private const val CHATS_GROUP_ID = "__chats__"
 
     fun makeGroups(threads: List<CodexThread>): List<SidebarThreadGroup> {
-        val archivedThreads = threads.filter { it.syncState == CodexThreadSyncState.archivedLocal }
-        val projectGroups = makeProjectGroups(threads = threads)
-        val chatsGroup = makeChatsGroup(threads = threads)
+        val userFacingThreads = threads.filter { !it.ephemeral }
+        val archivedThreads = userFacingThreads.filter { it.syncState == CodexThreadSyncState.archivedLocal }
+        val projectGroups = makeProjectGroups(threads = userFacingThreads)
+        val chatsGroup = makeChatsGroup(threads = userFacingThreads)
         val sortedArchived = sortThreadsByRecentActivity(archivedThreads)
         val archivedGroup =
             sortedArchived.firstOrNull()?.let { first ->
@@ -91,7 +92,8 @@ object SidebarThreadGrouping {
         if (group.kind != SidebarThreadGroupKind.Project) return emptyList()
         return sortThreadsByRecentActivity(
             allThreads.filter { thread ->
-                thread.syncState != CodexThreadSyncState.archivedLocal &&
+                !thread.ephemeral &&
+                    thread.syncState != CodexThreadSyncState.archivedLocal &&
                     projectGroupId(thread) == group.id
             },
         ).map { it.id }
@@ -117,6 +119,7 @@ object SidebarThreadGrouping {
     private fun makeProjectGroups(threads: List<CodexThread>): List<SidebarThreadGroup> {
         val liveByProject = LinkedHashMap<String, MutableList<CodexThread>>()
         for (thread in threads) {
+            if (thread.ephemeral) continue
             if (thread.syncState == CodexThreadSyncState.archivedLocal) continue
             if (thread.normalizedProjectPath == null) continue
             liveByProject.getOrPut(thread.projectKey) { mutableListOf() }.add(thread)
@@ -136,7 +139,8 @@ object SidebarThreadGrouping {
         val chatThreads =
             sortThreadsByRecentActivity(
                 threads.filter { thread ->
-                    thread.syncState != CodexThreadSyncState.archivedLocal &&
+                    !thread.ephemeral &&
+                        thread.syncState != CodexThreadSyncState.archivedLocal &&
                         thread.normalizedProjectPath == null
                 },
             )

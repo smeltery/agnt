@@ -4,7 +4,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CodexThreadDisplayTitleTest {
@@ -65,6 +67,20 @@ class CodexThreadDisplayTitleTest {
         assertNull(decoded.title)
         assertEquals("hello", decoded.preview)
         assertEquals("Hello", decoded.displayTitle)
+    }
+
+    @Test
+    fun fromJsonObject_decodesEphemeralThreadFlag() {
+        val obj =
+            buildJsonObject {
+                put("id", JsonPrimitive("tid"))
+                put("ephemeral", JsonPrimitive(true))
+            }
+
+        val decoded = CodexThread.fromJsonObject(obj)
+
+        assertTrue(decoded.ephemeral)
+        assertFalse(CodexThread.fromJsonObject(buildJsonObject { put("id", JsonPrimitive("persisted")) }).ephemeral)
     }
 
     @Test
