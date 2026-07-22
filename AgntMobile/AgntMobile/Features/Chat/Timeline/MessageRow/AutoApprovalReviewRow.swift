@@ -2,11 +2,12 @@
 // Purpose: Presents automatic approval-review lifecycle rows in the timeline.
 // Layer: View Component
 // Exports: AutoApprovalReviewRow
-// Depends on: SwiftUI, CodexAutoApprovalReview
+// Depends on: SwiftUI, CodexService, CodexAutoApprovalReview
 
 import SwiftUI
 
 struct AutoApprovalReviewRow: View {
+    let threadId: String
     let review: CodexAutoApprovalReview
     let actionSummary: String
 
@@ -45,6 +46,7 @@ struct AutoApprovalReviewRow: View {
 
             if isExpanded {
                 AutoApprovalReviewDetails(
+                    threadId: threadId,
                     review: review,
                     actionSummary: actionSummary,
                     statusColor: presentation.color
@@ -62,6 +64,7 @@ struct AutoApprovalReviewRow: View {
 }
 
 private struct AutoApprovalReviewDetails: View {
+    let threadId: String
     let review: CodexAutoApprovalReview
     let actionSummary: String
     let statusColor: Color
@@ -96,10 +99,8 @@ private struct AutoApprovalReviewDetails: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if review.status == .denied, let retryUnavailableReason = review.retryUnavailableReason {
-                Text(retryUnavailableReason)
-                    .font(AppFont.footnote())
-                    .foregroundStyle(.secondary)
+            if review.status == .denied {
+                AutoApprovalRetryControl(threadId: threadId, review: review)
             }
         }
         .padding(.leading, 25)
@@ -111,6 +112,73 @@ private struct AutoApprovalReviewDetails: View {
             return nil
         }
         return value
+    }
+}
+
+private struct AutoApprovalRetryControl: View {
+    @Environment(CodexService.self) private var codex
+
+    let threadId: String
+    let review: CodexAutoApprovalReview
+
+    @State private var isApprovingRetry = false
+    @State private var retryErrorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if review.retryApproved {
+                Label("Approval recorded; the retry will still be reviewed", systemImage: "checkmark")
+                    .font(AppFont.footnote(weight: .medium))
+                    .foregroundStyle(.secondary)
+            } else if let retryUnavailableReason = review.retryUnavailableReason {
+                Text(retryUnavailableReason)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(.secondary)
+            } else {
+                Button(action: approveOneRetry) {
+                    HStack(spacing: 7) {
+                        if isApprovingRetry {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text("Approve one retry")
+                    }
+                    .font(AppFont.footnote(weight: .semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .tint(.blue)
+                .disabled(isApprovingRetry)
+            }
+
+            if let retryErrorMessage {
+                Text(retryErrorMessage)
+                    .font(AppFont.caption())
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func approveOneRetry() {
+        guard !isApprovingRetry else {
+            return
+        }
+
+        HapticFeedback.shared.triggerImpactFeedback(style: .light)
+        isApprovingRetry = true
+        retryErrorMessage = nil
+
+        Task { @MainActor in
+            defer { isApprovingRetry = false }
+            do {
+                try await codex.approveAutoApprovalRetry(
+                    threadId: threadId,
+                    reviewId: review.reviewId
+                )
+            } catch {
+                retryErrorMessage = error.localizedDescription
+            }
+        }
     }
 }
 

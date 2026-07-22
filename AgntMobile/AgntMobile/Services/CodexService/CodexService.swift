@@ -327,6 +327,8 @@ final class CodexService {
     var knownRepoRoots: Set<String> = []
     // Service-owned per-thread UI state keeps the active chat isolated from unrelated thread mutations.
     @ObservationIgnored var threadTimelineStateByThread: [String: ThreadTimelineState] = [:]
+    @ObservationIgnored var autoApprovalRetryTokensByReviewKey: [String: CodexAutoApprovalRetryToken] = [:]
+    @ObservationIgnored var autoApprovalRetryReviewIDsInFlight: Set<String> = []
     @ObservationIgnored var forkedFromThreadIDByThreadID: [String: String] = [:]
     @ObservationIgnored var renamedThreadNameByThreadID: [String: String] = [:]
     @ObservationIgnored var associatedManagedWorktreePathByThreadID: [String: String] = [:]

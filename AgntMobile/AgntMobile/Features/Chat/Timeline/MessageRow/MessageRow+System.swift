@@ -39,7 +39,7 @@ extension MessageRow {
             }
         case .autoApprovalReview:
             if let review = message.autoApprovalReview {
-                AutoApprovalReviewRow(review: review, actionSummary: text)
+                AutoApprovalReviewRow(threadId: message.threadId, review: review, actionSummary: text)
             } else {
                 defaultSystemView(text: text)
             }

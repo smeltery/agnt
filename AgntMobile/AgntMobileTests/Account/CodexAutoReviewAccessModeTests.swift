@@ -82,14 +82,83 @@ final class CodexAutoReviewAccessModeTests: XCTestCase {
             ]),
             "action": .object([
                 "type": .string("command"),
+                "source": .string("model"),
                 "command": .string("git push origin main"),
+                "cwd": .string("/repo"),
             ]),
         ])
 
         XCTAssertEqual(review?.reviewId, "review-1")
         XCTAssertEqual(review?.status, .denied)
         XCTAssertEqual(review?.actionSummary, "git push origin main")
-        XCTAssertEqual(review?.retryUnavailableReason, "Approve retries in Codex Desktop.")
+        XCTAssertNil(review?.retryUnavailableReason)
+        XCTAssertEqual(review?.coreDeniedEvent?.objectValue?["id"], .string("review-1"))
+        XCTAssertEqual(review?.coreDeniedEvent?.objectValue?["action"]?.objectValue?["source"], .string("model"))
+    }
+
+    func testDecodeAutoApprovalReviewDisablesDesktopMirroredRetry() {
+        let service = makeService()
+
+        let review = service.decodeAutoApprovalReview(from: [
+            "threadId": .string("thread-1"),
+            "turnId": .string("turn-1"),
+            "reviewId": .string("review-1"),
+            "remodexDesktopIpcMirror": .bool(true),
+            "review": .object([
+                "status": .string("denied"),
+            ]),
+            "action": .object([
+                "type": .string("command"),
+                "source": .string("model"),
+                "command": .string("git status"),
+                "cwd": .string("/repo"),
+            ]),
+        ])
+
+        XCTAssertEqual(review?.retryUnavailableReason, "Approve this retry in Codex Desktop.")
+    }
+
+    func testApproveAutoApprovalRetrySendsOneShotDeniedEvent() async throws {
+        let service = makeService()
+        var capturedMethod: String?
+        var capturedParams: [String: JSONValue] = [:]
+        service.requestTransportOverride = { method, params in
+            capturedMethod = method
+            capturedParams = params?.objectValue ?? [:]
+            return RPCMessage(
+                id: .string("request-1"),
+                result: .object([:]),
+                includeJSONRPC: false
+            )
+        }
+
+        service.handleAutoApprovalReviewNotification([
+            "threadId": .string("thread-1"),
+            "turnId": .string("turn-1"),
+            "reviewId": .string("review-1"),
+            "startedAtMs": .integer(1_700_000_000_000),
+            "review": .object([
+                "status": .string("denied"),
+            ]),
+            "action": .object([
+                "type": .string("command"),
+                "source": .string("model"),
+                "command": .string("git status"),
+                "cwd": .string("/repo"),
+            ]),
+        ])
+
+        try await service.approveAutoApprovalRetry(threadId: "thread-1", reviewId: "review-1")
+
+        XCTAssertEqual(capturedMethod, "thread/approveGuardianDeniedAction")
+        XCTAssertEqual(capturedParams["threadId"], .string("thread-1"))
+        let event = capturedParams["event"]?.objectValue
+        XCTAssertEqual(event?["id"], .string("review-1"))
+        XCTAssertEqual(event?["status"], .string("denied"))
+        XCTAssertEqual(event?["action"]?.objectValue?["type"], .string("command"))
+        XCTAssertEqual(event?["action"]?.objectValue?["cwd"], .string("/repo"))
+        let review = service.messagesByThread["thread-1"]?.first?.autoApprovalReview
+        XCTAssertEqual(review?.retryApproved, true)
     }
 
     func testAutoApprovalReviewActionSummaryForPatchFiles() {

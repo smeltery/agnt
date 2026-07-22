@@ -57,6 +57,11 @@ enum CodexAutoApprovalReviewStatus: Codable, Hashable, Sendable {
 }
 
 struct CodexAutoApprovalReview: Codable, Hashable, Sendable {
+    static let liveSessionRetryUnavailableReason =
+        "Retry approvals are available only during the live session."
+    static let expiredRetryUnavailableReason =
+        "This retry is no longer available. Wait for the agent to request the action again."
+
     let reviewId: String
     let targetItemId: String?
     let turnId: String
@@ -103,10 +108,44 @@ struct CodexAutoApprovalReview: Codable, Hashable, Sendable {
             let summary = [server, tool].compactMap { $0 }.joined(separator: ".")
             return summary.isEmpty ? "Call MCP tool" : summary
         case "requestPermissions":
-            return object["reason"]?.stringValue ?? "Request additional permissions"
+            return object["reason"]?.stringValue ?? permissionSummary(object["permissions"])
         default:
             return "Requested action"
         }
+    }
+
+    var coreDeniedEvent: JSONValue? {
+        guard status == .denied,
+              let coreAction = coreActionValue(action) else {
+            return nil
+        }
+
+        var event: [String: JSONValue] = [
+            "id": .string(reviewId),
+            "turn_id": .string(turnId),
+            "started_at_ms": .integer(startedAtMs),
+            "status": .string(status.coreValue),
+            "action": coreAction,
+        ]
+        if let completedAtMs {
+            event["completed_at_ms"] = .integer(completedAtMs)
+        }
+        if let targetItemId {
+            event["target_item_id"] = .string(targetItemId)
+        }
+        if let riskLevel {
+            event["risk_level"] = .string(riskLevel)
+        }
+        if let userAuthorization {
+            event["user_authorization"] = .string(userAuthorization)
+        }
+        if let rationale {
+            event["rationale"] = .string(rationale)
+        }
+        if let decisionSource {
+            event["decision_source"] = .string(coreIdentifier(decisionSource))
+        }
+        return .object(event)
     }
 
     private func shellQuoted(_ value: String) -> String {
@@ -115,5 +154,223 @@ struct CodexAutoApprovalReview: Codable, Hashable, Sendable {
             return value
         }
         return "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+
+    private func permissionSummary(_ value: JSONValue?) -> String {
+        guard let permissions = value?.objectValue else {
+            return "Request additional permissions"
+        }
+        var requested: [String] = []
+        if permissions["network"] != nil, permissions["network"] != .null {
+            requested.append("network")
+        }
+        if permissions["fileSystem"] != nil, permissions["fileSystem"] != .null {
+            requested.append("file access")
+        }
+        return requested.isEmpty
+            ? "Request additional permissions"
+            : "Request \(requested.joined(separator: " and "))"
+    }
+
+    private func coreActionValue(_ value: JSONValue) -> JSONValue? {
+        guard let object = value.objectValue,
+              let type = object["type"]?.stringValue else {
+            return nil
+        }
+
+        switch type {
+        case "command":
+            guard let source = object["source"]?.stringValue,
+                  let command = object["command"]?.stringValue,
+                  let cwd = object["cwd"]?.stringValue else {
+                return nil
+            }
+            return .object([
+                "type": .string("command"),
+                "source": .string(coreIdentifier(source)),
+                "command": .string(command),
+                "cwd": .string(cwd),
+            ])
+        case "execve":
+            guard let source = object["source"]?.stringValue,
+                  let program = object["program"]?.stringValue,
+                  let argv = object["argv"]?.arrayValue,
+                  argv.allSatisfy({ $0.stringValue != nil }),
+                  let cwd = object["cwd"]?.stringValue else {
+                return nil
+            }
+            return .object([
+                "type": .string("execve"),
+                "source": .string(coreIdentifier(source)),
+                "program": .string(program),
+                "argv": .array(argv),
+                "cwd": .string(cwd),
+            ])
+        case "applyPatch":
+            guard let cwd = object["cwd"]?.stringValue,
+                  let files = object["files"]?.arrayValue,
+                  files.allSatisfy({ $0.stringValue != nil }) else {
+                return nil
+            }
+            return .object([
+                "type": .string("apply_patch"),
+                "cwd": .string(cwd),
+                "files": .array(files),
+            ])
+        case "networkAccess":
+            guard let target = object["target"]?.stringValue,
+                  let host = object["host"]?.stringValue,
+                  let protocolValue = object["protocol"]?.stringValue,
+                  let port = object["port"]?.intValue else {
+                return nil
+            }
+            return .object([
+                "type": .string("network_access"),
+                "target": .string(target),
+                "host": .string(host),
+                "protocol": .string(coreIdentifier(protocolValue)),
+                "port": .integer(port),
+            ])
+        case "mcpToolCall":
+            guard let server = object["server"]?.stringValue,
+                  let toolName = object["toolName"]?.stringValue else {
+                return nil
+            }
+            var result: [String: JSONValue] = [
+                "type": .string("mcp_tool_call"),
+                "server": .string(server),
+                "tool_name": .string(toolName),
+            ]
+            copyOptionalString(from: object, key: "connectorId", to: &result, as: "connector_id")
+            copyOptionalString(from: object, key: "connectorName", to: &result, as: "connector_name")
+            copyOptionalString(from: object, key: "toolTitle", to: &result, as: "tool_title")
+            return .object(result)
+        case "requestPermissions":
+            guard let permissions = corePermissionProfile(object["permissions"]) else {
+                return nil
+            }
+            var result: [String: JSONValue] = [
+                "type": .string("request_permissions"),
+                "permissions": permissions,
+            ]
+            copyOptionalString(from: object, key: "reason", to: &result, as: "reason")
+            return .object(result)
+        default:
+            return nil
+        }
+    }
+
+    private func corePermissionProfile(_ value: JSONValue?) -> JSONValue? {
+        guard let permissions = value?.objectValue else {
+            return nil
+        }
+        var result: [String: JSONValue] = [:]
+        if let network = permissions["network"] {
+            result["network"] = network
+        }
+        if let fileSystem = permissions["fileSystem"] {
+            guard let mappedFileSystem = coreFileSystemPermissions(fileSystem) else {
+                return nil
+            }
+            result["file_system"] = mappedFileSystem
+        }
+        return .object(result)
+    }
+
+    private func coreFileSystemPermissions(_ value: JSONValue) -> JSONValue? {
+        if value == .null {
+            return .null
+        }
+        guard let fileSystem = value.objectValue else {
+            return nil
+        }
+
+        let globDepth = fileSystem["globScanMaxDepth"]
+        if let entries = fileSystem["entries"], entries != .null {
+            guard entries.arrayValue != nil else { return nil }
+            var canonical: [String: JSONValue] = ["entries": entries]
+            if let globDepth, globDepth != .null {
+                canonical["glob_scan_max_depth"] = globDepth
+            }
+            return .object(canonical)
+        }
+
+        if let globDepth, globDepth != .null {
+            var entries: [JSONValue] = []
+            for (key, access) in [("read", "read"), ("write", "write")] {
+                guard let paths = fileSystem[key], paths != .null else { continue }
+                guard let pathValues = paths.arrayValue,
+                      pathValues.allSatisfy({ $0.stringValue != nil }) else {
+                    return nil
+                }
+                entries.append(contentsOf: pathValues.map { path in
+                    .object([
+                        "path": .object(["type": .string("path"), "path": path]),
+                        "access": .string(access),
+                    ])
+                })
+            }
+            return .object([
+                "entries": .array(entries),
+                "glob_scan_max_depth": globDepth,
+            ])
+        }
+
+        var legacy: [String: JSONValue] = [:]
+        for key in ["read", "write"] {
+            if let paths = fileSystem[key], paths != .null {
+                guard let pathValues = paths.arrayValue,
+                      pathValues.allSatisfy({ $0.stringValue != nil }) else {
+                    return nil
+                }
+                legacy[key] = paths
+            }
+        }
+        return .object(legacy)
+    }
+
+    private func copyOptionalString(
+        from source: [String: JSONValue],
+        key: String,
+        to destination: inout [String: JSONValue],
+        as destinationKey: String
+    ) {
+        guard let value = source[key] else { return }
+        if value == .null {
+            destination[destinationKey] = .null
+        } else if let string = value.stringValue {
+            destination[destinationKey] = .string(string)
+        }
+    }
+
+    private func coreIdentifier(_ value: String) -> String {
+        var result = ""
+        for character in value {
+            if character == "-" {
+                result.append("_")
+            } else {
+                result.append(character)
+            }
+        }
+        return result
+    }
+}
+
+private extension CodexAutoApprovalReviewStatus {
+    var coreValue: String {
+        switch self {
+        case .inProgress:
+            return "in_progress"
+        case .approved:
+            return "approved"
+        case .denied:
+            return "denied"
+        case .timedOut:
+            return "timed_out"
+        case .aborted:
+            return "aborted"
+        case .unknown(let value):
+            return value
+        }
     }
 }
