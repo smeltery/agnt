@@ -171,7 +171,7 @@ test("desktop IPC follower discovers running sidebar threads before open", async
   )));
 });
 
-test("desktop IPC follower settles background runs on completion and disconnect", async (t) => {
+test("desktop IPC follower settles background runs on completion but not disconnect", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-background-settle-");
   let serverSocket = null;
 
@@ -203,7 +203,6 @@ test("desktop IPC follower settles background runs on completion and disconnect"
     sendApplicationResponse(message) {
       outbound.push(JSON.parse(message));
     },
-    backgroundDisconnectGraceMs: 20,
     requestTimeoutMs: 500,
   });
   t.after(() => follower.stopAll());
@@ -243,11 +242,12 @@ test("desktop IPC follower settles background runs on completion and disconnect"
       && message.params?.threadId === "thread-background-disconnect"
   )));
   serverSocket.destroy();
-  await waitFor(() => outbound.some((message) => (
+  await wait(50);
+  assert.equal(outbound.some((message) => (
     message.method === "turn/completed"
       && message.params?.threadId === "thread-background-disconnect"
       && message.params?.status === "interrupted"
-  )), 1_000);
+  )), false);
 });
 
 test("desktop IPC follower settles a running background thread before archive", async (t) => {

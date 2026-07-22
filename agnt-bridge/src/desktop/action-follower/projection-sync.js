@@ -63,9 +63,16 @@ function createProjectionSync({
       && !canonicalHistoryReplacementSentThreadIds.has(threadId)) {
       canonicalHistoryReplacementSentThreadIds.add(threadId);
       conversationProjector.remove(threadId);
-      conversationProjector.seed(threadId, liveState);
+      const bootstrapOutput = conversationProjector.project(threadId, liveState, {
+        includeAllActiveTurns: true,
+      });
       sendApplicationResponse(JSON.stringify(desktopThreadReplacedNotification(threadId)));
       syncCanonicalSnapshotLifecycle(threadId, liveState);
+      for (const notification of bootstrapOutput.notifications || []) {
+        if (String(notification?.method || "").startsWith("item/")) {
+          sendApplicationResponse(JSON.stringify(notification));
+        }
+      }
       return;
     }
 

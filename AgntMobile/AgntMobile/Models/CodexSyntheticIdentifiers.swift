@@ -42,6 +42,10 @@ nonisolated enum CodexSyntheticIdentifiers {
         turnId.hasPrefix("ipc-turn-")
     }
 
+    static func provisionalIDLessTurnID() -> String {
+        "agnt-idless-turn-\(UUID().uuidString)"
+    }
+
     static func isProjectedDesktopUserItemID(_ itemId: String) -> Bool {
         itemId.hasSuffix(":input")
     }

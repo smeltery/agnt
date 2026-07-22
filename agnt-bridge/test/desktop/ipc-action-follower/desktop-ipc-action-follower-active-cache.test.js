@@ -181,14 +181,27 @@ test("desktop IPC follower stops serving stale active-turn caches to phone reads
   assert.equal(freshServed, true);
   assert.equal(outbound.some((message) => message.id === "read-fresh"), true);
 
-  // Desktop went silent while the cache still claims an active turn: the cache
-  // is stale evidence, so the read must fall through to the local app-server
-  // instead of pinning a phantom running indicator on the phone. The same
-  // staleness must unmute the rollout fallback mirror (hasFreshLiveThreadState
-  // false while hasLiveThreadState stays true) so the reopened thread recovers.
+  // Desktop can be quiet during long-running tools, approvals, and subagents.
+  // While the IPC publisher itself is still responsive, cached active reads stay
+  // authoritative so the phone does not clear Stop from a real running turn.
   fakeNow += 21_000;
   assert.equal(follower.hasLiveThreadState("thread-stale-active"), true);
   assert.equal(follower.hasFreshLiveThreadState("thread-stale-active"), false);
+  const quietServed = follower.observeInbound(JSON.stringify({
+    id: "read-quiet-connected",
+    method: "thread/read",
+    params: { threadId: "thread-stale-active" },
+  }));
+  assert.equal(quietServed, true);
+  assert.equal(outbound.some((message) => message.id === "read-quiet-connected"), true);
+
+  // Once the IPC publisher has not produced frames for its generous activity
+  // lease, the same active cache is stale evidence and reads fall through to
+  // local recovery instead of pinning a phantom running indicator on the phone.
+  // The same staleness must unmute the rollout fallback mirror
+  // (hasFreshLiveThreadState false while hasLiveThreadState stays true) so the
+  // reopened thread recovers.
+  fakeNow += 5 * 60_000;
   const staleServed = follower.observeInbound(JSON.stringify({
     id: "read-stale",
     method: "thread/read",

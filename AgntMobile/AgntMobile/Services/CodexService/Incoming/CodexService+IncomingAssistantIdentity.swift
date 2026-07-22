@@ -53,23 +53,44 @@ extension CodexService {
         paramsObject: IncomingParamsObject,
         eventObject: IncomingParamsObject?,
         itemObject: IncomingParamsObject? = nil,
+        allowsActiveTurnFallback: Bool = false,
         requiresTurnId: Bool = false
     ) -> AssistantEventContext? {
-        let identity = extractAssistantEventIdentity(
+        let extractedIdentity = extractAssistantEventIdentity(
             paramsObject: paramsObject,
             eventObject: eventObject,
             itemObject: itemObject
         )
 
-        if requiresTurnId, identity.turnId == nil {
+        guard let threadId = resolveThreadID(from: paramsObject, turnIdHint: extractedIdentity.turnId) else {
             return nil
         }
 
-        guard let threadId = resolveThreadID(from: paramsObject, turnIdHint: identity.turnId) else {
+        let resolvedTurnId: String?
+        if let explicitTurnId = extractedIdentity.turnId {
+            resolvedTurnId = explicitTurnId
+        } else if let itemId = extractedIdentity.itemId,
+                  let knownTurnId = knownAssistantTurnId(threadId: threadId, itemId: itemId) {
+            resolvedTurnId = knownTurnId
+        } else if allowsActiveTurnFallback,
+                  threadHasActiveOrRunningTurn(threadId) {
+            resolvedTurnId = activeTurnID(for: threadId)
+                ?? provisionalIDLessTurnIDByThread[threadId]
+        } else {
+            resolvedTurnId = nil
+        }
+
+        if requiresTurnId, resolvedTurnId == nil {
             return nil
         }
 
-        if let turnId = identity.turnId {
+        let identity = AssistantEventIdentity(
+            turnId: resolvedTurnId,
+            itemId: extractedIdentity.itemId,
+            phase: extractedIdentity.phase
+        )
+
+        if let turnId = resolvedTurnId {
             threadIdByTurnID[turnId] = threadId
         }
 

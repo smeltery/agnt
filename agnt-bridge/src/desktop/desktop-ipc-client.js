@@ -27,6 +27,7 @@ function createDesktopIpcClient({
   let socket = null;
   let clientId = "";
   let isConnecting = false;
+  let lastActivityAt = 0;
   let readBuffer = Buffer.alloc(0);
   const pendingRequests = new Map();
   const pendingDiscoveries = new Map();
@@ -138,6 +139,9 @@ function createDesktopIpcClient({
   }
 
   function handleData(chunk) {
+    if (chunk.length > 0) {
+      lastActivityAt = now();
+    }
     readBuffer = Buffer.concat([readBuffer, chunk]);
     while (readBuffer.length >= FRAME_HEADER_BYTES) {
       const frameLength = readBuffer.readUInt32LE(0);
@@ -213,6 +217,7 @@ function createDesktopIpcClient({
     socket = null;
     clientId = "";
     isConnecting = false;
+    lastActivityAt = 0;
     readBuffer = Buffer.alloc(0);
     for (const waiter of pendingRequests.values()) {
       clearTimeout(waiter.timeout);
@@ -248,6 +253,14 @@ function createDesktopIpcClient({
 
   return {
     ensureConnected,
+    isConnected() {
+      return Boolean(socket && !socket.destroyed && clientId);
+    },
+    hasRecentActivity(maxAgeMs) {
+      return Boolean(socket && !socket.destroyed && clientId)
+        && lastActivityAt > 0
+        && now() - lastActivityAt <= Math.max(0, Number(maxAgeMs) || 0);
+    },
     sendRequest,
     sendDiscoveryRequest,
     close,

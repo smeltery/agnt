@@ -37,6 +37,9 @@ final class CodexService {
     var runningThreadIDs: Set<String> = []
     // Protects active runs that are real but have not yielded a stable turnId yet.
     var protectedRunningFallbackThreadIDs: Set<String> = []
+    var provisionalIDLessTurnIDByThread: [String: String] = [:]
+    var displacedActiveTurnIDsByThread: [String: Set<String>] = [:]
+    var supersededTurnIDsByIDLessRunByThread: [String: Set<String>] = [:]
     var readyThreadIDs: Set<String> = []
     var failedThreadIDs: Set<String> = []
     // Threads that started a real run and haven't completed yet; survives sync-poll clearing.

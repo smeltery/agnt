@@ -107,12 +107,26 @@ extension CodexService {
 
     // Marks streaming assistant state complete once turn/completed arrives.
     func markTurnCompleted(threadId: String, turnId: String?) {
-        let resolvedTurnId = turnId ?? activeTurnIdByThread[threadId]
+        let resolvedTurnId = turnId
+            ?? activeTurnIdByThread[threadId]
+            ?? provisionalIDLessTurnIDByThread[threadId]
+        promoteDisplacedActiveTurnIfNeeded(
+            threadId: threadId,
+            completedTurnId: resolvedTurnId
+        )
+        let currentActiveTurnId = activeTurnIdByThread[threadId]
         flushPendingAssistantDeltas(for: threadId, turnId: resolvedTurnId)
         flushPendingSystemDeltasForTurn(threadId: threadId, turnId: resolvedTurnId)
 
-        clearRunningState(for: threadId)
-        clearRunningThreadWatch(threadId)
+        let completesCurrentThreadRun = turnCompletionMatchesCurrentThreadRun(
+            threadId: threadId,
+            completedTurnId: resolvedTurnId,
+            currentActiveTurnId: currentActiveTurnId
+        )
+        if completesCurrentThreadRun {
+            clearRunningState(for: threadId)
+            clearRunningThreadWatch(threadId)
+        }
         let shouldFinalizePlanSteps: Bool = {
             if let resolvedTurnId {
                 return turnTerminalState(for: resolvedTurnId, threadId: threadId) == .completed
@@ -125,14 +139,15 @@ extension CodexService {
         }
 
         if let resolvedTurnId,
-           activeTurnIdByThread[threadId] == resolvedTurnId {
+            activeTurnIdByThread[threadId] == resolvedTurnId {
             setActiveTurnID(nil, for: threadId)
-        } else if resolvedTurnId == nil {
+        } else if resolvedTurnId == nil, completesCurrentThreadRun {
             setActiveTurnID(nil, for: threadId)
         }
 
         if let resolvedTurnId,
-           activeTurnId == resolvedTurnId {
+           activeTurnId == resolvedTurnId,
+           completesCurrentThreadRun {
             activeTurnId = nil
         }
 

@@ -70,9 +70,9 @@ function createThreadStateManager({
     baselineRecoveryStateByThreadId.clear();
     queuedChangesByThreadId.clear();
     heldFollowerRequests.clearConnectionProbeState();
-    for (const threadId of announcedBackgroundTurnsByThreadId.keys()) {
-      scheduleBackgroundDisconnectSettlement(threadId);
-    }
+    // A lost IPC connection is not evidence that Desktop stopped the turn.
+    // Keep announced lifecycle state until a reconnect snapshot, archive, or
+    // another authoritative state transition supplies a real terminal status.
   }
 
   function stopAll() {

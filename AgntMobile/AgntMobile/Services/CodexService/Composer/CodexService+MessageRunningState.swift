@@ -40,6 +40,104 @@ extension CodexService {
         refreshThreadTimelineState(for: threadId)
     }
 
+    func provisionalIDLessTurnID(for threadId: String, startsNewRun: Bool) -> String {
+        if !startsNewRun, let existing = provisionalIDLessTurnIDByThread[threadId] {
+            return existing
+        }
+        let provisionalTurnID = CodexSyntheticIdentifiers.provisionalIDLessTurnID()
+        provisionalIDLessTurnIDByThread[threadId] = provisionalTurnID
+        threadIdByTurnID[provisionalTurnID] = threadId
+        return provisionalTurnID
+    }
+
+    func promoteProvisionalIDLessTurnIfNeeded(threadId: String, canonicalTurnID: String) {
+        guard let provisionalTurnID = provisionalIDLessTurnIDByThread.removeValue(forKey: threadId),
+              provisionalTurnID != canonicalTurnID else {
+            return
+        }
+
+        flushPendingAssistantDeltas(for: threadId, turnId: provisionalTurnID)
+        flushPendingSystemDeltasForTurn(threadId: threadId, turnId: provisionalTurnID)
+
+        if var threadMessages = messagesByThread[threadId] {
+            var didMutate = false
+            for index in threadMessages.indices where threadMessages[index].turnId == provisionalTurnID {
+                threadMessages[index].turnId = canonicalTurnID
+                didMutate = true
+            }
+            if didMutate {
+                messagesByThread[threadId] = threadMessages
+                persistMessages()
+                updateCurrentOutput(for: threadId)
+            }
+        }
+
+        let provisionalTurnKey = streamingMessageKey(threadId: threadId, turnId: provisionalTurnID)
+        let canonicalTurnKey = streamingMessageKey(threadId: threadId, turnId: canonicalTurnID)
+        if let messageID = streamingAssistantFallbackMessageByTurnID.removeValue(forKey: provisionalTurnKey) {
+            streamingAssistantFallbackMessageByTurnID[canonicalTurnKey] = messageID
+        }
+        let provisionalItemPrefix = "\(provisionalTurnKey)|item:"
+        let provisionalItemKeys = streamingAssistantMessageByItemKey.keys.filter {
+            $0.hasPrefix(provisionalItemPrefix)
+        }
+        for provisionalKey in provisionalItemKeys {
+            guard let messageID = streamingAssistantMessageByItemKey.removeValue(forKey: provisionalKey) else {
+                continue
+            }
+            let itemSuffix = provisionalKey.dropFirst(provisionalTurnKey.count)
+            streamingAssistantMessageByItemKey[canonicalTurnKey + itemSuffix] = messageID
+        }
+        threadIdByTurnID.removeValue(forKey: provisionalTurnID)
+        threadIdByTurnID[canonicalTurnID] = threadId
+    }
+
+    @discardableResult
+    func promoteDisplacedActiveTurnIfNeeded(threadId: String, completedTurnId: String?) -> Bool {
+        guard let completedTurnId else {
+            return false
+        }
+
+        displacedActiveTurnIDsByThread[threadId]?.remove(completedTurnId)
+        guard activeTurnIdByThread[threadId] == completedTurnId,
+              let promotedTurnId = displacedActiveTurnIDsByThread[threadId]?.popFirst() else {
+            if displacedActiveTurnIDsByThread[threadId]?.isEmpty == true {
+                displacedActiveTurnIDsByThread.removeValue(forKey: threadId)
+            }
+            return false
+        }
+
+        if displacedActiveTurnIDsByThread[threadId]?.isEmpty == true {
+            displacedActiveTurnIDsByThread.removeValue(forKey: threadId)
+        }
+        setActiveTurnID(promotedTurnId, for: threadId)
+        threadIdByTurnID[promotedTurnId] = threadId
+        markThreadAsRunning(threadId)
+        setProtectedRunningFallback(false, for: threadId)
+        if activeTurnId == completedTurnId {
+            activeTurnId = promotedTurnId
+        }
+        return true
+    }
+
+    func turnCompletionMatchesCurrentThreadRun(
+        threadId: String,
+        completedTurnId: String?,
+        currentActiveTurnId: String?
+    ) -> Bool {
+        guard let completedTurnId else {
+            return true
+        }
+        if let currentActiveTurnId {
+            return completedTurnId == currentActiveTurnId
+        }
+        if supersededTurnIDsByIDLessRunByThread[threadId]?.contains(completedTurnId) == true,
+           protectedRunningFallbackThreadIDs.contains(threadId) {
+            return false
+        }
+        return true
+    }
+
     // Marks a rollout-mirrored run for extra thread/resume catch-up until a real
     // assistant delta arrives or the turn completes.
     func markMirroredRunningCatchupNeeded(for threadId: String) {
@@ -57,6 +155,9 @@ extension CodexService {
     func clearRunningState(for threadId: String) {
         runningThreadIDs.remove(threadId)
         protectedRunningFallbackThreadIDs.remove(threadId)
+        displacedActiveTurnIDsByThread.removeValue(forKey: threadId)
+        supersededTurnIDsByIDLessRunByThread.removeValue(forKey: threadId)
+        provisionalIDLessTurnIDByThread.removeValue(forKey: threadId)
         clearMirroredRunningCatchupNeeded(for: threadId)
         refreshBusyRepoRootsAndDependentTimelineStates()
         refreshThreadTimelineState(for: threadId)
@@ -67,6 +168,9 @@ extension CodexService {
     func clearAllRunningState() {
         runningThreadIDs.removeAll()
         protectedRunningFallbackThreadIDs.removeAll()
+        displacedActiveTurnIDsByThread.removeAll()
+        supersededTurnIDsByIDLessRunByThread.removeAll()
+        provisionalIDLessTurnIDByThread.removeAll()
         mirroredRunningCatchupThreadIDs.removeAll()
         lastMirroredRunningCatchupAtByThread.removeAll()
         refreshBusyRepoRootsAndDependentTimelineStates()

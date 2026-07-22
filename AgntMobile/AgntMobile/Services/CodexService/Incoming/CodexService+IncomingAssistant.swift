@@ -28,15 +28,10 @@ extension CodexService {
             eventObject: eventObject
         ) else { return }
 
-        if let directThreadId = extractThreadID(from: paramsObject),
-           !directThreadId.isEmpty,
-           !isApplyingReplayedBridgeEvent {
-            markThreadAsRunning(directThreadId)
-        }
-
         guard let context = resolveAssistantEventContext(
             paramsObject: paramsObject,
             eventObject: eventObject,
+            allowsActiveTurnFallback: true,
             requiresTurnId: true
         ),
         let turnId = context.identity.turnId else {
@@ -248,12 +243,19 @@ extension CodexService {
         guard let paramsObject else { return }
         let eventObject = envelopeEventObject(from: paramsObject)
 
-        if let directThreadId = extractThreadID(from: paramsObject), !directThreadId.isEmpty {
-            markThreadAsRunning(directThreadId)
-        }
-
         guard let itemObject = extractIncomingItemObject(from: paramsObject, eventObject: eventObject) else {
             return
+        }
+
+        let lifecycleTurnID = extractTurnID(from: paramsObject)
+        let lifecycleThreadID = resolveThreadID(from: paramsObject, turnIdHint: lifecycleTurnID)
+        if lifecycleTurnID == nil,
+           let lifecycleThreadID,
+           !threadHasActiveOrRunningTurn(lifecycleThreadID) {
+            return
+        }
+        if let lifecycleThreadID {
+            markThreadAsRunning(lifecycleThreadID)
         }
 
         let itemType = normalizedItemType(itemObject["type"]?.stringValue ?? "")
@@ -279,6 +281,7 @@ extension CodexService {
                 paramsObject: paramsObject,
                 eventObject: eventObject,
                 itemObject: itemObject,
+                allowsActiveTurnFallback: true,
                 requiresTurnId: true
             ),
             let turnId = context.identity.turnId else {
@@ -304,6 +307,7 @@ extension CodexService {
             paramsObject: paramsObject,
             eventObject: eventObject,
             itemObject: itemObject,
+            allowsActiveTurnFallback: true,
             requiresTurnId: true
         ),
         let turnId = context.identity.turnId else {

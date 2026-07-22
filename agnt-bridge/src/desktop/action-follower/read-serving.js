@@ -25,6 +25,7 @@ function createDesktopReadServer({
   staleActiveReadMaxAgeMs,
   staleYieldedThreadIds,
   stateReadMethods,
+  hasResponsiveDesktopIpc = () => false,
 }) {
   function tryServeDesktopOwnedRead(message) {
     const method = readString(message?.method);
@@ -60,6 +61,7 @@ function createDesktopReadServer({
     const thread = projectDesktopConversationStateToThread(threadId, rawState, { now });
     if (hasActiveProjectedTurn(thread)
       && isRawStateStaleForActiveRead(threadId)
+      && !hasResponsiveDesktopIpc()
       && !ownsDesktopCursor) {
       staleYieldedThreadIds.add(threadId);
       return false;

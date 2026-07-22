@@ -57,6 +57,7 @@ const DESKTOP_STATE_READ_METHODS = new Set([
 ]);
 const DESKTOP_BACKGROUND_DISCOVERY_METHODS = new Set(["thread/list"]);
 const STALE_ACTIVE_READ_MAX_AGE_MS = 20_000;
+const CONNECTED_IPC_ACTIVITY_LEASE_MS = 5 * 60_000;
 const DESKTOP_FOLLOWER_REQUEST_METHODS = new Set([
   "turn/start",
   "turn/steer",
@@ -186,6 +187,9 @@ function createDesktopIpcActionFollower({
     staleActiveReadMaxAgeMs: STALE_ACTIVE_READ_MAX_AGE_MS,
     staleYieldedThreadIds,
     stateReadMethods: DESKTOP_STATE_READ_METHODS,
+    hasResponsiveDesktopIpc() {
+      return ipc.hasRecentActivity(CONNECTED_IPC_ACTIVITY_LEASE_MS);
+    },
   });
   const baselineRecovery = createBaselineRecovery({
     backgroundOnlyThreadIds,
