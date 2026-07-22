@@ -19,7 +19,7 @@ extension GhosttyTerminalView {
     }
 
     func clearAppSelection() {
-        selectionEditMenuInteraction.dismissMenu()
+        selectionEditMenuInteraction?.dismissMenu()
         isSelectingText = false
         selectionAnchorCell = nil
         selectionFocusCell = nil

@@ -82,7 +82,8 @@ final class GhosttyTerminalView: UIView, UITextFieldDelegate, UIGestureRecognize
     let focusTapGesture = UITapGestureRecognizer()
     let scrollPanGesture = UIPanGestureRecognizer()
     let selectionLongPressGesture = UILongPressGestureRecognizer()
-    lazy var selectionEditMenuInteraction = UIEditMenuInteraction(delegate: self)
+    // Created during view hierarchy setup so teardown paths never instantiate UIKit interactions.
+    var selectionEditMenuInteraction: UIEditMenuInteraction?
     var lastViewportSize: CGSize = .zero
     var lastContentScale: CGFloat = 0
     var lastReportedGrid: (cols: Int, rows: Int)?

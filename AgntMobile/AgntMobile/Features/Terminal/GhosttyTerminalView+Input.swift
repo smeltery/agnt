@@ -178,7 +178,7 @@ extension GhosttyTerminalView {
         selectionMenuTargetRect = selectionOverlay.menuTargetRect() ?? terminalViewport.bounds
         let sourcePoint = CGPoint(x: selectionMenuTargetRect?.midX ?? 0, y: selectionMenuTargetRect?.minY ?? 0)
         let configuration = UIEditMenuConfiguration(identifier: nil, sourcePoint: sourcePoint)
-        selectionEditMenuInteraction.presentEditMenu(with: configuration)
+        selectionEditMenuInteraction?.presentEditMenu(with: configuration)
     }
 
     // Copy uses the captured menu text so live terminal output cannot change
@@ -221,7 +221,7 @@ extension GhosttyTerminalView {
             guard let metrics = currentSelectionMetrics() else { return }
             let startCell = handle == .start ? currentRange.start : currentRange.end
             let startLocation = handleBoundaryPoint(for: startCell, handle: handle, metrics: metrics)
-            selectionEditMenuInteraction.dismissMenu()
+            selectionEditMenuInteraction?.dismissMenu()
             handleDragOppositeCell = handle == .start ? currentRange.end : currentRange.start
             handleDragStartCell = startCell
             handleDragStartLocation = startLocation

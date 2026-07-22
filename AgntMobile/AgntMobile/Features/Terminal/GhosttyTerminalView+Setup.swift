@@ -62,7 +62,9 @@ extension GhosttyTerminalView {
         selectionLongPressGesture.cancelsTouchesInView = false
         selectionLongPressGesture.delegate = self
         terminalViewport.addGestureRecognizer(selectionLongPressGesture)
-        terminalViewport.addInteraction(selectionEditMenuInteraction)
+        let editMenuInteraction = UIEditMenuInteraction(delegate: self)
+        terminalViewport.addInteraction(editMenuInteraction)
+        selectionEditMenuInteraction = editMenuInteraction
 
         addSubview(terminalViewport)
         addSubview(selectionOverlay)
