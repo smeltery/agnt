@@ -33,6 +33,28 @@ enum CodexAccessMode: String, Codable, CaseIterable, Hashable, Sendable {
         }
     }
 
+    var pickerTitle: String {
+        switch self {
+        case .onRequest:
+            return "Ask Each Time"
+        case .autoReview:
+            return "Approve for Me"
+        case .fullAccess:
+            return "Full Access"
+        }
+    }
+
+    var pickerSubtitle: String {
+        switch self {
+        case .onRequest:
+            return "Prompt before commands and file changes."
+        case .autoReview:
+            return "Let the local reviewer approve low-risk actions."
+        case .fullAccess:
+            return "Run without approval prompts."
+        }
+    }
+
     // Tries modern approval-policy enums first, then the bridge's kebab-case sandbox enum fallback.
     var approvalPolicyCandidates: [String] {
         switch self {

@@ -52,7 +52,6 @@ struct ComposerBottomBar: View {
     private var metaSymbolFont: Font { AppFont.system(size: 11, weight: .regular) }
     private let metaVerticalPadding: CGFloat = 6
     private let plusTapTargetSide: CGFloat = 22
-    private let inlineAccessControlSize: CGFloat = 32
 
     private var showsStopButton: Bool {
         isThreadRunning && !showsSendButton
@@ -82,7 +81,11 @@ struct ComposerBottomBar: View {
                 onTapAddImage: onTapAddImage,
                 onTapTakePhoto: onTapTakePhoto
             )
-            inlineAccessMenuLabel
+            ComposerAccessModeControl(
+                selectedAccessMode: selectedAccessMode,
+                isInteractionLocked: isComposerInteractionLocked,
+                onSelect: onSelectAccessMode
+            )
             inlineStatusControl
 
             ComposerRuntimeMenuControl(
@@ -171,32 +174,6 @@ struct ComposerBottomBar: View {
     }
 
     // MARK: - Menus
-
-    private var inlineAccessMenuLabel: some View {
-        Menu {
-            ForEach(CodexAccessMode.allCases, id: \.rawValue) { mode in
-                Button {
-                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                    onSelectAccessMode(mode)
-                } label: {
-                    if selectedAccessMode == mode {
-                        Label(mode.menuTitle, systemImage: "checkmark")
-                    } else {
-                        Text(mode.menuTitle)
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: selectedAccessMode == .fullAccess ? "hand.thumbsup" : "hand.raised")
-                .font(AppFont.system(size: 14, weight: .regular))
-                .foregroundStyle(selectedAccessMode == .fullAccess ? .orange : metaLabelColor)
-                .frame(width: inlineAccessControlSize, height: inlineAccessControlSize)
-                .contentShape(Circle())
-        }
-        .menuIndicator(.hidden)
-        .tint(metaLabelColor)
-        .disabled(isComposerInteractionLocked)
-    }
 
     private var inlineStatusControl: some View {
         ContextWindowProgressRing(
