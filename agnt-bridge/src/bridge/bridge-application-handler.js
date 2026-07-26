@@ -12,6 +12,9 @@ const {
   maybeBuildJsonlThreadTurnsListFallback,
   buildEmptyTurnsListResponse,
 } = require("./turns-list-pager");
+const {
+  annotateTurnStateProbeWithMirrorActiveTurn,
+} = require("./turn-state-probe");
 
 function createBridgeApplicationHandler({
   activeProvider,
@@ -62,8 +65,13 @@ function createBridgeApplicationHandler({
             usesJsonl: true,
           }),
         });
+        const response = annotateTurnStateProbeWithMirrorActiveTurn(
+          request,
+          selection.response,
+          (threadId) => rolloutLiveMirror?.getActiveTurnId(threadId) || null
+        );
         forwardedRequestTracker.markSanitizedResponse(request.id, "thread/turns/list");
-        sendApplicationResponse(JSON.stringify(selection.response));
+        sendApplicationResponse(JSON.stringify(response));
       } catch (error) {
         sendApplicationResponse(createJsonRpcErrorResponse(
           request.id,

@@ -121,6 +121,19 @@ function genericToolActivityMessage(toolName) {
   }
 }
 
+function genericToolCompletionMessage(toolName) {
+  switch (readString(toolName).toLowerCase()) {
+  case "apply_patch":
+    return "Applied patch";
+  case "write_stdin":
+    return "Wrote to terminal";
+  case "read_thread_terminal":
+    return "Read terminal output";
+  default:
+    return `Completed ${readString(toolName)}`;
+  }
+}
+
 function createNotification(method, params) {
   return { method, params };
 }
@@ -247,6 +260,7 @@ module.exports = {
   firstNonEmptyString,
   generatedImagePathForRolloutItem,
   genericToolActivityMessage,
+  genericToolCompletionMessage,
   isCommandToolName,
   isDesktopRolloutOrigin,
   isInternalProgressPlanToolName,

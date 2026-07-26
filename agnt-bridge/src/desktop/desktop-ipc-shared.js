@@ -62,8 +62,10 @@ const LEGACY_CONTEXT_WARNING_PREFIXES = [
 const LEGACY_APPLY_PATCH_WARNING_PREFIX = "Warning: apply_patch was requested via ";
 const LEGACY_APPLY_PATCH_WARNING_SUFFIX = "Use the apply_patch tool instead of exec_command.";
 const AGENTS_INSTRUCTIONS_PREFIX = "# AGENTS.md instructions";
-const INTERNAL_CONTEXT_PATTERN = /^<codex_internal_context\s+source=(?:"[a-z][a-z0-9_]*"|'[a-z][a-z0-9_]*')>[\s\S]*<\/codex_internal_context>$/;
-const EXTERNAL_CONTEXT_PATTERN = /^<external_([a-z0-9_-]+)>[\s\S]*<\/external_\1>$/;
+const AGENTS_INSTRUCTIONS_BEGIN = "<instructions>";
+const AGENTS_INSTRUCTIONS_END = "</instructions>";
+const INTERNAL_CONTEXT_PREFIX_PATTERN = /^<codex_internal_context\s+source=(?:"[a-z][a-z0-9_]*"|'[a-z][a-z0-9_]*')>[\s\S]*?<\/codex_internal_context>/;
+const EXTERNAL_CONTEXT_PREFIX_PATTERN = /^<external_([a-z0-9_-]+)>[\s\S]*?<\/external_\1>/;
 const PROMPT_REQUEST_BEGIN = "## My request for Codex:";
 const REVIEW_PROMPT_PREFIX = "## Code review guidelines:";
 
@@ -90,38 +92,91 @@ function stripImagePlaceholders(text) {
   return IMAGE_PLACEHOLDER_TOKEN.test(withoutPairs.trim()) ? "" : withoutPairs;
 }
 
+function isReviewEnvelopeText(trimmed) {
+  return trimmed.startsWith(REVIEW_PROMPT_PREFIX) && trimmed.includes(PROMPT_REQUEST_BEGIN);
+}
+
+function consumeLeadingContextFragment(text) {
+  const lower = text.toLowerCase();
+
+  for (const [start, end] of CONTEXT_MARKER_PAIRS) {
+    if (!lower.startsWith(start)) {
+      continue;
+    }
+    const closeIndex = lower.indexOf(end, start.length);
+    return closeIndex === -1 ? null : text.slice(closeIndex + end.length);
+  }
+
+  const internal = INTERNAL_CONTEXT_PREFIX_PATTERN.exec(text);
+  if (internal) {
+    return text.slice(internal[0].length);
+  }
+  const external = EXTERNAL_CONTEXT_PREFIX_PATTERN.exec(text);
+  if (external) {
+    return text.slice(external[0].length);
+  }
+
+  if (lower.startsWith(AGENTS_INSTRUCTIONS_PREFIX.toLowerCase())) {
+    return consumeAgentsInstructionsFragment(text, lower);
+  }
+
+  if (LEGACY_CONTEXT_WARNING_PREFIXES.some((prefix) => text.startsWith(prefix))) {
+    return "";
+  }
+  return text.startsWith(LEGACY_APPLY_PATCH_WARNING_PREFIX)
+    && text.endsWith(LEGACY_APPLY_PATCH_WARNING_SUFFIX)
+    ? ""
+    : null;
+}
+
+function consumeAgentsInstructionsFragment(text, lower) {
+  const closeIndex = lower.indexOf(AGENTS_INSTRUCTIONS_END);
+  if (closeIndex >= 0) {
+    return consumeChainedInstructionsBlocks(text.slice(closeIndex + AGENTS_INSTRUCTIONS_END.length));
+  }
+
+  const nextMarkerIndex = CONTEXT_MARKER_PAIRS
+    .map(([start]) => lower.indexOf(start, 1))
+    .filter((index) => index > 0)
+    .sort((left, right) => left - right)[0];
+  return nextMarkerIndex === undefined ? null : text.slice(nextMarkerIndex);
+}
+
+function consumeChainedInstructionsBlocks(text) {
+  let rest = text;
+  for (;;) {
+    const trimmed = rest.trimStart();
+    const lower = trimmed.toLowerCase();
+    if (!lower.startsWith(AGENTS_INSTRUCTIONS_BEGIN)) {
+      return rest;
+    }
+    const closeIndex = lower.indexOf(AGENTS_INSTRUCTIONS_END, AGENTS_INSTRUCTIONS_BEGIN.length);
+    if (closeIndex === -1) {
+      return rest;
+    }
+    rest = trimmed.slice(closeIndex + AGENTS_INSTRUCTIONS_END.length);
+  }
+}
+
+function stripLeadingContextFragments(trimmed) {
+  let rest = trimmed;
+  while (rest) {
+    const remainder = consumeLeadingContextFragment(rest);
+    if (remainder === null) {
+      break;
+    }
+    rest = remainder.trim();
+  }
+  return rest;
+}
+
 function isContextualUserText(text) {
   const raw = typeof text === "string" ? text : "";
   const trimmed = stripImagePlaceholders(raw).trim();
-  if (!trimmed) {
+  if (!trimmed || isReviewEnvelopeText(trimmed)) {
     return false;
   }
-  // Review envelopes contain a real request after the delimiter and are never
-  // wholly contextual, even when that request itself contains reserved markup.
-  if (trimmed.startsWith(REVIEW_PROMPT_PREFIX) && trimmed.includes(PROMPT_REQUEST_BEGIN)) {
-    return false;
-  }
-  const normalized = trimmed.toLowerCase();
-  if (normalized.startsWith(AGENTS_INSTRUCTIONS_PREFIX.toLowerCase())) {
-    // Runtime context can concatenate AGENTS.md with any registered hidden
-    // fragment. Only classify the whole item as hidden when its final fragment
-    // is also runtime-owned; a following real user request must stay visible.
-    return normalized.endsWith("</instructions>")
-      || CONTEXT_MARKER_PAIRS.some(([, end]) => normalized.endsWith(end));
-  }
-  if (CONTEXT_MARKER_PAIRS.some(([start, end]) => (
-    normalized.startsWith(start) && normalized.endsWith(end)
-  ))) {
-    return true;
-  }
-  if (INTERNAL_CONTEXT_PATTERN.test(trimmed) || EXTERNAL_CONTEXT_PATTERN.test(trimmed)) {
-    return true;
-  }
-  if (LEGACY_CONTEXT_WARNING_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) {
-    return true;
-  }
-  return trimmed.startsWith(LEGACY_APPLY_PATCH_WARNING_PREFIX)
-    && trimmed.endsWith(LEGACY_APPLY_PATCH_WARNING_SUFFIX);
+  return stripLeadingContextFragments(trimmed) === "";
 }
 
 function decodeXmlText(text) {
@@ -172,20 +227,31 @@ function visibleUserPromptText(text) {
     return "";
   }
   const cleaned = stripImagePlaceholders(text);
-  // Context bodies can contain the request delimiter as ordinary text. Classify
-  // the complete fragment first so the delimiter cannot reveal hidden content.
-  if (isContextualUserText(cleaned)) {
+  const trimmed = cleaned.trim();
+  if (!trimmed) {
     return "";
   }
-  const requestIndex = cleaned.lastIndexOf(PROMPT_REQUEST_BEGIN);
-  if (requestIndex >= 0) {
-    return cleaned.slice(requestIndex + PROMPT_REQUEST_BEGIN.length).trim();
+  const stripped = isReviewEnvelopeText(trimmed)
+    ? trimmed
+    : stripLeadingContextFragments(trimmed);
+  if (!stripped) {
+    return "";
   }
-  const envelopeText = extractVisibleRuntimeEnvelope(cleaned);
+  const body = stripped === trimmed ? cleaned : stripped;
+  const requestIndex = body.lastIndexOf(PROMPT_REQUEST_BEGIN);
+  if (requestIndex >= 0) {
+    const request = body.slice(requestIndex + PROMPT_REQUEST_BEGIN.length).trim();
+    if (request) {
+      return request;
+    }
+    const precedingBody = body.slice(0, requestIndex).trimEnd();
+    return isContextualUserText(precedingBody) ? "" : precedingBody;
+  }
+  const envelopeText = extractVisibleRuntimeEnvelope(body);
   if (envelopeText != null) {
     return envelopeText;
   }
-  return cleaned;
+  return body;
 }
 
 // Sanitizes text fragments independently so a hidden fragment cannot cause a
@@ -314,6 +380,20 @@ function normalizeToken(value) {
     : "";
 }
 
+function isThreadTurnStateProbeRequest(message) {
+  const params = message?.params;
+  if (readString(message?.method) !== "thread/turns/list"
+    || readString(params?.cursor)
+    || params?.agntRequireCanonical === true) {
+    return false;
+  }
+  if (params?.agntTurnStateOnly === true) {
+    return true;
+  }
+  return Number(params?.limit) === 8
+    && normalizeToken(readString(params?.sortDirection) || "desc") === "desc";
+}
+
 function cloneJSON(value) {
   if (value == null) {
     return value;
@@ -414,6 +494,7 @@ module.exports = {
   hasVisiblePlanUpdate,
   isContextualUserText,
   isPlainJSONObject,
+  isThreadTurnStateProbeRequest,
   isUserRoleItem,
   normalizeToken,
   readString,

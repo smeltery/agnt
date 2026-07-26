@@ -156,7 +156,9 @@ private struct ThinkingDisclosureView: View {
     private func runtimeMarkdownText(_ value: String) -> AttributedString {
         var options = AttributedString.MarkdownParsingOptions()
         options.interpretedSyntax = .inlineOnlyPreservingWhitespace
-        return (try? AttributedString(markdown: value, options: options)) ?? AttributedString(value)
+        var parsed = (try? AttributedString(markdown: value, options: options)) ?? AttributedString(value)
+        AppFont.monospaceCodeSpans(in: &parsed, textStyle: .caption)
+        return parsed
     }
 }
 

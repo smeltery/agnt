@@ -48,6 +48,14 @@ extension TurnTimelineRenderProjection {
         return message.kind == .thinking || message.kind == .fileChange
     }
 
+    static func isCommandGroupingToolActivity(_ message: CodexMessage) -> Bool {
+        message.role == .system && message.kind == .toolActivity
+    }
+
+    static func isCommandGroupingCompanion(_ message: CodexMessage) -> Bool {
+        isCommandGroupingInterstitial(message) || isCommandGroupingToolActivity(message)
+    }
+
     // Drops placeholder-only system rows before SwiftUI can reserve timeline spacing for them.
     static func shouldSkipVisualRow(
         _ message: CodexMessage,

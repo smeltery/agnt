@@ -217,6 +217,7 @@ enum UserBubbleInlineMarkdownRenderer {
         options.interpretedSyntax = .inlineOnlyPreservingWhitespace
         var parsed = (try? AttributedString(markdown: preparedText, options: options)) ?? AttributedString(rawText)
         underlineLinks(in: &parsed)
+        AppFont.monospaceCodeSpans(in: &parsed)
         return parsed
     }
 

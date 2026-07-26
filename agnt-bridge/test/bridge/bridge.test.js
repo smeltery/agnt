@@ -7,6 +7,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  annotateTurnStateProbeWithMirrorActiveTurn,
   buildHeartbeatBridgeStatus,
   disableUnsupportedReasoningSummaryForTurnStart,
   hasRelayConnectionGoneStale,
@@ -67,6 +68,37 @@ test("disableUnsupportedReasoningSummaryForTurnStart leaves other models untouch
   });
 
   assert.equal(disableUnsupportedReasoningSummaryForTurnStart(raw), raw);
+});
+
+test("turn-state probe responses carry mirror active turn without mutating cached pages", () => {
+  const request = {
+    id: "req-probe",
+    method: "thread/turns/list",
+    params: { threadId: "thread-mirrored", agntTurnStateOnly: true },
+  };
+  const cachedResponse = {
+    id: "req-probe",
+    result: { data: [{ id: "turn-old", status: "completed" }], nextCursor: null },
+  };
+
+  const annotated = annotateTurnStateProbeWithMirrorActiveTurn(
+    request,
+    cachedResponse,
+    (threadId) => (threadId === "thread-mirrored" ? "turn-live" : null)
+  );
+
+  assert.equal(annotated.result.agntMirrorActiveTurnId, "turn-live");
+  assert.equal(annotated.result.data[0].id, "turn-old");
+  assert.equal(cachedResponse.result.agntMirrorActiveTurnId, undefined);
+  assert.equal(
+    annotateTurnStateProbeWithMirrorActiveTurn(request, cachedResponse, () => null),
+    cachedResponse
+  );
+  const historyRequest = { ...request, params: { threadId: "thread-mirrored", limit: 5 } };
+  assert.equal(
+    annotateTurnStateProbeWithMirrorActiveTurn(historyRequest, cachedResponse, () => "turn-live"),
+    cachedResponse
+  );
 });
 
 test("hasRelayConnectionGoneStale returns true once the relay silence crosses the timeout", () => {

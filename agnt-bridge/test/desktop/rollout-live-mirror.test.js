@@ -19,6 +19,7 @@ const {
   appendRolloutLines,
   createTemporaryRolloutHome,
   customToolCall,
+  customToolCallOutput,
   errorEvent,
   functionCall,
   functionCallOutput,
@@ -89,6 +90,85 @@ test("desktop-origin active runs replay thinking and exec command activity on re
   assert.equal(outbound[1].params.delta, "Thinking...");
   assert.equal(outbound[2].params.command, "git status");
   assert.equal(outbound[3].params.chunk, "On branch main");
+});
+
+test("desktop-origin mirror exposes only real active turn ids for probes", async (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-active-probe",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [taskStarted("turn-active-probe")],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse() {},
+    pollIntervalMs: 5,
+    idleTimeoutMs: 200,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-active-probe" },
+  }));
+
+  await wait(30);
+  assert.equal(controller.getActiveTurnId("thread-active-probe"), "turn-active-probe");
+  appendRolloutLines(rolloutPath, [taskComplete("turn-active-probe")]);
+  await wait(30);
+  assert.equal(controller.getActiveTurnId("thread-active-probe"), null);
+});
+
+test("desktop-origin mirror completes custom tool activity rows", async (t) => {
+  const { homeDir } = createTemporaryRolloutHome({
+    threadId: "thread-custom-tool-output",
+    originator: "Codex Desktop",
+    source: "desktop",
+    lines: [
+      taskStarted("turn-custom-tool-output"),
+      customToolCall("custom-call-1", "read_thread_terminal", "read"),
+      customToolCallOutput("custom-call-1", "terminal text"),
+    ],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => {
+    restoreCodexHome(previousCodexHome);
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  const outbound = [];
+  const controller = createRolloutLiveMirrorController({
+    sendApplicationResponse(message) {
+      outbound.push(JSON.parse(message));
+    },
+    pollIntervalMs: 5,
+    idleTimeoutMs: 50,
+  });
+  t.after(() => controller.stopAll());
+
+  controller.observeInbound(JSON.stringify({
+    method: "thread/resume",
+    params: { threadId: "thread-custom-tool-output" },
+  }));
+
+  await wait(30);
+  assert.ok(outbound.some((message) => (
+    message.method === "codex/event/background_event"
+      && message.params.call_id === "custom-call-1"
+      && message.params.message === "Reading terminal output"
+  )));
+  assert.ok(outbound.some((message) => (
+    message.method === "codex/event/background_event"
+      && message.params.call_id === "custom-call-1"
+      && message.params.message === "Read terminal output"
+  )));
 });
 
 test("desktop-origin bootstrap replays the pending user message and final assistant text", async (t) => {

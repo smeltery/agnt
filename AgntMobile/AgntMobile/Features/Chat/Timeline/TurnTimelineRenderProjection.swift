@@ -18,6 +18,7 @@ enum TurnTimelineRenderProjection {
         var bufferedToolMessages: [CodexMessage] = []
         var bufferedCommandMessages: [CodexMessage] = []
         var bufferedCommandOrderedMessages: [CodexMessage] = []
+        var bufferedCommandPendingToolActivity: [CodexMessage] = []
         var bufferedCommandTrailingFileChanges: [CodexMessage] = []
         let fileChangePlan = fileChangeCollapsePlan(in: messages)
         let finalCollapsePlan = previousMessagesCollapsePlan(
@@ -45,13 +46,26 @@ enum TurnTimelineRenderProjection {
             bufferedToolMessages.removeAll(keepingCapacity: true)
         }
 
-        func flushBufferedCommandMessages() {
+        func commitBufferedCommandPendingToolActivity() {
+            guard !bufferedCommandPendingToolActivity.isEmpty else { return }
+            bufferedCommandOrderedMessages.append(contentsOf: bufferedCommandPendingToolActivity)
+            bufferedCommandPendingToolActivity.removeAll(keepingCapacity: true)
+        }
+
+        func flushBufferedCommandMessages(adoptsPendingToolActivity: Bool = true) {
+            if adoptsPendingToolActivity {
+                commitBufferedCommandPendingToolActivity()
+            }
+            let deferredToolActivity = bufferedCommandPendingToolActivity
+            bufferedCommandPendingToolActivity.removeAll(keepingCapacity: true)
+
             if !bufferedCommandMessages.isEmpty {
                 items.append(.commandGroup(TurnTimelineCommandGroup(
                     messages: bufferedCommandMessages,
                     orderedMessages: bufferedCommandOrderedMessages
                 )))
             }
+            items.append(contentsOf: deferredToolActivity.map(TurnTimelineRenderItem.message))
             items.append(contentsOf: bufferedCommandTrailingFileChanges.map(TurnTimelineRenderItem.message))
             bufferedCommandMessages.removeAll(keepingCapacity: true)
             bufferedCommandOrderedMessages.removeAll(keepingCapacity: true)
@@ -64,6 +78,22 @@ enum TurnTimelineRenderProjection {
             bufferedCommandTrailingFileChanges.removeAll(keepingCapacity: true)
         }
 
+        func adoptBufferedToolMessagesIntoOpeningCommandGroup(_ incoming: CodexMessage) -> Bool {
+            guard bufferedCommandMessages.isEmpty,
+                  !bufferedToolMessages.isEmpty,
+                  bufferedToolMessages.allSatisfy({ message in
+                      isCommandGroupingToolActivity(message)
+                  }),
+                  let previous = bufferedToolMessages.last,
+                  canShareToolBurst(previous: previous, incoming: incoming) else {
+                return false
+            }
+
+            bufferedCommandOrderedMessages.append(contentsOf: bufferedToolMessages)
+            bufferedToolMessages.removeAll(keepingCapacity: true)
+            return true
+        }
+
         for (index, message) in messages.enumerated() {
             if let group = groupByInsertionIndex[index] {
                 flushBufferedToolMessages()
@@ -74,7 +104,7 @@ enum TurnTimelineRenderProjection {
             }
 
             if hiddenIndices.contains(index) {
-                if !isCommandGroupingInterstitial(message) {
+                if !isCommandGroupingCompanion(message) {
                     flushBufferedToolMessages()
                     flushBufferedCommandMessages()
                 }
@@ -98,6 +128,7 @@ enum TurnTimelineRenderProjection {
                     flushBufferedCommandMessages()
                     items.append(.message(renderedMessage))
                 } else if isCommandGroupingTrace(renderedMessage) {
+                    commitBufferedCommandPendingToolActivity()
                     commitBufferedCommandTrailingFileChanges()
                     bufferedCommandOrderedMessages.append(renderedMessage)
                 } else {
@@ -114,14 +145,27 @@ enum TurnTimelineRenderProjection {
             }
 
             guard !isFinishedCommandToolCall(renderedMessage) else {
-                flushBufferedToolMessages()
+                if !adoptBufferedToolMessagesIntoOpeningCommandGroup(renderedMessage) {
+                    flushBufferedToolMessages()
+                }
                 if let previous = bufferedCommandMessages.last,
                    !canShareToolBurst(previous: previous, incoming: renderedMessage) {
                     flushBufferedCommandMessages()
                 }
+                commitBufferedCommandPendingToolActivity()
                 commitBufferedCommandTrailingFileChanges()
                 bufferedCommandMessages.append(renderedMessage)
                 bufferedCommandOrderedMessages.append(renderedMessage)
+                continue
+            }
+
+            if !bufferedCommandMessages.isEmpty,
+               isCommandGroupingToolActivity(renderedMessage),
+               let previous = bufferedCommandMessages.last,
+               canShareToolBurst(previous: previous, incoming: renderedMessage) {
+                flushBufferedToolMessages()
+                commitBufferedCommandTrailingFileChanges()
+                bufferedCommandPendingToolActivity.append(renderedMessage)
                 continue
             }
 
@@ -134,8 +178,10 @@ enum TurnTimelineRenderProjection {
             bufferedToolMessages.append(renderedMessage)
         }
 
+        let keepsLiveToolActivityVisible = isThreadRunning
+            && bufferedCommandPendingToolActivity.contains { $0.isStreaming }
         flushBufferedToolMessages()
-        flushBufferedCommandMessages()
+        flushBufferedCommandMessages(adoptsPendingToolActivity: !keepsLiveToolActivityVisible)
         return mergeAdjacentFileChangeItems(items)
     }
 

@@ -128,12 +128,18 @@ extension CodexService {
                         "threadId": .string(threadId),
                         "limit": .integer(ThreadTurnStateSnapshotPolicy.recentTurnLimit),
                         "sortDirection": .string("desc"),
+                        "agntTurnStateOnly": .bool(true),
                     ]),
                     timeoutNanoseconds: ThreadTurnStateSnapshotPolicy.requestTimeoutNanoseconds
                 )
 
                 guard let resultObject = response.result?.objectValue else {
                     return (nil, false, nil)
+                }
+                if let mirrorActiveTurnID = normalizedInterruptIdentifier(
+                    resultObject["agntMirrorActiveTurnId"]?.stringValue
+                ) {
+                    return (mirrorActiveTurnID, false, mirrorActiveTurnID)
                 }
 
                 let turnObjects = (

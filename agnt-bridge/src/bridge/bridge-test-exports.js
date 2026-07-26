@@ -21,8 +21,10 @@ const { sanitizeLiveGeneratedImageMessageForRelay } = require("./relay-image-san
 const { sanitizeThreadHistoryImagesForRelay } = require("./relay-payload-pipeline");
 const { persistBridgePreferences } = require("./bridge-preferences");
 const { disableUnsupportedReasoningSummaryForTurnStart } = require("./turn-start-normalizer");
+const { annotateTurnStateProbeWithMirrorActiveTurn } = require("./turn-state-probe");
 
 module.exports = {
+  annotateTurnStateProbeWithMirrorActiveTurn,
   buildEmergencySingleTurnResponse,
   buildEmptyTurnsListResponse,
   buildHeartbeatBridgeStatus,

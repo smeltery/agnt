@@ -108,7 +108,12 @@ function createRolloutLiveMirrorController({
     mirrorsByThreadId.clear();
   }
 
+  function getActiveTurnId(threadId) {
+    return mirrorsByThreadId.get(threadId)?.getActiveTurnId() || null;
+  }
+
   return {
+    getActiveTurnId,
     observeInbound,
     stopAll,
   };
@@ -294,8 +299,23 @@ function createThreadRolloutLiveMirror({
     onStop();
   }
 
+  function getActiveTurnId() {
+    if (
+      isStopped
+      || wasSuppressed
+      || state.isDesktopOrigin === false
+      || state.suppressLiveActivityUntilGrowth
+      || state.activeTurnIdIsSynthetic
+      || state.pendingSyntheticTerminalTurnId
+    ) {
+      return null;
+    }
+    return state.activeTurnId || null;
+  }
+
   return {
     bump,
+    getActiveTurnId,
     stop,
   };
 }

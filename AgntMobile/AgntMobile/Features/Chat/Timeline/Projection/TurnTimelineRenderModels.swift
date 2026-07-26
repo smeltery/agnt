@@ -67,6 +67,16 @@ struct TurnTimelineCommandGroup: Identifiable, Equatable {
         messages.count
     }
 
+    var toolCallCount: Int {
+        orderedMessages.reduce(into: 0) { total, message in
+            guard message.role == .system, message.kind == .toolActivity else { return }
+            total += message.text
+                .split(separator: "\n")
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .count
+        }
+    }
+
     var traceMessages: [CodexMessage] {
         orderedMessages.filter { $0.role == .system && $0.kind == .thinking }
     }
@@ -79,7 +89,8 @@ struct TurnTimelineCommandGroup: Identifiable, Equatable {
     }
 
     var accessoryHostMessage: CodexMessage? {
-        orderedMessages.last
+        orderedMessages.last { !($0.role == .system && $0.kind == .toolActivity) }
+            ?? messages.last
     }
 
     var failedCommandCount: Int {

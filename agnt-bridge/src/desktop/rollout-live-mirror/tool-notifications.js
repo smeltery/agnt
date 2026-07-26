@@ -10,6 +10,7 @@ const {
   firstNonEmptyString,
   generatedImagePathForRolloutItem,
   genericToolActivityMessage,
+  genericToolCompletionMessage,
   isCommandToolName,
   isInternalProgressPlanToolName,
   parseToolArguments,
@@ -106,6 +107,12 @@ function customToolStartNotifications(state, payload, helpers) {
         changes: item.changes,
       }));
     }
+  } else if (!isCommandToolName(toolName) && !state.applyPatchCalls.has(callId)) {
+    state.commandCalls.set(callId, {
+      toolName,
+      command: toolName,
+      cwd: readString(state.sessionMeta?.cwd) || "",
+    });
   }
 
   const activityMessage = genericToolActivityMessage(toolName);
@@ -198,8 +205,15 @@ function toolOutputNotifications(state, payload, helpers) {
   }
 
   if (!isCommandToolName(toolCall.toolName)) {
+    const notifications = [...helpers.ensureThinkingNotifications(state)];
+    notifications.push(createNotification("codex/event/background_event", {
+      threadId: state.threadId,
+      turnId: state.activeTurnId,
+      call_id: callId,
+      message: genericToolCompletionMessage(toolCall.toolName),
+    }));
     state.commandCalls.delete(callId);
-    return [];
+    return notifications;
   }
 
   const output = readString(payload.output);

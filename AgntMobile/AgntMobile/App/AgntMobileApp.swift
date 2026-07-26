@@ -10,11 +10,13 @@ import SwiftUI
 struct AgntMobileApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @UIApplicationDelegateAdaptor(AgntMobileAppDelegate.self) private var appDelegate
+    @AppStorage(AppFont.storageKey) private var appFontStyleRawValue = AppFont.defaultStoredStyleRawValue
     @State private var codexService: CodexService
     @State private var petCompanionStore: PetCompanionStore
     @State private var petCompanionStatusStore: PetCompanionStatusStore
 
     init() {
+        AppTypographyController.apply()
         let service = CodexService()
         service.configureNotifications()
         _codexService = State(initialValue: service)
@@ -25,6 +27,7 @@ struct AgntMobileApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .font(activeBodyFont)
                 .environment(codexService)
                 .environment(petCompanionStore)
                 .environment(petCompanionStatusStore)
@@ -59,7 +62,16 @@ struct AgntMobileApp: App {
                         break
                     }
                 }
+                .onChange(of: appFontStyleRawValue) { _, _ in
+                    AppTypographyController.apply()
+                    TurnCacheManager.resetAll()
+                }
         }
+    }
+
+    private var activeBodyFont: Font {
+        _ = appFontStyleRawValue
+        return AppFont.body()
     }
 
     private func handleAppURL(_ url: URL, codexService: CodexService) -> Bool {

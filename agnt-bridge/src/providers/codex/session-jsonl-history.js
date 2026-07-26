@@ -12,6 +12,7 @@ const {
   historyItemUserText,
   isContextualUserText,
   isUserRoleHistoryItem,
+  sanitizeUserRoleItem,
   visibleUserPromptText,
 } = require("../../bridge/contextual-user-items");
 
@@ -424,11 +425,7 @@ function normalizeResponseItemForHistory(payload, lineNumber) {
     item.role = "assistant";
   }
 
-  if (isUserRoleHistoryItem(item) && isContextualUserText(historyItemUserText(item))) {
-    return null;
-  }
-
-  return item;
+  return isUserRoleHistoryItem(item) ? sanitizeUserRoleItem(item) : item;
 }
 
 function normalizeHistoryItemType(rawType) {

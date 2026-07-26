@@ -215,6 +215,105 @@ func testTimelineRenderProjectionPreservesCommandTraceOrderInsideDisclosure() {
     XCTAssertEqual(group.orderedMessages.map(\.id), ["command-1", "reasoning", "file-change", "command-2"])
 }
 
+func testTimelineRenderProjectionFoldsToolActivityIntoCommandDisclosure() {
+    let now = Date()
+    let messages = [
+        makeTimelineTestMessage(
+            id: "write-terminal",
+            threadID: "thread",
+            role: .system,
+            kind: .toolActivity,
+            text: "Wrote to terminal",
+            createdAt: now,
+            turnID: "turn-1",
+            itemID: "write-terminal"
+        ),
+        makeTimelineTestMessage(
+            id: "command-1",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed npm test",
+            createdAt: now.addingTimeInterval(1),
+            turnID: "turn-1",
+            itemID: "command-1"
+        ),
+        makeTimelineTestMessage(
+            id: "read-terminal",
+            threadID: "thread",
+            role: .system,
+            kind: .toolActivity,
+            text: "Read terminal output\nWrote to terminal",
+            createdAt: now.addingTimeInterval(2),
+            turnID: "turn-1",
+            itemID: "read-terminal"
+        ),
+        makeTimelineTestMessage(
+            id: "command-2",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed git diff --check",
+            createdAt: now.addingTimeInterval(3),
+            turnID: "turn-1",
+            itemID: "command-2"
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(messages: messages)
+
+    XCTAssertEqual(items.map(\.id), ["command-group:command-1"])
+    guard case .commandGroup(let group) = items.first else {
+        return XCTFail("Expected command disclosure to absorb adjacent tool activity")
+    }
+    XCTAssertEqual(group.messages.map(\.id), ["command-1", "command-2"])
+    XCTAssertEqual(group.orderedMessages.map(\.id), ["write-terminal", "command-1", "read-terminal", "command-2"])
+    XCTAssertEqual(group.commandCount, 2)
+    XCTAssertEqual(group.toolCallCount, 3)
+    XCTAssertEqual(group.accessoryHostMessage?.id, "command-2")
+}
+
+func testTimelineRenderProjectionKeepsLiveTrailingToolActivityVisible() {
+    let now = Date()
+    let messages = [
+        makeTimelineTestMessage(
+            id: "command-1",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed npm test",
+            createdAt: now,
+            turnID: "turn-1",
+            itemID: "command-1"
+        ),
+        makeTimelineTestMessage(
+            id: "read-terminal",
+            threadID: "thread",
+            role: .system,
+            kind: .toolActivity,
+            text: "Reading terminal output",
+            createdAt: now.addingTimeInterval(1),
+            turnID: "turn-1",
+            itemID: "read-terminal",
+            isStreaming: true
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(
+        messages: messages,
+        activeTurnID: "turn-1",
+        isThreadRunning: true
+    )
+
+    XCTAssertEqual(items.map(\.id), ["command-group:command-1", "read-terminal"])
+    guard case .commandGroup(let group) = items.first,
+          case .message(let liveToolActivity) = items.last else {
+        return XCTFail("Expected finished command group followed by live tool activity")
+    }
+    XCTAssertEqual(group.toolCallCount, 0)
+    XCTAssertEqual(liveToolActivity.id, "read-terminal")
+}
+
 func testTimelineRenderProjectionCollapsesCompletedTurnBeforeFinalAnswer() {
     let now = Date()
     let messages = [

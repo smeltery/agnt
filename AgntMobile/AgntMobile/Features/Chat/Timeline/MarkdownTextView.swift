@@ -29,7 +29,8 @@ private struct CachingMarkdownParser: MarkupParser {
         if let cached = Self.cache.get(key) {
             return cached
         }
-        let result = try inner.attributedString(for: input)
+        var result = try inner.attributedString(for: input)
+        AppFont.monospaceCodeSpans(in: &result)
         Self.cache.set(key, value: result)
         return result
     }
@@ -45,7 +46,9 @@ struct UncachedMarkdownParser: MarkupParser {
     private let inner: AttributedStringMarkdownParser = .markdown()
 
     func attributedString(for input: String) throws -> AttributedString {
-        try inner.attributedString(for: input)
+        var result = try inner.attributedString(for: input)
+        AppFont.monospaceCodeSpans(in: &result)
+        return result
     }
 }
 
@@ -59,7 +62,9 @@ private struct PreparsedMarkdownParser: MarkupParser {
     let value: AttributedString
 
     func attributedString(for input: String) throws -> AttributedString {
-        value
+        var result = value
+        AppFont.monospaceCodeSpans(in: &result)
+        return result
     }
 }
 
@@ -108,6 +113,7 @@ struct MarkdownTextView: View {
         // the chat feel like a pannable canvas.
         let baseView = StructuredText(prepared.markup, parser: prepared.parser)
             .font(AppFont.body())
+            .textual.inlineStyle(.gitHub.code(.font(AppFont.mono(.body))))
             .textual.structuredTextStyle(.gitHub)
             .textual.overflowMode(.wrap)
 

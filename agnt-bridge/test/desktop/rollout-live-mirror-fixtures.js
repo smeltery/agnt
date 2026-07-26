@@ -181,6 +181,18 @@ function customToolCall(callId, name, input) {
   });
 }
 
+function customToolCallOutput(callId, output = "") {
+  return JSON.stringify({
+    timestamp: "2026-03-15T19:47:39.000Z",
+    type: "response_item",
+    payload: {
+      type: "custom_tool_call_output",
+      call_id: callId,
+      output,
+    },
+  });
+}
+
 function patchApplyEnd(turnId, callId) {
   return JSON.stringify({
     timestamp: "2026-03-15T19:47:38.750Z",
@@ -321,6 +333,7 @@ module.exports = {
   appendRolloutLines,
   createTemporaryRolloutHome,
   customToolCall,
+  customToolCallOutput,
   errorEvent,
   functionCall,
   functionCallOutput,

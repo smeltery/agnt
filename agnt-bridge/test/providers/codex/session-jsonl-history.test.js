@@ -375,3 +375,74 @@ test("parseSessionJsonlTurns drops expanded skill context user items", () => {
   assert.equal(userItems.length, 0);
   assert.equal(turns[0].items.some((item) => item.role === "assistant"), true);
 });
+
+test("parseSessionJsonlTurns hides injected desktop preamble before the prompt", () => {
+  const content = jsonl(
+    { timestamp: "2026-07-25T00:39:28.000Z", type: "event_msg", payload: { type: "task_started", turn_id: "turn-opener" } },
+    {
+      timestamp: "2026-07-25T00:39:30.000Z",
+      type: "response_item",
+      payload: {
+        id: "injected-preamble",
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "<recommended_plugins>\n- Figma\n</recommended_plugins>" },
+          { type: "input_text", text: "# AGENTS.md instructions for /Users/me/proj\n\n<INSTRUCTIONS>\nrules\n</INSTRUCTIONS>" },
+          { type: "input_text", text: "<environment_context>\n  <cwd>/Users/me/proj</cwd>\n</environment_context>" },
+        ],
+        internal_chat_message_metadata_passthrough: { turn_id: "turn-opener" },
+      },
+    },
+    {
+      timestamp: "2026-07-25T00:39:30.100Z",
+      type: "response_item",
+      payload: {
+        id: "real-prompt",
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "check the release" }],
+        internal_chat_message_metadata_passthrough: { turn_id: "turn-opener" },
+      },
+    },
+    { timestamp: "2026-07-25T00:41:00.000Z", type: "event_msg", payload: { type: "task_complete", turn_id: "turn-opener" } }
+  );
+
+  const turns = parseSessionJsonlTurns(content, { threadId: "thread-opener" });
+  const serialized = JSON.stringify(turns);
+  const userItems = turns[0].items.filter((item) => item.role === "user");
+
+  assert.equal(serialized.includes("recommended_plugins"), false);
+  assert.equal(serialized.includes("AGENTS.md instructions"), false);
+  assert.equal(serialized.includes("environment_context"), false);
+  assert.equal(userItems.length, 1);
+  assert.equal(userItems[0].content[0].text, "check the release");
+});
+
+test("parseSessionJsonlTurns keeps request sharing an item with injected context", () => {
+  const content = jsonl(
+    { timestamp: "2026-07-25T00:39:28.000Z", type: "event_msg", payload: { type: "task_started", turn_id: "turn-mixed" } },
+    {
+      timestamp: "2026-07-25T00:39:30.000Z",
+      type: "response_item",
+      payload: {
+        id: "mixed-opener",
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "<recommended_plugins>\n- Figma\n</recommended_plugins>" },
+          { type: "input_text", text: "check the release" },
+        ],
+        internal_chat_message_metadata_passthrough: { turn_id: "turn-mixed" },
+      },
+    },
+    { timestamp: "2026-07-25T00:41:00.000Z", type: "event_msg", payload: { type: "task_complete", turn_id: "turn-mixed" } }
+  );
+
+  const turns = parseSessionJsonlTurns(content, { threadId: "thread-mixed" });
+  const userItems = turns[0].items.filter((item) => item.role === "user");
+
+  assert.equal(JSON.stringify(turns).includes("recommended_plugins"), false);
+  assert.equal(userItems.length, 1);
+  assert.deepEqual(userItems[0].content, [{ type: "input_text", text: "check the release" }]);
+});

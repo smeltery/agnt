@@ -8,6 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   isContextualUserText,
+  isThreadTurnStateProbeRequest,
   sanitizeUserInputEntries,
   sanitizeUserRoleItem,
   visibleUserPromptText,
@@ -35,6 +36,46 @@ test("filters AGENTS.md instructions concatenated with registered context fragme
     assert.equal(isContextualUserText(text), true, suffix);
     assert.equal(visibleUserPromptText(text), "", suffix);
   }
+});
+
+test("filters desktop opener chains with several injected fragments", () => {
+  const text = [
+    "<recommended_plugins>",
+    "- Figma (figma@openai-curated-remote)",
+    "</recommended_plugins>",
+    "# AGENTS.md instructions for /Users/me/proj",
+    "",
+    "<INSTRUCTIONS>",
+    "root rules",
+    "</INSTRUCTIONS>",
+    "<INSTRUCTIONS>",
+    "nested rules",
+    "</INSTRUCTIONS>",
+    "<environment_context>",
+    "  <cwd>/Users/me/proj</cwd>",
+    "</environment_context>",
+  ].join("\n");
+
+  assert.equal(isContextualUserText(text), true);
+  assert.equal(visibleUserPromptText(text), "");
+});
+
+test("keeps visible requests that trail injected context fragments", () => {
+  const preamble = "<recommended_plugins>\n- Figma\n</recommended_plugins>\n"
+    + "<environment_context>\n  <cwd>/Users/me/proj</cwd>\n</environment_context>\n\n";
+
+  assert.equal(isContextualUserText(`${preamble}check the release`), false);
+  assert.equal(visibleUserPromptText(`${preamble}check the release`), "check the release");
+  assert.equal(
+    visibleUserPromptText("<skill>\n<name>release-check</name>\n</skill>\nrun it"),
+    "run it"
+  );
+});
+
+test("leaves unterminated reserved markers visible", () => {
+  const text = "<environment_context> is this tag reserved?";
+  assert.equal(isContextualUserText(text), false);
+  assert.equal(visibleUserPromptText(text), text);
 });
 
 test("does not expose a request delimiter that appears inside hidden context", () => {
@@ -219,4 +260,19 @@ test("drops fully contextual user items but preserves attachment-only items", ()
   assert.deepEqual(sanitizeUserRoleItem(attachment)?.content, [
     { type: "input_image", image_url: "data:image/png;base64,AAAA" },
   ]);
+});
+
+test("turn-state probe detection matches marker and legacy shape only", () => {
+  const probe = (params) => isThreadTurnStateProbeRequest({ method: "thread/turns/list", params });
+  assert.equal(probe({ threadId: "t", agntTurnStateOnly: true }), true);
+  assert.equal(probe({ threadId: "t", limit: 8, sortDirection: "desc" }), true);
+  assert.equal(probe({ threadId: "t", limit: 8 }), true);
+  assert.equal(probe({ threadId: "t", limit: 5, sortDirection: "desc" }), false);
+  assert.equal(probe({ threadId: "t", limit: 8, sortDirection: "asc" }), false);
+  assert.equal(probe({ threadId: "t", limit: 8, sortDirection: "desc", cursor: "page-2" }), false);
+  assert.equal(probe({ threadId: "t", limit: 8, agntRequireCanonical: true }), false);
+  assert.equal(
+    isThreadTurnStateProbeRequest({ method: "thread/read", params: { threadId: "t", limit: 8 } }),
+    false
+  );
 });

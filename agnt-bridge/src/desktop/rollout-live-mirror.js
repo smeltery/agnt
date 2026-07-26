@@ -271,7 +271,7 @@ function synthesizeNotificationsFromRolloutEntry(entry, state, options = {}) {
     return notifications;
   }
 
-  if (itemType === "functioncalloutput") {
+  if (itemType === "functioncalloutput" || itemType === "customtoolcalloutput") {
     notifications.push(...toolOutputNotifications(state, payload, notificationHelpers));
     return notifications;
   }
