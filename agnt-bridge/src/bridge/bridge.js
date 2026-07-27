@@ -79,6 +79,8 @@ const {
   createThreadMemoryObserver,
   createThreadNameNotifier,
 } = require("./bridge-message-helpers");
+const { createThreadListProvenanceEnricher } = require("./thread-list-provenance");
+const { createWorktreeOriginEnricher } = require("./worktree-origin");
 const bridgeTestExports = require("./bridge-test-exports");
 const {
   loadOrCreateBridgeDeviceState,
@@ -152,6 +154,12 @@ function startBridge({
   const forwardedRequestTracker = createForwardedRequestTracker({
     parseJson: safeParseJSON,
   });
+  const threadRowEnrichers = activeProvider.id === "codex"
+    ? [
+      createWorktreeOriginEnricher(),
+      createThreadListProvenanceEnricher(),
+    ]
+    : [];
   const handshakeHandler = createHandshakeHandler({
     sendApplicationResponse,
     bridgePackageVersion,
@@ -202,6 +210,7 @@ function startBridge({
     forwardedRequestTracker,
     parseJson: safeParseJSON,
     sanitizeThreadHistoryImagesForRelay,
+    threadRowEnrichers,
   });
   const sendThreadNameUpdatedNotification = createThreadNameNotifier({
     sendApplicationResponse,

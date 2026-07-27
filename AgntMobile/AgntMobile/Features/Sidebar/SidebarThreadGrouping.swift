@@ -255,12 +255,12 @@ enum SidebarThreadGrouping {
         let projectPath =
             projectKey == CodexThread.noProjectGroupKey
                 ? nil
-                : representativeThread?.normalizedProjectPath
+                : representativeThread?.projectGroupPath
         return SidebarThreadGroup(
             id: "project:\(projectKey)",
             label: projectKey == CodexThread.noProjectGroupKey
                 ? CodexThread.noProjectDisplayName
-                : representativeThread?.projectDisplayName ?? CodexThread.noProjectDisplayName,
+                : CodexThread.projectDisplayLabel(for: projectPath),
             kind: .project,
             sortDate: sortDate,
             projectPath: projectPath,
@@ -375,7 +375,7 @@ enum SidebarThreadGrouping {
     private static func projectKey(for thread: CodexThread, projectlessRootPaths: [String]) -> String {
         isProjectlessChatThread(thread, projectlessRootPaths: projectlessRootPaths)
             ? CodexThread.noProjectGroupKey
-            : thread.projectKey
+            : thread.projectGroupKey
     }
 
     static func isProjectlessChatThread(

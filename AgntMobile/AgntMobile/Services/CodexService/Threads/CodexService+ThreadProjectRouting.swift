@@ -53,7 +53,7 @@ extension CodexService {
             threadId: normalizedThreadId,
             projectPath: normalizedProjectPath
         )
-        if CodexThread.projectIconSystemName(for: normalizedProjectPath) == "arrow.triangle.branch" {
+        if CodexThread.isManagedWorktreePath(normalizedProjectPath) {
             rememberAssociatedManagedWorktreePath(normalizedProjectPath, for: normalizedThreadId)
         }
 
@@ -191,7 +191,7 @@ extension CodexService {
         let canonicalCurrentPath = canonicalRepoIdentifier(for: currentProjectPath) ?? currentProjectPath
         let canonicalObservedPath = canonicalRepoIdentifier(for: observedProjectPath) ?? observedProjectPath
         guard canonicalCurrentPath == canonicalObservedPath,
-              CodexThread.projectIconSystemName(for: canonicalObservedPath) == "arrow.triangle.branch" else {
+              CodexThread.isManagedWorktreePath(canonicalObservedPath) else {
             return false
         }
 

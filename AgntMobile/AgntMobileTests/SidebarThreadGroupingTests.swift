@@ -268,6 +268,28 @@ final class SidebarThreadGroupingTests: SidebarThreadGroupingTestCase {
         XCTAssertEqual(worktreeGroup.iconSystemName, "arrow.triangle.branch")
     }
 
+    func testMakeGroupsPlacesManagedWorktreeThreadsUnderOriginProjectWhenAvailable() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let originPath = "/Users/me/work/agnt"
+        let worktreePath = "/Users/me/.codex/worktrees/ce15/agnt"
+        let threads = [
+            makeThread(id: "main-thread", updatedAt: now, cwd: originPath),
+            makeThread(
+                id: "worktree-thread",
+                updatedAt: now.addingTimeInterval(-60),
+                cwd: worktreePath,
+                worktreeOriginPath: originPath
+            ),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(from: threads, now: now)
+
+        XCTAssertEqual(groups.map(\.id), ["project:/Users/me/work/agnt"])
+        XCTAssertEqual(groups[0].projectPath, originPath)
+        XCTAssertEqual(groups[0].label, "agnt")
+        XCTAssertEqual(groups[0].threads.map(\.id), ["main-thread", "worktree-thread"])
+    }
+
     func testMakeProjectChoicesReusesLiveProjectBucketsAndSkipsNoProject() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let threads = [

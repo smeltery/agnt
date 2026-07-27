@@ -107,11 +107,13 @@ extension CodexService {
         if merged.createdAt == nil { merged.createdAt = existing.createdAt }
         if merged.updatedAt == nil { merged.updatedAt = existing.updatedAt }
         if merged.cwd == nil { merged.cwd = existing.normalizedProjectPath }
+        if merged.worktreeOriginPath == nil { merged.worktreeOriginPath = existing.normalizedWorktreeOriginPath }
         merged.metadata = mergedThreadMetadata(
             serverMetadata: merged.metadata,
             localMetadata: existing.metadata
         )
         if merged.forkedFromThreadId == nil { merged.forkedFromThreadId = existing.forkedFromThreadId }
+        if merged.threadSource == nil { merged.threadSource = existing.threadSource }
         if merged.parentThreadId == nil { merged.parentThreadId = existing.parentThreadId }
         if merged.agentId == nil { merged.agentId = existing.agentId }
         if merged.agentNickname == nil { merged.agentNickname = existing.agentNickname }

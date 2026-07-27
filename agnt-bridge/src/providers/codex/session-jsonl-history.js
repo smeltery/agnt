@@ -274,6 +274,18 @@ function parseSessionJsonlMetadata(content) {
       || normalizeString(payload.currentWorkingDirectory)
       || normalizeString(payload.working_directory)
       || normalizeString(payload.workingDirectory);
+    const forkedFromId = normalizeString(payload.forked_from_id)
+      || normalizeString(payload.forkedFromId)
+      || normalizeString(payload.forked_from_thread_id)
+      || normalizeString(payload.forkedFromThreadId);
+    if (forkedFromId) {
+      metadata.forkedFromId ||= forkedFromId;
+    }
+    const threadSource = normalizeString(payload.thread_source)
+      || normalizeString(payload.threadSource);
+    if (threadSource) {
+      metadata.threadSource ||= threadSource;
+    }
   }
 
   return metadata;

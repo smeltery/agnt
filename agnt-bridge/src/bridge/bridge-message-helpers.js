@@ -50,6 +50,7 @@ function createRelayResponseSanitizer({
   forwardedRequestTracker,
   parseJson,
   sanitizeThreadHistoryImagesForRelay,
+  threadRowEnrichers = [],
 }) {
   return function sanitizeRelayBoundCodexMessage(rawMessage) {
     forwardedRequestTracker.pruneExpired();
@@ -74,6 +75,7 @@ function createRelayResponseSanitizer({
     }
     return sanitizeThreadHistoryImagesForRelay(normalizedMessage, trackedRequest.method, {
       activeProviderId: activeProvider.id,
+      threadRowEnrichers,
     });
   };
 }

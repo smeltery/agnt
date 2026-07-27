@@ -68,6 +68,22 @@ extension CodexThread {
         forkedFromThreadId != nil
     }
 
+    var automationSourceLabel: String? {
+        guard let source = threadSource?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !source.isEmpty,
+              source.localizedCaseInsensitiveCompare("user") != .orderedSame else {
+            return nil
+        }
+
+        return source
+            .replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .map { word in
+                word.prefix(1).uppercased() + String(word.dropFirst())
+            }
+            .joined(separator: " ")
+    }
+
     var preferredSubagentLabel: String? {
         guard isSubagent else { return nil }
 
@@ -144,6 +160,10 @@ extension CodexThread {
         Self.normalizeProjectPath(cwd)
     }
 
+    var normalizedWorktreeOriginPath: String? {
+        Self.normalizeProjectPath(worktreeOriginPath)
+    }
+
     // Best-effort repo root for project-scoped bridge features like git actions.
     var gitWorkingDirectory: String? {
         if let normalizedProjectPath {
@@ -157,6 +177,14 @@ extension CodexThread {
         normalizedProjectPath ?? Self.noProjectGroupKey
     }
 
+    var projectGroupPath: String? {
+        normalizedWorktreeOriginPath ?? normalizedProjectPath
+    }
+
+    var projectGroupKey: String {
+        projectGroupPath ?? Self.noProjectGroupKey
+    }
+
     // User-facing project label shown in the sidebar section header.
     var projectDisplayName: String {
         Self.projectDisplayLabel(for: normalizedProjectPath)
@@ -164,7 +192,7 @@ extension CodexThread {
 
     // Reuses the same worktree detection across the sidebar, toolbar, and composer affordances.
     var isManagedWorktreeProject: Bool {
-        Self.projectIconSystemName(for: normalizedProjectPath) == "arrow.triangle.branch"
+        Self.isManagedWorktreePath(normalizedProjectPath)
     }
 
     // Distinguishes Codex-managed worktrees from the main repo in compact sidebar UIs.
@@ -186,7 +214,14 @@ extension CodexThread {
             return "bubble.left.and.bubble.right"
         }
 
-        return codexManagedWorktreeToken(for: normalizedProjectPath) == nil ? "folder" : "arrow.triangle.branch"
+        return isManagedWorktreePath(normalizedProjectPath) ? "arrow.triangle.branch" : "folder"
+    }
+
+    static func isManagedWorktreePath(_ normalizedProjectPath: String?) -> Bool {
+        guard let normalizedProjectPath else {
+            return false
+        }
+        return codexManagedWorktreeToken(for: normalizedProjectPath) != nil
     }
 
     // Shared path gate for every flow that needs to decide whether a cwd represents a real local project.

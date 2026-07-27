@@ -83,25 +83,27 @@ function normalizeNonEmptyString(value) {
 }
 
 function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod, requestContext = {}) {
+  const rawWithThreadRowEnrichment = enrichThreadRowsForRelay(rawMessage, requestMethod, requestContext);
+
   if (requestMethod === "thread/turns/list") {
-    return sanitizeThreadTurnsListForRelay(rawMessage);
+    return sanitizeThreadTurnsListForRelay(rawWithThreadRowEnrichment);
   }
 
   if (requestMethod !== "thread/read" && requestMethod !== "thread/resume") {
-    return rawMessage;
+    return rawWithThreadRowEnrichment;
   }
 
-  const parsed = parseJSON(rawMessage);
+  const parsed = parseJSON(rawWithThreadRowEnrichment);
   const thread = parsed?.result?.thread;
   if (!thread || typeof thread !== "object" || !Array.isArray(thread.turns)) {
-    return rawMessage;
+    return rawWithThreadRowEnrichment;
   }
 
   const threadId = normalizeNonEmptyString(thread.id)
     || normalizeNonEmptyString(thread.threadId)
     || normalizeNonEmptyString(thread.thread_id);
   const shouldAugmentJsonlMetadata = requestContext.activeProviderId === "codex";
-  const didPreTrimTurnWindow = Buffer.byteLength(rawMessage, "utf8") > RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES
+  const didPreTrimTurnWindow = Buffer.byteLength(rawWithThreadRowEnrichment, "utf8") > RELAY_THREAD_PAYLOAD_SOFT_LIMIT_BYTES
     && thread.turns.length > RELAY_HISTORY_RECENT_TURN_TARGET;
   const workingTurns = didPreTrimTurnWindow
     ? thread.turns.slice(-RELAY_HISTORY_RECENT_TURN_TARGET)
@@ -122,7 +124,7 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod, requestC
 
   if (!didSanitize && !didPreTrimTurnWindow && !didAugmentThreadMetadata) {
     const trimmedPayload = trimThreadPayloadForRelay(parsed, thread);
-    return trimmedPayload == null ? rawMessage : trimmedPayload;
+    return trimmedPayload == null ? rawWithThreadRowEnrichment : trimmedPayload;
   }
 
   const sanitizedPayload = JSON.stringify({
@@ -137,6 +139,30 @@ function sanitizeThreadHistoryImagesForRelay(rawMessage, requestMethod, requestC
   });
 
   return trimThreadPayloadForRelay(parseJSON(sanitizedPayload), null, trimOptions) ?? sanitizedPayload;
+}
+
+function enrichThreadRowsForRelay(rawMessage, requestMethod, requestContext = {}) {
+  const enrichers = Array.isArray(requestContext.threadRowEnrichers)
+    ? requestContext.threadRowEnrichers
+    : [];
+  if (enrichers.length === 0) {
+    return rawMessage;
+  }
+  if (requestMethod !== "thread/list" && requestMethod !== "thread/read" && requestMethod !== "thread/resume") {
+    return rawMessage;
+  }
+
+  const parsed = parseJSON(rawMessage);
+  if (!parsed || typeof parsed !== "object") {
+    return rawMessage;
+  }
+
+  for (const enricher of enrichers) {
+    if (typeof enricher?.enrichResponse === "function") {
+      enricher.enrichResponse(requestMethod, parsed);
+    }
+  }
+  return JSON.stringify(parsed);
 }
 
 function sanitizeLiveContextualUserItemForRelay(rawMessage) {
@@ -449,6 +475,7 @@ function normalizeHistoryItemToken(value) {
 
 module.exports = {
   augmentRelayThreadWithJsonlMetadata,
+  enrichThreadRowsForRelay,
   sanitizeLiveContextualUserItemForRelay,
   sanitizeLiveUserNotification,
   sanitizeThreadHistoryImagesForRelay,

@@ -75,8 +75,10 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date?
     var updatedAt: Date?
     var cwd: String?
+    var worktreeOriginPath: String?
     var metadata: [String: JSONValue]?
     var forkedFromThreadId: String?
+    var threadSource: String?
     var parentThreadId: String?
     var agentId: String?
     var agentNickname: String?
@@ -96,8 +98,10 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         createdAt: Date? = nil,
         updatedAt: Date? = nil,
         cwd: String? = nil,
+        worktreeOriginPath: String? = nil,
         metadata: [String: JSONValue]? = nil,
         forkedFromThreadId: String? = nil,
+        threadSource: String? = nil,
         parentThreadId: String? = nil,
         agentId: String? = nil,
         agentNickname: String? = nil,
@@ -114,8 +118,10 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.cwd = Self.normalizeProjectPath(cwd)
+        self.worktreeOriginPath = Self.normalizeProjectPath(worktreeOriginPath)
         self.metadata = metadata
         self.forkedFromThreadId = Self.normalizeIdentifier(forkedFromThreadId)
+        self.threadSource = Self.normalizeIdentifier(threadSource)
         self.parentThreadId = Self.normalizeIdentifier(parentThreadId)
         self.agentId = Self.normalizeIdentifier(agentId)
         self.agentNickname = Self.normalizeIdentifier(agentNickname)
@@ -140,11 +146,15 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         case cwd
         case cwdSnake = "current_working_directory"
         case cwdWorkingDirectory = "working_directory"
+        case worktreeOriginPath
+        case worktreeOriginPathSnake = "worktree_origin_path"
         case metadata
         case forkedFromThreadId
         case forkedFromId = "forkedFromId"
         case forkedFromThreadIdSnake = "forked_from_thread_id"
         case forkedFromIdSnake = "forked_from_id"
+        case threadSource
+        case threadSourceSnake = "thread_source"
         case parentThreadId
         case parentThreadIdSnake = "parent_thread_id"
         case agentId
@@ -173,11 +183,23 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         updatedAt = try Self.decodeDateIfPresent(from: container, keys: [.updatedAt, .updatedAtSnake])
         cwd = Self.decodeStringIfPresent(from: container, keys: [.cwd, .cwdSnake, .cwdWorkingDirectory])
         metadata = try container.decodeIfPresent([String: JSONValue].self, forKey: .metadata)
+        worktreeOriginPath = Self.decodeThreadPath(
+            from: container,
+            metadata: metadata,
+            keys: [.worktreeOriginPath, .worktreeOriginPathSnake],
+            metadataKeys: ["worktreeOriginPath", "worktree_origin_path"]
+        )
         forkedFromThreadId = Self.decodeThreadIdentity(
             from: container,
             metadata: metadata,
             keys: [.forkedFromThreadId, .forkedFromId, .forkedFromThreadIdSnake, .forkedFromIdSnake],
             metadataKeys: ["forkedFromThreadId", "forked_from_thread_id", "forkedFromId", "forked_from_id"]
+        )
+        threadSource = Self.decodeThreadIdentity(
+            from: container,
+            metadata: metadata,
+            keys: [.threadSource, .threadSourceSnake],
+            metadataKeys: ["threadSource", "thread_source"]
         )
         parentThreadId = Self.decodeThreadIdentity(
             from: container,
@@ -231,8 +253,10 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
         try container.encodeIfPresent(Self.normalizeProjectPath(cwd), forKey: .cwd)
+        try container.encodeIfPresent(Self.normalizeProjectPath(worktreeOriginPath), forKey: .worktreeOriginPath)
         try container.encodeIfPresent(metadata, forKey: .metadata)
         try container.encodeIfPresent(Self.normalizeIdentifier(forkedFromThreadId), forKey: .forkedFromThreadId)
+        try container.encodeIfPresent(Self.normalizeIdentifier(threadSource), forKey: .threadSource)
         try container.encodeIfPresent(Self.normalizeIdentifier(parentThreadId), forKey: .parentThreadId)
         try container.encodeIfPresent(Self.normalizeIdentifier(agentId), forKey: .agentId)
         try container.encodeIfPresent(Self.normalizeIdentifier(agentNickname), forKey: .agentNickname)
@@ -303,6 +327,28 @@ extension CodexThread {
 
         for metadataKey in metadataKeys {
             if let normalized = normalizeIdentifier(metadata?[metadataKey]?.stringValue) {
+                return normalized
+            }
+        }
+
+        return nil
+    }
+
+    private static func decodeThreadPath(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        metadata: [String: JSONValue]?,
+        keys: [CodingKeys],
+        metadataKeys: [String]
+    ) -> String? {
+        for key in keys {
+            if let value = try? container.decodeIfPresent(String.self, forKey: key),
+               let normalized = normalizeProjectPath(value) {
+                return normalized
+            }
+        }
+
+        for metadataKey in metadataKeys {
+            if let normalized = normalizeProjectPath(metadata?[metadataKey]?.stringValue) {
                 return normalized
             }
         }

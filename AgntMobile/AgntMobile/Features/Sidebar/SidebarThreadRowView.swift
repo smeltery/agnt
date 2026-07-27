@@ -82,6 +82,12 @@ struct SidebarThreadRowView: View {
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                             .truncationMode(.tail)
+                    } else if let sourceLabel = thread.automationSourceLabel {
+                        Text(sourceLabel)
+                            .font(AppFont.footnote())
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
