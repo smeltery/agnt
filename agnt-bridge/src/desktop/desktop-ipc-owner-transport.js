@@ -7,12 +7,13 @@
 const { randomUUID } = require("crypto");
 
 const {
+  buildIpcRequestEnvelope,
+  createFrameReader,
   DESKTOP_IPC_METHOD_VERSIONS: METHOD_VERSION_BY_NAME,
-  FRAME_HEADER_BYTES,
-  MAX_FRAME_BYTES,
   readString,
   requestIdKey,
-  safeParseJSON,
+  resolveIpcSocketPathCandidates,
+  toSocketPathCandidatesResolver,
   writeFrame,
 } = require("./desktop-ipc-shared");
 const { createDesktopIpcRouterServer } = require("./ipc-owner/router");
@@ -36,12 +37,18 @@ function createDesktopOwnerIpcClient({
   let isConnecting = false;
   let isInitialized = false;
   let clientId = "";
-  let readBuffer = Buffer.alloc(0);
+  let remainingSocketPaths = [];
   let reconnectTimer = null;
   let shouldReconnect = false;
+  const resolveSocketPaths = toSocketPathCandidatesResolver(socketPath || resolveIpcSocketPathCandidates);
+  const frameReader = createFrameReader({
+    onFrame: (envelope) => dispatchEnvelope(envelope),
+    onOverflow: () => closeSocket(),
+  });
+  const routerSocketPath = resolveSocketPaths()[0];
   const localRouter = startRouterWhenMissing
     ? createDesktopIpcRouterServer({
-      socketPath,
+      socketPath: routerSocketPath,
       netModule,
       now,
       requestTimeoutMs,
@@ -57,8 +64,20 @@ function createDesktopOwnerIpcClient({
       return;
     }
     clearReconnectTimer();
+    remainingSocketPaths = resolveSocketPaths();
+    connectNextSocket();
+  }
+
+  function connectNextSocket() {
+    const nextSocketPath = remainingSocketPaths.shift();
+    if (!nextSocketPath) {
+      isConnecting = false;
+      startLocalRouterAfterMissingSocket("ENOENT");
+      return;
+    }
+
     isConnecting = true;
-    const nextSocket = netModule.createConnection(socketPath);
+    const nextSocket = netModule.createConnection(nextSocketPath);
     socket = nextSocket;
 
     nextSocket.on("connect", () => {
@@ -77,6 +96,11 @@ function createDesktopOwnerIpcClient({
     nextSocket.on("data", handleData);
     nextSocket.on("close", () => handleClose(nextSocket));
     nextSocket.on("error", (error) => {
+      if ((error?.code === "ENOENT" || error?.code === "ECONNREFUSED")
+        && remainingSocketPaths.length > 0) {
+        retryNextSocket(nextSocket);
+        return;
+      }
       if (error?.code === "ENOENT" || error?.code === "ECONNREFUSED") {
         startLocalRouterAfterMissingSocket(error.code);
         return;
@@ -85,6 +109,16 @@ function createDesktopOwnerIpcClient({
         console.warn(`${logPrefix} desktop IPC live owner connection failed: ${error.message}`);
       }
     });
+  }
+
+  function retryNextSocket(failedSocket) {
+    if (socket === failedSocket) {
+      socket = null;
+    }
+    isConnecting = false;
+    frameReader.reset();
+    failedSocket.destroy();
+    connectNextSocket();
   }
 
   function startLocalRouterAfterMissingSocket(reasonCode) {
@@ -129,14 +163,13 @@ function createDesktopOwnerIpcClient({
       return Promise.reject(new Error("Desktop IPC is not connected."));
     }
     const requestId = `agnt-owner-${now().toString(36)}-${randomUUID()}`;
-    const envelope = {
-      type: "request",
+    const envelope = buildIpcRequestEnvelope({
       requestId,
-      sourceClientId: initializing ? "initializing-client" : clientId || "agnt-bridge",
-      version: METHOD_VERSION_BY_NAME.get(method) || 1,
       method,
-      params: params || {},
-    };
+      params,
+      clientId,
+      initializing,
+    });
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pendingResponses.delete(requestId);
@@ -158,24 +191,7 @@ function createDesktopOwnerIpcClient({
   }
 
   function handleData(chunk) {
-    readBuffer = Buffer.concat([readBuffer, chunk]);
-    while (readBuffer.length >= FRAME_HEADER_BYTES) {
-      const frameLength = readBuffer.readUInt32LE(0);
-      if (frameLength > MAX_FRAME_BYTES) {
-        closeSocket();
-        return;
-      }
-      if (readBuffer.length < FRAME_HEADER_BYTES + frameLength) {
-        return;
-      }
-
-      const payload = readBuffer.slice(FRAME_HEADER_BYTES, FRAME_HEADER_BYTES + frameLength).toString("utf8");
-      readBuffer = readBuffer.slice(FRAME_HEADER_BYTES + frameLength);
-      const envelope = safeParseJSON(payload);
-      if (envelope) {
-        dispatchEnvelope(envelope);
-      }
-    }
+    frameReader.push(chunk);
   }
 
   function dispatchEnvelope(envelope) {
@@ -249,7 +265,8 @@ function createDesktopOwnerIpcClient({
     isConnecting = false;
     isInitialized = false;
     clientId = "";
-    readBuffer = Buffer.alloc(0);
+    remainingSocketPaths = [];
+    frameReader.reset();
     for (const waiter of pendingResponses.values()) {
       clearTimeout(waiter.timeout);
       waiter.reject(new Error("Desktop IPC connection closed."));

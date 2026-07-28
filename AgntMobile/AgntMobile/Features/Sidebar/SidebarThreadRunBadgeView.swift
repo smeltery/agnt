@@ -24,6 +24,8 @@ struct SidebarThreadRunBadgeView: View {
 private extension CodexThreadRunBadgeState {
     var color: Color {
         switch self {
+        case .waitingOnUser:
+            return .orange
         case .running:
             return .blue
         case .ready:

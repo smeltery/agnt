@@ -130,6 +130,53 @@ test("gitCreateManagedWorktree leaves ignored files only in Local", async () => 
   }
 });
 
+test("gitCreateManagedWorktree copies .worktreeinclude-listed files into the new worktree", async () => {
+  const repoDir = makeTempRepo();
+  const projectDir = path.join(repoDir, "agnt-bridge");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
+  const previousCodexHome = process.env.CODEX_HOME;
+
+  process.env.CODEX_HOME = codexHome;
+
+  try {
+    fs.writeFileSync(path.join(repoDir, ".gitignore"), ".env\nignored-not-listed.txt\nlink.env\n");
+    fs.writeFileSync(path.join(repoDir, ".env"), "SECRET=root\n");
+    fs.mkdirSync(path.join(repoDir, "packages", "api"), { recursive: true });
+    fs.writeFileSync(path.join(repoDir, "packages", "api", ".env"), "SECRET=nested\n");
+    fs.writeFileSync(path.join(repoDir, "notes.local"), "plain untracked\n");
+    fs.writeFileSync(path.join(repoDir, "ignored-not-listed.txt"), "skip me\n");
+    fs.symlinkSync(path.join(repoDir, ".env"), path.join(repoDir, "link.env"));
+    fs.writeFileSync(
+      path.join(repoDir, ".worktreeinclude"),
+      "# required non-tracked files\n.env\nnotes.local\nlink.env\nmissing-entry.txt\n"
+    );
+    git(repoDir, "add", ".gitignore", ".worktreeinclude");
+    git(repoDir, "commit", "-m", "Add worktree include manifest");
+
+    const result = await __test.gitCreateManagedWorktree(projectDir, {
+      baseBranch: "main",
+    });
+    const worktreeRoot = path.dirname(result.worktreePath);
+
+    assert.equal(fs.readFileSync(path.join(worktreeRoot, ".env"), "utf8"), "SECRET=root\n");
+    assert.equal(
+      fs.readFileSync(path.join(worktreeRoot, "packages", "api", ".env"), "utf8"),
+      "SECRET=nested\n"
+    );
+    assert.equal(fs.readFileSync(path.join(worktreeRoot, "notes.local"), "utf8"), "plain untracked\n");
+    assert.equal(fs.existsSync(path.join(worktreeRoot, "ignored-not-listed.txt")), false);
+    assert.equal(fs.existsSync(path.join(worktreeRoot, "link.env")), false);
+  } finally {
+    if (previousCodexHome === undefined) {
+      delete process.env.CODEX_HOME;
+    } else {
+      process.env.CODEX_HOME = previousCodexHome;
+    }
+    fs.rmSync(repoDir, { recursive: true, force: true });
+    fs.rmSync(codexHome, { recursive: true, force: true });
+  }
+});
+
 test("gitTransferManagedHandoff moves tracked changes from Local into an existing managed worktree", async () => {
   const repoDir = makeTempRepo();
   const projectDir = path.join(repoDir, "agnt-bridge");

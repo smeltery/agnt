@@ -212,14 +212,15 @@ extension SidebarView {
                 || ($0.normalizedProjectPath?.localizedCaseInsensitiveContains(query) ?? false)
             }
         }
-        let fingerprint = groupingFingerprint(query: query, source: source)
+        let fingerprint = groupingFingerprint(query: query, source: source, runBadges: cachedRunBadges)
         guard fingerprint != lastGroupedThreadsFingerprint else { return }
         lastGroupedThreadsFingerprint = fingerprint
         groupedThreads = SidebarThreadGrouping.makeGroups(
             from: source,
             pinnedThreadIDs: codex.pinnedThreadIDs,
             scope: groupingScope,
-            projectlessRootPaths: projectlessChatRootPaths
+            projectlessRootPaths: projectlessChatRootPaths,
+            runBadgeStateByThreadID: cachedRunBadges
         )
         debugSidebarLog(
             "rebuildGroupedThreads durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1000)) "
@@ -227,7 +228,11 @@ extension SidebarView {
         )
     }
 
-    func groupingFingerprint(query: String, source: [CodexThread]) -> Int {
+    func groupingFingerprint(
+        query: String,
+        source: [CodexThread],
+        runBadges: [String: CodexThreadRunBadgeState]
+    ) -> Int {
         var hasher = Hasher()
         hasher.combine(query)
         hasher.combine(contentScopeRawValue)
@@ -235,6 +240,7 @@ extension SidebarView {
         hasher.combine(projectlessChatRootPaths)
         for thread in source {
             hasher.combine(thread)
+            hasher.combine(runBadges[thread.id])
         }
         return hasher.finalize()
     }

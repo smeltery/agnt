@@ -172,6 +172,13 @@ extension CodexService {
             reconcileLocalThreadsWithServer(activeThreads, serverArchivedThreads: archivedThreads)
             debugSyncLog("sync thread/list active=\(activeThreads.count) archived=\(archivedThreads.count) local=\(threads.count)")
         } catch {
+            // A capped thread/list timeout while the socket still accepts writes is
+            // the signature of a half-open connection. Reset the transport instead
+            // of polling a dead peer every cycle.
+            if isConnected, isAppInForeground, isRecoverableTransientConnectionError(error) {
+                handleReceiveError(error)
+                return
+            }
             presentConnectionErrorIfNeeded(error)
         }
     }

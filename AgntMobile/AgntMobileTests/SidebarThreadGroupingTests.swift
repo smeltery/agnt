@@ -290,6 +290,63 @@ final class SidebarThreadGroupingTests: SidebarThreadGroupingTestCase {
         XCTAssertEqual(groups[0].threads.map(\.id), ["main-thread", "worktree-thread"])
     }
 
+    func testMakeGroupsLiftsRunningAndReadyThreadsAheadOfNewerIdleThreads() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "running-thread", updatedAt: now.addingTimeInterval(-3_600), cwd: "/Users/me/work/app"),
+            makeThread(id: "newer-idle-thread", updatedAt: now, cwd: "/Users/me/work/app"),
+            makeThread(id: "ready-thread", updatedAt: now.addingTimeInterval(-1_800), cwd: "/Users/me/work/app"),
+            makeThread(id: "other-project-thread", updatedAt: now.addingTimeInterval(-30), cwd: "/Users/me/work/site"),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(
+            from: threads,
+            runBadgeStateByThreadID: [
+                "running-thread": .running,
+                "ready-thread": .ready,
+            ],
+            now: now
+        )
+
+        XCTAssertEqual(groups.map(\.id), ["project:/Users/me/work/app", "project:/Users/me/work/site"])
+        XCTAssertEqual(groups.first?.threads.map(\.id), ["running-thread", "ready-thread", "newer-idle-thread"])
+    }
+
+    func testMakeGroupsKeepsApprovalWaitingThreadsAtTheFront() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "running-thread", updatedAt: now, cwd: "/Users/me/work/app"),
+            makeThread(id: "approval-thread", updatedAt: now.addingTimeInterval(-3_600), cwd: "/Users/me/work/app"),
+            makeThread(id: "ready-thread", updatedAt: now.addingTimeInterval(60), cwd: "/Users/me/work/app"),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(
+            from: threads,
+            runBadgeStateByThreadID: [
+                "approval-thread": .waitingOnUser,
+                "running-thread": .running,
+                "ready-thread": .ready,
+            ],
+            now: now
+        )
+
+        XCTAssertEqual(groups.first?.threads.map(\.id), ["approval-thread", "running-thread", "ready-thread"])
+    }
+
+    func testMakeGroupsKeepsRecencyOrderingWhenRunBadgesAreAbsent() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let threads = [
+            makeThread(id: "older-app-thread", updatedAt: now.addingTimeInterval(-3_600), cwd: "/Users/me/work/app"),
+            makeThread(id: "newer-app-thread", updatedAt: now, cwd: "/Users/me/work/app"),
+            makeThread(id: "site-thread", updatedAt: now.addingTimeInterval(-30), cwd: "/Users/me/work/site"),
+        ]
+
+        let groups = SidebarThreadGrouping.makeGroups(from: threads, now: now)
+
+        XCTAssertEqual(groups.map(\.id), ["project:/Users/me/work/app", "project:/Users/me/work/site"])
+        XCTAssertEqual(groups.first?.threads.map(\.id), ["newer-app-thread", "older-app-thread"])
+    }
+
     func testMakeProjectChoicesReusesLiveProjectBucketsAndSkipsNoProject() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let threads = [

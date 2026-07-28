@@ -215,6 +215,7 @@ struct CodexMissingNotificationThreadPrompt: Identifiable, Equatable, Sendable {
 }
 
 enum CodexThreadRunBadgeState: Hashable, Sendable {
+    case waitingOnUser
     case running
     case ready
     case failed

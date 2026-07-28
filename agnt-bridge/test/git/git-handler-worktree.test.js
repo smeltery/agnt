@@ -120,6 +120,49 @@ test("gitCreateWorktree reuses an existing worktree for the same agnt branch", a
   }
 });
 
+test("gitCreateWorktree backfills .worktreeinclude files when reusing an existing worktree", async () => {
+  const repoDir = makeTempRepo();
+  const projectDir = path.join(repoDir, "agnt-bridge");
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "agnt-codex-home-"));
+  const previousCodexHome = process.env.CODEX_HOME;
+
+  process.env.CODEX_HOME = codexHome;
+
+  try {
+    const created = await __test.gitCreateWorktree(projectDir, {
+      name: "reused",
+      baseBranch: "main",
+    });
+    const worktreeRoot = path.dirname(created.worktreePath);
+    assert.equal(fs.existsSync(path.join(worktreeRoot, ".env")), false);
+
+    fs.writeFileSync(path.join(repoDir, ".gitignore"), ".env\n");
+    fs.writeFileSync(path.join(repoDir, ".env"), "SECRET=late\n");
+    fs.writeFileSync(path.join(repoDir, "kept.env"), "source version\n");
+    fs.writeFileSync(path.join(worktreeRoot, "kept.env"), "worktree version\n");
+    fs.writeFileSync(path.join(repoDir, ".worktreeinclude"), ".env\nkept.env\n");
+    git(repoDir, "add", ".gitignore", ".worktreeinclude");
+    git(repoDir, "commit", "-m", "Add worktree include manifest");
+
+    const reused = await __test.gitCreateWorktree(projectDir, {
+      name: "reused",
+      baseBranch: "main",
+    });
+
+    assert.equal(reused.alreadyExisted, true);
+    assert.equal(fs.readFileSync(path.join(worktreeRoot, ".env"), "utf8"), "SECRET=late\n");
+    assert.equal(fs.readFileSync(path.join(worktreeRoot, "kept.env"), "utf8"), "worktree version\n");
+  } finally {
+    if (previousCodexHome === undefined) {
+      delete process.env.CODEX_HOME;
+    } else {
+      process.env.CODEX_HOME = previousCodexHome;
+    }
+    fs.rmSync(repoDir, { recursive: true, force: true });
+    fs.rmSync(codexHome, { recursive: true, force: true });
+  }
+});
+
 test("gitCreateWorktree rejects a reused local branch name before ignoring the chosen base branch", async () => {
   const repoDir = makeTempRepo();
 

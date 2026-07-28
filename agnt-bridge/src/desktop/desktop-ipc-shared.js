@@ -1,9 +1,10 @@
 // FILE: desktop-ipc-shared.js
-// Purpose: Shared primitives for the Codex Desktop IPC modules (framing, socket path, JSON helpers).
+// Purpose: Shared primitives for the Codex Desktop IPC modules (framing, socket path, envelopes, JSON helpers).
 // Layer: CLI helper
-// Exports: FRAME_HEADER_BYTES, MAX_FRAME_BYTES, cloneJSON, normalizeToken, readString, readText, requestIdKey, resolveDefaultIpcSocketPath, safeParseJSON, writeFrame
-// Depends on: os, path
+// Exports: FRAME_HEADER_BYTES, MAX_FRAME_BYTES, cloneJSON, normalizeToken, readString, readText, requestIdKey, resolveDefaultIpcSocketPath, resolveIpcSocketPathCandidates, safeParseJSON, writeFrame
+// Depends on: fs, os, path
 
+const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
@@ -475,17 +476,101 @@ function writeFrame(socket, payload, callback) {
   socket.write(Buffer.concat([header, body]), callback);
 }
 
-function resolveDefaultIpcSocketPath() {
+function createFrameReader({ onFrame, onOverflow }) {
+  let buffer = Buffer.alloc(0);
+
+  return {
+    push(chunk) {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (buffer.length >= FRAME_HEADER_BYTES) {
+        const frameLength = buffer.readUInt32LE(0);
+        if (frameLength > MAX_FRAME_BYTES) {
+          buffer = Buffer.alloc(0);
+          onOverflow?.();
+          return;
+        }
+        if (buffer.length < FRAME_HEADER_BYTES + frameLength) {
+          return;
+        }
+
+        const payload = buffer
+          .slice(FRAME_HEADER_BYTES, FRAME_HEADER_BYTES + frameLength)
+          .toString("utf8");
+        buffer = buffer.slice(FRAME_HEADER_BYTES + frameLength);
+        const envelope = safeParseJSON(payload);
+        if (envelope) {
+          onFrame(envelope);
+        }
+      }
+    },
+    reset() {
+      buffer = Buffer.alloc(0);
+    },
+  };
+}
+
+function buildIpcRequestEnvelope({ requestId, method, params, clientId, initializing = false }) {
+  return {
+    type: "request",
+    requestId,
+    sourceClientId: initializing ? "initializing-client" : clientId || "agnt-bridge",
+    version: DESKTOP_IPC_METHOD_VERSIONS.get(method) || 1,
+    method,
+    params: params || {},
+  };
+}
+
+function resolveIpcSocketPathCandidates() {
   if (process.platform === "win32") {
-    return "\\\\.\\pipe\\codex-ipc";
+    return ["\\\\.\\pipe\\codex-ipc"];
   }
 
+  const configuredCodexHome = readString(process.env.CODEX_HOME);
+  const codexHome = configuredCodexHome
+    ? path.resolve(configuredCodexHome)
+    : path.join(os.homedir(), ".codex");
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
-  return path.join(os.tmpdir(), "codex-ipc", `ipc-${uid}.sock`);
+  return [
+    path.join(codexHome, "ipc", "ipc.sock"),
+    path.join(os.tmpdir(), "codex-ipc", `ipc-${uid}.sock`),
+  ];
+}
+
+function resolveDefaultIpcSocketPath() {
+  const candidates = resolveIpcSocketPathCandidates();
+  for (const candidate of candidates) {
+    try {
+      if (fs.statSync(candidate).isSocket()) {
+        return candidate;
+      }
+    } catch {
+      // Missing or unreadable candidate: keep looking.
+    }
+  }
+  return candidates[0];
+}
+
+function toSocketPathResolver(socketPath) {
+  return typeof socketPath === "function" ? socketPath : () => socketPath;
+}
+
+function toSocketPathCandidatesResolver(socketPath) {
+  const resolveSocketPath = toSocketPathResolver(socketPath);
+  return () => {
+    const resolved = resolveSocketPath();
+    const candidates = Array.isArray(resolved) ? resolved : [resolved];
+    return candidates.filter((candidate, index) => (
+      typeof candidate === "string"
+      && candidate.length > 0
+      && candidates.indexOf(candidate) === index
+    ));
+  };
 }
 
 module.exports = {
   CLIENT_STATUS_CHANGED,
+  buildIpcRequestEnvelope,
+  createFrameReader,
   DESKTOP_IPC_METHOD_VERSIONS,
   FRAME_HEADER_BYTES,
   MAX_FRAME_BYTES,
@@ -502,9 +587,12 @@ module.exports = {
   readUserItemText,
   requestIdKey,
   resolveDefaultIpcSocketPath,
+  resolveIpcSocketPathCandidates,
   safeParseJSON,
   sanitizeUserInputEntries,
   sanitizeUserRoleItem,
+  toSocketPathCandidatesResolver,
+  toSocketPathResolver,
   visibleUserPromptText,
   visibleUserPromptFromInputEntries,
   writeFrame,

@@ -7,12 +7,69 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  buildIpcRequestEnvelope,
+  createFrameReader,
   isContextualUserText,
   isThreadTurnStateProbeRequest,
   sanitizeUserInputEntries,
   sanitizeUserRoleItem,
+  toSocketPathCandidatesResolver,
   visibleUserPromptText,
+  writeFrame,
 } = require("../../src/desktop/desktop-ipc-shared");
+
+test("desktop IPC socket candidate resolver accepts strings, arrays, and functions", () => {
+  assert.deepEqual(toSocketPathCandidatesResolver("/tmp/a.sock")(), ["/tmp/a.sock"]);
+  assert.deepEqual(
+    toSocketPathCandidatesResolver(() => ["/tmp/a.sock", "", "/tmp/b.sock", "/tmp/a.sock"])(),
+    ["/tmp/a.sock", "/tmp/b.sock"]
+  );
+});
+
+test("desktop IPC request envelopes use the shared version map and source id", () => {
+  assert.deepEqual(buildIpcRequestEnvelope({
+    requestId: "req-1",
+    method: "thread-follower-interrupt-turn",
+    params: { conversationId: "thread-1" },
+    clientId: "client-1",
+  }), {
+    type: "request",
+    requestId: "req-1",
+    sourceClientId: "client-1",
+    version: 2,
+    method: "thread-follower-interrupt-turn",
+    params: { conversationId: "thread-1" },
+  });
+  assert.equal(buildIpcRequestEnvelope({
+    requestId: "req-2",
+    method: "initialize",
+    initializing: true,
+  }).sourceClientId, "initializing-client");
+});
+
+test("desktop IPC frame reader handles split frames and overflows", () => {
+  const frames = [];
+  let overflowed = false;
+  const reader = createFrameReader({
+    onFrame: (frame) => frames.push(frame),
+    onOverflow: () => {
+      overflowed = true;
+    },
+  });
+  const chunks = [];
+  writeFrame({ write: (buffer) => chunks.push(buffer) }, JSON.stringify({ ok: true }));
+  const frame = chunks[0];
+
+  reader.push(frame.slice(0, 3));
+  assert.deepEqual(frames, []);
+  reader.push(frame.slice(3));
+  assert.deepEqual(frames, [{ ok: true }]);
+
+  const oversizedHeader = Buffer.alloc(4);
+  oversizedHeader.writeUInt32LE(256 * 1024 * 1024 + 1, 0);
+  reader.push(oversizedHeader);
+  assert.equal(overflowed, true);
+});
 
 test("filters AGENTS.md instructions with and without the legacy path suffix", () => {
   const current = "# AGENTS.md instructions\n\n<INSTRUCTIONS>\n## Skills\n- check-code: ...\n</INSTRUCTIONS>";

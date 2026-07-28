@@ -5,12 +5,12 @@
 // Depends on: ./desktop-ipc-shared
 
 const {
-  DESKTOP_IPC_METHOD_VERSIONS: METHOD_VERSION_BY_NAME,
-  FRAME_HEADER_BYTES,
-  MAX_FRAME_BYTES,
+  buildIpcRequestEnvelope,
+  createFrameReader,
   readString,
   requestIdKey,
-  safeParseJSON,
+  resolveIpcSocketPathCandidates,
+  toSocketPathCandidatesResolver,
   writeFrame,
 } = require("./desktop-ipc-shared");
 
@@ -28,17 +28,33 @@ function createDesktopIpcClient({
   let clientId = "";
   let isConnecting = false;
   let lastActivityAt = 0;
-  let readBuffer = Buffer.alloc(0);
+  let remainingSocketPaths = [];
   const pendingRequests = new Map();
   const pendingDiscoveries = new Map();
+  const frameReader = createFrameReader({
+    onFrame: (envelope) => dispatchEnvelope(envelope),
+    onOverflow: () => close(),
+  });
+  const resolveSocketPaths = toSocketPathCandidatesResolver(socketPath || resolveIpcSocketPathCandidates);
 
   function ensureConnected() {
     if (socket || isConnecting) {
       return;
     }
 
+    remainingSocketPaths = resolveSocketPaths();
+    connectNextSocket();
+  }
+
+  function connectNextSocket() {
+    const nextSocketPath = remainingSocketPaths.shift();
+    if (!nextSocketPath) {
+      isConnecting = false;
+      return;
+    }
+
     isConnecting = true;
-    const nextSocket = netModule.createConnection(socketPath);
+    const nextSocket = netModule.createConnection(nextSocketPath);
     socket = nextSocket;
 
     nextSocket.on("connect", () => {
@@ -54,12 +70,27 @@ function createDesktopIpcClient({
         });
     });
     nextSocket.on("data", handleData);
-    nextSocket.on("close", handleClose);
+    nextSocket.on("close", () => handleClose(nextSocket));
     nextSocket.on("error", (error) => {
+      if ((error?.code === "ENOENT" || error?.code === "ECONNREFUSED")
+        && remainingSocketPaths.length > 0) {
+        retryNextSocket(nextSocket);
+        return;
+      }
       if (error?.code !== "ENOENT" && error?.code !== "ECONNREFUSED") {
         console.warn(`${logPrefix} desktop IPC connection failed: ${error.message}`);
       }
     });
+  }
+
+  function retryNextSocket(failedSocket) {
+    if (socket === failedSocket) {
+      socket = null;
+    }
+    isConnecting = false;
+    frameReader.reset();
+    failedSocket.destroy();
+    connectNextSocket();
   }
 
   function sendRequest(method, params) {
@@ -69,14 +100,13 @@ function createDesktopIpcClient({
     }
 
     const requestId = `agnt-${now().toString(36)}-${Math.random().toString(16).slice(2)}`;
-    const envelope = {
-      type: "request",
+    const envelope = buildIpcRequestEnvelope({
       requestId,
-      sourceClientId: method === "initialize" ? "initializing-client" : clientId || "agnt-bridge",
-      version: METHOD_VERSION_BY_NAME.get(method) || 1,
       method,
-      params: params || {},
-    };
+      params,
+      clientId,
+      initializing: method === "initialize",
+    });
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -142,24 +172,7 @@ function createDesktopIpcClient({
     if (chunk.length > 0) {
       lastActivityAt = now();
     }
-    readBuffer = Buffer.concat([readBuffer, chunk]);
-    while (readBuffer.length >= FRAME_HEADER_BYTES) {
-      const frameLength = readBuffer.readUInt32LE(0);
-      if (frameLength > MAX_FRAME_BYTES) {
-        close();
-        return;
-      }
-      if (readBuffer.length < FRAME_HEADER_BYTES + frameLength) {
-        return;
-      }
-
-      const payload = readBuffer.slice(FRAME_HEADER_BYTES, FRAME_HEADER_BYTES + frameLength).toString("utf8");
-      readBuffer = readBuffer.slice(FRAME_HEADER_BYTES + frameLength);
-      const envelope = safeParseJSON(payload);
-      if (envelope) {
-        dispatchEnvelope(envelope);
-      }
-    }
+    frameReader.push(chunk);
   }
 
   function dispatchEnvelope(envelope) {
@@ -213,12 +226,16 @@ function createDesktopIpcClient({
     onEnvelope(envelope);
   }
 
-  function handleClose() {
+  function handleClose(closedSocket) {
+    if (socket && socket !== closedSocket) {
+      return;
+    }
     socket = null;
     clientId = "";
     isConnecting = false;
     lastActivityAt = 0;
-    readBuffer = Buffer.alloc(0);
+    remainingSocketPaths = [];
+    frameReader.reset();
     for (const waiter of pendingRequests.values()) {
       clearTimeout(waiter.timeout);
       waiter.reject(new Error("Desktop IPC connection closed."));

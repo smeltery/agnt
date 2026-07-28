@@ -132,6 +132,11 @@ function createWorktreeActions({
         );
       }
 
+      const existingWorktreeRoot = await resolveRepoRoot(existingWorktreePath).catch(() => null);
+      if (existingWorktreeRoot) {
+        await copyWorktreeIncludeFiles(repoRoot, existingWorktreeRoot, git);
+      }
+
       return {
         branch,
         worktreePath: existingWorktreePath,
@@ -170,6 +175,7 @@ function createWorktreeActions({
       if (copiedLocalChangesPatch) {
         await applyCopiedLocalChangesToWorktree(worktreeRootPath, copiedLocalChangesPatch);
       }
+      await copyWorktreeIncludeFiles(repoRoot, worktreeRootPath, git);
     } catch (err) {
       if (didCreateWorktree) {
         await cleanupManagedWorktree(repoRoot, worktreeRootPath, branch);
@@ -258,6 +264,7 @@ function createWorktreeActions({
       if (copiedLocalChangesPatch) {
         await applyCopiedLocalChangesToWorktree(worktreeRootPath, copiedLocalChangesPatch);
       }
+      await copyWorktreeIncludeFiles(repoRoot, worktreeRootPath, git);
     } catch (err) {
       if (didCreateWorktree) {
         await cleanupManagedWorktree(repoRoot, worktreeRootPath);
@@ -437,6 +444,95 @@ function allocateManagedWorktreePath(repoRoot, gitError) {
 
   throw gitError("create_worktree_failed", "Could not allocate a managed worktree path.");
 }
+
+async function copyWorktreeIncludeFiles(repoRoot, worktreeRootPath, git) {
+  const manifestPath = path.join(repoRoot, WORKTREE_INCLUDE_FILE);
+  if (!fs.existsSync(manifestPath)) {
+    return;
+  }
+
+  const relativePaths = await listWorktreeIncludePaths(repoRoot, manifestPath, git);
+  if (relativePaths.length === 0) {
+    return;
+  }
+
+  const canonicalWorktreeRoot = await fs.promises.realpath(worktreeRootPath).catch(() => null);
+  if (!canonicalWorktreeRoot) {
+    return;
+  }
+  const resolvedRepoRoot = path.resolve(repoRoot);
+  const resolvedWorktreeRoot = path.resolve(worktreeRootPath);
+
+  for (const relativePath of relativePaths) {
+    const sourcePath = path.resolve(repoRoot, relativePath);
+    const destinationPath = path.resolve(worktreeRootPath, relativePath);
+    if (!isPathContainedIn(sourcePath, resolvedRepoRoot)
+      || !isPathContainedIn(destinationPath, resolvedWorktreeRoot)) {
+      continue;
+    }
+    await copyWorktreeIncludeEntry(sourcePath, destinationPath, canonicalWorktreeRoot);
+  }
+}
+
+async function listWorktreeIncludePaths(repoRoot, manifestPath, git) {
+  let listing = "";
+  try {
+    listing = await git(
+      repoRoot,
+      "ls-files",
+      "--others",
+      "-i",
+      "-z",
+      `--exclude-from=${manifestPath}`
+    );
+  } catch (err) {
+    console.error(`[agnt] .worktreeinclude listing failed: ${err.message}`);
+    return [];
+  }
+
+  const relativePaths = listing.split("\0").filter(Boolean);
+  if (relativePaths.length > WORKTREE_INCLUDE_MAX_FILES) {
+    console.error(
+      `[agnt] .worktreeinclude matched ${relativePaths.length} files; copying only the first ${WORKTREE_INCLUDE_MAX_FILES}. Narrow the manifest patterns.`
+    );
+    relativePaths.length = WORKTREE_INCLUDE_MAX_FILES;
+  }
+  return relativePaths;
+}
+
+async function copyWorktreeIncludeEntry(sourcePath, destinationPath, canonicalWorktreeRoot) {
+  try {
+    const sourceStats = await fs.promises.lstat(sourcePath);
+    if (!sourceStats.isFile()) {
+      return;
+    }
+
+    const destinationDirectory = path.dirname(destinationPath);
+    await fs.promises.mkdir(destinationDirectory, { recursive: true });
+    const canonicalDestinationDirectory = await fs.promises.realpath(destinationDirectory);
+    if (!isPathContainedIn(canonicalDestinationDirectory, canonicalWorktreeRoot)) {
+      return;
+    }
+
+    await fs.promises.copyFile(
+      sourcePath,
+      path.join(canonicalDestinationDirectory, path.basename(destinationPath)),
+      fs.constants.COPYFILE_EXCL
+    );
+  } catch {
+    // Missing, unreadable, symlinked, or already-present entries are ignored.
+  }
+}
+
+function isPathContainedIn(candidatePath, rootPath) {
+  const normalizedCandidate = path.resolve(candidatePath);
+  const normalizedRoot = path.resolve(rootPath);
+  return normalizedCandidate === normalizedRoot
+    || normalizedCandidate.startsWith(normalizedRoot + path.sep);
+}
+
+const WORKTREE_INCLUDE_FILE = ".worktreeinclude";
+const WORKTREE_INCLUDE_MAX_FILES = 512;
 
 module.exports = {
   createWorktreeActions,

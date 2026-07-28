@@ -82,6 +82,7 @@ enum SidebarThreadGrouping {
         pinnedThreadIDs: [String] = [],
         scope: SidebarThreadGroupingScope = .all,
         projectlessRootPaths: [String] = [],
+        runBadgeStateByThreadID: [String: CodexThreadRunBadgeState] = [:],
         now _: Date = Date(),
         calendar _: Calendar = .current
     ) -> [SidebarThreadGroup] {
@@ -119,12 +120,14 @@ enum SidebarThreadGrouping {
             groups.append(contentsOf: makeProjectGroups(
                 from: scopedThreads,
                 excludingPinnedThreadIDs: pinnedThreadIDSet,
-                projectlessRootPaths: projectlessRootPaths
+                projectlessRootPaths: projectlessRootPaths,
+                runBadgeStateByThreadID: runBadgeStateByThreadID
             ))
         case .chats:
             if let chatGroup = makeRootlessChatGroup(
                 from: scopedThreads,
-                excludingPinnedThreadIDs: pinnedThreadIDSet
+                excludingPinnedThreadIDs: pinnedThreadIDSet,
+                runBadgeStateByThreadID: runBadgeStateByThreadID
             ) {
                 groups.append(chatGroup)
             }
@@ -166,13 +169,17 @@ enum SidebarThreadGrouping {
 
     private static func makeRootlessChatGroup(
         from threads: [CodexThread],
-        excludingPinnedThreadIDs pinnedThreadIDs: Set<String>
+        excludingPinnedThreadIDs pinnedThreadIDs: Set<String>,
+        runBadgeStateByThreadID: [String: CodexThreadRunBadgeState]
     ) -> SidebarThreadGroup? {
         let liveThreads = threads.filter {
             $0.syncState != .archivedLocal && !pinnedThreadIDs.contains($0.id)
         }
-        let sortedThreads = sortThreadsByRecentActivity(liveThreads)
-        guard let firstThread = sortedThreads.first else {
+        let sortedThreads = sortThreadsByRecentActivity(
+            liveThreads,
+            runBadgeStateByThreadID: runBadgeStateByThreadID
+        )
+        guard !sortedThreads.isEmpty else {
             return nil
         }
 
@@ -180,7 +187,7 @@ enum SidebarThreadGrouping {
             id: "chats:rootless",
             label: "Chats",
             kind: .chat,
-            sortDate: firstThread.updatedAt ?? firstThread.createdAt ?? .distantPast,
+            sortDate: liveThreads.compactMap { $0.updatedAt ?? $0.createdAt }.max() ?? .distantPast,
             projectPath: nil,
             threads: sortedThreads
         )
@@ -248,10 +255,17 @@ enum SidebarThreadGrouping {
         ).map(\.id)
     }
 
-    private static func makeProjectGroup(projectKey: String, threads: [CodexThread]) -> SidebarThreadGroup {
-        let sortedThreads = sortThreadsByRecentActivity(threads)
+    private static func makeProjectGroup(
+        projectKey: String,
+        threads: [CodexThread],
+        runBadgeStateByThreadID: [String: CodexThreadRunBadgeState]
+    ) -> SidebarThreadGroup {
+        let sortedThreads = sortThreadsByRecentActivity(
+            threads,
+            runBadgeStateByThreadID: runBadgeStateByThreadID
+        )
         let representativeThread = sortedThreads.first
-        let sortDate = representativeThread?.updatedAt ?? representativeThread?.createdAt ?? .distantPast
+        let sortDate = threads.compactMap { $0.updatedAt ?? $0.createdAt }.max() ?? .distantPast
         let projectPath =
             projectKey == CodexThread.noProjectGroupKey
                 ? nil
@@ -272,7 +286,8 @@ enum SidebarThreadGrouping {
     private static func makeProjectGroups(
         from threads: [CodexThread],
         excludingPinnedThreadIDs pinnedThreadIDs: Set<String> = [],
-        projectlessRootPaths: [String] = []
+        projectlessRootPaths: [String] = [],
+        runBadgeStateByThreadID: [String: CodexThreadRunBadgeState] = [:]
     ) -> [SidebarThreadGroup] {
         var liveThreadsByProject: [String: [CodexThread]] = [:]
 
@@ -288,9 +303,19 @@ enum SidebarThreadGrouping {
         }
 
         return liveThreadsByProject.map { projectKey, projectThreads in
-            makeProjectGroup(projectKey: projectKey, threads: projectThreads)
+            makeProjectGroup(
+                projectKey: projectKey,
+                threads: projectThreads,
+                runBadgeStateByThreadID: runBadgeStateByThreadID
+            )
         }
         .sorted { lhs, rhs in
+            let lhsTier = sidebarActivityTier(of: lhs.threads.first, in: runBadgeStateByThreadID)
+            let rhsTier = sidebarActivityTier(of: rhs.threads.first, in: runBadgeStateByThreadID)
+            if lhsTier != rhsTier {
+                return lhsTier < rhsTier
+            }
+
             if lhs.sortDate != rhs.sortDate {
                 return lhs.sortDate > rhs.sortDate
             }
@@ -357,14 +382,41 @@ enum SidebarThreadGrouping {
         }
     }
 
-    private static func sortThreadsByRecentActivity(_ threads: [CodexThread]) -> [CodexThread] {
+    private static func sortThreadsByRecentActivity(
+        _ threads: [CodexThread],
+        runBadgeStateByThreadID: [String: CodexThreadRunBadgeState] = [:]
+    ) -> [CodexThread] {
         threads.sorted { lhs, rhs in
+            let lhsTier = sidebarActivityTier(of: lhs, in: runBadgeStateByThreadID)
+            let rhsTier = sidebarActivityTier(of: rhs, in: runBadgeStateByThreadID)
+            if lhsTier != rhsTier {
+                return lhsTier < rhsTier
+            }
+
             let lhsDate = lhs.updatedAt ?? lhs.createdAt ?? .distantPast
             let rhsDate = rhs.updatedAt ?? rhs.createdAt ?? .distantPast
             if lhsDate != rhsDate {
                 return lhsDate > rhsDate
             }
             return lhs.id < rhs.id
+        }
+    }
+
+    private static func sidebarActivityTier(
+        of thread: CodexThread?,
+        in runBadgeStateByThreadID: [String: CodexThreadRunBadgeState]
+    ) -> Int {
+        guard let thread, let badgeState = runBadgeStateByThreadID[thread.id] else {
+            return 3
+        }
+
+        switch badgeState {
+        case .waitingOnUser:
+            return 0
+        case .running:
+            return 1
+        case .ready, .failed:
+            return 2
         }
     }
 

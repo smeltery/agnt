@@ -274,6 +274,7 @@ struct SidebarView: View {
     private func handleBadgeFingerprintChanged() {
         debugSidebarLog("badge fingerprint changed visible=\(isVisible)")
         rebuildCachedRunBadges()
+        rebuildGroupedThreads()
     }
 
     private func handleVisibilityChanged(to visible: Bool) {
