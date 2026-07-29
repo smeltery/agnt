@@ -7,7 +7,7 @@ import { idb } from "./idb";
 const KEY_PREFIX = "messages:";
 // Caps the persisted history per thread to keep IndexedDB writes cheap. Older
 // rows can always be re-fetched via thread/turns/list.
-const MAX_PERSISTED_PER_THREAD = 500;
+export const MAX_PERSISTED_PER_THREAD = 50;
 
 export const messagesStore = {
   async load(threadId: string): Promise<CodexMessage[]> {

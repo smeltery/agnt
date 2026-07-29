@@ -6,9 +6,9 @@ function thread(id: string, updatedAt: number | undefined, name: string): CodexT
   return { id, name, syncState: "live", updatedAt };
 }
 
-// Anchor "now" to a Wednesday 2026-05-08 noon UTC so the test boundaries
+// Anchor "now" to a local Wednesday noon so start-of-day bucket boundaries
 // are deterministic across timezones.
-const NOW = new Date("2026-05-08T12:00:00Z").getTime();
+const NOW = new Date(2026, 4, 6, 12, 0, 0, 0).getTime();
 const HOURS = 60 * 60 * 1000;
 const DAYS = 24 * HOURS;
 

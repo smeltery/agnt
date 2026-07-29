@@ -269,6 +269,6 @@ class CodexMessagePersistence(
         }
 
     private companion object {
-        const val DEFAULT_TAIL_CACHE_LIMIT = 48
+        const val DEFAULT_TAIL_CACHE_LIMIT = 16
     }
 }

@@ -53,7 +53,7 @@ import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-private const val INITIAL_TIMELINE_TAIL_LIMIT = 48
+private const val INITIAL_TIMELINE_TAIL_LIMIT = 16
 
 /**
  * Android counterpart of [AgentService.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService.swift).

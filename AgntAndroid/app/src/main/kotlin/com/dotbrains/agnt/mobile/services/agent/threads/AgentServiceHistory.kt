@@ -22,8 +22,8 @@ import java.time.Instant
 /**
  * Mirrors [AgentService+History.swift](../../../../../../../../CodexMobile/CodexMobile/Services/AgentService+History.swift).
  */
-private const val INITIAL_HISTORY_TURN_LIMIT = 160
-private const val OLDER_HISTORY_TURN_LIMIT = 160
+private const val INITIAL_HISTORY_TURN_LIMIT = 16
+private const val OLDER_HISTORY_TURN_LIMIT = 16
 
 internal suspend fun AgentService.syncThreadHistoryInternal(
     threadId: String,

@@ -357,6 +357,6 @@ internal class MessageTimelineStore(
     ) = chatMessages.attachLatestTurnlessUserMessageToTurn(threadId, turnId)
 
     private companion object {
-        const val DEFAULT_INITIAL_TAIL_LIMIT = 48
+        const val DEFAULT_INITIAL_TAIL_LIMIT = 16
     }
 }
