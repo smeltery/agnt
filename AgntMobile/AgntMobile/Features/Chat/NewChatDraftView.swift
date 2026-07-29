@@ -34,6 +34,11 @@ enum NewChatDraftLeadingControl {
     case hamburger(action: () -> Void)
 }
 
+enum NewChatDraftRuntimeMode {
+    case local
+    case newWorktree
+}
+
 struct NewChatDraftView: View {
     @Environment(CodexService.self) var codex
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
@@ -56,6 +61,7 @@ struct NewChatDraftView: View {
     @State var isShowingMacHandoffConfirm = false
     @State var macHandoffErrorMessage: String?
     @State var isDeferringSendForFocusDismissal = false
+    @State var draftRuntimeMode: NewChatDraftRuntimeMode = .local
 
     // UI-only check for layout experiments: true when opened from the general
     // sidebar Chat affordance, false when opened from a folder section button.
@@ -139,6 +145,7 @@ struct NewChatDraftView: View {
             DispatchQueue.main.async { [viewModel] in
                 viewModel.clearComposerAutocomplete()
             }
+            draftRuntimeMode = .local
             refreshDraftGitStateForSelectedProject()
         }
         .sheet(item: $activeSheet) { sheet in
@@ -241,10 +248,32 @@ struct NewChatDraftView: View {
                 codex: codex,
                 draftThreadID: route.id,
                 preferredProjectPath: selectedProjectPath,
+                startThread: {
+                    try await startDraftThread()
+                },
                 onThreadCreated: openThread
             )
             isDeferringSendForFocusDismissal = false
         }
+    }
+
+    func startDraftThread() async throws -> CodexThread {
+        guard draftRuntimeMode == .newWorktree else {
+            return try await WorktreeFlowCoordinator.startNewLocalChat(
+                preferredProjectPath: selectedProjectPath,
+                codex: codex
+            )
+        }
+
+        guard let selectedProjectPath else {
+            throw WorktreeFlowError("A valid local project path is required.")
+        }
+
+        return try await WorktreeFlowCoordinator.startNewWorktreeChat(
+            preferredProjectPath: selectedProjectPath,
+            baseBranch: draftWorktreeBaseBranch,
+            codex: codex
+        )
     }
 
     @ViewBuilder

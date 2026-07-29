@@ -174,6 +174,20 @@ extension NewChatDraftView {
         viewModel.selectedGitBaseBranch = ""
     }
 
+    var isDraftWorktreeMode: Bool {
+        draftRuntimeMode == .newWorktree
+    }
+
+    var draftWorktreeBaseBranch: String? {
+        [
+            viewModel.selectedGitBaseBranch,
+            viewModel.currentGitBranch,
+            viewModel.gitDefaultBranch,
+        ]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+    }
+
     var hasSelectedProject: Bool {
         selectedProjectPath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
@@ -345,7 +359,7 @@ extension NewChatDraftView {
             activeTurnID: nil,
             isThreadRunning: false,
             isEmptyThread: true,
-            isWorktreeProject: false,
+            isWorktreeProject: isDraftWorktreeMode,
             canForkLocally: false,
             isInputFocused: $isInputFocused,
             orderedModelOptions: orderedModelOptions,
@@ -386,7 +400,15 @@ extension NewChatDraftView {
             },
             onStartForkThreadLocally: {},
             onOpenForkWorktree: {},
-            onOpenWorktreeHandoff: {},
+            onOpenWorktreeHandoff: {
+                guard hasSelectedProject,
+                      viewModel.isGitRepositoryInitialized,
+                      draftWorktreeBaseBranch != nil else {
+                    return
+                }
+                HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                draftRuntimeMode = .newWorktree
+            },
             onOpenFeedbackMail: {},
             onShowStatus: {},
             onShowGoal: { _ in },

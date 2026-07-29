@@ -18,6 +18,29 @@ final class TurnGitBranchSelectorTests: XCTestCase {
         XCTAssertEqual(agntNormalizedCreatedBranchName("   "), "")
     }
 
+    func testCreatedBranchNameValidationRejectsEmptyAndBarePrefix() {
+        XCTAssertFalse(agntCreatedBranchNameIsValid(""))
+        XCTAssertFalse(agntCreatedBranchNameIsValid("   "))
+        XCTAssertFalse(agntCreatedBranchNameIsValid("agnt/"))
+        XCTAssertTrue(agntCreatedBranchNameIsValid("agnt/feature-a"))
+        XCTAssertTrue(agntCreatedBranchNameIsValid("feature-a"))
+    }
+
+    func testVisibleBranchLabelFallsBackToDefaultThenPlaceholder() {
+        XCTAssertEqual(
+            agntVisibleBranchLabel(currentBranch: " agnt/topic ", defaultBranch: "main"),
+            "agnt/topic"
+        )
+        XCTAssertEqual(
+            agntVisibleBranchLabel(currentBranch: " ", defaultBranch: " main "),
+            "main"
+        )
+        XCTAssertEqual(
+            agntVisibleBranchLabel(currentBranch: " ", defaultBranch: " "),
+            "Branch"
+        )
+    }
+
     func testCurrentBranchSelectionDisablesCheckedOutElsewhereRowsWhenWorktreePathIsMissing() {
         XCTAssertTrue(
             agntCurrentBranchSelectionIsDisabled(

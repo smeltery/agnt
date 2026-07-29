@@ -16,6 +16,22 @@ func agntNormalizedCreatedBranchName(_ rawName: String) -> String {
     return "agnt/\(trimmedName)"
 }
 
+// A prompt-stage name is creatable once it holds more than the seeded prefix.
+func agntCreatedBranchNameIsValid(_ rawName: String) -> Bool {
+    let trimmedName = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !trimmedName.isEmpty && trimmedName != "agnt/"
+}
+
+// Single fallback rule for branch labels: current checkout, repo default, then a neutral placeholder.
+func agntVisibleBranchLabel(currentBranch: String, defaultBranch: String) -> String {
+    let normalizedCurrentBranch = currentBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !normalizedCurrentBranch.isEmpty {
+        return normalizedCurrentBranch
+    }
+    let normalizedDefaultBranch = defaultBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+    return normalizedDefaultBranch.isEmpty ? "Branch" : normalizedDefaultBranch
+}
+
 // Leaves "open elsewhere" branches selectable so the caller can surface the right alert or git error.
 func agntCurrentBranchSelectionIsDisabled(
     branch: String,
@@ -96,10 +112,7 @@ struct TurnGitBranchSelector: View, Equatable {
         currentGitBranch.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     private var visibleBranchLabel: String {
-        if !normalizedCurrentBranch.isEmpty {
-            return normalizedCurrentBranch
-        }
-        return normalizedDefaultBranch ?? "Branch"
+        agntVisibleBranchLabel(currentBranch: currentGitBranch, defaultBranch: defaultBranch)
     }
 
     static func == (lhs: TurnGitBranchSelector, rhs: TurnGitBranchSelector) -> Bool {
@@ -247,9 +260,7 @@ struct TurnGitBranchPickerSheet: View {
     }
 
     private var isNewBranchNameValid: Bool {
-        let trimmed = newBranchName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != "agnt/" else { return false }
-        return true
+        agntCreatedBranchNameIsValid(newBranchName)
     }
 
     // Suggests quick branch creation when the search query does not match an existing branch.

@@ -69,6 +69,7 @@ extension TurnViewModel {
         codex: CodexService,
         draftThreadID: String,
         preferredProjectPath: String?,
+        startThread: (@MainActor () async throws -> CodexThread)? = nil,
         onThreadCreated: @escaping @MainActor @Sendable (CodexThread) -> Void,
         onSendFailed: (@MainActor @Sendable () -> Void)? = nil
     ) -> Bool {
@@ -90,7 +91,9 @@ extension TurnViewModel {
             defer { isSending = false }
 
             do {
-                let thread = try await codex.startThreadIfReady(preferredProjectPath: preferredProjectPath)
+                let thread = try await (startThread ?? {
+                    try await codex.startThreadIfReady(preferredProjectPath: preferredProjectPath)
+                })()
                 let preAppendedMessage = movePreAppendedNewThreadUserMessageIfNeeded(
                     draftPreAppendedMessage,
                     pendingSend: pendingSend,
