@@ -69,6 +69,17 @@ export function ChevronUp(props: IconProps) {
   );
 }
 
+export function Cloud(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path
+        {...BASE_STROKE_PROPS}
+        d="M5.4 12.5 H12 A2.5 2.5 0 0 0 12.2 7.5 A4 4 0 0 0 4.7 6.4 A3.1 3.1 0 0 0 5.4 12.5 Z"
+      />
+    </svg>
+  );
+}
+
 export function Xmark(props: IconProps) {
   return (
     <svg {...svgProps(props)}>

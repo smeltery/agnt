@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useThreadsStore } from "../../state/threads-store";
 import { Sheet } from "../shared/Sheet";
+import { ComposerDevicePicker } from "./ComposerDevicePicker";
 
 interface NewChatModalProps {
   onClose(): void;
@@ -77,6 +78,10 @@ export function NewChatModal({ onClose, onPickProject, initialCwd, initialPrompt
           <h2 id="agnt-newchat-title">New chat</h2>
         </header>
         <section className="agnt-modal-body">
+          <div className="agnt-newchat-run-on-row">
+            <ComposerDevicePicker />
+          </div>
+
           <label className="agnt-input-field">
             <legend>
               <span className="agnt-input-field-header">Project folder</span>

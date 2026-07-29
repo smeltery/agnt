@@ -4,6 +4,7 @@ import type { ImageAttachment } from "../../models";
 import type { ProjectDirectoryEntry } from "../../protocol/project";
 import type { SlashCommand } from "../../state/slash-commands";
 import { Eye, EyeSlash, Paperclip } from "../shared/Icon";
+import { ComposerDevicePicker } from "./ComposerDevicePicker";
 import { ComposerFindReplace } from "./ComposerFindReplace";
 import { ComposerMentionMenu, ComposerSlashMenu, DraftStatsFooter, PromptHistoryDropdown } from "./ComposerPickers";
 import { MarkdownContent } from "./MarkdownContent";
@@ -221,6 +222,7 @@ function ComposerEditor({
 function ComposerActions(props: ComposerSurfaceProps) {
   return (
     <div className="agnt-composer-actions">
+      <ComposerDevicePicker />
       <button
         type="button"
         className="agnt-button-ghost"

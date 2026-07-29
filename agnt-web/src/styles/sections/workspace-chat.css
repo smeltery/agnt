@@ -232,6 +232,109 @@
   align-items: center;
   flex-wrap: wrap;
 }
+.agnt-composer-device-picker {
+  position: relative;
+  display: inline-flex;
+  margin-right: auto;
+}
+.agnt-composer-meta-button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--agnt-fg-dim);
+  min-height: 32px;
+  max-width: min(260px, 72vw);
+  border-radius: 8px;
+  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.agnt-composer-meta-button:hover,
+.agnt-composer-meta-button[aria-expanded="true"] {
+  color: var(--agnt-fg);
+  background: var(--agnt-bg-elev-2);
+  border-color: var(--agnt-border);
+}
+.agnt-composer-meta-button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.agnt-composer-meta-kicker {
+  color: var(--agnt-fg-tertiary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.agnt-composer-meta-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--agnt-fg);
+}
+.agnt-composer-device-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(240px, calc(100vw - 32px));
+  z-index: 25;
+  border: 1px solid var(--agnt-border);
+  border-radius: 8px;
+  background: var(--agnt-bg-elev);
+  box-shadow: 0 18px 44px color-mix(in srgb, black 30%, transparent);
+  padding: 6px;
+}
+.agnt-composer-device-menu-title {
+  padding: 7px 10px 5px;
+  color: var(--agnt-fg-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.agnt-composer-device-option {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--agnt-fg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.agnt-composer-device-option:hover,
+.agnt-composer-device-option-current {
+  background: var(--agnt-bg-elev-2);
+}
+.agnt-composer-device-option-main {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.agnt-composer-device-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.agnt-composer-device-option-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--agnt-fg-tertiary);
+  font-size: 11px;
+}
+.agnt-newchat-run-on-row {
+  display: flex;
+  min-height: 32px;
+}
+.agnt-newchat-run-on-row .agnt-composer-device-picker {
+  margin-right: 0;
+}
 /* Mirror iOS send button: small filled circle with the active foreground
    on the system background. The Send affordance lives inside the actions
    row alongside attach / voice ghost buttons. */

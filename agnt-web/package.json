@@ -13,6 +13,7 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "build:vite": "vite build",
+    "icons": "../scripts/generate-app-icons.sh",
     "preview": "vite preview --port 4173",
     "test": "vitest run",
     "test:watch": "vitest",
