@@ -188,7 +188,7 @@ async function main({
     return;
   }
 
-  if (command === "qr" || command === "pair") {
+  if (command === "qr" || command === "pair" || command === "connect") {
     assertServiceCommand(command, { platform, consoleImpl, exitImpl });
     const result = platform === "darwin"
       ? await deps.startMacOSBridgeService({ waitForPairing: true, providerId })
@@ -205,7 +205,9 @@ async function main({
       return;
     }
 
-    consoleImpl.log("[agnt] Refreshing bridge pairing QR...");
+    consoleImpl.log(command === "connect"
+      ? "[agnt] Connecting this machine with a fresh pairing QR..."
+      : "[agnt] Refreshing bridge pairing QR...");
     if (platform === "darwin") {
       deps.printMacOSBridgePairingQr({ pairingSession: result.pairingSession });
     } else {
@@ -331,9 +333,9 @@ async function main({
 
   consoleImpl.error(`Unknown command: ${command}`);
   consoleImpl.error(
-    "Usage: agnt up | agnt run | agnt qr | agnt pair | agnt start | agnt restart | agnt stop | agnt status | "
+    "Usage: agnt up | agnt run | agnt connect | agnt qr | agnt pair | agnt start | agnt restart | agnt stop | agnt status | "
     + "agnt reset-pairing | agnt resume | agnt watch [threadId] | agnt --version | "
-    + "append --json to qr/pair/start/restart/stop/status/reset-pairing/resume for machine-readable output"
+    + "append --json to connect/qr/pair/start/restart/stop/status/reset-pairing/resume for machine-readable output"
   );
   exitImpl(1);
 }

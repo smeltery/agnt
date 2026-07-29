@@ -207,6 +207,39 @@ test("agnt qr refreshes a service pairing session and prints the QR", async () =
   ]);
 });
 
+test("agnt connect starts a service pairing session and prints the QR", async () => {
+  const calls = [];
+  const messages = [];
+  const pairingSession = {
+    pairingPayload: { sessionId: "session-connect" },
+  };
+
+  await main({
+    argv: ["node", "agnt", "connect", "--provider", "cursor"],
+    platform: "darwin",
+    consoleImpl: {
+      log(message) { messages.push(message); },
+      error(message) { throw new Error(`unexpected error: ${message}`); },
+    },
+    exitImpl(code) { throw new Error(`unexpected exit ${code}`); },
+    deps: {
+      async startMacOSBridgeService(options) {
+        calls.push(["start-service", options]);
+        return { plistPath: "/tmp/agnt.plist", pairingSession };
+      },
+      printMacOSBridgePairingQr(options) {
+        calls.push(["print-qr", options]);
+      },
+    },
+  });
+
+  assert.deepEqual(messages, ["[agnt] Connecting this machine with a fresh pairing QR..."]);
+  assert.deepEqual(calls, [
+    ["start-service", { waitForPairing: true, providerId: "cursor" }],
+    ["print-qr", { pairingSession }],
+  ]);
+});
+
 test("agnt pair --json redacts the live pairing session", async () => {
   const writes = [];
   const originalWrite = process.stdout.write;
@@ -265,6 +298,68 @@ test("agnt pair --json redacts the live pairing session", async () => {
   assert.equal(payload.pairingSession?.pairingPayload?.hasRelay, true);
   assert.equal(payload.pairingSession?.pairingPayload?.hasSessionId, true);
   assert.equal(payload.pairingSession?.pairingPayload?.hasMacIdentityPublicKey, true);
+});
+
+test("agnt connect --json redacts the live pairing session", async () => {
+  const writes = [];
+  const originalWrite = process.stdout.write;
+
+  process.stdout.write = (chunk, encoding, callback) => {
+    writes.push(String(chunk));
+    if (typeof callback === "function") {
+      callback();
+    }
+    return true;
+  };
+
+  try {
+    await main({
+      argv: ["node", "agnt", "connect", "--json"],
+      platform: "linux",
+      consoleImpl: {
+        log() {},
+        error(message) { throw new Error(`unexpected error: ${message}`); },
+      },
+      exitImpl(code) { throw new Error(`unexpected exit ${code}`); },
+      deps: {
+        async startLinuxBridgeService(options) {
+          assert.deepEqual(options, { waitForPairing: true, providerId: "" });
+          return {
+            unitPath: "/tmp/agnt.service",
+            pairingSession: {
+              createdAt: "2026-07-09T12:00:00.000Z",
+              pairingCode: "ABCDEFGHJK",
+              pairingPayload: {
+                v: 2,
+                relay: "ws://127.0.0.1:9000/relay",
+                sessionId: "session-secret",
+                macIdentityPublicKey: "pubkey-secret",
+                expiresAt: "2026-07-09T12:05:00.000Z",
+                displayName: "Nick's Linux",
+              },
+            },
+          };
+        },
+        printLinuxBridgePairingQr() {
+          throw new Error("QR printer should not run for --json");
+        },
+      },
+    });
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+
+  const payload = JSON.parse(writes.join("").trim());
+  assert.equal(payload.ok, true);
+  assert.equal(payload.unitPath, "/tmp/agnt.service");
+  assert.equal(payload.pairingSession?.pairingCode, "ABCDEFGHJK");
+  assert.equal(payload.pairingSession?.pairingPayload?.relay, undefined);
+  assert.equal(payload.pairingSession?.pairingPayload?.sessionId, undefined);
+  assert.equal(payload.pairingSession?.pairingPayload?.macIdentityPublicKey, undefined);
+  assert.equal(payload.pairingSession?.pairingPayload?.hasRelay, true);
+  assert.equal(payload.pairingSession?.pairingPayload?.hasSessionId, true);
+  assert.equal(payload.pairingSession?.pairingPayload?.hasMacIdentityPublicKey, true);
+  assert.equal(payload.pairingSession?.pairingPayload?.displayName, "Nick's Linux");
 });
 
 test("runCli reports uncaught CLI failures with the agnt prefix", async () => {
