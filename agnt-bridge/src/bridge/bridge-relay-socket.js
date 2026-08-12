@@ -12,7 +12,6 @@ function createBridgeRelaySocketLoop({
   contextUsageWatcher,
   desktopIpcActionFollower,
   desktopIpcLiveOwner,
-  desktopRefresher,
   getDeviceState,
   getPairingSession,
   getRelaySessionUrl,
@@ -59,7 +58,11 @@ function createBridgeRelaySocketLoop({
       rolloutLiveMirror?.stopAll();
       desktopIpcLiveOwner?.stopAll();
       desktopIpcActionFollower?.stopAll();
-      desktopRefresher.handleTransportReset();
+      // Relay reconnects are transport-only: keep the refresher's own
+      // follow-confirmation state (timers, watchers) running so a brief
+      // reconnect blip doesn't restart an in-flight auto-follow activation
+      // from scratch. codex.onClose / stopBridge still call
+      // handleTransportReset() for real teardown.
     },
     handleIncomingWireMessage: (message, ctx) => secureTransport.handleIncomingWireMessage(message, ctx),
     onApplicationMessage: handleApplicationMessage,

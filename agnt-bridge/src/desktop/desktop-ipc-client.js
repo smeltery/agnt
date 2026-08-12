@@ -5,6 +5,7 @@
 // Depends on: ./desktop-ipc-shared
 
 const {
+  DESKTOP_IPC_METHOD_VERSIONS: METHOD_VERSION_BY_NAME,
   buildIpcRequestEnvelope,
   createFrameReader,
   readString,
@@ -168,6 +169,25 @@ function createDesktopIpcClient({
     });
   }
 
+  function sendBroadcast(method, params, { targetClientIds } = {}) {
+    ensureConnected();
+    if (!socket || socket.destroyed || !clientId) {
+      return false;
+    }
+    const envelope = {
+      type: "broadcast",
+      method,
+      sourceClientId: clientId,
+      params: params || {},
+      version: METHOD_VERSION_BY_NAME.get(method) || 1,
+    };
+    if (Array.isArray(targetClientIds) && targetClientIds.length > 0) {
+      envelope.targetClientIds = targetClientIds;
+    }
+    writeEnvelope(envelope);
+    return true;
+  }
+
   function handleData(chunk) {
     if (chunk.length > 0) {
       lastActivityAt = now();
@@ -269,6 +289,9 @@ function createDesktopIpcClient({
   }
 
   return {
+    get clientId() {
+      return clientId;
+    },
     ensureConnected,
     isConnected() {
       return Boolean(socket && !socket.destroyed && clientId);
@@ -280,6 +303,7 @@ function createDesktopIpcClient({
     },
     sendRequest,
     sendDiscoveryRequest,
+    sendBroadcast,
     close,
   };
 }

@@ -200,6 +200,7 @@ function loadBridgeWithTestDoubles({ createCodexTransportImpl }) {
           handleInbound() {},
           handleOutbound() {},
           handleTransportReset() {},
+          handleFollowerStateChanged() {},
         }),
       };
       return {

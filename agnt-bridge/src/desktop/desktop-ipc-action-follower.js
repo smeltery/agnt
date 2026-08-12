@@ -34,12 +34,17 @@ const {
   seedConversationStateFromThreadRead,
 } = require("./desktop-ipc-action-follower-support");
 const {
+  CLIENT_STATUS_CHANGED,
   DESKTOP_IPC_METHOD_VERSIONS: METHOD_VERSION_BY_NAME,
+  THREAD_STREAM_FOLLOWING_CHANGED,
+  THREAD_STREAM_FOLLOWING_STATUS_REQUESTED,
   cloneJSON,
+  normalizeToken,
   readString,
   resolveDefaultIpcSocketPath,
   safeParseJSON,
 } = require("./desktop-ipc-shared");
+const { createFollowerStateTracker } = require("./desktop-ipc-follower-tracker");
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const OWNERSHIP_PROBE_TIMEOUT_MS = 1_500;
@@ -84,6 +89,7 @@ function createDesktopIpcActionFollower({
   ownershipProbeTimeoutMs = OWNERSHIP_PROBE_TIMEOUT_MS,
   backgroundDisconnectGraceMs = BACKGROUND_DISCONNECT_GRACE_MS,
   snapshotDebounceMs = 0,
+  onFollowerStateChanged = null,
 } = {}) {
   const ipc = createDesktopIpcClient({
     socketPath,
@@ -93,10 +99,48 @@ function createDesktopIpcActionFollower({
     logPrefix,
     onEnvelope,
     onConnected() {
+      announceDesktopFollowForActiveThreads();
       heldFollowerRequests.probeHeldRequests();
     },
     onDisconnect,
   });
+  // Threads this bridge itself is announcing as "following" to Desktop's own
+  // renderer(s) — mirrors what Desktop's route-mount lifecycle would do if a
+  // human opened the same Desktop-owned thread locally.
+  const desktopFollowThreadIds = new Set();
+  const followerTracker = createFollowerStateTracker({
+    isTrackedThread: (threadId) => !isLocallyOwnedThread(threadId) && !liveOwnerThreadIds.has(threadId),
+    onFollowerStateChanged,
+  });
+
+  function followDesktopThread(threadId, targetClientIds = undefined) {
+    if (!threadId || isLocallyOwnedThread(threadId) || liveOwnerThreadIds.has(threadId)) {
+      return false;
+    }
+    desktopFollowThreadIds.add(threadId);
+    return ipc.sendBroadcast(THREAD_STREAM_FOLLOWING_CHANGED, {
+      hostId: "local",
+      conversationId: threadId,
+      following: true,
+    }, { targetClientIds });
+  }
+
+  function unfollowDesktopThread(threadId) {
+    if (!desktopFollowThreadIds.delete(threadId)) {
+      return false;
+    }
+    return ipc.sendBroadcast(THREAD_STREAM_FOLLOWING_CHANGED, {
+      hostId: "local",
+      conversationId: threadId,
+      following: false,
+    });
+  }
+
+  function announceDesktopFollowForActiveThreads() {
+    for (const threadId of desktopFollowThreadIds) {
+      followDesktopThread(threadId);
+    }
+  }
   const rawStatesByThreadId = new Map();
   const rawStateUpdatedAtByThreadId = new Map();
   const pendingSnapshotsByThreadId = new Map();
@@ -266,6 +310,8 @@ function createDesktopIpcActionFollower({
     settleAnnouncedBackgroundTurn,
     staleYieldedThreadIds,
     syncProjectedActions,
+    unfollowDesktopThread,
+    followerTracker,
   });
   const { tryServeDesktopOwnedRead } = readServer;
   const { queueThreadChange, recoverThreadBaseline } = baselineRecovery;
@@ -338,6 +384,7 @@ function createDesktopIpcActionFollower({
       heldFollowerRequests.setProbeDeadline(threadId);
     }
     ipc.ensureConnected();
+    followDesktopThread(threadId);
     return false;
   }
 
@@ -364,10 +411,33 @@ function createDesktopIpcActionFollower({
   }
 
   function stopAll() {
+    for (const threadId of desktopFollowThreadIds) {
+      unfollowDesktopThread(threadId);
+    }
+    desktopFollowThreadIds.clear();
+    followerTracker.clear();
     threadStateManager.stopAll();
   }
 
   function onEnvelope(envelope) {
+    if (envelope?.type === "broadcast" && envelope.method === CLIENT_STATUS_CHANGED) {
+      if (normalizeToken(envelope.params?.status) === "disconnected") {
+        followerTracker.removeFollowerClient(envelope.params?.clientId || envelope.sourceClientId);
+      }
+      return;
+    }
+    if (envelope?.type === "broadcast" && envelope.method === THREAD_STREAM_FOLLOWING_CHANGED) {
+      followerTracker.updateFollowerState(envelope, ipc.clientId);
+      return;
+    }
+    if (envelope?.type === "broadcast" && envelope.method === THREAD_STREAM_FOLLOWING_STATUS_REQUESTED) {
+      const params = envelope.params || {};
+      const threadId = readString(params.conversationId) || readString(params.conversation_id);
+      if (threadId && desktopFollowThreadIds.has(threadId)) {
+        followDesktopThread(threadId, [envelope.sourceClientId].filter(Boolean));
+      }
+      return;
+    }
     if (envelope?.type === "broadcast"
       && (envelope.method === "thread-archived" || envelope.method === "thread-unarchived")) {
       syncThreadArchiveBroadcast(envelope);

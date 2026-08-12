@@ -124,7 +124,25 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
       },
     },
   });
+  const explicitAutoFollowOffConfig = readBridgeConfig({
+    env: {
+      AGNT_DESKTOP_AUTO_FOLLOW: "false",
+    },
+    platform: "darwin",
+    runtimeRoot: "/tmp/agnt-package",
+    fsImpl: {
+      existsSync: () => false,
+      readFileSync: () => {
+        throw new Error("unexpected read");
+      },
+    },
+  });
   assert.equal(macConfig.refreshEnabled, false);
+  assert.equal(macConfig.desktopAutoFollowEnabled, true);
+  assert.equal(macEndpointConfig.desktopAutoFollowEnabled, false);
+  assert.equal(linuxConfig.desktopAutoFollowEnabled, false);
+  assert.equal(explicitOffConfig.desktopAutoFollowEnabled, true);
+  assert.equal(explicitAutoFollowOffConfig.desktopAutoFollowEnabled, false);
   assert.equal(macConfig.keepMacAwakeEnabled, false);
   assert.equal(macConfig.relayUrl, "");
   assert.equal(macConfig.pushServiceUrl, "");

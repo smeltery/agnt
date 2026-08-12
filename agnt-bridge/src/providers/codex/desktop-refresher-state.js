@@ -24,6 +24,11 @@ function initializeDesktopRefresherState(refresher, { enabled }) {
   refresher.watchStartAt = 0;
   refresher.lastRolloutSize = null;
   refresher.stopWatcherAfterRefreshThreadId = null;
+  refresher.materializationPendingThreadIds = new Set();
+  refresher.followedThreadIds = new Set();
+  refresher.followAttemptsByThreadId = new Map();
+  refresher.followConfirmationTimersByThreadId = new Map();
+  refresher.followActivationSerial = 0;
   refresher.runtimeRefreshAvailable = enabled;
   refresher.consecutiveRefreshFailures = 0;
   refresher.unavailableLogged = false;

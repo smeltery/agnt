@@ -153,6 +153,119 @@ test("live owner broadcasts phone-owned turn snapshots over Desktop IPC", async 
   assert.equal(turn.items[0].text, "Hello");
 });
 
+test("live owner confirms Desktop follow handshakes and sends an immediate baseline", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-live-owner-follow-");
+  const frames = [];
+  const followerChanges = [];
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      frames.push(frame);
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "router",
+          result: { clientId: "agnt-owner-follow" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+
+  const owner = createDesktopIpcLiveOwner({
+    socketPath,
+    snapshotDebounceMs: 1,
+    sendCodexRequest: async () => ({ ok: true }),
+    sendRawCodexMessage() {},
+    onFollowerStateChanged(threadId, following) {
+      followerChanges.push({ threadId, following });
+    },
+  });
+  t.after(() => {
+    owner.stopAll();
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  owner.observeInbound(JSON.stringify({
+    id: "thread-follow-start",
+    method: "thread/start",
+    params: {
+      cwd: "/tmp/project",
+    },
+  }));
+  owner.observeOutbound(JSON.stringify({
+    id: "thread-follow-start",
+    result: {
+      thread: {
+        id: "thread-follow-handshake",
+        sessionId: "thread-follow-handshake",
+        preview: "hello",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1,
+        updatedAt: 1,
+        status: { type: "idle" },
+        cwd: "/tmp/project",
+        turns: [],
+      },
+    },
+  }));
+  await waitForMessage(frames, (frame) => frame.method === "initialize");
+  await waitForMessage(
+    frames,
+    (frame) => frame.method === "thread-stream-following-status-requested"
+      && frame.params?.conversationId === "thread-follow-handshake"
+  );
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-following-changed",
+    sourceClientId: "desktop-follower",
+    version: 1,
+    params: {
+      hostId: "local",
+      conversationId: "thread-follow-handshake",
+      following: true,
+    },
+  });
+
+  await waitFor(() => followerChanges.length === 1);
+  assert.deepEqual(followerChanges, [{
+    threadId: "thread-follow-handshake",
+    following: true,
+  }]);
+  await waitForMessage(
+    frames,
+    (frame) => frame.method === "thread-stream-state-changed"
+      && frame.params?.conversationId === "thread-follow-handshake"
+  );
+
+  writeFrame(serverSocket, {
+    type: "broadcast",
+    method: "thread-stream-following-changed",
+    sourceClientId: "desktop-follower",
+    version: 1,
+    params: {
+      hostId: "local",
+      conversationId: "thread-follow-handshake",
+      following: false,
+    },
+  });
+
+  await waitFor(() => followerChanges.length === 2);
+  assert.deepEqual(followerChanges[1], {
+    threadId: "thread-follow-handshake",
+    following: false,
+  });
+});
+
 test("live owner routes Desktop follower turns to Codex", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-live-owner-router-");
   const codexRequests = [];

@@ -7,6 +7,7 @@ function createThreadStateManager({
   canonicalHistoryReplacementSentThreadIds,
   canonicalHistoryThreadIds,
   conversationProjector,
+  followerTracker,
   heldFollowerRequests,
   ipc,
   liveOwnerThreadIds,
@@ -21,6 +22,7 @@ function createThreadStateManager({
   settleAnnouncedBackgroundTurn,
   staleYieldedThreadIds,
   syncProjectedActions,
+  unfollowDesktopThread,
   backgroundDisconnectTimersByThreadId,
   announcedBackgroundTurnsByThreadId,
 }) {
@@ -45,6 +47,7 @@ function createThreadStateManager({
   }
 
   function clearDesktopThreadCaches(threadId) {
+    unfollowDesktopThread(threadId);
     settleAnnouncedBackgroundTurn(threadId, "interrupted");
     if (backgroundOnlyThreadIds.delete(threadId)) {
       activeThreads.delete(threadId);
@@ -72,6 +75,9 @@ function createThreadStateManager({
     baselineRecoveryStateByThreadId.clear();
     queuedChangesByThreadId.clear();
     heldFollowerRequests.clearConnectionProbeState();
+    // A lost follow confirmation cannot be re-sent by a peer that just
+    // disconnected; tell the refresher so it does not wait forever.
+    followerTracker.clearAndNotify();
     // A lost IPC connection is not evidence that Desktop stopped the turn.
     // Keep announced lifecycle state until a reconnect snapshot, archive, or
     // another authoritative state transition supplies a real terminal status.
@@ -102,6 +108,7 @@ function createThreadStateManager({
     queuedChangesByThreadId.clear();
     liveOwnerThreadIds.clear();
     heldFollowerRequests.clearAll();
+    followerTracker.clear();
     ipc.close();
   }
 

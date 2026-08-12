@@ -1,4 +1,5 @@
 const {
+  buildCompleteThreadReadParams,
   cloneJSON,
   readString,
 } = require("../desktop-ipc-shared");
@@ -122,7 +123,7 @@ function createInitialHistoryState({
       return;
     }
     const hydration = Promise.resolve()
-      .then(() => sendCodexRequest("thread/read", { threadId: normalizedThreadId }))
+      .then(() => sendCodexRequest("thread/read", buildCompleteThreadReadParams(normalizedThreadId)))
       .then((result) => {
         const thread = readThreadFromPayload(result);
         if (!thread?.id) {

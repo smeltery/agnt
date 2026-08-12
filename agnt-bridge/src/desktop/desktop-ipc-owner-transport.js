@@ -142,7 +142,7 @@ function createDesktopOwnerIpcClient({
       });
   }
 
-  function sendBroadcast(method, params) {
+  function sendBroadcast(method, params, { targetClientIds } = {}) {
     ensureConnected();
     if (!socket || socket.destroyed || !isInitialized) {
       return false;
@@ -160,6 +160,9 @@ function createDesktopOwnerIpcClient({
       params: params || {},
       version: METHOD_VERSION_BY_NAME.get(method) || 1,
     };
+    if (Array.isArray(targetClientIds) && targetClientIds.length > 0) {
+      envelope.targetClientIds = targetClientIds;
+    }
     return writeEnvelope(envelope);
   }
 

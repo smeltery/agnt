@@ -49,6 +49,7 @@ function readBridgeConfig({
     env
   );
   const explicitRefreshEnabled = readOptionalBooleanEnv(["AGNT_REFRESH_ENABLED"], env);
+  const explicitDesktopAutoFollowEnabled = readOptionalBooleanEnv(["AGNT_DESKTOP_AUTO_FOLLOW"], env);
   const explicitKeepMacAwakeEnabled = readOptionalBooleanEnv(["AGNT_KEEP_MAC_AWAKE"], env);
   const persistedRefreshEnabled = typeof daemonConfig.refreshEnabled === "boolean"
     ? daemonConfig.refreshEnabled
@@ -59,6 +60,10 @@ function readBridgeConfig({
   // Desktop refresh is opt-in, but once enabled in preferences the persisted
   // choice must survive daemon restarts unless the env explicitly overrides it.
   const defaultRefreshEnabled = persistedRefreshEnabled == null ? false : persistedRefreshEnabled;
+  // Desktop IPC live sync has no separate opt-out in agnt (it is inherent to
+  // running the local app-server rather than a remote endpoint), so the
+  // "liveSync enabled" term collapses to "we own the local Codex runtime".
+  const defaultDesktopAutoFollowEnabled = platform === "darwin" && !codexEndpoint;
   return {
     relayUrl,
     pushServiceUrl: readFirstDefinedEnv(
@@ -77,6 +82,9 @@ function readBridgeConfig({
       readFirstDefinedEnv(["AGNT_REFRESH_DEBOUNCE_MS"], String(DEFAULT_DEBOUNCE_MS), env),
       DEFAULT_DEBOUNCE_MS
     ),
+    desktopAutoFollowEnabled: explicitDesktopAutoFollowEnabled == null
+      ? defaultDesktopAutoFollowEnabled
+      : explicitDesktopAutoFollowEnabled,
     keepMacAwakeEnabled: explicitKeepMacAwakeEnabled == null
       ? (persistedKeepMacAwakeEnabled == null ? false : persistedKeepMacAwakeEnabled)
       : explicitKeepMacAwakeEnabled,
