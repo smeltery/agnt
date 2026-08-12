@@ -12,6 +12,8 @@ const FRAME_HEADER_BYTES = 4;
 const MAX_FRAME_BYTES = 256 * 1024 * 1024;
 
 const CLIENT_STATUS_CHANGED = "client-status-changed";
+const THREAD_STREAM_FOLLOWING_CHANGED = "thread-stream-following-changed";
+const THREAD_STREAM_FOLLOWING_STATUS_REQUESTED = "thread-stream-following-status-requested";
 
 // Single source of truth for Codex Desktop's IPC method versions. Desktop's
 // bundled map validates versions on both requests and broadcasts, and this
@@ -21,6 +23,8 @@ const DESKTOP_IPC_METHOD_VERSIONS = new Map([
   [CLIENT_STATUS_CHANGED, 1],
   // Desktop pins thread-stream-state-changed at version 8 and drops mismatches.
   ["thread-stream-state-changed", 8],
+  [THREAD_STREAM_FOLLOWING_CHANGED, 1],
+  [THREAD_STREAM_FOLLOWING_STATUS_REQUESTED, 1],
   ["thread-archived", 2],
   ["thread-unarchived", 1],
   ["thread-read-state-changed", 1],
@@ -520,6 +524,18 @@ function buildIpcRequestEnvelope({ requestId, method, params, clientId, initiali
   };
 }
 
+// Newer app-server builds omit every turn unless thread/read opts in explicitly.
+// Callers that hydrate a Desktop-owned or bridge-owned thread's full baseline
+// (rather than just watching for metadata changes) always need the complete
+// history: publishing the metadata-only default as a Desktop snapshot would
+// replace the visible transcript with an empty one.
+function buildCompleteThreadReadParams(threadId) {
+  return {
+    threadId: readString(threadId),
+    includeTurns: true,
+  };
+}
+
 function resolveIpcSocketPathCandidates() {
   if (process.platform === "win32") {
     return ["\\\\.\\pipe\\codex-ipc"];
@@ -569,6 +585,9 @@ function toSocketPathCandidatesResolver(socketPath) {
 
 module.exports = {
   CLIENT_STATUS_CHANGED,
+  THREAD_STREAM_FOLLOWING_CHANGED,
+  THREAD_STREAM_FOLLOWING_STATUS_REQUESTED,
+  buildCompleteThreadReadParams,
   buildIpcRequestEnvelope,
   createFrameReader,
   DESKTOP_IPC_METHOD_VERSIONS,

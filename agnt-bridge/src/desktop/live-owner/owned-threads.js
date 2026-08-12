@@ -17,6 +17,7 @@ function createOwnedThreadState({
   fallbackTurnIdsByThreadId,
   followerRequestsRef,
   followerRuntimeOverridesByThreadId,
+  forgetFollowerThread = () => {},
   hostId,
   ipc,
   lastBroadcastStatesByThreadId,
@@ -26,6 +27,7 @@ function createOwnedThreadState({
   pendingThreadHydrationsByThreadId,
   pendingTurnStarts,
   queuedFollowUpsByThreadId,
+  requestFollowerStatus = () => {},
   runningQueuedFollowUpThreadIds,
   stopAwaitingInitialHistory,
   streamRevisionsByThreadId,
@@ -35,8 +37,12 @@ function createOwnedThreadState({
     if (!normalizedThreadId) {
       return;
     }
+    const isNewOwner = !ownedThreadIds.has(normalizedThreadId);
     ownedThreadIds.add(normalizedThreadId);
     ipc.ensureConnected();
+    if (isNewOwner) {
+      requestFollowerStatus(normalizedThreadId);
+    }
   }
 
   function removeOwnedThread(threadId, { broadcastRemoval = false, reason = "", skipArchiveMetadataBroadcast = false } = {}) {
@@ -58,6 +64,7 @@ function createOwnedThreadState({
     lastBroadcastStatesByThreadId.delete(normalizedThreadId);
     fallbackTurnIdsByThreadId.delete(normalizedThreadId);
     streamRevisionsByThreadId.delete(normalizedThreadId);
+    forgetFollowerThread(normalizedThreadId);
     const droppedQueuedFollowUps = (queuedFollowUpsByThreadId.get(normalizedThreadId) || []).length > 0;
     queuedFollowUpsByThreadId.delete(normalizedThreadId);
     if (droppedQueuedFollowUps) {

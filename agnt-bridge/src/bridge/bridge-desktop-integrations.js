@@ -10,6 +10,7 @@ function createBridgeDesktopIntegrations({
   bridgeManagedCodex,
   codex,
   config,
+  desktopRefresher,
   normalizeCodexTurnStartParams,
   normalizeProviderMessage,
   readDesktopConversationState,
@@ -17,6 +18,12 @@ function createBridgeDesktopIntegrations({
   sendApplicationResponse,
 }) {
   const threadRuntimeSettingsStore = createThreadRuntimeSettingsStore();
+  // Both Desktop-owned (action follower) and bridge-owned (live owner) threads
+  // can be the target of a phone-initiated auto-follow deep link, so both
+  // sides forward Desktop's follow confirmation to the same refresher hook.
+  function onFollowerStateChanged(threadId, following) {
+    desktopRefresher?.handleFollowerStateChanged(threadId, following);
+  }
   const desktopIpcLiveOwner = !config.codexEndpoint && activeProvider.id === "codex"
     ? createDesktopIpcLiveOwner({
       sendApplicationResponse,
@@ -26,6 +33,7 @@ function createBridgeDesktopIntegrations({
       socketPath: config.desktopIpcSocketPath || undefined,
       snapshotDebounceMs: config.desktopIpcSnapshotDebounceMs,
       runtimeSettingsStore: threadRuntimeSettingsStore,
+      onFollowerStateChanged,
     })
     : null;
 
@@ -47,6 +55,7 @@ function createBridgeDesktopIntegrations({
         : (params) => params,
       socketPath: config.desktopIpcSocketPath || undefined,
       snapshotDebounceMs: config.desktopIpcSnapshotDebounceMs,
+      onFollowerStateChanged,
     })
     : null;
 

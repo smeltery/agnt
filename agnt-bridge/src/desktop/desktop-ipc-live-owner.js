@@ -1,12 +1,15 @@
 const net = require("net");
 
 const {
+  THREAD_STREAM_FOLLOWING_STATUS_REQUESTED,
+  buildCompleteThreadReadParams,
   cloneJSON,
   normalizeToken,
   readString,
   resolveDefaultIpcSocketPath,
   safeParseJSON,
 } = require("./desktop-ipc-shared");
+const { createFollowerStateTracker } = require("./desktop-ipc-follower-tracker");
 const {
   LOCAL_HOST_ID,
   applyAppServerMessageToConversationState,
@@ -83,6 +86,7 @@ function createDesktopIpcLiveOwner({
   initialHistoryRetryMs = DEFAULT_INITIAL_HISTORY_RETRY_MS,
   initialHistoryMaxAttempts = DEFAULT_INITIAL_HISTORY_MAX_ATTEMPTS,
   runtimeSettingsStore = null,
+  onFollowerStateChanged = null,
   netModule = net,
   now = () => Date.now(),
   logPrefix = "[agnt]",
@@ -163,6 +167,7 @@ function createDesktopIpcLiveOwner({
     logPrefix,
     onConnected() {
       listMetadata.flushPendingThreadArchiveMetadataBroadcasts();
+      requestFollowerStatusForAllOwnedThreads();
       broadcastAllOwnedSnapshots();
     },
     onBroadcast(envelope) {
@@ -175,6 +180,35 @@ function createDesktopIpcLiveOwner({
       return handleFollowerRequest(envelope);
     },
   });
+  // Desktop's own route-mount lifecycle announces (or retracts) following a
+  // bridge-owned thread over the same handshake the action-follower uses for
+  // Desktop-owned threads. That is the authoritative signal the auto-follow
+  // deep-link controller waits on to know its navigation actually landed.
+  const followerTracker = createFollowerStateTracker({
+    isTrackedThread: (threadId) => ownedThreadIds.has(threadId),
+    onFollowerStateChanged(threadId, following) {
+      if (following) {
+        // Match Codex's owner behavior: a newly mounted follower receives an
+        // immediate full baseline instead of waiting for the next model delta.
+        broadcastConversationState(threadId, { forceSnapshot: true });
+      }
+      onFollowerStateChanged?.(threadId, following);
+    },
+  });
+
+  function requestFollowerStatus(threadId) {
+    ipc.sendBroadcast(THREAD_STREAM_FOLLOWING_STATUS_REQUESTED, {
+      hostId,
+      conversationId: threadId,
+    });
+  }
+
+  function requestFollowerStatusForAllOwnedThreads() {
+    for (const threadId of ownedThreadIds) {
+      requestFollowerStatus(threadId);
+    }
+  }
+
   const followerRuntimeState = createFollowerRuntimeState({
     conversations,
     followerRuntimeOverridesByThreadId,
@@ -257,6 +291,7 @@ function createDesktopIpcLiveOwner({
     fallbackTurnIdsByThreadId,
     followerRequestsRef,
     followerRuntimeOverridesByThreadId,
+    forgetFollowerThread: followerTracker.forgetThread,
     hostId,
     ipc,
     lastBroadcastStatesByThreadId,
@@ -266,6 +301,7 @@ function createDesktopIpcLiveOwner({
     pendingThreadHydrationsByThreadId,
     pendingTurnStarts,
     queuedFollowUpsByThreadId,
+    requestFollowerStatus,
     runningQueuedFollowUpThreadIds,
     stopAwaitingInitialHistory,
     streamRevisionsByThreadId,
@@ -278,6 +314,7 @@ function createDesktopIpcLiveOwner({
     fallbackTurnIdsByThreadId,
     followerRequests,
     followerRuntimeOverridesByThreadId,
+    followerTracker,
     initialHistoryAttemptCountByThreadId,
     initialHistoryRetryAfterByThreadId,
     initialHistoryRetryTimersByThreadId,

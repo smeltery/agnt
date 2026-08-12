@@ -5,6 +5,7 @@
 // Depends on: ./desktop-ipc-live-owner-support, ./desktop-ipc-live-owner-utils, ./desktop-ipc-shared
 
 const {
+  buildCompleteThreadReadParams,
   cloneJSON,
   isPlainJSONObject,
   normalizeToken,
@@ -107,7 +108,7 @@ function createLiveOwnerFollowerRequestHandler({
 
   async function handleFollowerLoadCompleteHistory(conversationId) {
     try {
-      const result = await sendCodexRequest("thread/read", { threadId: conversationId });
+      const result = await sendCodexRequest("thread/read", buildCompleteThreadReadParams(conversationId));
       const thread = readThreadFromPayload(result);
       if (thread?.id) {
         rememberCachedThread(thread.id, thread);

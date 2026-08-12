@@ -24,8 +24,8 @@ const { listProviders, getProvider } = require("../../src/providers/index");
 test("createNoopDesktopRefresher implements every hook the bridge call sites invoke", () => {
   const noop = createNoopDesktopRefresher();
   // Method names mirror the bridge.js call sites
-  // (handleTransportReset / handleOutbound / handleInbound).
-  for (const method of ["handleInbound", "handleOutbound", "handleTransportReset"]) {
+  // (handleTransportReset / handleOutbound / handleInbound / handleFollowerStateChanged).
+  for (const method of ["handleInbound", "handleOutbound", "handleTransportReset", "handleFollowerStateChanged"]) {
     assert.equal(
       typeof noop[method],
       "function",
@@ -53,6 +53,7 @@ test("createNoopDesktopRefresher returns undefined and never throws on any paylo
     assert.equal(noop.handleOutbound(payload), undefined);
   }
   assert.equal(noop.handleTransportReset(), undefined);
+  assert.equal(noop.handleFollowerStateChanged("thread-1", true), undefined);
 });
 
 test("only Codex declares rolloutMirror=true; every other registered provider opts out", () => {

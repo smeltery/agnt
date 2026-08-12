@@ -129,8 +129,133 @@ test("navigation-only mode refreshes phone turn starts but skips watchers and co
   }));
   await wait(25);
 
-  assert.deepEqual(refreshCalls, ["codex://threads/thread-nav-only"]);
+  // Auto-follow activation appends a unique query so an already-mounted
+  // route still re-fires Codex's set-active-conversation effect.
+  assert.equal(refreshCalls.length, 1);
+  assert.match(
+    refreshCalls[0],
+    /^codex:\/\/threads\/thread-nav-only\?agnt-follow=\d+-1$/
+  );
   assert.deepEqual(watchedThreads, []);
+  refresher.handleTransportReset();
+});
+
+test("navigation-only follow retries remount an already-open route with a unique query", async () => {
+  const refreshCalls = [];
+  const refresher = new CodexDesktopRefresher({
+    enabled: true,
+    navigationOnly: true,
+    debounceMs: 0,
+    followConfirmTimeoutMs: 5,
+    followMaxAttempts: 3,
+    now: () => 123,
+    refreshExecutor: async (targetUrl) => {
+      refreshCalls.push(targetUrl);
+    },
+  });
+
+  refresher.handleInbound(JSON.stringify({
+    method: "turn/start",
+    params: {
+      threadId: "thread-already-open",
+      input: [{ type: "text", text: "hello" }],
+    },
+  }));
+  await waitFor(() => refreshCalls.length === 2);
+
+  assert.deepEqual(refreshCalls, [
+    "codex://threads/thread-already-open?agnt-follow=123-1",
+    "codex://threads/thread-already-open?agnt-follow=123-2",
+  ]);
+
+  refresher.handleFollowerStateChanged("thread-already-open", true);
+  await wait(15);
+  assert.equal(refreshCalls.length, 2);
+  refresher.handleTransportReset();
+});
+
+test("navigation-only mode waits for a new thread rollout before activating its route", async () => {
+  const refreshCalls = [];
+  let watcherHooks = null;
+  const refresher = new CodexDesktopRefresher({
+    enabled: true,
+    navigationOnly: true,
+    debounceMs: 0,
+    fallbackNewThreadMs: 5,
+    refreshExecutor: async (targetUrl) => {
+      refreshCalls.push(targetUrl);
+    },
+    watchThreadRolloutFactory: (hooks) => {
+      watcherHooks = hooks;
+      return { stop() {} };
+    },
+  });
+
+  refresher.handleInbound(JSON.stringify({
+    method: "thread/start",
+    params: {},
+  }));
+  await wait(15);
+  assert.deepEqual(refreshCalls, [], "auto-follow must not open the generic new-thread route");
+
+  refresher.handleOutbound(JSON.stringify({
+    method: "thread/started",
+    params: {
+      thread: { id: "thread-materializing" },
+    },
+  }));
+  assert.ok(watcherHooks);
+  assert.deepEqual(refreshCalls, []);
+
+  watcherHooks.onEvent({
+    reason: "materialized",
+    threadId: "thread-materializing",
+    size: 100,
+  });
+  await waitFor(() => refreshCalls.length === 1);
+
+  assert.equal(refreshCalls.length, 1);
+  assert.match(
+    refreshCalls[0],
+    /^codex:\/\/threads\/thread-materializing\?agnt-follow=\d+-1$/
+  );
+  refresher.handleFollowerStateChanged("thread-materializing", true);
+  refresher.handleTransportReset();
+});
+
+test("confirmed Desktop followers skip redundant activation until the route unmounts", async () => {
+  const refreshCalls = [];
+  const refresher = new CodexDesktopRefresher({
+    enabled: true,
+    navigationOnly: true,
+    debounceMs: 0,
+    refreshExecutor: async (targetUrl) => {
+      refreshCalls.push(targetUrl);
+    },
+  });
+  const turnStart = JSON.stringify({
+    method: "turn/start",
+    params: {
+      threadId: "thread-followed",
+      input: [{ type: "text", text: "hello" }],
+    },
+  });
+
+  refresher.handleFollowerStateChanged("thread-followed", true);
+  refresher.handleInbound(turnStart);
+  await wait(15);
+  assert.deepEqual(refreshCalls, []);
+
+  refresher.handleFollowerStateChanged("thread-followed", false);
+  refresher.handleInbound(turnStart);
+  await waitFor(() => refreshCalls.length === 1);
+  assert.equal(refreshCalls.length, 1);
+  assert.match(
+    refreshCalls[0],
+    /^codex:\/\/threads\/thread-followed\?agnt-follow=\d+-1$/
+  );
+
+  refresher.handleFollowerStateChanged("thread-followed", true);
   refresher.handleTransportReset();
 });
 

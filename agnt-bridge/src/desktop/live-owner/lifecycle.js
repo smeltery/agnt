@@ -1,5 +1,6 @@
 const {
   CLIENT_STATUS_CHANGED,
+  THREAD_STREAM_FOLLOWING_CHANGED,
   conversationSnapshotShowsActiveTurn,
   normalizeToken,
   readString,
@@ -17,6 +18,7 @@ function createLiveOwnerLifecycle({
   fallbackTurnIdsByThreadId,
   followerRequests,
   followerRuntimeOverridesByThreadId,
+  followerTracker,
   initialHistoryAttemptCountByThreadId,
   initialHistoryRetryAfterByThreadId,
   initialHistoryRetryTimersByThreadId,
@@ -52,6 +54,7 @@ function createLiveOwnerLifecycle({
     lastBroadcastStatesByThreadId.clear();
     fallbackTurnIdsByThreadId.clear();
     streamRevisionsByThreadId.clear();
+    followerTracker.clear();
     listMetadata.clearAll();
     pendingTurnStarts.clear();
     followerRuntimeOverridesByThreadId.clear();
@@ -71,6 +74,13 @@ function createLiveOwnerLifecycle({
       // Desktop immediately refreshes its sidebar.
       listMetadata.flushPendingThreadArchiveMetadataBroadcasts();
       snapshotState.broadcastAllOwnedSnapshots();
+      if (normalizeToken(envelope.params?.status) === "disconnected") {
+        followerTracker.removeFollowerClient(envelope.params?.clientId || envelope.sourceClientId);
+      }
+      return;
+    }
+    if (envelope?.method === THREAD_STREAM_FOLLOWING_CHANGED) {
+      followerTracker.updateFollowerState(envelope, ipc.clientId);
       return;
     }
     if (listMetadata.maybeYieldOwnedThreadForPeerArchive(envelope)) {

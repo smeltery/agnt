@@ -113,7 +113,10 @@ function loadDeviceStateOrExit({ loadOrCreateBridgeDeviceState }) {
 function createDesktopRefresher({ activeProvider, config, desktopBundle }) {
   return activeProvider.capabilities?.desktopRefresher && typeof activeProvider.createDesktopRefresher === "function"
     ? activeProvider.createDesktopRefresher({
-      enabled: config.refreshEnabled,
+      // IPC snapshots are accepted only after Codex mounts the route and
+      // announces itself as a follower. Auto-follow performs that one-time
+      // activation; refreshEnabled still controls the legacy reload workaround.
+      enabled: config.refreshEnabled || config.desktopAutoFollowEnabled === true,
       navigationOnly: !config.codexEndpoint,
       debounceMs: config.refreshDebounceMs,
       refreshCommand: config.refreshCommand,

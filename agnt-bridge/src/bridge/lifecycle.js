@@ -19,6 +19,7 @@ function createNoopDesktopRefresher() {
     handleInbound() {},
     handleOutbound() {},
     handleTransportReset() {},
+    handleFollowerStateChanged() {},
   };
 }
 
