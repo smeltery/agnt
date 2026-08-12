@@ -4,6 +4,7 @@ const {
 } = require("../desktop-ipc-action-follower-support");
 const { readString } = require("../desktop-ipc-shared");
 const { desktopThreadReplacedNotification } = require("./read-serving");
+const { drainPendingReviewOverlays } = require("./review-overlay-replay");
 
 function createBackgroundPromotion({
   announcedBackgroundTurnsByThreadId,
@@ -12,6 +13,7 @@ function createBackgroundPromotion({
   canonicalHistoryThreadIds,
   clearBackgroundDisconnectTimer,
   conversationProjector,
+  normalizedReviewFingerprintsByThreadId,
   rememberCanonicalActiveTurns,
   sendApplicationResponse,
   settleAnnouncedBackgroundTurn,
@@ -37,6 +39,16 @@ function createBackgroundPromotion({
       canonicalHistoryReplacementSentThreadIds.add(threadId);
       conversationProjector.remove(threadId);
       sendApplicationResponse(JSON.stringify(desktopThreadReplacedNotification(threadId)));
+      // Guardian reviews on normalized-only history turns never appear in
+      // canonical thread/read history, so drain their overlays here too;
+      // otherwise a thread that stays idle after opening never delivers them.
+      drainPendingReviewOverlays({
+        threadId,
+        rawState,
+        liveTurns: liveState.turns,
+        fingerprintsByThreadId: normalizedReviewFingerprintsByThreadId,
+        sendApplicationResponse,
+      });
       const output = conversationProjector.project(threadId, liveState, {
         includeAllActiveTurns: true,
       });

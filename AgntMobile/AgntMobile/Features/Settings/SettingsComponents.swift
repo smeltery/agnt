@@ -3,6 +3,7 @@
 // Layer: View
 
 import SwiftUI
+import UIKit
 
 struct SettingsCard<Content: View>: View {
     let title: String
@@ -58,6 +59,60 @@ struct SettingsButton: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct SettingsMenuPickerOption<Value: Hashable>: Identifiable {
+    let value: Value
+    let title: String
+
+    var id: Value { value }
+}
+
+// Native UIKit single-selection menu row. Replaces `Picker(selection:)
+// .pickerStyle(.menu)` so the trigger gets UIKit's checkmark state and the
+// shared `AppMenuPresentation` menu-row typography instead of SwiftUI's
+// `Menu`, which doesn't expose either.
+struct SettingsMenuPickerRow<Value: Hashable>: View {
+    let title: String
+    let value: String
+    let options: [SettingsMenuPickerOption<Value>]
+    @Binding var selection: Value
+    var isDisabled = false
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            UIKitMenuButton {
+                HStack(spacing: 6) {
+                    Text(value)
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(AppFont.caption2(weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            } menu: {
+                UIMenu(
+                    options: [.singleSelection],
+                    children: options.map { option in
+                        UIAction(
+                            title: option.title,
+                            state: option.value == selection ? .on : .off
+                        ) { _ in
+                            selection = option.value
+                        }
+                    }
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isDisabled || options.isEmpty)
+        }
     }
 }
 

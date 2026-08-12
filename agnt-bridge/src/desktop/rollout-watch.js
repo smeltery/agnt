@@ -12,6 +12,7 @@ const {
   findRecentRolloutFileForContextRead,
   findRecentRolloutFileForWatch,
   findRolloutFileForThread,
+  invalidateRolloutLookupCache,
 } = require("./rollout/file-lookup");
 const {
   contextUsageFromTokenCountPayload,
@@ -80,6 +81,12 @@ function createThreadRolloutActivityWatcher({
           transientErrorCount = 0;
           return;
         }
+
+        // The rollout file just materialized: bust the shared lookup cache so
+        // any other lookup racing this one (e.g. the desktop mirror context
+        // read for the same thread) sees it immediately instead of waiting
+        // out the cache TTL.
+        invalidateRolloutLookupCache({ root: sessionsRoot, threadId: resolvedThreadId, fsModule });
 
         lastSize = readFileSize(rolloutPath, fsModule);
         lastGrowthAt = currentTime;
@@ -349,4 +356,5 @@ module.exports = {
   resolveSessionsRoot,
   findRolloutFileForThread,
   findRecentRolloutFileForContextRead,
+  invalidateRolloutLookupCache,
 };

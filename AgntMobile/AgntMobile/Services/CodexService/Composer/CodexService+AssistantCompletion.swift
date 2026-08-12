@@ -62,6 +62,31 @@ extension CodexService {
             return
         }
 
+        if let resolvedTurnId,
+           let explicitItemId,
+           let canonicalFinalMessageId = reconcileCanonicalFinalAnswerReplay(
+               threadId: threadId,
+               turnId: resolvedTurnId,
+               providerItemId: explicitItemId,
+               assistantPhase: normalizedPhase,
+               canonicalText: trimmedText
+           ) {
+            assistantCompletionFingerprintByThread[threadId] = (text: trimmedText, timestamp: now)
+            _ = mergeGeneratedImageArtifactsIntoAssistantMessage(
+                threadId: threadId,
+                turnId: resolvedTurnId,
+                assistantMessageId: canonicalFinalMessageId
+            )
+            persistMessages()
+            noteAssistantMessage(
+                threadId: threadId,
+                turnId: resolvedTurnId,
+                assistantMessageId: canonicalFinalMessageId
+            )
+            updateCurrentOutput(for: threadId)
+            return
+        }
+
         if let replayTerminalMessageId = absorbAssistantBlockReplayCompletion(
             threadId: threadId,
             turnId: resolvedTurnId,
@@ -351,5 +376,78 @@ extension CodexService {
     }
 
     // Renders image-generation artifacts as assistant image previews without embedding image bytes.
+
+    // Desktop live mirroring and the canonical completion stream can expose the
+    // same final answer under different provider ids. Reconcile only a proven
+    // same-turn final row; commentary and distinct completed prose stay separate.
+    func reconcileCanonicalFinalAnswerReplay(
+        threadId: String,
+        turnId: String,
+        providerItemId: String,
+        assistantPhase: String?,
+        canonicalText: String
+    ) -> String? {
+        guard Self.isFinalAnswerAssistantPhase(assistantPhase),
+              let candidateIndex = messagesByThread[threadId]?.indices.reversed().first(where: { index in
+                  guard let candidate = messagesByThread[threadId]?[index],
+                        candidate.role == .assistant,
+                        candidate.kind == .chat,
+                        candidate.turnId == turnId,
+                        candidate.itemId != providerItemId else {
+                      return false
+                  }
+
+                  let textMatches = Self.assistantFinalReplayTextsMatch(
+                      candidate.text,
+                      canonicalText
+                  )
+                  if Self.isFinalAnswerAssistantPhase(candidate.assistantPhase) {
+                      return candidate.isStreaming || textMatches
+                  }
+
+                  let hasProvisionalIdentity = candidate.itemId.map {
+                      CodexSyntheticIdentifiers.isMirrorMintedItemID($0)
+                  } ?? true
+                  return candidate.assistantPhase == nil
+                      && textMatches
+                      && (candidate.isStreaming || hasProvisionalIdentity)
+              }),
+              let existingText = messagesByThread[threadId]?[candidateIndex].text,
+              let messageId = messagesByThread[threadId]?[candidateIndex].id else {
+            return nil
+        }
+
+        messagesByThread[threadId]?[candidateIndex].text = Self.assistantCompletionTextPreservingImages(
+            existingText: existingText,
+            canonicalText: canonicalText
+        )
+        messagesByThread[threadId]?[candidateIndex].isStreaming = false
+        applyAssistantPhaseIfNeeded(
+            threadId: threadId,
+            messageIndex: candidateIndex,
+            assistantPhase: assistantPhase
+        )
+        // A canonical provider id replaces a synthetic or mirror-minted live id. Drop every
+        // stale lookup pointing at this row so a late chunk cannot revive a second bubble.
+        removeAssistantStreamingLookups(messageId: messageId)
+        messagesByThread[threadId]?[candidateIndex].itemId = providerItemId
+        refreshDerivedPlanMetadata(threadId: threadId, messageIndex: candidateIndex)
+        return messageId
+    }
+
+    private static func isFinalAnswerAssistantPhase(_ phase: String?) -> Bool {
+        phase == "final_answer"
+    }
+
+    private static let assistantFinalReplayTextByteLimit = 64_000
+
+    private static func assistantFinalReplayTextsMatch(_ existing: String, _ incoming: String) -> Bool {
+        guard existing.utf8.count <= assistantFinalReplayTextByteLimit,
+              incoming.utf8.count <= assistantFinalReplayTextByteLimit else {
+            return existing == incoming
+        }
+        return existing.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            == incoming.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
 
 }

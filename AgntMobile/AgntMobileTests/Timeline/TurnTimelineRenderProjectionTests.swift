@@ -314,6 +314,80 @@ func testTimelineRenderProjectionKeepsLiveTrailingToolActivityVisible() {
     XCTAssertEqual(liveToolActivity.id, "read-terminal")
 }
 
+// A single finished tool call is the most recently active one while its turn is
+// still running. It must stay visible as its own row instead of folding into a
+// disclosure group, matching the same "keep the latest call visible" rule the
+// trailing-live-tool-activity test above exercises for still-streaming activity.
+func testTimelineRenderProjectionKeepsLatestFinishedCallVisibleWhileTurnRuns() {
+    let now = Date()
+    let messages = [
+        makeTimelineTestMessage(
+            id: "command-1",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed git status",
+            createdAt: now,
+            turnID: "turn-1",
+            itemID: "command-1"
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(
+        messages: messages,
+        activeTurnID: "turn-1",
+        isThreadRunning: true
+    )
+
+    XCTAssertEqual(items.map(\.id), ["command-1"])
+    guard case .message(let latestToolCall) = items.first else {
+        return XCTFail("Expected the latest completed call to remain visible")
+    }
+    XCTAssertEqual(latestToolCall.id, "command-1")
+}
+
+// Once another finished call arrives in the same turn, only the newest one stays
+// deferred outside the disclosure; earlier calls settle into the group as usual.
+func testTimelineRenderProjectionKeepsOnlyNewestFinishedCallVisibleAcrossMultipleCommands() {
+    let now = Date()
+    let messages = [
+        makeTimelineTestMessage(
+            id: "command-1",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed git status",
+            createdAt: now,
+            turnID: "turn-1",
+            itemID: "command-1"
+        ),
+        makeTimelineTestMessage(
+            id: "command-2",
+            threadID: "thread",
+            role: .system,
+            kind: .commandExecution,
+            text: "Completed git diff --stat",
+            createdAt: now.addingTimeInterval(1),
+            turnID: "turn-1",
+            itemID: "command-2"
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(
+        messages: messages,
+        activeTurnID: "turn-1",
+        isThreadRunning: true
+    )
+
+    XCTAssertEqual(items.map(\.id), ["command-group:command-1", "command-2"])
+    guard case .commandGroup(let group) = items.first,
+          case .message(let latestToolCall) = items.last else {
+        return XCTFail("Expected the earlier command behind the disclosure and the newest one visible")
+    }
+    XCTAssertEqual(group.messages.map(\.id), ["command-1"])
+    XCTAssertEqual(latestToolCall.id, "command-2")
+}
+
 func testTimelineRenderProjectionCollapsesCompletedTurnBeforeFinalAnswer() {
     let now = Date()
     let messages = [

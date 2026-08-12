@@ -35,6 +35,7 @@ enum TurnTimelineRenderProjection {
                 result[entry.key] = replacement
             }
         }
+        let latestUserMessageIndex = messages.lastIndex { $0.role == .user }
 
         func flushBufferedToolMessages() {
             guard !bufferedToolMessages.isEmpty else { return }
@@ -52,11 +53,37 @@ enum TurnTimelineRenderProjection {
             bufferedCommandPendingToolActivity.removeAll(keepingCapacity: true)
         }
 
-        func flushBufferedCommandMessages(adoptsPendingToolActivity: Bool = true) {
-            if adoptsPendingToolActivity {
-                commitBufferedCommandPendingToolActivity()
+        func belongsToActiveTurn(_ message: CodexMessage) -> Bool {
+            guard isThreadRunning else { return false }
+
+            let messageTurnID = normalizedIdentifier(message.turnId)
+            if let activeTurnID = normalizedIdentifier(activeTurnID) {
+                if let messageTurnID {
+                    return messageTurnID == activeTurnID
+                }
             }
-            let deferredToolActivity = bufferedCommandPendingToolActivity
+
+            guard messageTurnID == nil,
+                  let latestUserMessageIndex,
+                  let messageIndex = messages.lastIndex(where: { $0.id == message.id }) else {
+                return false
+            }
+            return messageIndex > latestUserMessageIndex
+        }
+
+        func flushBufferedCommandMessages(keepsLatestToolCallVisible: Bool = false) {
+            commitBufferedCommandPendingToolActivity()
+
+            var deferredToolCall: CodexMessage?
+            if keepsLatestToolCallVisible,
+               bufferedCommandTrailingFileChanges.isEmpty,
+               let latestMessage = bufferedCommandOrderedMessages.last,
+               isToolBurstCandidate(latestMessage),
+               belongsToActiveTurn(latestMessage) {
+                deferredToolCall = bufferedCommandOrderedMessages.removeLast()
+                bufferedCommandMessages.removeAll { $0.id == latestMessage.id }
+            }
+
             bufferedCommandPendingToolActivity.removeAll(keepingCapacity: true)
 
             if !bufferedCommandMessages.isEmpty {
@@ -64,8 +91,12 @@ enum TurnTimelineRenderProjection {
                     messages: bufferedCommandMessages,
                     orderedMessages: bufferedCommandOrderedMessages
                 )))
+            } else {
+                items.append(contentsOf: bufferedCommandOrderedMessages.map(TurnTimelineRenderItem.message))
             }
-            items.append(contentsOf: deferredToolActivity.map(TurnTimelineRenderItem.message))
+            if let deferredToolCall {
+                items.append(.message(deferredToolCall))
+            }
             items.append(contentsOf: bufferedCommandTrailingFileChanges.map(TurnTimelineRenderItem.message))
             bufferedCommandMessages.removeAll(keepingCapacity: true)
             bufferedCommandOrderedMessages.removeAll(keepingCapacity: true)
@@ -178,10 +209,11 @@ enum TurnTimelineRenderProjection {
             bufferedToolMessages.append(renderedMessage)
         }
 
-        let keepsLiveToolActivityVisible = isThreadRunning
-            && bufferedCommandPendingToolActivity.contains { $0.isStreaming }
+        // Keep the latest call of the active turn readable until another call or
+        // assistant text arrives. Once the turn settles, the same projection folds
+        // it into the disclosure without needing extra persisted presentation state.
         flushBufferedToolMessages()
-        flushBufferedCommandMessages(adoptsPendingToolActivity: !keepsLiveToolActivityVisible)
+        flushBufferedCommandMessages(keepsLatestToolCallVisible: isThreadRunning)
         return mergeAdjacentFileChangeItems(items)
     }
 

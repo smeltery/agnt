@@ -36,6 +36,7 @@ function createMirrorState(threadId) {
     commandCalls: new Map(),
     applyPatchCalls: new Map(),
     emittedPatchApplyEndCalls: new Set(),
+    wrappedExecCallIdsByOuterId: new Map(),
     emittedAgentMessageKeys: new Set(),
     pendingUserMessages: [],
     suppressLiveActivityUntilGrowth: false,
@@ -188,6 +189,7 @@ function resetRunState(state) {
   state.commandCalls.clear();
   state.applyPatchCalls.clear();
   state.emittedPatchApplyEndCalls.clear();
+  state.wrappedExecCallIdsByOuterId.clear();
   state.emittedAgentMessageKeys.clear();
   state.pendingUserMessages.length = 0;
 }

@@ -5,11 +5,13 @@ const {
   projectedResolvedNotification,
 } = require("../desktop-ipc-action-follower-support");
 const { desktopThreadReplacedNotification } = require("./read-serving");
+const { drainPendingReviewOverlays } = require("./review-overlay-replay");
 
 function createProjectionSync({
   canonicalHistoryReplacementSentThreadIds,
   canonicalHistoryThreadIds,
   conversationProjector,
+  normalizedReviewFingerprintsByThreadId,
   pendingRoutesByRequestId,
   rememberCanonicalActiveTurns,
   sendApplicationResponse,
@@ -52,10 +54,22 @@ function createProjectionSync({
     }
 
     const liveState = desktopLiveStateForProjection(nextState);
+    // Guardian reviews on normalized-only history turns never appear in
+    // canonical thread/read history, so drain their overlays wherever this
+    // sync (re)builds the live projection; otherwise a thread that stays
+    // idle after this sync never delivers them.
+    const drainReviewOverlays = () => drainPendingReviewOverlays({
+      threadId,
+      rawState: nextState,
+      liveTurns: liveState.turns,
+      fingerprintsByThreadId: normalizedReviewFingerprintsByThreadId,
+      sendApplicationResponse,
+    });
     if (isFullSnapshot
       && canonicalHistoryThreadIds.has(threadId)
       && canonicalHistoryReplacementSentThreadIds.has(threadId)) {
       syncCanonicalSnapshotLifecycle(threadId, liveState);
+      drainReviewOverlays();
       conversationProjector.seed(threadId, liveState);
       return;
     }
@@ -67,6 +81,7 @@ function createProjectionSync({
         includeAllActiveTurns: true,
       });
       sendApplicationResponse(JSON.stringify(desktopThreadReplacedNotification(threadId)));
+      drainReviewOverlays();
       syncCanonicalSnapshotLifecycle(threadId, liveState);
       for (const notification of bootstrapOutput.notifications || []) {
         if (String(notification?.method || "").startsWith("item/")) {
@@ -79,6 +94,7 @@ function createProjectionSync({
     if (resumedAfterStaleYield) {
       conversationProjector.remove(threadId);
     }
+    drainReviewOverlays();
     const output = conversationProjector.project(threadId, liveState);
     if (resumedAfterStaleYield || output.type === "fullReplace" || output.type === "baseline") {
       sendApplicationResponse(JSON.stringify(desktopThreadReplacedNotification(threadId)));

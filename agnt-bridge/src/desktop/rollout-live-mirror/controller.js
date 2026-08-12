@@ -37,6 +37,8 @@ function createRolloutLiveMirrorController({
   now = () => Date.now(),
   setIntervalFn = setInterval,
   clearIntervalFn = clearInterval,
+  setImmediateFn = setImmediate,
+  clearImmediateFn = clearImmediate,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   lookupTimeoutMs = DEFAULT_LOOKUP_TIMEOUT_MS,
   idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
@@ -82,6 +84,8 @@ function createRolloutLiveMirrorController({
       now,
       setIntervalFn,
       clearIntervalFn,
+      setImmediateFn,
+      clearImmediateFn,
       pollIntervalMs,
       lookupTimeoutMs,
       idleTimeoutMs,
@@ -128,6 +132,8 @@ function createThreadRolloutLiveMirror({
   now,
   setIntervalFn,
   clearIntervalFn,
+  setImmediateFn,
+  clearImmediateFn,
   pollIntervalMs,
   lookupTimeoutMs,
   idleTimeoutMs,
@@ -141,6 +147,7 @@ function createThreadRolloutLiveMirror({
   onStop = () => {},
 }) {
   const startedAt = now();
+  let lookupStartedAt = startedAt;
   const state = createMirrorState(threadId);
 
   let isStopped = false;
@@ -154,7 +161,10 @@ function createThreadRolloutLiveMirror({
   let wasSuppressed = false;
 
   const intervalId = setIntervalFn(tick, pollIntervalMs);
-  tick();
+  let initialTickId = setImmediateFn(() => {
+    initialTickId = null;
+    tick();
+  });
 
   function tick() {
     if (isStopped) {
@@ -164,16 +174,33 @@ function createThreadRolloutLiveMirror({
     try {
       const currentTime = now();
       const suppressed = isSuppressed();
-      if (wasSuppressed && !suppressed && didBootstrap) {
+      if (suppressed) {
+        // Owned by another live source: skip every bit of filesystem work
+        // (lookup, stat, bootstrap) until suppression lifts. Reset internal
+        // state once on the leading edge so a resumed mirror re-bootstraps
+        // cleanly instead of resuming a stale offset.
+        if (!wasSuppressed) {
+          rolloutPath = null;
+          lastSize = 0;
+          partialLine = "";
+          didBootstrap = false;
+          resetRunState(state);
+        }
+        wasSuppressed = true;
+        return;
+      }
+      if (wasSuppressed) {
+        rolloutPath = null;
         lastSize = 0;
         partialLine = "";
         didBootstrap = false;
         resetRunState(state);
+        lookupStartedAt = currentTime;
+        wasSuppressed = false;
       }
-      wasSuppressed = suppressed;
 
       if (!rolloutPath) {
-        if (currentTime - startedAt >= lookupTimeoutMs) {
+        if (currentTime - lookupStartedAt >= lookupTimeoutMs) {
           stop();
           return;
         }
@@ -296,6 +323,10 @@ function createThreadRolloutLiveMirror({
 
     isStopped = true;
     clearIntervalFn(intervalId);
+    if (initialTickId != null) {
+      clearImmediateFn(initialTickId);
+      initialTickId = null;
+    }
     onStop();
   }
 

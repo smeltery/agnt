@@ -456,4 +456,110 @@ final class CodexServiceIncomingStreamingTests: CodexServiceIncomingStreamingTes
         XCTAssertEqual(assistantMessages.first?.text, "Final answer replay")
         XCTAssertFalse(assistantMessages.first?.isStreaming ?? true)
     }
+
+    // Desktop mirroring can stream a final answer under one item id while the
+    // canonical completion for the same turn lands under a different id. The two
+    // copies differ only by whitespace, so the fuzzy replay match must still fold
+    // them into a single row instead of leaving a duplicate mirrored bubble behind.
+    func testCanonicalFinalAnswerReplacesSourceRotatedLiveRow() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let liveText = """
+        Test completed.
+
+        1. First result
+        2. Second result
+        """
+        let canonicalText = """
+        Test completed.
+
+        1. First result
+
+        2. Second result
+        """
+
+        service.appendAssistantDelta(
+            threadId: threadID,
+            turnId: turnID,
+            itemId: "desktop-live-final",
+            assistantPhase: "final_answer",
+            delta: liveText
+        )
+        service.flushPendingAssistantDeltas(for: threadID, turnId: turnID)
+
+        service.completeAssistantMessage(
+            threadId: threadID,
+            turnId: turnID,
+            itemId: "msg-canonical-final",
+            assistantPhase: "final_answer",
+            text: canonicalText
+        )
+
+        let assistantMessages = service.messages(for: threadID).filter { $0.role == .assistant }
+        XCTAssertEqual(assistantMessages.count, 1)
+        XCTAssertEqual(assistantMessages.first?.text, canonicalText)
+        XCTAssertEqual(assistantMessages.first?.itemId, "msg-canonical-final")
+        XCTAssertEqual(assistantMessages.first?.assistantPhase, "final_answer")
+        XCTAssertFalse(assistantMessages.first?.isStreaming ?? true)
+    }
+
+    // Both deliveries can also arrive already closed (mirror settled first, then
+    // the canonical stream repeats the exact same final text under its own id).
+    func testCanonicalFinalAnswerReconcilesClosedExactReplayAcrossProviderIDs() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+        let finalText = "The same canonical final answer arrived through two sources."
+
+        service.completeAssistantMessage(
+            threadId: threadID,
+            turnId: turnID,
+            itemId: "desktop-final-item",
+            assistantPhase: "final_answer",
+            text: finalText
+        )
+        service.completeAssistantMessage(
+            threadId: threadID,
+            turnId: turnID,
+            itemId: "msg-canonical-final",
+            assistantPhase: "final_answer",
+            text: finalText
+        )
+
+        let assistantMessages = service.messages(for: threadID).filter { $0.role == .assistant }
+        XCTAssertEqual(assistantMessages.count, 1)
+        XCTAssertEqual(assistantMessages.first?.itemId, "msg-canonical-final")
+        XCTAssertEqual(assistantMessages.first?.text, finalText)
+    }
+
+    // Two genuinely different final answers in the same turn must never be folded
+    // together just because they share a turn id and a final_answer phase.
+    func testDistinctClosedFinalAnswersInSameTurnRemainSeparate() {
+        let service = makeService()
+        let threadID = "thread-\(UUID().uuidString)"
+        let turnID = "turn-\(UUID().uuidString)"
+
+        service.completeAssistantMessage(
+            threadId: threadID,
+            turnId: turnID,
+            itemId: "first-final-item",
+            assistantPhase: "final_answer",
+            text: "First completed final item."
+        )
+        service.completeAssistantMessage(
+            threadId: threadID,
+            turnId: turnID,
+            itemId: "second-final-item",
+            assistantPhase: "final_answer",
+            text: "A genuinely different completed final item."
+        )
+
+        let assistantMessages = service.messages(for: threadID).filter { $0.role == .assistant }
+        XCTAssertEqual(assistantMessages.map(\.itemId), ["first-final-item", "second-final-item"])
+        XCTAssertEqual(assistantMessages.map(\.text), [
+            "First completed final item.",
+            "A genuinely different completed final item.",
+        ])
+    }
 }

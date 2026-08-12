@@ -10,6 +10,7 @@ function createThreadStateManager({
   heldFollowerRequests,
   ipc,
   liveOwnerThreadIds,
+  normalizedReviewFingerprintsByThreadId,
   pendingRoutesByRequestId,
   pendingSnapshotsByThreadId,
   queuedChangesByThreadId,
@@ -56,6 +57,7 @@ function createThreadStateManager({
     canonicalHistoryReplacementSentThreadIds.delete(threadId);
     canonicalActiveTurnsByThreadId.delete(threadId);
     staleYieldedThreadIds.delete(threadId);
+    normalizedReviewFingerprintsByThreadId.delete(threadId);
     conversationProjector.remove(threadId);
     queuedChangesByThreadId.delete(threadId);
     baselineRecoveryStateByThreadId.delete(threadId);
@@ -85,6 +87,7 @@ function createThreadStateManager({
     canonicalHistoryReplacementSentThreadIds.clear();
     canonicalActiveTurnsByThreadId.clear();
     staleYieldedThreadIds.clear();
+    normalizedReviewFingerprintsByThreadId.clear();
     conversationProjector.reset();
     pendingRoutesByRequestId.clear();
     activeThreads.clear();

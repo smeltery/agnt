@@ -12,11 +12,10 @@ const {
   createRolloutLiveMirrorController: createController,
 } = require("./rollout-live-mirror/controller");
 const {
-  customToolStartNotifications,
   imageGenerationNotifications,
   patchApplyEndNotifications,
+  projectedToolStartNotifications,
   toolOutputNotifications,
-  toolStartNotifications,
   turnFileChangeSnapshotNotifications,
 } = require("./rollout-live-mirror/tool-notifications");
 const {
@@ -124,6 +123,7 @@ function synthesizeNotificationsFromRolloutEntry(entry, state, options = {}) {
       state.commandCalls.clear();
       state.applyPatchCalls.clear();
       state.emittedPatchApplyEndCalls.clear();
+      state.wrappedExecCallIdsByOuterId.clear();
 
       notifications.push(createNotification("turn/started", {
         threadId: state.threadId,
@@ -261,13 +261,8 @@ function synthesizeNotificationsFromRolloutEntry(entry, state, options = {}) {
     return notifications;
   }
 
-  if (itemType === "functioncall") {
-    notifications.push(...toolStartNotifications(state, payload, notificationHelpers));
-    return notifications;
-  }
-
-  if (itemType === "customtoolcall") {
-    notifications.push(...customToolStartNotifications(state, payload, notificationHelpers));
+  if (itemType === "functioncall" || itemType === "customtoolcall") {
+    notifications.push(...projectedToolStartNotifications(state, payload, notificationHelpers));
     return notifications;
   }
 
