@@ -478,3 +478,122 @@ test("agnt reset-pairing surfaces unexpected Linux service errors instead of rep
   assert.equal(errors.length, 1);
   assert.match(errors[0], /Permission denied/);
 });
+
+test("agnt uninstall-service removes the launchd service definition", async () => {
+  const calls = [];
+  const messages = [];
+
+  await main({
+    argv: ["node", "agnt", "uninstall-service"],
+    platform: "darwin",
+    consoleImpl: {
+      log(message) {
+        messages.push(message);
+      },
+      error(message) {
+        messages.push(message);
+      },
+    },
+    exitImpl(code) {
+      throw new Error(`unexpected exit ${code}`);
+    },
+    deps: {
+      uninstallMacOSBridgeService() {
+        calls.push("uninstall-service");
+        return {
+          plistPath: "/tmp/agnt.plist",
+          removed: true,
+        };
+      },
+    },
+  });
+
+  assert.deepEqual(calls, [
+    "uninstall-service",
+  ]);
+  assert.deepEqual(messages, [
+    "[agnt] Removed the macOS bridge service. You can now run `npm uninstall -g @dotbrains/agnt`.",
+  ]);
+});
+
+test("agnt uninstall-service --json reports the removed plist path", async () => {
+  const writes = [];
+  const originalWrite = process.stdout.write;
+
+  process.stdout.write = (chunk, encoding, callback) => {
+    writes.push(String(chunk));
+    if (typeof callback === "function") {
+      callback();
+    }
+    return true;
+  };
+
+  try {
+    await main({
+      argv: ["node", "agnt", "uninstall-service", "--json"],
+      platform: "darwin",
+      consoleImpl: {
+        log(message) {
+          throw new Error(`unexpected log: ${message}`);
+        },
+        error(message) {
+          throw new Error(`unexpected error: ${message}`);
+        },
+      },
+      exitImpl(code) {
+        throw new Error(`unexpected exit ${code}`);
+      },
+      deps: {
+        uninstallMacOSBridgeService() {
+          return {
+            plistPath: "/tmp/agnt.plist",
+            removed: false,
+          };
+        },
+      },
+    });
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+
+  const payload = JSON.parse(writes.join("").trim());
+  assert.equal(payload.ok, true);
+  assert.equal(payload.currentVersion, version);
+  assert.equal(payload.plistPath, "/tmp/agnt.plist");
+  assert.equal(payload.removed, false);
+});
+
+test("agnt uninstall-service is rejected on non-macOS platforms", async () => {
+  const messages = [];
+  let exitCode = null;
+
+  await assert.rejects(
+    main({
+      argv: ["node", "agnt", "uninstall-service"],
+      platform: "linux",
+      consoleImpl: {
+        log(message) {
+          throw new Error(`unexpected log: ${message}`);
+        },
+        error(message) {
+          messages.push(message);
+        },
+      },
+      exitImpl(code) {
+        exitCode = code;
+        throw new Error("cli-exit");
+      },
+      deps: {
+        uninstallMacOSBridgeService() {
+          throw new Error("uninstall must not run on non-macOS platforms");
+        },
+      },
+    }),
+    /cli-exit/
+  );
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(messages, [
+    "[agnt] `uninstall-service` is only available on macOS. Use `agnt up` or `agnt run` for the foreground bridge on this OS.",
+  ]);
+});

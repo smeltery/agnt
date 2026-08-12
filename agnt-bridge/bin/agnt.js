@@ -15,6 +15,7 @@ const {
   startBridge,
   startMacOSBridgeService,
   stopMacOSBridgeService,
+  uninstallMacOSBridgeService,
   getLinuxBridgeServiceStatus,
   isLinuxBridgeServiceNotInstalledError,
   printLinuxBridgePairingQr,
@@ -39,6 +40,7 @@ const defaultDeps = {
   startBridge,
   startMacOSBridgeService,
   stopMacOSBridgeService,
+  uninstallMacOSBridgeService,
   getLinuxBridgeServiceStatus,
   printLinuxBridgePairingQr,
   printLinuxBridgeServiceStatus,
@@ -182,6 +184,23 @@ async function main({
       message: platform === "darwin"
         ? "[agnt] macOS bridge service stopped."
         : "[agnt] Linux bridge service stopped.",
+      jsonOutput,
+      consoleImpl,
+    });
+    return;
+  }
+
+  if (command === "uninstall-service") {
+    assertMacOSOnlyCommand(command, { platform, consoleImpl, exitImpl });
+    const result = deps.uninstallMacOSBridgeService();
+    emitResult({
+      payload: {
+        ok: true,
+        currentVersion: version,
+        plistPath: result?.plistPath,
+        removed: result?.removed,
+      },
+      message: "[agnt] Removed the macOS bridge service. You can now run `npm uninstall -g @dotbrains/agnt`.",
       jsonOutput,
       consoleImpl,
     });
@@ -333,9 +352,9 @@ async function main({
 
   consoleImpl.error(`Unknown command: ${command}`);
   consoleImpl.error(
-    "Usage: agnt up | agnt run | agnt connect | agnt qr | agnt pair | agnt start | agnt restart | agnt stop | agnt status | "
+    "Usage: agnt up | agnt run | agnt connect | agnt qr | agnt pair | agnt start | agnt restart | agnt stop | agnt uninstall-service | agnt status | "
     + "agnt reset-pairing | agnt resume | agnt watch [threadId] | agnt --version | "
-    + "append --json to connect/qr/pair/start/restart/stop/status/reset-pairing/resume for machine-readable output"
+    + "append --json to connect/qr/pair/start/restart/stop/uninstall-service/status/reset-pairing/resume for machine-readable output"
   );
   exitImpl(1);
 }
@@ -467,6 +486,21 @@ function assertServiceCommand(name, {
   }
 
   consoleImpl.error(`[agnt] \`${name}\` is only available on macOS or Linux. Use \`agnt up\` or \`agnt run\` for the foreground bridge on this OS.`);
+  exitImpl(1);
+}
+
+// `uninstall-service` only has a launchd implementation today; Linux service removal
+// is not yet wired up, so it stays macOS-only rather than silently no-op-ing there.
+function assertMacOSOnlyCommand(name, {
+  platform = process.platform,
+  consoleImpl = console,
+  exitImpl = process.exit,
+} = {}) {
+  if (platform === "darwin") {
+    return;
+  }
+
+  consoleImpl.error(`[agnt] \`${name}\` is only available on macOS. Use \`agnt up\` or \`agnt run\` for the foreground bridge on this OS.`);
   exitImpl(1);
 }
 
