@@ -14,7 +14,7 @@ extension CodexService {
     ) -> Bool {
         guard itemType == "reasoning"
             || itemType == "filechange"
-            || itemType == "toolcall"
+            || isGenericToolCallItemType(itemType)
             || itemType == "commandexecution"
             || itemType == "collabagenttoolcall"
             || itemType == "collabtoolcall"
@@ -52,7 +52,7 @@ extension CodexService {
         case "filechange":
             kind = .fileChange
             body = decodeFileChangeItemBody(itemObject)
-        case "toolcall":
+        case let toolType where isGenericToolCallItemType(toolType):
             if let resolvedBody = decodeToolCallFileChangeBody(itemObject, isCompleted: isCompleted) {
                 kind = .fileChange
                 body = resolvedBody

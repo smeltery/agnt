@@ -30,6 +30,29 @@ extension CodexService {
         }
 
         var merged = existing
+
+        // Older builds could persist a read-only connector result as a file-change
+        // row merely because its result contained a `diff` field. Once canonical
+        // history decodes that same stable item as tool activity, discard the stale
+        // kind so it cannot survive every relaunch beside the corrected row.
+        let canonicalToolActivityItemIDs = Set(history.compactMap { message -> String? in
+            guard message.role == .system,
+                  message.kind == .toolActivity else {
+                return nil
+            }
+            return normalizedHistoryIdentifier(message.itemId)
+        })
+        if !canonicalToolActivityItemIDs.isEmpty {
+            merged.removeAll { candidate in
+                guard candidate.role == .system,
+                      candidate.kind == .fileChange,
+                      let itemID = normalizedHistoryIdentifier(candidate.itemId) else {
+                    return false
+                }
+                return canonicalToolActivityItemIDs.contains(itemID)
+            }
+        }
+
         let assistantHistoryCountByTurn = Dictionary(
             grouping: history.filter { $0.role == .assistant }
         ) { $0.turnId ?? "" }

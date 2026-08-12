@@ -41,10 +41,17 @@ extension CodexService {
     }
 
     func decodeHistoryDiffItemText(from itemObject: [String: JSONValue]) -> String? {
-        decodeHistoryToolCallFileChangeText(from: itemObject)
+        decodeHistoryFileChangeToolPayload(from: itemObject)
     }
 
     func decodeHistoryToolCallFileChangeText(from itemObject: [String: JSONValue]) -> String? {
+        guard isWorkspaceFileMutationToolCall(itemObject) else {
+            return nil
+        }
+        return decodeHistoryFileChangeToolPayload(from: itemObject)
+    }
+
+    private func decodeHistoryFileChangeToolPayload(from itemObject: [String: JSONValue]) -> String? {
         let status = decodeHistoryNestedStatus(from: itemObject) ?? "completed"
 
         var synthetic = itemObject
