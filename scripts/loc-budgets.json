@@ -160,6 +160,10 @@
         "limit": 40,
         "reason": "Bridge runtime modules stay flat so handler, relay, lifecycle, and sanitizer boundaries remain import-light."
       },
+      "agnt-bridge/src/desktop": {
+        "limit": 26,
+        "reason": "desktop-ipc-follower-tracker.js is shared by both action-follower/ and live-owner/, so it stays flat rather than nesting under one side's subdirectory."
+      },
       "AgntAndroid/app/src/test/kotlin/com/dotbrains/agnt/mobile/data": {
         "limit": 40,
         "reason": "Android data tests mirror the main data package."
