@@ -147,6 +147,12 @@ function createDesktopOwnerIpcClient({
     if (!socket || socket.destroyed || !isInitialized) {
       return false;
     }
+    // A write to the bridge-owned fallback router is not a delivery when no
+    // Desktop/VSCode peer is attached. Report that state as pending so callers
+    // can replay metadata and snapshots when the router announces a real peer.
+    if (localRouter && !localRouter.hasBroadcastRecipientFor(clientId)) {
+      return false;
+    }
     const envelope = {
       type: "broadcast",
       method,

@@ -396,9 +396,25 @@ function createDesktopIpcRouterServer({
     }
   }
 
+  function hasBroadcastRecipientFor(senderClientId) {
+    const sender = clientsById.get(senderClientId);
+    if (!sender) {
+      // The owner is connected to an external Codex bus rather than this
+      // fallback router; that bus itself is the broadcast recipient.
+      return true;
+    }
+    return Array.from(clientsById.values()).some((client) => (
+      client !== sender
+      && client.initialized
+      && !client.socket.destroyed
+      && normalizeToken(client.type) !== "agntbridge"
+    ));
+  }
+
   return {
     start,
     close,
+    hasBroadcastRecipientFor,
     get isStarted() {
       return started && !closed;
     },
