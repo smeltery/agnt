@@ -19,6 +19,9 @@ struct ComposerBottomBar: View {
     let isRuntimeSelectionLoading: Bool
     let runtimeState: TurnComposerRuntimeState
     let runtimeActions: TurnComposerRuntimeActions
+    // Re-requests model/list when the runtime picker opens without options
+    // (bootstrap fetch failed or still in flight). Defaulted for previews.
+    var onRefreshModelsIfNeeded: () -> Void = {}
     let remainingAttachmentSlots: Int
     let isComposerInteractionLocked: Bool
     let isSendDisabled: Bool
@@ -101,7 +104,8 @@ struct ComposerBottomBar: View {
                 isRuntimeSelectionLoading: isRuntimeSelectionLoading,
                 runtimeState: runtimeState,
                 runtimeActions: runtimeActions,
-                showsAllModelsSheet: $showsAllModelsSheet
+                showsAllModelsSheet: $showsAllModelsSheet,
+                onRefreshModelsIfNeeded: onRefreshModelsIfNeeded
             )
             .equatable()
             if isPlanModeArmed {

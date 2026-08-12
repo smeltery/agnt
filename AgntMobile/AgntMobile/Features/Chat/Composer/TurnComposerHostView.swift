@@ -142,6 +142,7 @@ struct TurnComposerHostView: View {
             isRuntimeSelectionLoading: isRuntimeSelectionLoading,
             runtimeState: runtimeState,
             runtimeActions: runtimeActions,
+            onRefreshModelsIfNeeded: { codex.refreshModelsIfNeeded() },
             voiceButtonPresentation: voiceButtonPresentation,
             selectedAccessMode: codex.selectedAccessMode,
             contextWindowUsage: codex.contextWindowUsageByThread[thread.id],

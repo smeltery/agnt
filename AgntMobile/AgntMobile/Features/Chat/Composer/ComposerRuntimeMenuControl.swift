@@ -16,6 +16,9 @@ struct ComposerRuntimeMenuControl: View, Equatable {
     let runtimeState: TurnComposerRuntimeState
     let runtimeActions: TurnComposerRuntimeActions
     @Binding var showsAllModelsSheet: Bool
+    // Re-requests model/list when this menu opens without options (bootstrap
+    // fetch failed or still in flight). Defaulted for previews.
+    var onRefreshModelsIfNeeded: () -> Void = {}
 
     private let metaLabelColor = Color(.secondaryLabel)
     private var metaTextFont: Font { AppFont.callout() }
@@ -117,6 +120,10 @@ struct ComposerRuntimeMenuControl: View, Equatable {
         .layoutPriority(-1)
         .tint(metaLabelColor)
         .accessibilityLabel(runtimeAccessibilityLabel)
+        // A failed bootstrap fetch would otherwise leave this menu with no
+        // models and no fast-mode toggle forever. Simultaneous so it never
+        // interferes with the Menu's own open gesture.
+        .simultaneousGesture(TapGesture().onEnded(onRefreshModelsIfNeeded))
     }
 
     private var compactRuntimeTitle: String {

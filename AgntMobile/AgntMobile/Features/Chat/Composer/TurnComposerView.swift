@@ -36,6 +36,9 @@ struct TurnComposerView: View {
 
     let runtimeState: TurnComposerRuntimeState
     let runtimeActions: TurnComposerRuntimeActions
+    // Re-requests model/list when the runtime picker opens without options
+    // (bootstrap fetch failed or still in flight). Defaulted for previews.
+    var onRefreshModelsIfNeeded: () -> Void = {}
     let voiceButtonPresentation: TurnComposerVoiceButtonPresentation
 
     let selectedAccessMode: CodexAccessMode
@@ -334,6 +337,7 @@ struct TurnComposerView: View {
             isRuntimeSelectionLoading: isRuntimeSelectionLoading,
             runtimeState: runtimeState,
             runtimeActions: runtimeActions,
+            onRefreshModelsIfNeeded: onRefreshModelsIfNeeded,
             remainingAttachmentSlots: remainingAttachmentSlots,
             isComposerInteractionLocked: isComposerInteractionLocked,
             isSendDisabled: isSendDisabled,
