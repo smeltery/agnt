@@ -49,6 +49,7 @@ final class CodexServiceThreadListTests: XCTestCase {
         XCTAssertEqual(activeRequestParams?["limit"]?.intValue, 70)
         XCTAssertEqual(archivedRequestParams?["limit"]?.intValue, 10)
         XCTAssertEqual(archivedRequestParams?["archived"]?.boolValue, true)
+        XCTAssertEqual(activeRequestParams?["sortKey"]?.stringValue, "updated_at")
         XCTAssertEqual(
             activeRequestParams?["sourceKinds"]?.arrayValue?.compactMap(\.stringValue),
             ["cli", "vscode", "appServer", "exec", "unknown"]
