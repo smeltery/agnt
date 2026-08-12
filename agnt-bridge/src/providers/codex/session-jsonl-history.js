@@ -15,6 +15,10 @@ const {
   sanitizeUserRoleItem,
   visibleUserPromptText,
 } = require("../../bridge/contextual-user-items");
+const {
+  expandExecWrapperToolCall,
+  isOrchestrationWaitCall,
+} = require("./codex-tool-wrapper");
 
 const JSONL_OLDER_HANDOFF_CURSOR = "agnt-jsonl-fallback-older-unavailable";
 const DEFAULT_SESSION_JSONL_METADATA_HEAD_BYTES = 256 * 1024;
@@ -300,6 +304,10 @@ function parseSessionJsonlTurns(content, {
   const turnsById = new Map();
   let activeTurnId = "";
   let sessionThreadId = normalizeString(threadId) || normalizeString(initialMetadata?.threadId);
+  // Orchestration "wait" calls have no visible tool call, so their matching
+  // function_call_output must be suppressed too instead of rendering as an
+  // orphaned output with no counterpart.
+  const skippedCallIds = new Set();
 
   const lines = String(content || "").split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
@@ -381,16 +389,37 @@ function parseSessionJsonlTurns(content, {
       if (!payload) {
         continue;
       }
-      const turn = ensureTurn(
-        turns,
-        turnsById,
-        responseItemTurnId(payload) || activeTurnId || `turn-line-${sourceLineNumber}`,
-        sessionThreadId,
-        entry.timestamp
-      );
-      const item = normalizeResponseItemForHistory(payload, sourceLineNumber);
-      if (item) {
-        turn.items.push(item);
+
+      // Codex's `exec` tool is a JS wrapper around one or more real tool
+      // calls (tools.exec_command, tools.apply_patch, ...). Project it into
+      // its nested calls so history shows the real tools instead of one
+      // opaque "exec" step.
+      for (const projectedPayload of expandExecWrapperToolCall(payload)) {
+        const callId = normalizeString(projectedPayload.call_id)
+          || normalizeString(projectedPayload.callId);
+
+        if (isOrchestrationWaitCall(projectedPayload)) {
+          if (callId) {
+            skippedCallIds.add(callId);
+          }
+          continue;
+        }
+
+        if (callId && skippedCallIds.has(callId) && isCallOutputItemType(projectedPayload.type)) {
+          continue;
+        }
+
+        const turn = ensureTurn(
+          turns,
+          turnsById,
+          responseItemTurnId(projectedPayload) || activeTurnId || `turn-line-${sourceLineNumber}`,
+          sessionThreadId,
+          entry.timestamp
+        );
+        const item = normalizeResponseItemForHistory(projectedPayload, sourceLineNumber);
+        if (item) {
+          turn.items.push(item);
+        }
       }
     }
   }
@@ -438,6 +467,11 @@ function normalizeResponseItemForHistory(payload, lineNumber) {
   }
 
   return isUserRoleHistoryItem(item) ? sanitizeUserRoleItem(item) : item;
+}
+
+function isCallOutputItemType(rawType) {
+  const normalized = normalizeString(rawType).toLowerCase().replace(/[\s_-]+/g, "");
+  return normalized === "functioncalloutput" || normalized === "customtoolcalloutput";
 }
 
 function normalizeHistoryItemType(rawType) {

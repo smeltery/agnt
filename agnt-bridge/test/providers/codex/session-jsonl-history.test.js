@@ -158,6 +158,73 @@ test("parseSessionJsonlTurns normalizes tool-call types: functionCall → tool_c
   assert.deepEqual(types, ["tool_call", "tool_call_output"]);
 });
 
+test("parseSessionJsonlTurns unwraps an exec wrapper into its real nested tool call", () => {
+  const content = jsonl(
+    { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },
+    {
+      type: "response_item",
+      payload: {
+        type: "custom_tool_call",
+        name: "exec",
+        call_id: "call-outer-exec",
+        status: "completed",
+        turn_id: "t-1",
+        input: [
+          "const result = await tools.exec_command({",
+          "  cmd: \"gh run view 30709849174 --json status\",",
+          "  workdir: \"/repo\",",
+          "});",
+          "text(result.output);",
+        ].join("\n"),
+      },
+    },
+    {
+      type: "response_item",
+      payload: {
+        type: "custom_tool_call_output",
+        call_id: "call-outer-exec",
+        output: "completed",
+        turn_id: "t-1",
+      },
+    }
+  );
+
+  const turns = parseSessionJsonlTurns(content);
+  const toolCall = turns[0].items.find((item) => item.type === "tool_call");
+  assert.equal(toolCall.name, "exec_command");
+  assert.deepEqual(JSON.parse(toolCall.arguments), {
+    cmd: "gh run view 30709849174 --json status",
+    workdir: "/repo",
+  });
+  assert.equal(turns[0].items.some((item) => item.name === "exec"), false);
+});
+
+test("parseSessionJsonlTurns suppresses cell-backed orchestration wait calls and their output", () => {
+  const content = jsonl(
+    { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },
+    {
+      type: "response_item",
+      payload: {
+        type: "function_call",
+        name: "wait",
+        call_id: "call-cell-wait",
+        turn_id: "t-1",
+        arguments: JSON.stringify({ cell_id: "382", yield_time_ms: 30000 }),
+      },
+    },
+    {
+      type: "response_item",
+      payload: { type: "function_call_output", call_id: "call-cell-wait", output: "completed", turn_id: "t-1" },
+    },
+    { type: "response_item", payload: { type: "message", id: "m-1", content: [{ type: "output_text", text: "done" }], turn_id: "t-1" } }
+  );
+
+  const turns = parseSessionJsonlTurns(content);
+  assert.equal(turns[0].items.some((item) => item.name === "wait" || item.call_id === "call-cell-wait"), false);
+  assert.equal(turns[0].items.length, 1);
+  assert.equal(turns[0].items[0].type, "message");
+});
+
 test("parseSessionJsonlTurns defaults message role to assistant when one is missing", () => {
   const content = jsonl(
     { type: "event_msg", payload: { type: "task_started", turn_id: "t-1" } },

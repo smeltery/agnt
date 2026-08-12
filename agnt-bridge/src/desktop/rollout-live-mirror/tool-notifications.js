@@ -1,9 +1,13 @@
 // FILE: rollout-live-mirror-tool-notifications.js
 // Purpose: Builds rollout live-mirror notifications for tools, patch changes, commands, and images.
 // Layer: CLI helper
-// Depends on: ./apply-patch-changes, ./rollout-live-mirror-utils
+// Depends on: ./apply-patch-changes, ./rollout-live-mirror-utils, ../../providers/codex/codex-tool-wrapper
 
 const { buildApplyPatchFileChangeItem } = require("../apply-patch-changes");
+const {
+  expandExecWrapperToolCall,
+  isOrchestrationWaitCall,
+} = require("../../providers/codex/codex-tool-wrapper");
 const {
   buildSyntheticItemId,
   createNotification,
@@ -13,11 +17,40 @@ const {
   genericToolCompletionMessage,
   isCommandToolName,
   isInternalProgressPlanToolName,
+  normalizeRolloutItemType,
   parseToolArguments,
   readString,
   resolveToolCommand,
   resolveToolWorkingDirectory,
 } = require("../rollout-live-mirror-utils");
+
+// Codex's `exec` tool wraps one or more real tool calls in an opaque
+// JavaScript sandbox call, and orchestration-only "wait" calls poll an
+// internal cell with no user-relevant progress. Unwrap the former into its
+// nested calls and drop the latter before dispatching to the normal
+// tool/customTool start handlers below.
+function projectedToolStartNotifications(state, payload, helpers) {
+  if (isOrchestrationWaitCall(payload)) {
+    return [];
+  }
+
+  const projectedPayloads = expandExecWrapperToolCall(payload);
+  const outerCallId = projectedPayloads[0]?.wrappedExecCallId;
+  if (outerCallId && projectedPayloads.length > 1) {
+    state.wrappedExecCallIdsByOuterId.set(
+      outerCallId,
+      projectedPayloads.map((projectedPayload) => (
+        readString(projectedPayload.call_id) || readString(projectedPayload.callId)
+      )).filter(Boolean)
+    );
+  }
+
+  return projectedPayloads.flatMap((projectedPayload) => (
+    normalizeRolloutItemType(projectedPayload.type) === "customtoolcall"
+      ? customToolStartNotifications(state, projectedPayload, helpers)
+      : toolStartNotifications(state, projectedPayload, helpers)
+  ));
+}
 
 function toolStartNotifications(state, payload, helpers) {
   if (!state.activeTurnId) {
@@ -42,6 +75,7 @@ function toolStartNotifications(state, payload, helpers) {
     toolName,
     command: resolveToolCommand(toolName, argumentsObject),
     cwd: resolveToolWorkingDirectory(argumentsObject, state),
+    wrappedExecCall: Boolean(payload.wrappedExecCallId),
   });
 
   if (isCommandToolName(toolName)) {
@@ -114,6 +148,7 @@ function customToolStartNotifications(state, payload, helpers) {
       toolName,
       command: toolName,
       cwd: readString(state.sessionMeta?.cwd) || "",
+      wrappedExecCall: Boolean(payload.wrappedExecCallId),
     });
   }
 
@@ -205,8 +240,34 @@ function toolOutputNotifications(state, payload, helpers) {
     return [];
   }
 
+  // An exec wrapper's single output covers every nested call it kicked off.
+  // Fan it back out so each nested call still gets its own completion
+  // notification; only the recipient tool call keeps the real output text.
+  const wrappedCallIds = state.wrappedExecCallIdsByOuterId.get(callId);
+  if (Array.isArray(wrappedCallIds) && wrappedCallIds.length > 0) {
+    state.wrappedExecCallIdsByOuterId.delete(callId);
+    const outputRecipientId = wrappedCallIds.find((nestedCallId) => (
+      isCommandToolName(state.commandCalls.get(nestedCallId)?.toolName)
+    )) || wrappedCallIds[0];
+    return wrappedCallIds.flatMap((nestedCallId) => toolOutputNotifications(state, {
+      ...payload,
+      call_id: nestedCallId,
+      callId: nestedCallId,
+      output: nestedCallId === outputRecipientId ? payload.output : "",
+    }, helpers));
+  }
+
   const toolCall = state.commandCalls.get(callId);
   if (!toolCall) {
+    // A nested apply_patch call has no separate patch_apply_end event (that
+    // event only exists for top-level calls), so its projected output is the
+    // only signal that the patch finished.
+    if (state.applyPatchCalls.has(callId)) {
+      return patchApplyEndNotifications(state, {
+        ...payload,
+        status: readString(payload.status) || "completed",
+      }, helpers);
+    }
     return [];
   }
 
@@ -224,7 +285,8 @@ function toolOutputNotifications(state, payload, helpers) {
     return notifications;
   }
 
-  const output = readString(payload.output);
+  const rawOutput = extractToolOutputText(payload.output);
+  const output = toolCall.wrappedExecCall ? stripExecOutputEnvelope(rawOutput) : rawOutput;
   const notifications = [...helpers.ensureThinkingNotifications(state)];
   if (output) {
     notifications.push(createNotification("codex/event/exec_command_output_delta", {
@@ -248,6 +310,41 @@ function toolOutputNotifications(state, payload, helpers) {
   }));
   state.commandCalls.delete(callId);
   return notifications;
+}
+
+function extractToolOutputText(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(extractToolOutputText).join("");
+  }
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  for (const key of ["text", "output_text", "outputText"]) {
+    if (typeof value[key] === "string") {
+      return value[key];
+    }
+  }
+  for (const key of ["content", "output", "result"]) {
+    const text = extractToolOutputText(value[key]);
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+// The exec wrapper's runtime prefixes real command output with its own
+// script/timing preamble; strip it so the mirrored command output matches
+// what a native exec_command call would have produced.
+function stripExecOutputEnvelope(output) {
+  return readString(output).replace(
+    /^Script [^\n]*\nWall time [^\n]*\nOutput:\n?/,
+    ""
+  );
 }
 
 function imageGenerationNotifications(state, payload, helpers, { preferCallId = false } = {}) {
@@ -302,6 +399,7 @@ module.exports = {
   customToolStartNotifications,
   imageGenerationNotifications,
   patchApplyEndNotifications,
+  projectedToolStartNotifications,
   toolOutputNotifications,
   toolStartNotifications,
   turnFileChangeSnapshotNotifications,
