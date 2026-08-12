@@ -521,6 +521,15 @@ enum UserBubbleColor: String, CaseIterable, Identifiable {
         }
     }
 
+    // UIAction's `image:` needs a rendered UIImage; a filled circle SF Symbol
+    // tinted with the swatch color mirrors the SwiftUI `Circle().fill(...)`
+    // preview used in the row's trigger label.
+    var menuSwatchImage: UIImage {
+        let configuration = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        let image = UIImage(systemName: "circle.fill", withConfiguration: configuration) ?? UIImage()
+        return image.withTintColor(uiColor, renderingMode: .alwaysOriginal)
+    }
+
     func bubbleForeground(for colorScheme: ColorScheme) -> Color {
         switch self {
         case .default:

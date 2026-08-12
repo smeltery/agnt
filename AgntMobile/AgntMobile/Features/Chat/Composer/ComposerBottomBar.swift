@@ -2,9 +2,10 @@
 // Purpose: Bottom bar with attachment/runtime/access menus, queue controls, and send button.
 // Layer: View Component
 // Exports: ComposerBottomBar
-// Depends on: SwiftUI, TurnComposerMetaMapper
+// Depends on: SwiftUI, UIKit, TurnComposerMetaMapper
 
 import SwiftUI
+import UIKit
 
 struct ComposerBottomBar: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -266,50 +267,69 @@ struct ComposerAttachmentMenu: View {
     private let metaLabelColor = Color(.secondaryLabel)
 
     var body: some View {
-        Menu {
-            Toggle(isOn: Binding(
-                get: { isPlanModeArmed },
-                set: { newValue in
-                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                    onSetPlanModeArmed(newValue)
-                }
-            )) {
-                Label("Plan mode", systemImage: "checklist")
-            }
-
-            if runtimeState.supportsFastMode {
-                Button {
-                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                    runtimeActions.selectServiceTier(runtimeState.isSelectedServiceTier(.fast) ? nil : .fast)
-                } label: {
-                    Label("Fast Mode", systemImage: runtimeState.isSelectedServiceTier(.fast) ? "bolt.fill" : "bolt")
-                }
-            }
-
-            Section {
-                Button("Photo library") {
-                    HapticFeedback.shared.triggerImpactFeedback()
-                    onTapAddImage()
-                }
-                .disabled(remainingAttachmentSlots == 0)
-
-                Button("Take a photo") {
-                    HapticFeedback.shared.triggerImpactFeedback()
-                    onTapTakePhoto()
-                }
-                .disabled(remainingAttachmentSlots == 0)
-            }
-        } label: {
+        UIKitMenuButton {
             Image(systemName: "plus")
                 .font(AppFont.subheadline())
                 .fontWeight(.regular)
                 .foregroundStyle(metaLabelColor)
                 .frame(width: tapTargetSide, height: tapTargetSide)
                 .contentShape(Circle())
+        } menu: {
+            attachmentMenu()
         }
         .tint(metaLabelColor)
         .disabled(isInteractionLocked)
         .accessibilityLabel("Composer options")
+    }
+
+    private func attachmentMenu() -> UIMenu {
+        var modeActions: [UIMenuElement] = [
+            UIAction(
+                title: "Plan mode",
+                image: UIImage(systemName: "checklist"),
+                state: isPlanModeArmed ? .on : .off
+            ) { _ in
+                HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                onSetPlanModeArmed(!isPlanModeArmed)
+            },
+        ]
+
+        if runtimeState.supportsFastMode {
+            modeActions.append(
+                UIAction(
+                    title: "Fast Mode",
+                    image: UIImage(systemName: runtimeState.isSelectedServiceTier(.fast) ? "bolt.fill" : "bolt"),
+                    state: runtimeState.isSelectedServiceTier(.fast) ? .on : .off
+                ) { _ in
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    runtimeActions.selectServiceTier(runtimeState.isSelectedServiceTier(.fast) ? nil : .fast)
+                }
+            )
+        }
+
+        let attachmentActions: [UIMenuElement] = [
+            UIAction(
+                title: "Photo library",
+                image: UIImage(systemName: "photo"),
+                attributes: remainingAttachmentSlots == 0 ? .disabled : []
+            ) { _ in
+                HapticFeedback.shared.triggerImpactFeedback()
+                onTapAddImage()
+            },
+            UIAction(
+                title: "Take a photo",
+                image: UIImage(systemName: "camera.fill"),
+                attributes: remainingAttachmentSlots == 0 ? .disabled : []
+            ) { _ in
+                HapticFeedback.shared.triggerImpactFeedback()
+                onTapTakePhoto()
+            },
+        ]
+
+        return UIMenu(children: [
+            UIMenu(options: [.displayInline], children: modeActions),
+            UIMenu(options: [.displayInline], children: attachmentActions),
+        ])
     }
 }
 

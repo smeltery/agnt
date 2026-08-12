@@ -72,10 +72,9 @@ struct CodexWorktreeIcon: View {
         .withRenderingMode(.alwaysTemplate)
     }
 
-    // Matches the UIKit menu glyph metric used by `Image(systemName:)` toolbar items.
+    // Matches the shared UIKit menu glyph metric used across toolbar/menu icons.
     static func toolbarMenuUIImage() -> UIImage {
-        let pointSize = UIFontMetrics.default.scaledValue(for: 20)
-        return menuImage(pointSize: pointSize, weight: .regular)
+        menuImage(pointSize: AppMenuPresentation.glyphPointSize, weight: .regular)
     }
 }
 

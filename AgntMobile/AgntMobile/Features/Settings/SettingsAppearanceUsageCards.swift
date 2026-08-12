@@ -3,6 +3,7 @@
 // Layer: View
 
 import SwiftUI
+import UIKit
 
 struct SettingsUsageCard: View {
     @Environment(CodexService.self) private var codex
@@ -76,18 +77,14 @@ struct SettingsAppearanceCard: View {
 
     var body: some View {
         SettingsCard(title: "Appearance") {
-            HStack {
-                Text("Font")
-                Spacer()
-                Picker("Font", selection: $appFontStyle) {
-                    ForEach(AppFont.Style.allCases) { style in
-                        Text(style.title).tag(style)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .tint(settingsAccentColor)
-            }
+            SettingsMenuPickerRow(
+                title: "Font",
+                value: appFontStyle.title,
+                options: AppFont.Style.allCases.map { style in
+                    SettingsMenuPickerOption(value: style, title: style.title)
+                },
+                selection: $appFontStyle
+            )
 
             Text(appFontStyle.subtitle)
                 .font(AppFont.caption())
@@ -96,21 +93,7 @@ struct SettingsAppearanceCard: View {
             HStack {
                 Text("Message Bubble")
                 Spacer()
-                Menu {
-                    ForEach(UserBubbleColor.allCases) { color in
-                        Button {
-                            HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                            userBubbleColorRawValue = color.rawValue
-                        } label: {
-                            Label {
-                                Text(color.title)
-                            } icon: {
-                                Circle()
-                                    .fill(color.swatchColor)
-                            }
-                        }
-                    }
-                } label: {
+                UIKitMenuButton {
                     HStack(spacing: 8) {
                         Circle()
                             .fill(selectedUserBubbleColor.swatchColor)
@@ -119,7 +102,23 @@ struct SettingsAppearanceCard: View {
                             .font(AppFont.callout())
                     }
                     .foregroundStyle(.primary)
+                    .contentShape(Rectangle())
+                } menu: {
+                    UIMenu(
+                        options: [.singleSelection],
+                        children: UserBubbleColor.allCases.map { color in
+                            UIAction(
+                                title: color.title,
+                                image: color.menuSwatchImage,
+                                state: color == selectedUserBubbleColor ? .on : .off
+                            ) { _ in
+                                HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                                userBubbleColorRawValue = color.rawValue
+                            }
+                        }
+                    )
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Message bubble color")
                 .accessibilityValue(selectedUserBubbleColor.title)
             }
@@ -179,18 +178,14 @@ struct SettingsPetCompanionSection: View {
                         .font(AppFont.caption())
                         .foregroundStyle(.secondary)
                 } else {
-                    HStack {
-                        Text("Pet")
-                        Spacer()
-                        Picker("Pet", selection: selectedPetBinding) {
-                            ForEach(petStore.availablePets) { pet in
-                                Text(pet.displayName).tag(pet.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .tint(settingsAccentColor)
-                    }
+                    SettingsMenuPickerRow(
+                        title: "Pet",
+                        value: petStore.selectedPet?.displayName ?? "None",
+                        options: petStore.availablePets.map { pet in
+                            SettingsMenuPickerOption(value: pet.id, title: pet.displayName)
+                        },
+                        selection: selectedPetBinding
+                    )
 
                     if let description = petStore.selectedPet?.description,
                        !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

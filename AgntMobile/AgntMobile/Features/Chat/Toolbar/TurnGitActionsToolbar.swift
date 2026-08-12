@@ -7,7 +7,8 @@
 import SwiftUI
 
 extension TurnGitActionKind {
-    func menuIcon(pointSize: CGFloat = 20) -> UIImage {
+    func menuIcon(pointSize: CGFloat? = nil) -> UIImage {
+        let pointSize = pointSize ?? AppMenuPresentation.glyphPointSize
         let cgSize = CGSize(width: pointSize, height: pointSize)
         switch self {
         case .initialize:
