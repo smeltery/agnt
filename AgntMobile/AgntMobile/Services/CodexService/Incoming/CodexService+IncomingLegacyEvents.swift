@@ -377,6 +377,45 @@ extension CodexService {
             return false
         }
 
+        // A background event carrying an itemId/status pair is a streaming
+        // tool-activity row, not one-off essential-activity text: route it
+        // through the same upsert/complete lifecycle other streaming system
+        // items use so the row settles instead of accumulating duplicates.
+        if eventType == "background_event",
+           let itemId = firstNonEmptyString([
+               firstStringValue(in: payload, keys: ["itemId", "item_id", "call_id", "callId"]),
+               firstStringValue(in: paramsObject, keys: ["itemId", "item_id", "call_id", "callId"]),
+           ]),
+           let rawStatus = firstNonEmptyString([
+               firstStringValue(in: payload, keys: ["status"]),
+               firstStringValue(in: paramsObject, keys: ["status"]),
+           ]) {
+            let isCompleted = normalizedToolActivityStatus(
+                rawStatus,
+                isCompleted: false
+            ) != "Running"
+
+            if isCompleted {
+                completeStreamingSystemItemMessage(
+                    threadId: threadId,
+                    turnId: turnId,
+                    itemId: itemId,
+                    kind: .toolActivity,
+                    text: line
+                )
+            } else {
+                upsertStreamingSystemItemMessage(
+                    threadId: threadId,
+                    turnId: turnId,
+                    itemId: itemId,
+                    kind: .toolActivity,
+                    text: line,
+                    isStreaming: true
+                )
+            }
+            return true
+        }
+
         appendEssentialActivityLine(threadId: threadId, turnId: turnId, line: line)
         return true
     }

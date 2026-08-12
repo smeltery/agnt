@@ -65,6 +65,11 @@ function createLiveOwnerLifecycle({
 
   function handlePeerBroadcast(envelope) {
     if (envelope?.method === CLIENT_STATUS_CHANGED) {
+      // The fallback router can accept the owner's connection before any
+      // Desktop client exists. Metadata broadcasts remain queued in that state;
+      // retry them whenever peer membership changes so a newly connected
+      // Desktop immediately refreshes its sidebar.
+      listMetadata.flushPendingThreadArchiveMetadataBroadcasts();
       snapshotState.broadcastAllOwnedSnapshots();
       return;
     }

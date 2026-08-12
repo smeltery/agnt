@@ -9,6 +9,23 @@ const {
 
 const SERVICE_LABEL = "com.dotbrains.agnt.bridge";
 
+// If the saved Node binary or CLI entrypoint disappears (npm uninstall, deleted
+// checkout), exit 0 so launchd's KeepAlive.SuccessfulExit=false stops rescheduling
+// the job; `exec` keeps genuine daemon failures non-zero so they still restart.
+const LAUNCH_AGENT_GUARD_SCRIPT = 'if [ ! -x "$1" ] || [ ! -f "$2" ]; then exit 0; fi; exec "$1" "$2" run-service';
+
+// Keeps the guard script constant: the installed paths are shell positionals, never interpolated source.
+function buildLaunchAgentProgramArguments({ nodePath, cliPath }) {
+  return [
+    "/bin/sh",
+    "-c",
+    LAUNCH_AGENT_GUARD_SCRIPT,
+    SERVICE_LABEL,
+    nodePath,
+    cliPath,
+  ];
+}
+
 function buildLaunchAgentPlist({
   homeDir,
   pathEnv,
@@ -26,9 +43,9 @@ function buildLaunchAgentPlist({
   <string>${escapeXml(SERVICE_LABEL)}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${escapeXml(nodePath)}</string>
-    <string>${escapeXml(cliPath)}</string>
-    <string>run-service</string>
+${buildLaunchAgentProgramArguments({ nodePath, cliPath })
+    .map((argument) => `    <string>${escapeXml(argument)}</string>`)
+    .join("\n")}
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -232,6 +249,7 @@ module.exports = {
   assertRelayConfigured,
   bootoutLaunchAgent,
   buildLaunchAgentPlist,
+  buildLaunchAgentProgramArguments,
   readLaunchAgentState,
   resolveLaunchAgentPlistPath,
   restartLaunchAgent,

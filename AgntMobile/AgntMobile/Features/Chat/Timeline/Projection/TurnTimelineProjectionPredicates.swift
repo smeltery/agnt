@@ -69,6 +69,16 @@ extension TurnTimelineRenderProjection {
             return true
         }
 
+        // A historical review can arrive after its owning turn has fallen outside
+        // the bounded render page (so the previous-messages collapse plan never
+        // saw it). Approved reviews are normal tool history: show them only
+        // through that turn's own live-tail disclosure, never as a detached row.
+        // Denied and otherwise exceptional reviews remain visible for attention.
+        if isApprovedAutoApprovalReview(message),
+           !(isThreadRunning && normalizedIdentifier(message.turnId) == normalizedIdentifier(activeTurnID)) {
+            return true
+        }
+
         guard message.role == .system,
               message.kind == .thinking else {
             return false
@@ -77,6 +87,12 @@ extension TurnTimelineRenderProjection {
         return ThinkingDisclosureParser
             .normalizedThinkingContent(from: message.text)
             .isEmpty
+    }
+
+    static func isApprovedAutoApprovalReview(_ message: CodexMessage) -> Bool {
+        message.role == .system
+            && message.kind == .autoApprovalReview
+            && message.autoApprovalReview?.status == .approved
     }
 
     // Late turn ids can arrive mid-stream, so only split when both rows already

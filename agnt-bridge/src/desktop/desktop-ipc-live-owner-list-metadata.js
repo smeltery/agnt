@@ -24,6 +24,11 @@ function createLiveOwnerListMetadataState({
   const announcedSidebarThreadIds = new Set();
   const sidebarRefreshTimersByThreadId = new Map();
   const pendingThreadArchiveMetadataByThreadId = new Map();
+  // A new rollout can exist as a thread id before Desktop's separate app-server
+  // can return it from thread/list. Keep a bounded materialization replay alive
+  // until the first user item and turn completion prove the rollout was written.
+  const pendingSidebarMaterializationThreadIds = new Set();
+  const replayedSidebarMaterializationThreadIds = new Set();
 
   function broadcastThreadArchived(threadId, cwd) {
     queueThreadArchiveMetadataBroadcast(THREAD_ARCHIVED, threadId, { cwd });
@@ -33,6 +38,10 @@ function createLiveOwnerListMetadataState({
     queueThreadArchiveMetadataBroadcast(THREAD_UNARCHIVED, threadId);
   }
 
+  // Desktop has no watcher on the shared session store, but its webview reacts
+  // to thread-unarchived broadcasts by re-running thread/list. The first timed
+  // announcement keeps the common path responsive; materialization events below
+  // replay it because a new rollout id can precede Desktop's thread/list entry.
   function scheduleSidebarAnnouncement(threadId) {
     const normalizedThreadId = readString(threadId);
     if (!normalizedThreadId
@@ -40,6 +49,7 @@ function createLiveOwnerListMetadataState({
       || sidebarRefreshTimersByThreadId.has(normalizedThreadId)) {
       return;
     }
+    pendingSidebarMaterializationThreadIds.add(normalizedThreadId);
     const timer = setTimeout(() => {
       sidebarRefreshTimersByThreadId.delete(normalizedThreadId);
       if (!ownedThreadIds.has(normalizedThreadId)) {
@@ -58,6 +68,47 @@ function createLiveOwnerListMetadataState({
       clearTimeout(timer);
       sidebarRefreshTimersByThreadId.delete(threadId);
     }
+  }
+
+  // Replays the sidebar announcement once the rollout has actually materialized:
+  // either a persisted user item lands, or the turn completes (the bounded
+  // fallback for app-server/catalog write races). Re-announcing on the user item
+  // is one-shot; a later turn completion always replays once more and then
+  // forgets the thread so it does not keep refreshing an idle sidebar entry.
+  function replaySidebarAnnouncementAfterMaterialization(message, threadId) {
+    const normalizedThreadId = readString(threadId);
+    if (!normalizedThreadId
+      || !ownedThreadIds.has(normalizedThreadId)
+      || !pendingSidebarMaterializationThreadIds.has(normalizedThreadId)) {
+      return;
+    }
+
+    const method = readString(message?.method);
+    const itemType = readString(message?.params?.item?.type);
+    const turnItems = Array.isArray(message?.params?.turn?.items)
+      ? message.params.turn.items
+      : [];
+    const includesPersistedUserMessage = (
+      (method === "item/started" || method === "item/completed")
+        && itemType === "userMessage"
+    ) || turnItems.some((item) => readString(item?.type) === "userMessage");
+    const turnCompleted = method === "turn/completed";
+    if (!includesPersistedUserMessage && !turnCompleted) {
+      return;
+    }
+
+    cancelSidebarAnnouncement(normalizedThreadId);
+    announcedSidebarThreadIds.add(normalizedThreadId);
+    if (!replayedSidebarMaterializationThreadIds.has(normalizedThreadId) || turnCompleted) {
+      broadcastThreadUnarchived(normalizedThreadId);
+    }
+
+    if (turnCompleted) {
+      pendingSidebarMaterializationThreadIds.delete(normalizedThreadId);
+      replayedSidebarMaterializationThreadIds.delete(normalizedThreadId);
+      return;
+    }
+    replayedSidebarMaterializationThreadIds.add(normalizedThreadId);
   }
 
   function queueThreadArchiveMetadataBroadcast(method, threadId, { cwd } = {}) {
@@ -115,6 +166,8 @@ function createLiveOwnerListMetadataState({
   function forgetThread(threadId) {
     cancelSidebarAnnouncement(threadId);
     announcedSidebarThreadIds.delete(threadId);
+    pendingSidebarMaterializationThreadIds.delete(threadId);
+    replayedSidebarMaterializationThreadIds.delete(threadId);
   }
 
   function clearAll() {
@@ -123,6 +176,8 @@ function createLiveOwnerListMetadataState({
     }
     sidebarRefreshTimersByThreadId.clear();
     announcedSidebarThreadIds.clear();
+    pendingSidebarMaterializationThreadIds.clear();
+    replayedSidebarMaterializationThreadIds.clear();
     pendingThreadArchiveMetadataByThreadId.clear();
   }
 
@@ -134,6 +189,7 @@ function createLiveOwnerListMetadataState({
     forgetThread,
     maybeYieldOwnedThreadForPeerArchive,
     readArchiveCwd,
+    replaySidebarAnnouncementAfterMaterialization,
     scheduleSidebarAnnouncement,
   };
 }

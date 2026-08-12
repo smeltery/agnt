@@ -215,6 +215,7 @@ struct CodexMissingNotificationThreadPrompt: Identifiable, Equatable, Sendable {
 }
 
 enum CodexThreadRunBadgeState: Hashable, Sendable {
+    // Run is parked on an approval or question: it moves once the user responds.
     case waitingOnUser
     case running
     case ready

@@ -137,7 +137,7 @@ extension CodexService {
                         timeZoneIdentifier: timeZoneIdentifier
                     )
 
-                case "toolcall":
+                case let toolType where isGenericToolCallItemType(toolType):
                     guard let decodedToolCall = decodeHistoryToolCallItem(from: itemObject) else { continue }
                     appendHistoryMessage(
                         to: &result,

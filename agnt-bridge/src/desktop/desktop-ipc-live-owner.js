@@ -372,6 +372,7 @@ function createDesktopIpcLiveOwner({
       }
       pendingTurnStarts.refreshFallback(update.threadId);
       scheduleSnapshot(update.threadId);
+      listMetadata.replaySidebarAnnouncementAfterMaterialization(message, update.threadId);
     }
 
     if (readString(message.method) === "turn/completed") {

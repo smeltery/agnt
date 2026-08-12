@@ -48,7 +48,10 @@ struct TurnTimelineCommandGroupView: View {
     @State private var isExpanded = false
 
     private var title: String {
-        var parts = [group.commandCount == 1 ? "Ran 1 command" : "Ran \(group.commandCount) commands"]
+        var parts: [String] = []
+        if group.commandCount > 0 {
+            parts.append(group.commandCount == 1 ? "Ran 1 command" : "Ran \(group.commandCount) commands")
+        }
         if group.toolCallCount > 0 {
             parts.append(group.toolCallCount == 1 ? "1 tool call" : "\(group.toolCallCount) tool calls")
         }
@@ -58,7 +61,9 @@ struct TurnTimelineCommandGroupView: View {
         if group.stoppedCommandCount > 0 {
             parts.append("\(group.stoppedCommandCount) stopped")
         }
-        return parts.joined(separator: " · ")
+        // Tool-only groups with no command rows would otherwise render an
+        // empty disclosure button.
+        return parts.isEmpty ? "Tool activity" : parts.joined(separator: " · ")
     }
 
     var body: some View {

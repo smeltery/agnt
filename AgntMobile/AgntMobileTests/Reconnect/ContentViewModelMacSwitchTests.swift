@@ -39,6 +39,25 @@ final class ContentViewModelMacSwitchTests: ContentViewModelReconnectTestCase {
         )
     }
 
+    func testMirroredRunningCatchupSurvivesSaveAndLoadLocalStateRoundTrip() {
+        let service = makeService()
+        let macDeviceID = "mac-\(UUID().uuidString)"
+        let threadID = "thread-\(UUID().uuidString)"
+
+        service.messagesByThread = [
+            threadID: [makeMessage(threadID: threadID, text: "still running")],
+        ]
+        service.markMirroredRunningCatchupNeeded(for: threadID)
+        service.saveLocalState(for: macDeviceID)
+
+        // A relaunch starts from a fresh in-memory service; only the persisted
+        // snapshot should be able to repopulate the mirrored-running hint.
+        service.mirroredRunningCatchupThreadIDs.removeAll()
+        service.loadLocalState(for: macDeviceID)
+
+        XCTAssertTrue(service.mirroredRunningCatchupThreadIDs.contains(threadID))
+    }
+
     func testSwitchToTrustedMacFailureRestoresPreviousMacNamespaceWithoutPersistingTargetDrafts() async {
         let service = makeService()
         let viewModel = ContentViewModel()

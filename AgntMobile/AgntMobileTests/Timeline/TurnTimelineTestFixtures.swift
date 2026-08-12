@@ -43,3 +43,25 @@ func makeTimelineTestMessage(
     return message
 }
 
+// Builds a compact auto-approval review fixture for timeline priority-visibility tests.
+func makeTimelineTestAutoApprovalReview(
+    id: String,
+    status: CodexAutoApprovalReviewStatus
+) -> CodexAutoApprovalReview {
+    CodexAutoApprovalReview(
+        reviewId: id,
+        targetItemId: nil,
+        turnId: "turn-1",
+        startedAtMs: 0,
+        completedAtMs: 1,
+        status: status,
+        riskLevel: nil,
+        userAuthorization: nil,
+        rationale: nil,
+        decisionSource: nil,
+        action: .object(["type": .string("command"), "command": .string("true")]),
+        retryApproved: false,
+        retryUnavailableReason: nil
+    )
+}
+

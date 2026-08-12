@@ -28,6 +28,16 @@ extension CodexService {
         return threadRuntimeOverridesByThreadID[normalizedThreadID]
     }
 
+    // On-demand retry for runtime surfaces: the bootstrap `model/list` can fail
+    // or still be in flight when the user opens a picker, and nothing else
+    // re-requests it until the next reconnect. Cheap no-op once models exist.
+    func refreshModelsIfNeeded() {
+        guard availableModels.isEmpty, !isLoadingModels, isConnected else { return }
+        Task { @MainActor [weak self] in
+            try? await self?.listModels()
+        }
+    }
+
     func listModels() async throws {
         isLoadingModels = true
         defer { isLoadingModels = false }

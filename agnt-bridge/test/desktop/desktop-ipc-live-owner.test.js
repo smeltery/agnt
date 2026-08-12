@@ -225,6 +225,178 @@ test("live owner routes Desktop follower turns to Codex", async (t) => {
   }]);
 });
 
+test("live owner replays a pending sidebar announcement when Desktop joins its fallback router", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-live-owner-sidebar-replay-");
+  const desktopFrames = [];
+  let desktopSocket = null;
+
+  const owner = createDesktopIpcLiveOwner({
+    socketPath,
+    sidebarRefreshDelayMs: 5,
+    snapshotDebounceMs: 1,
+    reconnectMs: 10,
+    requestTimeoutMs: 500,
+    sendCodexRequest: async () => ({ ok: true }),
+    sendRawCodexMessage() {},
+  });
+  t.after(() => {
+    owner.stopAll();
+    desktopSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  owner.observeInbound(JSON.stringify({
+    method: "turn/start",
+    params: {
+      threadId: "thread-sidebar-replay",
+      input: [],
+    },
+  }));
+
+  await waitFor(() => fs.existsSync(socketPath));
+  // Let the first announcement attempt run while only the bridge-owned router
+  // is present. It must remain pending rather than count that write as delivery.
+  await wait(30);
+  owner.observeInbound(JSON.stringify({
+    method: "thread/unsubscribe",
+    params: { threadId: "thread-sidebar-replay" },
+  }));
+  assert.equal(
+    owner.isThreadOwned("thread-sidebar-replay"),
+    false,
+    "sidebar metadata must outlive released stream ownership"
+  );
+
+  desktopSocket = net.createConnection(socketPath);
+  attachFrameReader(desktopSocket, (frame) => desktopFrames.push(frame));
+  await new Promise((resolve) => desktopSocket.once("connect", resolve));
+  writeFrame(desktopSocket, {
+    type: "request",
+    requestId: "desktop-sidebar-replay-init",
+    sourceClientId: "initializing-client",
+    version: 1,
+    method: "initialize",
+    params: { clientType: "vscode" },
+  });
+  await waitFor(() => desktopFrames.some(
+    (frame) => frame.type === "response"
+      && frame.requestId === "desktop-sidebar-replay-init"
+  ));
+
+  const announcement = await waitForMessage(
+    desktopFrames,
+    (frame) => frame.type === "broadcast"
+      && frame.method === "thread-unarchived"
+      && frame.params?.conversationId === "thread-sidebar-replay"
+  );
+  assert.equal(announcement.version, 1);
+  assert.equal(announcement.params.hostId, "local");
+});
+
+test("live owner replays an early sidebar announcement after rollout materialization", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-live-owner-sidebar-materialized-");
+  const frames = [];
+  let serverSocket = null;
+
+  const server = net.createServer((socket) => {
+    serverSocket = socket;
+    attachFrameReader(socket, (frame) => {
+      frames.push(frame);
+      if (frame.method === "initialize") {
+        writeFrame(socket, {
+          type: "response",
+          requestId: frame.requestId,
+          resultType: "success",
+          method: "initialize",
+          handledByClientId: "router",
+          result: { clientId: "agnt-owner-test" },
+        });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(socketPath, resolve));
+
+  const owner = createDesktopIpcLiveOwner({
+    socketPath,
+    snapshotDebounceMs: 1,
+    sidebarRefreshDelayMs: 5,
+    sendCodexRequest: async () => ({ ok: true }),
+    sendRawCodexMessage() {},
+  });
+  t.after(() => {
+    owner.stopAll();
+    server.close();
+    serverSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const announcementCount = () => frames.filter((frame) => (
+    frame.type === "broadcast"
+      && frame.method === "thread-unarchived"
+      && frame.params?.conversationId === "thread-sidebar-race"
+  )).length;
+
+  owner.observeInbound(JSON.stringify({
+    id: "sidebar-race-turn-1",
+    method: "turn/start",
+    params: {
+      threadId: "thread-sidebar-race",
+      input: [{ type: "text", text: "hi" }],
+    },
+  }));
+  await waitForMessage(
+    frames,
+    (frame) => frame.type === "broadcast"
+      && frame.method === "thread-unarchived"
+      && frame.params?.conversationId === "thread-sidebar-race"
+  );
+  assert.equal(announcementCount(), 1);
+
+  owner.observeOutbound(JSON.stringify({
+    method: "item/started",
+    params: {
+      threadId: "thread-sidebar-race",
+      turnId: "turn-sidebar-race",
+      item: { id: "user-sidebar-race", type: "userMessage", content: [{ type: "text", text: "hi" }] },
+    },
+  }));
+  await waitFor(() => announcementCount() === 2);
+
+  // item/completed for the same persisted user item must not create an
+  // unbounded refresh loop.
+  owner.observeOutbound(JSON.stringify({
+    method: "item/completed",
+    params: {
+      threadId: "thread-sidebar-race",
+      turnId: "turn-sidebar-race",
+      item: { id: "user-sidebar-race", type: "userMessage", content: [{ type: "text", text: "hi" }] },
+    },
+  }));
+  await wait(20);
+  assert.equal(announcementCount(), 2);
+
+  // Completion is the final bounded fallback for app-server/catalog write races.
+  owner.observeOutbound(JSON.stringify({
+    method: "turn/completed",
+    params: {
+      threadId: "thread-sidebar-race",
+      turn: { id: "turn-sidebar-race", items: [], status: "completed" },
+    },
+  }));
+  await waitFor(() => announcementCount() === 3);
+
+  owner.observeInbound(JSON.stringify({
+    id: "sidebar-race-turn-2",
+    method: "turn/start",
+    params: {
+      threadId: "thread-sidebar-race",
+      input: [{ type: "text", text: "again" }],
+    },
+  }));
+  await wait(20);
+  assert.equal(announcementCount(), 3);
+});
+
 function attachFrameReader(socket, onFrame) {
   let buffer = Buffer.alloc(0);
   socket.on("data", (chunk) => {

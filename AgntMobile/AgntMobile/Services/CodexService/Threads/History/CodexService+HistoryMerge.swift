@@ -29,7 +29,8 @@ extension CodexService {
             return historyMessagesMergingGeneratedImageArtifacts(sorted)
         }
 
-        var merged = existing
+        var merged = discardStaleFileChangeRowsSupersededByCanonicalToolActivity(existing, history: history)
+
         let assistantHistoryCountByTurn = Dictionary(
             grouping: history.filter { $0.role == .assistant }
         ) { $0.turnId ?? "" }

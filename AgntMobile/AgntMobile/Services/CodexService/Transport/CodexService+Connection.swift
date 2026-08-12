@@ -10,9 +10,10 @@ import UIKit
 
 extension CodexService {
     // Only close codes that prove the saved pairing/session can no longer be reused
-    // should force a QR reset. Temporary delivery loss uses the dedicated `4004`
-    // close so `4002` can stay available for "session unavailable right now" cases.
-    static let permanentRelayCloseCodeRawValues: Set<UInt16> = [4000, 4001, 4003]
+    // should force a QR reset. A `4003` replaces an older mobile socket with a newer one,
+    // so it must preserve pairing and follow the reconnect path.
+    static let permanentRelayCloseCodeRawValues: Set<UInt16> = [4000, 4001]
+    static let retryableRelayCloseCodeRawValues: Set<UInt16> = [4002, 4003]
     static let explicitRelayDropCloseCodeRawValues: Set<UInt16> = [4004]
     static let maxTrustedReconnectFailures = 3
     static let trustedReconnectRecoveryMessage =

@@ -1,7 +1,7 @@
 // FILE: macos-launch-agent.js
-// Purpose: Owns macOS-only launchd install/start/stop/status helpers for the background agnt bridge.
+// Purpose: Owns macOS-only launchd install/start/stop/uninstall/status helpers for the background agnt bridge.
 // Layer: CLI helper
-// Exports: start/stop/status helpers plus the launchd service runner used by `agnt up`.
+// Exports: start/stop/uninstall/status helpers plus the launchd service runner used by `agnt up`.
 // Depends on: child_process, fs, os, path, ./bridge, ./daemon-state, ./bridge-config, ./qr, ./secure-device-state
 
 const { execFileSync } = require("child_process");
@@ -20,6 +20,7 @@ const {
   assertRelayConfigured,
   bootoutLaunchAgent,
   buildLaunchAgentPlist,
+  buildLaunchAgentProgramArguments,
   readLaunchAgentState,
   resolveLaunchAgentPlistPath,
   restartLaunchAgent,
@@ -159,6 +160,30 @@ function stopMacOSBridgeService({
   });
   clearPairingSession({ env, fsImpl });
   clearBridgeStatus({ env, fsImpl });
+}
+
+// Removes launchd ownership of the bridge (unload + plist) while preserving daemon config,
+// logs, device trust, and pairing identity for a future reinstall.
+function uninstallMacOSBridgeService({
+  env = process.env,
+  platform = process.platform,
+  execFileSyncImpl = execFileSync,
+  fsImpl = fs,
+  processImpl = process,
+} = {}) {
+  assertDarwinPlatform(platform);
+  const plistPath = resolveLaunchAgentPlistPath({ env });
+  const removed = fsImpl.existsSync(plistPath);
+  // Stop first: a real bootout failure throws here and leaves the plist on disk.
+  stopMacOSBridgeService({
+    env,
+    platform,
+    execFileSyncImpl,
+    fsImpl,
+    processImpl,
+  });
+  fsImpl.rmSync(plistPath, { force: true });
+  return { plistPath, removed };
 }
 
 // Stops orphaned run-service processes left behind when launchd reports the job missing.
@@ -379,6 +404,7 @@ function shortFingerprint(value) {
 
 module.exports = {
   buildLaunchAgentPlist,
+  buildLaunchAgentProgramArguments,
   buildTrustedDeviceSummary,
   formatDeviceKind,
   getMacOSBridgeServiceStatus,
@@ -390,4 +416,5 @@ module.exports = {
   runMacOSBridgeService,
   startMacOSBridgeService,
   stopMacOSBridgeService,
+  uninstallMacOSBridgeService,
 };

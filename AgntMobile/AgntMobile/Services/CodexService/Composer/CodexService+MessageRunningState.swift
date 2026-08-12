@@ -332,10 +332,15 @@ extension CodexService {
     // Returns sidebar-only chat badge state. This intentionally stays separate from
     // per-turn runtime truth so "chat finished unread" does not leak into timeline logic.
     func threadRunBadgeState(for threadId: String) -> CodexThreadRunBadgeState? {
+        // A pending action outranks the spinner: the run is parked until the
+        // user responds, and that is the row worth opening first.
         if threadHasPendingApproval(threadId) {
             return .waitingOnUser
         }
         if threadHasActiveOrRunningTurn(threadId) {
+            if threadHasPendingStructuredUserInput(threadId) {
+                return .waitingOnUser
+            }
             return .running
         }
         if failedThreadIDs.contains(threadId) {
@@ -357,6 +362,17 @@ extension CodexService {
         return pendingApprovals.contains { request in
             request.threadId?.trimmingCharacters(in: .whitespacesAndNewlines) == normalizedThreadID
         }
+    }
+
+    // Structured questions are persisted as item-scoped system rows. Restrict
+    // this scan to active turns in threadRunBadgeState so sidebar projection
+    // remains cheap even for repositories with large histories.
+    private func threadHasPendingStructuredUserInput(_ threadId: String) -> Bool {
+        messagesByThread[threadId]?.contains { message in
+            message.role == .system
+                && message.kind == .userInputPrompt
+                && message.structuredUserInputRequest != nil
+        } == true
     }
 
     // Clears "ready/failed" badges when the user has opened a thread.
