@@ -371,5 +371,7 @@ module.exports = {
   isSnapshotChange,
   latestActiveBackgroundTurn,
   normalizeBoundedTurnsForRuntime,
+  normalizedTurnIdForEntity,
+  normalizedTurnStore,
   seedConversationStateFromThreadRead,
 };

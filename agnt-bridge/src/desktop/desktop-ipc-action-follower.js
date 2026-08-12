@@ -110,6 +110,7 @@ function createDesktopIpcActionFollower({
   const canonicalHistoryReplacementSentThreadIds = new Set();
   const canonicalActiveTurnsByThreadId = new Map();
   const staleYieldedThreadIds = new Set();
+  const normalizedReviewFingerprintsByThreadId = new Map();
   const activeThreads = createActiveThreadCache({
     maxSize: MAX_ACTIVE_THREAD_IDS,
     isEvictable(threadId) {
@@ -220,6 +221,7 @@ function createDesktopIpcActionFollower({
     canonicalHistoryReplacementSentThreadIds,
     canonicalHistoryThreadIds,
     conversationProjector,
+    normalizedReviewFingerprintsByThreadId,
     pendingRoutesByRequestId,
     rememberCanonicalActiveTurns,
     sendApplicationResponse,
@@ -253,6 +255,7 @@ function createDesktopIpcActionFollower({
     heldFollowerRequests,
     ipc,
     liveOwnerThreadIds,
+    normalizedReviewFingerprintsByThreadId,
     pendingRoutesByRequestId,
     pendingSnapshotsByThreadId,
     queuedChangesByThreadId,
@@ -273,6 +276,7 @@ function createDesktopIpcActionFollower({
     canonicalHistoryThreadIds,
     clearBackgroundDisconnectTimer,
     conversationProjector,
+    normalizedReviewFingerprintsByThreadId,
     rememberCanonicalActiveTurns,
     sendApplicationResponse,
     settleAnnouncedBackgroundTurn,
