@@ -385,6 +385,132 @@ func testTimelineRenderProjectionCollapsesCompletedTurnBeforeFinalAnswer() {
     )
 }
 
+func testTimelineRenderProjectionCollapsesApprovedAutoReviewsButKeepsDeniedReviewVisible() {
+    let now = Date()
+    var approvedReview = makeTimelineTestMessage(
+        id: "approved-review",
+        threadID: "thread",
+        role: .system,
+        kind: .autoApprovalReview,
+        text: "Approved automatically",
+        createdAt: now.addingTimeInterval(2),
+        turnID: "turn-1",
+        orderIndex: 3
+    )
+    approvedReview.autoApprovalReview = makeTimelineTestAutoApprovalReview(
+        id: "approved-review",
+        status: .approved
+    )
+
+    var deniedReview = makeTimelineTestMessage(
+        id: "denied-review",
+        threadID: "thread",
+        role: .system,
+        kind: .autoApprovalReview,
+        text: "Approval denied",
+        createdAt: now.addingTimeInterval(3),
+        turnID: "turn-1",
+        orderIndex: 4
+    )
+    deniedReview.autoApprovalReview = makeTimelineTestAutoApprovalReview(
+        id: "denied-review",
+        status: .denied
+    )
+
+    let messages = [
+        makeTimelineTestMessage(
+            id: "user",
+            threadID: "thread",
+            role: .user,
+            text: "Finish the task",
+            createdAt: now,
+            turnID: "turn-1",
+            orderIndex: 1
+        ),
+        makeTimelineTestMessage(
+            id: "thinking",
+            threadID: "thread",
+            role: .system,
+            kind: .thinking,
+            text: "Checking the implementation",
+            createdAt: now.addingTimeInterval(1),
+            turnID: "turn-1",
+            orderIndex: 2
+        ),
+        approvedReview,
+        deniedReview,
+        makeTimelineTestMessage(
+            id: "final",
+            threadID: "thread",
+            role: .assistant,
+            text: "Done.",
+            createdAt: now.addingTimeInterval(4),
+            turnID: "turn-1",
+            itemID: "final-item",
+            orderIndex: 5
+        ),
+    ]
+
+    let items = TurnTimelineRenderProjection.project(
+        messages: messages,
+        completedTurnIDs: ["turn-1"]
+    )
+
+    XCTAssertEqual(items.map(\.id), [
+        "user",
+        "previous-messages:final",
+        "denied-review",
+        "final",
+    ])
+    guard case .previousMessages(let previousGroup) = items[1] else {
+        return XCTFail("Expected approved review inside previous messages")
+    }
+    XCTAssertEqual(previousGroup.messages.map(\.id), ["thinking", "approved-review"])
+}
+
+func testTimelineRenderProjectionNeverShowsDetachedApprovedAutoReviewAtLiveTail() {
+    let now = Date()
+    var approvedReview = makeTimelineTestMessage(
+        id: "approved-review",
+        threadID: "thread",
+        role: .system,
+        kind: .autoApprovalReview,
+        text: "Approved automatically",
+        createdAt: now,
+        turnID: "older-turn"
+    )
+    approvedReview.autoApprovalReview = makeTimelineTestAutoApprovalReview(
+        id: "approved-review",
+        status: .approved
+    )
+
+    var deniedReview = makeTimelineTestMessage(
+        id: "denied-review",
+        threadID: "thread",
+        role: .system,
+        kind: .autoApprovalReview,
+        text: "Approval denied",
+        createdAt: now.addingTimeInterval(1),
+        turnID: "older-turn"
+    )
+    deniedReview.autoApprovalReview = makeTimelineTestAutoApprovalReview(
+        id: "denied-review",
+        status: .denied
+    )
+
+    let items = TurnTimelineRenderProjection.project(
+        messages: [approvedReview, deniedReview]
+    )
+    let activeItems = TurnTimelineRenderProjection.project(
+        messages: [approvedReview, deniedReview],
+        activeTurnID: "older-turn",
+        isThreadRunning: true
+    )
+
+    XCTAssertEqual(items.map(\.id), ["denied-review"])
+    XCTAssertEqual(activeItems.map(\.id), ["approved-review", "denied-review"])
+}
+
 func testTimelineRenderProjectionKeepsRunningTurnExpandedBeforeFinalAnswer() {
     let now = Date()
     let messages = [
