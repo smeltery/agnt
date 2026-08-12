@@ -163,11 +163,15 @@ test("desktop-origin mirror completes custom tool activity rows", async (t) => {
     message.method === "codex/event/background_event"
       && message.params.call_id === "custom-call-1"
       && message.params.message === "Reading terminal output"
+      && message.params.itemId === "custom-call-1"
+      && message.params.status === "inProgress"
   )));
   assert.ok(outbound.some((message) => (
     message.method === "codex/event/background_event"
       && message.params.call_id === "custom-call-1"
       && message.params.message === "Read terminal output"
+      && message.params.itemId === "custom-call-1"
+      && message.params.status === "completed"
   )));
 });
 

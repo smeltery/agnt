@@ -83,6 +83,8 @@ test("desktop-origin idle watchers stream new rollout growth after the phone reo
     ]
   );
   assert.equal(outbound[2].params.message, "Applying patch");
+  assert.equal(outbound[2].params.itemId, "call-2");
+  assert.equal(outbound[2].params.status, "inProgress");
 });
 
 
@@ -147,6 +149,8 @@ test("desktop-origin rollouts mirror custom apply_patch as file-change lifecycle
   assert.equal(outbound[2].params.itemId, "call-patch");
   assert.equal(outbound[2].params.status, "inProgress");
   assert.equal(outbound[2].params.changes[0].path, "Sources/App.swift");
+  assert.equal(outbound[3].params.itemId, undefined);
+  assert.equal(outbound[3].params.status, undefined);
   assert.equal(outbound[4].params.itemId, "call-patch");
   assert.equal(outbound[4].params.changes[0].path, "Sources/App.swift");
   assert.equal(outbound[4].params.changes[0].kind, "update");
