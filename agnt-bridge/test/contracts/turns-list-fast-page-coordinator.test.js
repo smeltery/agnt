@@ -152,6 +152,7 @@ test("thread turns-list first-page singleflight isolates request shapes and rebi
 
 test("thread turns-list fast page keeps an immediate canonical response authoritative", async () => {
   let deadlineWasScheduled = false;
+  let jsonlReads = 0;
   const coordinator = createThreadTurnsListFastPageCoordinator({
     setTimeoutImpl() {
       deadlineWasScheduled = true;
@@ -171,24 +172,29 @@ test("thread turns-list fast page keeps an immediate canonical response authorit
         nextCursor: null,
       },
     }),
-    readJsonl: async () => ({
-      response: {
-        id: "req-fast-canonical",
-        result: {
-          data: [{ id: "turn-jsonl", items: [] }],
-          nextCursor: "agnt-jsonl-fallback-older-unavailable",
+    readJsonl: async () => {
+      jsonlReads += 1;
+      return {
+        response: {
+          id: "req-fast-canonical",
+          result: {
+            data: [{ id: "turn-jsonl", items: [] }],
+            nextCursor: "agnt-jsonl-fallback-older-unavailable",
+          },
         },
-      },
-      usesJsonl: true,
-    }),
+        usesJsonl: true,
+      };
+    },
   });
 
   assert.equal(deadlineWasScheduled, true);
+  assert.equal(jsonlReads, 0);
   assert.equal(selection.source, "canonical");
   assert.equal(selection.response.result.data[0].id, "turn-canonical");
 });
 
-test("thread turns-list fast page prefers a newer running JSONL turn over stale canonical history", async () => {
+test("thread turns-list fast page does not build JSONL when canonical wins the deadline", async () => {
+  let jsonlReads = 0;
   const coordinator = createThreadTurnsListFastPageCoordinator({
     createToken: () => "newer-jsonl-token",
     setTimeoutImpl: () => 1,
@@ -206,21 +212,24 @@ test("thread turns-list fast page prefers a newer running JSONL turn over stale 
         nextCursor: "cursor-after-canonical-older",
       },
     }),
-    readJsonl: async () => ({
-      response: {
-        id: "req-newer-jsonl",
-        result: {
-          data: [{ id: "turn-jsonl-running", status: "running", items: [] }],
-          nextCursor: "agnt-jsonl-fallback-older-unavailable",
+    readJsonl: async () => {
+      jsonlReads += 1;
+      return {
+        response: {
+          id: "req-newer-jsonl",
+          result: {
+            data: [{ id: "turn-jsonl-running", status: "running", items: [] }],
+            nextCursor: "agnt-jsonl-fallback-older-unavailable",
+          },
         },
-      },
-      usesJsonl: true,
-    }),
+        usesJsonl: true,
+      };
+    },
   });
 
-  assert.equal(selection.source, "jsonl");
-  assert.equal(selection.response.result.data[0].id, "turn-jsonl-running");
-  assert.equal(selection.response.result.agntCanonicalHandoff, true);
+  assert.equal(jsonlReads, 0);
+  assert.equal(selection.source, "canonical");
+  assert.equal(selection.response.result.data[0].id, "turn-canonical-older");
 });
 
 test("thread turns-list handoff never returns newer canonical turns as older history", async () => {
