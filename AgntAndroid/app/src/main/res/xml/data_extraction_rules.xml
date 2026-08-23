@@ -5,13 +5,13 @@
         <exclude domain="sharedpref" path="agnt_session_state.xml" />
         <exclude domain="sharedpref" path="agnt_ui.xml" />
         <exclude domain="sharedpref" path="agnt_onboarding.xml" />
-        <exclude domain="file" path="com.dotbrains.agnt.mobile/" />
+        <exclude domain="file" path="com.smeltery.agnt.mobile/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="agnt_secure_store.xml" />
         <exclude domain="sharedpref" path="agnt_session_state.xml" />
         <exclude domain="sharedpref" path="agnt_ui.xml" />
         <exclude domain="sharedpref" path="agnt_onboarding.xml" />
-        <exclude domain="file" path="com.dotbrains.agnt.mobile/" />
+        <exclude domain="file" path="com.smeltery.agnt.mobile/" />
     </device-transfer>
 </data-extraction-rules>

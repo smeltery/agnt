@@ -10,7 +10,7 @@ Imported from:   Stivy-01/remodex@main, directory `remodex-host/`
 
 Modifications relative to upstream:
   - Crate / package renamed from `remodex-host` to `agnt-host`; app
-    identifier `com.remodex.host` -> `com.dotbrains.agnt.host`.
+    identifier `com.remodex.host` -> `com.smeltery.agnt.host`.
   - Bundled bridge directory renamed `phodex-bridge` -> `agnt-bridge`;
     entry script `bin/remodex.js` -> `bin/agnt.js`; bundle manifest
     `remodex-bundle.json` -> `agnt-bundle.json`.
@@ -25,7 +25,7 @@ Modifications relative to upstream:
   - Default remote-relay URL `wss://relay.remodex.app` replaced with the
     local-loopback default `ws://127.0.0.1:9000` (host is local-first;
     a hosted relay must be opted into explicitly).
-  - Tauri updater endpoint repointed to `dotbrains/agnt` releases. The
+  - Tauri updater endpoint repointed to `smeltery/agnt` releases. The
     minisign `pubkey` in `src-tauri/tauri.conf.json` is a placeholder —
     a fresh keypair must be generated before any signed release.
   - License migrated from ISC to Apache-2.0 to match the rest of this

@@ -45,7 +45,7 @@ Everything is validated by `validateProviderModule()` at registration time so a 
 | `createTranslator(ctx)` | conditional | required if the CLI doesn't speak Codex JSON-RPC natively |
 | `binCandidates` | optional | hint for `detect*Binary()` helpers in `<id>/detect.js` |
 | `isInstalled({env})` | optional | enables auto-detect during `resolveActiveProvider()` |
-| `bootstrap({env, logger})` | optional | postinstall hook (`@dotbrains/agnt`'s `postinstall` calls every provider's bootstrap) |
+| `bootstrap({env, logger})` | optional | postinstall hook (`@smeltery/agnt`'s `postinstall` calls every provider's bootstrap) |
 | `createDesktopRefresher(opts)` | optional | only relevant for `capabilities.desktopRefresher === true` |
 | `parseRolloutLine(line)` | optional | only relevant for `capabilities.rolloutMirror === true` |
 

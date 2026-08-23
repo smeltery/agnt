@@ -13,7 +13,7 @@ enum QRScannerPairingValidationResult {
     case bridgeUpdateRequired(CodexBridgeUpdatePrompt)
 }
 
-private let qrScannerBridgeUpdateCommand = "npm install -g @dotbrains/agnt@latest"
+private let qrScannerBridgeUpdateCommand = "npm install -g @smeltery/agnt@latest"
 private let qrScannerPairingCodePrefix = "AGNT1:"
 // Legacy upstream paste-token prefix. agnt never emits it, but we keep accepting it so any
 // token a user still has around (or one from an upstream bridge) decodes without an error.

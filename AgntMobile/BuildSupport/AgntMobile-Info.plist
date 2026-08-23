@@ -4,7 +4,7 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.dotbrains.agnt.AgntMobile.refresh</string>
+		<string>com.smeltery.agnt.AgntMobile.refresh</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
@@ -28,7 +28,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.dotbrains.agnt.AgntMobile.auth</string>
+			<string>com.smeltery.agnt.AgntMobile.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>agnt</string>

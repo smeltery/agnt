@@ -434,8 +434,8 @@ test("agnt reset-pairing falls back to file-only reset only when the Linux unit 
     exitImpl(code) { throw new Error(`unexpected exit ${code}`); },
     deps: {
       resetLinuxBridgePairing() {
-        const error = new Error("Unit com.dotbrains.agnt.bridge.service not loaded.");
-        error.stderr = Buffer.from("Unit com.dotbrains.agnt.bridge.service not loaded.");
+        const error = new Error("Unit com.smeltery.agnt.bridge.service not loaded.");
+        error.stderr = Buffer.from("Unit com.smeltery.agnt.bridge.service not loaded.");
         throw error;
       },
       resetBridgePairing() {
@@ -512,7 +512,7 @@ test("agnt uninstall-service removes the launchd service definition", async () =
     "uninstall-service",
   ]);
   assert.deepEqual(messages, [
-    "[agnt] Removed the macOS bridge service. You can now run `npm uninstall -g @dotbrains/agnt`.",
+    "[agnt] Removed the macOS bridge service. You can now run `npm uninstall -g @smeltery/agnt`.",
   ]);
 });
 

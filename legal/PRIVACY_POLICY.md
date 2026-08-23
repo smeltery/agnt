@@ -61,7 +61,7 @@ If you deploy agnt for others to use — for example by hosting the relay public
 
 ## 7. Source and contact
 
-- **Source:** [github.com/dotbrains/agnt](https://github.com/dotbrains/agnt)
+- **Source:** [github.com/smeltery/agnt](https://github.com/smeltery/agnt)
 - **Issues / questions:** open an issue in the repository.
 
 Upstream attribution is recorded in the project [README](../README.md).

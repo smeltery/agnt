@@ -91,7 +91,7 @@ struct AgntLockScreenWidgetView: View {
 }
 
 struct AgntLockScreenWidget: Widget {
-    static let kind = "com.dotbrains.agnt.AgntMobile.AgntWidget.LockScreen"
+    static let kind = "com.smeltery.agnt.AgntMobile.AgntWidget.LockScreen"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: AgntLockScreenProvider()) { entry in

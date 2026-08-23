@@ -1,5 +1,5 @@
 {
-  "name": "@dotbrains/agnt",
+  "name": "@smeltery/agnt",
   "version": "0.1.0",
   "description": "Local bridge between coding-agent CLIs (Codex, Claude Code, opencode, Cursor, ...) and the Agnt mobile app. Run `agnt up` to start.",
   "main": "src/index.js",
@@ -34,7 +34,7 @@
     "cursor",
     "multi-provider"
   ],
-  "author": "dotbrains",
+  "author": "smeltery",
   "license": "SEE LICENSE IN LICENSE",
   "type": "commonjs",
   "dependencies": {

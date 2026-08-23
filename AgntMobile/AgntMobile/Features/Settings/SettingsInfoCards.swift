@@ -146,7 +146,7 @@ struct SettingsAboutCard: View {
 
             Button {
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                if let url = URL(string: "https://github.com/dotbrains/agnt") {
+                if let url = URL(string: "https://github.com/smeltery/agnt") {
                     UIApplication.shared.open(url)
                 }
             } label: {

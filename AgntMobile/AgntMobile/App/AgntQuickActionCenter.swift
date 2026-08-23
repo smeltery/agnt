@@ -16,8 +16,8 @@ enum AgntQuickAction: Equatable, Sendable {
 enum AgntQuickActionCenter {
     static let didReceiveQuickAction = Notification.Name("agnt.didReceiveQuickAction")
 
-    private static let newChatType = "com.dotbrains.agnt.quickAction.newChat"
-    private static let threadType = "com.dotbrains.agnt.quickAction.thread"
+    private static let newChatType = "com.smeltery.agnt.quickAction.newChat"
+    private static let threadType = "com.smeltery.agnt.quickAction.thread"
     private static let threadIDUserInfoKey = "threadId"
     private static var pendingAction: AgntQuickAction?
 

@@ -12,8 +12,8 @@ const baseUrl =
   process.env.AGNT_HOST_UPDATE_BASE_URL ||
   (
     releaseTag
-      ? `https://github.com/dotbrains/agnt/releases/download/${releaseTag}`
-      : "https://github.com/dotbrains/agnt/releases/latest/download"
+      ? `https://github.com/smeltery/agnt/releases/download/${releaseTag}`
+      : "https://github.com/smeltery/agnt/releases/latest/download"
   );
 
 const bundleRoot = path.join(appRoot, "src-tauri", "target", "release", "bundle");

@@ -1,5 +1,5 @@
 {
-  "name": "@dotbrains/agnt-web",
+  "name": "@smeltery/agnt-web",
   "version": "0.0.1",
   "description": "Browser client for the agnt local-first coding-agent bridge.",
   "type": "module",

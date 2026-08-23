@@ -10,7 +10,7 @@ const { promisify } = require("util");
 
 const execFileAsync = promisify(execFile);
 
-const BRIDGE_PACKAGE_UPDATE_COMMAND = "npm install -g @dotbrains/agnt@latest";
+const BRIDGE_PACKAGE_UPDATE_COMMAND = "npm install -g @smeltery/agnt@latest";
 const BRIDGE_PACKAGE_UPDATE_TIMEOUT_MS = 180_000;
 const BRIDGE_RESTART_AFTER_UPDATE_DELAY_MS = 750;
 

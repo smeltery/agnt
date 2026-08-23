@@ -10,7 +10,7 @@ Imported from:   Stivy-01/remodex@main, directory `android/`
 
 Modifications relative to upstream:
   - Package and namespace renamed from `com.remodex.mobile` to
-    `com.dotbrains.agnt.mobile`; classes prefixed with `Remodex` renamed to
+    `com.smeltery.agnt.mobile`; classes prefixed with `Remodex` renamed to
     `Agnt` to match the rest of this repository.
   - Secure-transport identifiers updated to match agnt-bridge:
       remodex-e2ee-v1                       -> agnt-e2ee-v1

@@ -59,7 +59,7 @@ private extension CodexService {
         CodexBridgeUpdatePrompt(
             title: "Update agnt on your computer to use /fork",
             message: "This computer bridge does not support native conversation forks yet. Update the agnt npm package to use /fork and worktree fork flows.",
-            command: "npm install -g @dotbrains/agnt@latest"
+            command: "npm install -g @smeltery/agnt@latest"
         )
     }
 }

@@ -15,7 +15,7 @@ final class BridgeControlService {
     private let launchAgentPlistURL = URL(fileURLWithPath: NSHomeDirectory())
         .appendingPathComponent("Library", isDirectory: true)
         .appendingPathComponent("LaunchAgents", isDirectory: true)
-        .appendingPathComponent("com.dotbrains.agnt.bridge.plist")
+        .appendingPathComponent("com.smeltery.agnt.bridge.plist")
 
     init(runner: ShellCommandRunner = ShellCommandRunner()) {
         self.runner = runner
@@ -104,16 +104,16 @@ final class BridgeControlService {
     }
 
     func updateBridgePackage() async throws {
-        _ = try await runner.run(command: "npm install -g @dotbrains/agnt@latest")
+        _ = try await runner.run(command: "npm install -g @smeltery/agnt@latest")
     }
 
     func fetchLatestPackageVersion() async -> Result<String, Error> {
         do {
-            let result = try await runner.run(command: "npm view @dotbrains/agnt version --json")
+            let result = try await runner.run(command: "npm view @smeltery/agnt version --json")
             let latestVersion = parseLatestVersion(result.stdout)
             guard let latestVersion else {
                 throw BridgeControlError.commandFailed(
-                    command: "npm view @dotbrains/agnt version --json",
+                    command: "npm view @smeltery/agnt version --json",
                     message: "npm returned an unreadable version."
                 )
             }
@@ -166,7 +166,7 @@ final class BridgeControlService {
 
         return BridgeSnapshot(
             currentVersion: currentVersion,
-            label: statusLines["service label"] ?? "com.dotbrains.agnt.bridge",
+            label: statusLines["service label"] ?? "com.smeltery.agnt.bridge",
             platform: "darwin",
             installed: installed,
             launchdLoaded: launchdLoaded,

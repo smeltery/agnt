@@ -23,8 +23,8 @@ export function AboutModal({ onClose }: { onClose(): void }) {
             <dd>{typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0"}</dd>
             <dt>Source</dt>
             <dd>
-              <a href="https://github.com/dotbrains/agnt" target="_blank" rel="noreferrer">
-                github.com/dotbrains/agnt
+              <a href="https://github.com/smeltery/agnt" target="_blank" rel="noreferrer">
+                github.com/smeltery/agnt
               </a>
             </dd>
             <dt>License</dt>

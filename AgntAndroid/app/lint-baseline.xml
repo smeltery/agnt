@@ -7,7 +7,7 @@
         errorLine1="            config.setLocales(LocaleList(englishLocale))"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/LanguagePreferences.kt"
             line="44"
             column="13"/>
     </issue>
@@ -18,7 +18,7 @@
         errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/wrapper/gradle-wrapper.properties"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/wrapper/gradle-wrapper.properties"
             line="3"
             column="17"/>
     </issue>
@@ -29,7 +29,7 @@
         errorLine1="agp = &quot;8.10.1&quot;"
         errorLine2="      ~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="2"
             column="7"/>
     </issue>
@@ -40,7 +40,7 @@
         errorLine1="composeBom = &quot;2026.02.01&quot;"
         errorLine2="             ~~~~~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="4"
             column="14"/>
     </issue>
@@ -51,7 +51,7 @@
         errorLine1="activityCompose = &quot;1.9.3&quot;"
         errorLine2="                  ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="8"
             column="19"/>
     </issue>
@@ -62,7 +62,7 @@
         errorLine1="appcompat = &quot;1.7.0&quot;"
         errorLine2="            ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="9"
             column="13"/>
     </issue>
@@ -73,7 +73,7 @@
         errorLine1="camerax = &quot;1.4.1&quot;"
         errorLine2="          ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="10"
             column="11"/>
     </issue>
@@ -84,7 +84,7 @@
         errorLine1="camerax = &quot;1.4.1&quot;"
         errorLine2="          ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="10"
             column="11"/>
     </issue>
@@ -95,7 +95,7 @@
         errorLine1="camerax = &quot;1.4.1&quot;"
         errorLine2="          ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="10"
             column="11"/>
     </issue>
@@ -106,7 +106,7 @@
         errorLine1="camerax = &quot;1.4.1&quot;"
         errorLine2="          ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="10"
             column="11"/>
     </issue>
@@ -117,7 +117,7 @@
         errorLine1="coreKtx = &quot;1.15.0&quot;"
         errorLine2="          ~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="11"
             column="11"/>
     </issue>
@@ -128,7 +128,7 @@
         errorLine1="lifecycle = &quot;2.8.7&quot;"
         errorLine2="            ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="12"
             column="13"/>
     </issue>
@@ -139,7 +139,7 @@
         errorLine1="lifecycle = &quot;2.8.7&quot;"
         errorLine2="            ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="12"
             column="13"/>
     </issue>
@@ -150,7 +150,7 @@
         errorLine1="lifecycle = &quot;2.8.7&quot;"
         errorLine2="            ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="12"
             column="13"/>
     </issue>
@@ -161,7 +161,7 @@
         errorLine1="lifecycle = &quot;2.8.7&quot;"
         errorLine2="            ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="12"
             column="13"/>
     </issue>
@@ -172,7 +172,7 @@
         errorLine1="navigationCompose = &quot;2.8.4&quot;"
         errorLine2="                    ~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="13"
             column="21"/>
     </issue>
@@ -183,7 +183,7 @@
         errorLine1="webkit = &quot;1.12.1&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="15"
             column="10"/>
     </issue>
@@ -194,7 +194,7 @@
         errorLine1="bouncycastle = &quot;1.78.1&quot;"
         errorLine2="               ~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="18"
             column="16"/>
     </issue>
@@ -205,7 +205,7 @@
         errorLine1="material = &quot;1.12.0&quot;"
         errorLine2="           ~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="25"
             column="12"/>
     </issue>
@@ -216,7 +216,7 @@
         errorLine1="            TurnMarkdownRenderCache.toolExecutionUi(preview, details, context.resources)"
         errorLine2="                                                                      ~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/subagent/TurnCommandExecutionCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/subagent/TurnCommandExecutionCard.kt"
             line="63"
             column="71"/>
     </issue>
@@ -227,7 +227,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/navigation/AppNavHost.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/navigation/AppNavHost.kt"
             line="28"
             column="5"/>
     </issue>
@@ -238,7 +238,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/BridgeUpdateSheet.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/home/BridgeUpdateSheet.kt"
             line="40"
             column="5"/>
     </issue>
@@ -249,7 +249,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/design/canvas/CanvasSnapshotViewer.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/design/canvas/CanvasSnapshotViewer.kt"
             line="42"
             column="5"/>
     </issue>
@@ -260,7 +260,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/agent/CodeAgentScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/agent/CodeAgentScreen.kt"
             line="24"
             column="5"/>
     </issue>
@@ -271,7 +271,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/agent/ConversationHeader.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/agent/ConversationHeader.kt"
             line="111"
             column="5"/>
     </issue>
@@ -282,7 +282,7 @@
         errorLine1="    modifier: Modifier = Modifier.fillMaxSize(),"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/HomeMainContent.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/home/HomeMainContent.kt"
             line="42"
             column="5"/>
     </issue>
@@ -293,7 +293,7 @@
         errorLine1="    modifier: Modifier = Modifier.fillMaxSize(),"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/HomeMainContent.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/home/HomeMainContent.kt"
             line="42"
             column="5"/>
     </issue>
@@ -304,7 +304,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarProjectPickerSheet.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/sidebar/SidebarProjectPickerSheet.kt"
             line="92"
             column="5"/>
     </issue>
@@ -315,7 +315,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/sidebar/SidebarScreen.kt"
             line="86"
             column="5"/>
     </issue>
@@ -326,7 +326,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarSearchField.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/sidebar/SidebarSearchField.kt"
             line="45"
             column="5"/>
     </issue>
@@ -337,7 +337,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarThreadRow.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/sidebar/SidebarThreadRow.kt"
             line="65"
             column="5"/>
     </issue>
@@ -348,7 +348,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/sidebar/SidebarThreadRow.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/sidebar/SidebarThreadRow.kt"
             line="242"
             column="5"/>
     </issue>
@@ -359,7 +359,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/home/ThreadCompletionBanner.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/home/ThreadCompletionBanner.kt"
             line="177"
             column="5"/>
     </issue>
@@ -370,7 +370,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/agent/ToolCallRow.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/agent/ToolCallRow.kt"
             line="18"
             column="5"/>
     </issue>
@@ -381,7 +381,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/subagent/TurnCommandExecutionCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/subagent/TurnCommandExecutionCard.kt"
             line="54"
             column="5"/>
     </issue>
@@ -392,7 +392,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/composer/TurnComposerBar.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/composer/TurnComposerBar.kt"
             line="106"
             column="5"/>
     </issue>
@@ -403,7 +403,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/composer/TurnComposerSecondaryBar.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/composer/TurnComposerSecondaryBar.kt"
             line="69"
             column="5"/>
     </issue>
@@ -414,7 +414,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/TurnConversationPane.kt"
             line="171"
             column="5"/>
     </issue>
@@ -425,7 +425,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/toolbar/TurnGitBranchAccessory.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/toolbar/TurnGitBranchAccessory.kt"
             line="85"
             column="5"/>
     </issue>
@@ -436,7 +436,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/toolbar/TurnPlanAccessoryCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/toolbar/TurnPlanAccessoryCard.kt"
             line="49"
             column="5"/>
     </issue>
@@ -447,7 +447,7 @@
         errorLine1="termux-terminal-emulator = { module = &quot;com.termux.termux-app:terminal-emulator&quot;, version.ref = &quot;termux&quot; }"
         errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="$HOME/Documents/GitHub/github.com/dotbrains/agnt/AgntAndroid/gradle/libs.versions.toml"
+            file="$HOME/Documents/GitHub/github.com/smeltery/agnt/AgntAndroid/gradle/libs.versions.toml"
             line="79"
             column="29"/>
     </issue>
@@ -472,7 +472,7 @@
         errorLine1="        val resId = context.resources.getIdentifier(name, &quot;string&quot;, context.packageName)"
         errorLine2="                                      ~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/config/AppEnvironment.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/config/AppEnvironment.kt"
             line="54"
             column="39"/>
     </issue>
@@ -677,7 +677,7 @@
         errorLine1="                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
             line="144"
             column="21"/>
     </issue>
@@ -688,7 +688,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
             line="236"
             column="17"/>
     </issue>
@@ -699,7 +699,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/LanguagePreferences.kt"
             line="43"
             column="13"/>
     </issue>
@@ -710,7 +710,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/LanguagePreferences.kt"
             line="53"
             column="13"/>
     </issue>
@@ -728,7 +728,7 @@
         errorLine1="    lateinit var messagePersistence: CodexMessagePersistence"
         errorLine2="    ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/AppContainer.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/AppContainer.kt"
             line="45"
             column="5"/>
     </issue>
@@ -739,7 +739,7 @@
         errorLine1="    lateinit var aiChangeSetPersistence: AIChangeSetPersistence"
         errorLine2="    ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/AppContainer.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/AppContainer.kt"
             line="48"
             column="5"/>
     </issue>
@@ -750,7 +750,7 @@
         errorLine1="    val nonce = ByteArray(12) { 0 }"
         errorLine2="                              ~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/model/SecureTransportModels.kt"
             line="364"
             column="31"/>
     </issue>
@@ -761,7 +761,7 @@
         errorLine1="    var gitToolbarRefreshNonce by remember { mutableStateOf(0) }"
         errorLine2="                                             ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/shell/MainShell.kt"
             line="144"
             column="46"/>
     </issue>
@@ -772,7 +772,7 @@
         errorLine1="    var scannerResetNonce by remember { mutableStateOf(0) }"
         errorLine2="                                        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/onboarding/QrScannerScreen.kt"
             line="103"
             column="41"/>
     </issue>
@@ -783,7 +783,7 @@
         errorLine1="    var refreshNonce by remember { mutableStateOf(0) }"
         errorLine2="                                   ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/settings/SettingsScreen.kt"
             line="295"
             column="36"/>
     </issue>
@@ -794,7 +794,7 @@
         errorLine1="    var fontSize by remember { mutableStateOf(TERMINAL_FONT_SIZE_DEFAULT) }"
         errorLine2="                               ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalScreen.kt"
             line="66"
             column="32"/>
     </issue>
@@ -805,7 +805,7 @@
         errorLine1="    var voiceRecordingDurationSeconds by remember(threadId) { mutableStateOf(0.0) }"
         errorLine2="                                                              ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/TurnConversationPane.kt"
             line="220"
             column="63"/>
     </issue>
@@ -1377,7 +1377,7 @@
         errorLine1="            prefs.edit().remove(key).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
             line="231"
             column="13"/>
     </issue>
@@ -1388,7 +1388,7 @@
         errorLine1="            context.applicationContext"
         errorLine2="            ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/notification/AgntLocalNotificationPresenter.kt"
             line="284"
             column="13"/>
     </issue>
@@ -1399,7 +1399,7 @@
         errorLine1="        prefs(context).edit().putString(AppFontStyle.storageKey, style.name).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/AppFontPreferences.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/AppFontPreferences.kt"
             line="20"
             column="9"/>
     </issue>
@@ -1410,7 +1410,7 @@
         errorLine1="        prefs(context).edit().putString(AppLanguagePreference.storageKey, preference.name).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/LanguagePreferences.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/LanguagePreferences.kt"
             line="31"
             column="9"/>
     </issue>
@@ -1421,7 +1421,7 @@
         errorLine1="        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))"
         errorLine2="                                                         ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/shell/MainShell.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/shell/MainShell.kt"
             line="418"
             column="58"/>
     </issue>
@@ -1432,7 +1432,7 @@
         errorLine1="        prefs.edit().putBoolean(KEY_HAS_SEEN_ONBOARDING, value).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/OnboardingPreferences.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/OnboardingPreferences.kt"
             line="20"
             column="9"/>
     </issue>
@@ -1443,7 +1443,7 @@
         errorLine1="        prefs.edit().putString(key, value).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/security/SecureStore.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/security/SecureStore.kt"
             line="33"
             column="9"/>
     </issue>
@@ -1454,7 +1454,7 @@
         errorLine1="        prefs.edit().remove(key).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/security/SecureStore.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/security/SecureStore.kt"
             line="73"
             column="9"/>
     </issue>
@@ -1465,7 +1465,7 @@
         errorLine1="        prefs.edit().putBoolean(KEY_FORCE_QR_BOOTSTRAP, value).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="72"
             column="9"/>
     </issue>
@@ -1476,7 +1476,7 @@
         errorLine1="        prefs.edit().putOrRemove(KEY_LOCAL_RELAY_HOST_OVERRIDE, value?.trim()?.takeIf { it.isNotEmpty() }).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="97"
             column="9"/>
     </issue>
@@ -1487,7 +1487,7 @@
         errorLine1="            prefs.edit().remove(KEY_LAST_ACTIVE_THREAD).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="102"
             column="13"/>
     </issue>
@@ -1498,7 +1498,7 @@
         errorLine1="            prefs.edit().putString(KEY_LAST_ACTIVE_THREAD, threadId.trim()).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="104"
             column="13"/>
     </issue>
@@ -1509,7 +1509,7 @@
         errorLine1="        prefs"
         errorLine2="        ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="124"
             column="9"/>
     </issue>
@@ -1520,7 +1520,7 @@
         errorLine1="            prefs"
         errorLine2="            ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="135"
             column="13"/>
     </issue>
@@ -1531,7 +1531,7 @@
         errorLine1="        prefs"
         errorLine2="        ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="154"
             column="9"/>
     </issue>
@@ -1542,7 +1542,7 @@
         errorLine1="        prefs"
         errorLine2="        ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="179"
             column="9"/>
     </issue>
@@ -1553,7 +1553,7 @@
         errorLine1="            prefs"
         errorLine2="            ^">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="190"
             column="13"/>
     </issue>
@@ -1564,7 +1564,7 @@
         errorLine1="            prefs.edit().putStringSet(KEY_LOCALLY_DELETED_THREAD_IDS, existing).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="210"
             column="13"/>
     </issue>
@@ -1575,7 +1575,7 @@
         errorLine1="            prefs.edit().putStringSet(KEY_LOCALLY_ARCHIVED_THREAD_IDS, existing).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="227"
             column="13"/>
     </issue>
@@ -1586,7 +1586,7 @@
         errorLine1="            prefs.edit().putStringSet(KEY_LOCALLY_ARCHIVED_THREAD_IDS, existing).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="236"
             column="13"/>
     </issue>
@@ -1597,7 +1597,7 @@
         errorLine1="        prefs.edit().putStringSet(KEY_CACHED_THREADS, entries).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/core/persistence/SessionPersistence.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/core/persistence/SessionPersistence.kt"
             line="256"
             column="9"/>
     </issue>
@@ -1608,7 +1608,7 @@
         errorLine1="    return Color(android.graphics.Color.parseColor(&quot;#$cleaned&quot;))"
         errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalAccessoryBar.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalAccessoryBar.kt"
             line="84"
             column="18"/>
     </issue>
@@ -1619,7 +1619,7 @@
         errorLine1="    val backgroundColor = remember(theme) { Color(android.graphics.Color.parseColor(theme.background)) }"
         errorLine2="                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalScreen.kt"
             line="54"
             column="51"/>
     </issue>
@@ -1630,7 +1630,7 @@
         errorLine1="                .background(Color(android.graphics.Color.parseColor(theme.background)))"
         errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalScreen.kt"
             line="386"
             column="35"/>
     </issue>
@@ -1641,7 +1641,7 @@
         errorLine1="            color = Color(android.graphics.Color.parseColor(theme.foreground)),"
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalScreen.kt"
             line="394"
             column="27"/>
     </issue>
@@ -1652,7 +1652,7 @@
         errorLine1="            color = Color(android.graphics.Color.parseColor(theme.mutedForeground)),"
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalScreen.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalScreen.kt"
             line="399"
             column="27"/>
     </issue>
@@ -1663,7 +1663,7 @@
         errorLine1="                        setBackgroundColor(android.graphics.Color.parseColor(theme.background))"
         errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalWebViewSurface.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalWebViewSurface.kt"
             line="80"
             column="44"/>
     </issue>
@@ -1674,7 +1674,7 @@
         errorLine1="            view.setBackgroundColor(android.graphics.Color.parseColor(theme.background))"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/terminal/TerminalWebViewSurface.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/terminal/TerminalWebViewSurface.kt"
             line="155"
             column="37"/>
     </issue>
@@ -1685,7 +1685,7 @@
         errorLine1="        prefs(context).edit().putString(AppThemePreference.storageKey, preference.name).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/ThemePreferences.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/ThemePreferences.kt"
             line="21"
             column="9"/>
     </issue>
@@ -1696,7 +1696,7 @@
         errorLine1="                Bitmap.createScaledBitmap(decoded, targetWidth, targetHeight, true).also {"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/TurnAttachmentCodec.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/TurnAttachmentCodec.kt"
             line="102"
             column="17"/>
     </issue>
@@ -1707,7 +1707,7 @@
         errorLine1="        val thumbnail = Bitmap.createBitmap(THUMBNAIL_SIDE, THUMBNAIL_SIDE, Bitmap.Config.ARGB_8888)"
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/data/TurnAttachmentCodec.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/data/TurnAttachmentCodec.kt"
             line="114"
             column="25"/>
     </issue>
@@ -1718,7 +1718,7 @@
         errorLine1="        return Uri.parse(source).path?.takeIf { it.isNotBlank() }"
         errorLine2="               ~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/attachments/TurnAttachmentViews.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/attachments/TurnAttachmentViews.kt"
             line="352"
             column="16"/>
     </issue>
@@ -1729,7 +1729,7 @@
         errorLine1="                ): Boolean = !isAllowedUrl(Uri.parse(url))"
         errorLine2="                                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
             line="205"
             column="44"/>
     </issue>
@@ -1740,7 +1740,7 @@
         errorLine1="                ): Boolean = !isAllowedUrl(Uri.parse(url))"
         errorLine2="                                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
             line="205"
             column="44"/>
     </issue>
@@ -1751,7 +1751,7 @@
         errorLine1="                    val parsed = Uri.parse(url)"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
             line="224"
             column="34"/>
     </issue>
@@ -1762,7 +1762,7 @@
         errorLine1="                    val parsed = Uri.parse(url)"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
             line="224"
             column="34"/>
     </issue>
@@ -1773,7 +1773,7 @@
         errorLine1="                    if (!isAllowedUrl(Uri.parse(url))) {"
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
             line="237"
             column="39"/>
     </issue>
@@ -1784,7 +1784,7 @@
         errorLine1="                    if (!isAllowedUrl(Uri.parse(url))) {"
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
+            file="src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/timeline/TurnMermaidWebViewCard.kt"
             line="237"
             column="39"/>
     </issue>

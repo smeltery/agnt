@@ -1,0 +1,19 @@
+package com.smeltery.agnt.mobile.ui.agent
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import com.smeltery.agnt.mobile.core.model.CodexMessage
+import com.smeltery.agnt.mobile.core.model.CodexMessageRole
+import com.smeltery.agnt.mobile.ui.turn.timeline.TurnMessageRow
+
+/** Assistant chat / markdown block (same layout as [TurnMessageRow] for [CodexMessageRole.assistant]). */
+@Composable
+fun AssistantMessageBlock(
+    message: CodexMessage,
+    modifier: Modifier = Modifier,
+    onOpenFullMessage: ((CodexMessage) -> Unit)? = null,
+) {
+    if (message.role == CodexMessageRole.assistant) {
+        TurnMessageRow(message = message, modifier = modifier, onOpenFullMessage = onOpenFullMessage)
+    }
+}

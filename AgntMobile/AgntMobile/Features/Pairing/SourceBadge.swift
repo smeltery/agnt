@@ -13,7 +13,7 @@ struct SourceBadge: View {
         case dark
     }
 
-    private let repoURL = URL(string: "https://github.com/dotbrains/agnt")!
+    private let repoURL = URL(string: "https://github.com/smeltery/agnt")!
 
     var body: some View {
         Link(destination: repoURL) {

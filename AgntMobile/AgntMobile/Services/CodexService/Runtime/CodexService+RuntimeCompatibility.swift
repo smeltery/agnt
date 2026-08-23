@@ -60,7 +60,7 @@ private extension CodexService {
         CodexBridgeUpdatePrompt(
             title: "Update agnt on your computer to use Speed controls",
             message: "This computer bridge does not support the selected speed setting yet. Update the agnt npm package to use Fast Mode and other speed controls.",
-            command: "npm install -g @dotbrains/agnt@latest"
+            command: "npm install -g @smeltery/agnt@latest"
         )
     }
 }

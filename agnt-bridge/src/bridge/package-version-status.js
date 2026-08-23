@@ -10,7 +10,7 @@ const { version: installedVersion = "" } = require("../../package.json");
 const DEFAULT_CACHE_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_EMPTY_CACHE_RETRY_MS = 60 * 1000;
 const DEFAULT_INITIAL_FETCH_WAIT_MS = 250;
-const AGNT_REGISTRY_URL = "https://registry.npmjs.org/@dotbrains%2Fagnt/latest";
+const AGNT_REGISTRY_URL = "https://registry.npmjs.org/@smeltery%2Fagnt/latest";
 
 function createBridgePackageVersionStatusReader({
   cacheTtlMs = DEFAULT_CACHE_TTL_MS,

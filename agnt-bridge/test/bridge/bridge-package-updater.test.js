@@ -45,7 +45,7 @@ test("bridge package updater runs npm update and schedules delayed restart", asy
       };
     },
     execPath: "/usr/local/bin/node",
-    cliPath: "/usr/local/lib/node_modules/@dotbrains/agnt/bin/agnt.js",
+    cliPath: "/usr/local/lib/node_modules/@smeltery/agnt/bin/agnt.js",
     env: { AGNT_TEST: "1" },
   });
 
@@ -74,7 +74,7 @@ test("bridge package updater runs npm update and schedules delayed restart", asy
   assert.equal(childUnrefCalled, true);
   assert.deepEqual(spawnCalls, [{
     command: "/usr/local/bin/node",
-    args: ["/usr/local/lib/node_modules/@dotbrains/agnt/bin/agnt.js", "restart"],
+    args: ["/usr/local/lib/node_modules/@smeltery/agnt/bin/agnt.js", "restart"],
     options: {
       detached: true,
       stdio: "ignore",

@@ -3,5 +3,5 @@
   "sourceBranch": "main",
   "lastAuditedSha": "8105e25038ad07443da01cda6c21e5f77ec61cd5",
   "lastAuditedAt": "2026-08-12T15:34:58Z",
-  "note": "Tracks the last remodex commit fully audited for feature gaps against dotbrains/agnt. Updated by the scheduled remodex-feature-gap-watcher routine. Manually seeded after PRs #151, #152, #153 shipped everything found as of this SHA."
+  "note": "Tracks the last remodex commit fully audited for feature gaps against smeltery/agnt. Updated by the scheduled remodex-feature-gap-watcher routine. Manually seeded after PRs #151, #152, #153 shipped everything found as of this SHA."
 }

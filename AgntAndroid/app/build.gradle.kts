@@ -36,11 +36,11 @@ val hasReleaseSigning =
             .all { key -> !keystoreProperties.getProperty(key).isNullOrBlank() }
 
 android {
-    namespace = "com.dotbrains.agnt.mobile"
+    namespace = "com.smeltery.agnt.mobile"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.dotbrains.agnt.mobile"
+        applicationId = "com.smeltery.agnt.mobile"
         minSdk = 26
         targetSdk = 36
 

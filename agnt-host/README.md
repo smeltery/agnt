@@ -49,14 +49,14 @@ On Windows, `npm run tauri:build:windows` produces NSIS + MSI installers.
 | Item | agnt |
 | --- | --- |
 | Crate / package name | `agnt-host` |
-| App identifier | `com.dotbrains.agnt.host` |
+| App identifier | `com.smeltery.agnt.host` |
 | Bundled bridge directory | `agnt-bridge` |
 | Bridge entry script | `bin/agnt.js` |
 | Bundle manifest | `agnt-bundle.json` |
 | Bridge env vars | `AGNT_RELAY`, `AGNT_PRINT_PAIRING_JSON` |
 | Updater env vars | `AGNT_HOST_UPDATE_*` |
 | Default remote relay URL | `ws://127.0.0.1:9000` (local; user must configure self-hosted relay) |
-| Updater endpoint | `dotbrains/agnt` releases |
+| Updater endpoint | `smeltery/agnt` releases |
 | Updater pubkey | placeholder — regenerate before release |
 | Provider-bridge secret file | `agnt-host/provider-bridge-secrets.json` |
 | Provider-bridge key env | `AGNT_PROVIDER_BRIDGE_API_KEY` (falls back to `DEEPSEEK_API_KEY`) |

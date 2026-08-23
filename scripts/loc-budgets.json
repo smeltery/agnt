@@ -35,7 +35,7 @@
       "agnt-host/src-tauri/src/app_runtime.rs": 200,
       "agnt-host/src-tauri/src/process_runtime.rs": 400,
       "agnt-host/src-tauri/src/bridge_runtime.rs": 350,
-      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/ui/turn/TurnConversationPane.kt": 1400,
+      "AgntAndroid/app/src/main/kotlin/com/smeltery/agnt/mobile/ui/turn/TurnConversationPane.kt": 1400,
       "AgntMobile/AgntMobile/Features/Chat/TurnView.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/TurnView/TurnView+Actions.swift": 500,
       "AgntMobile/AgntMobile/Features/Chat/TurnView/TurnView+Bindings.swift": 500,
@@ -136,11 +136,11 @@
         "limit": 70,
         "reason": "Xcode test target keeps many top-level XCTest files in one group."
       },
-      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model": {
+      "AgntAndroid/app/src/main/kotlin/com/smeltery/agnt/mobile/core/model": {
         "limit": 50,
         "reason": "Protocol DTOs are kept together for Android serialization parity."
       },
-      "AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/data": {
+      "AgntAndroid/app/src/main/kotlin/com/smeltery/agnt/mobile/data": {
         "limit": 45,
         "reason": "Android data adapters are grouped by app data surface."
       },
@@ -164,7 +164,7 @@
         "limit": 26,
         "reason": "desktop-ipc-follower-tracker.js is shared by both action-follower/ and live-owner/, so it stays flat rather than nesting under one side's subdirectory."
       },
-      "AgntAndroid/app/src/test/kotlin/com/dotbrains/agnt/mobile/data": {
+      "AgntAndroid/app/src/test/kotlin/com/smeltery/agnt/mobile/data": {
         "limit": 40,
         "reason": "Android data tests mirror the main data package."
       }

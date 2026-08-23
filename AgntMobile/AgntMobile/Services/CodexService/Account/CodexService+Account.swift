@@ -6,10 +6,10 @@
 
 import Foundation
 
-let minimumBridgePackageUpdateCommand = "npm install -g @dotbrains/agnt@latest"
+let minimumBridgePackageUpdateCommand = "npm install -g @smeltery/agnt@latest"
 let forcedBridgeUpgradeFromVersion = "1.3.8"
 let forcedBridgeUpgradeTargetVersion = "1.3.9"
-let forcedBridgeUpgradeCommand = "npm install -g @dotbrains/agnt@1.3.9"
+let forcedBridgeUpgradeCommand = "npm install -g @smeltery/agnt@1.3.9"
 
 enum CodexGPTAccountStatus: String, Codable, Sendable {
     case unknown

@@ -1,0 +1,18 @@
+package com.smeltery.agnt.mobile.core.terminal
+
+import com.smeltery.agnt.mobile.core.security.CodexSecureKeys
+import com.smeltery.agnt.mobile.core.security.SecureStore
+
+/**
+ * Persists [TerminalProfile] in [SecureStore] (Android Keystore-backed prefs).
+ * Mirrors `AgntTerminalProfileStore.swift`.
+ */
+class TerminalProfileStore(
+    private val secureStore: SecureStore,
+) {
+    fun load(): TerminalProfile = secureStore.readCodable<TerminalProfile>(CodexSecureKeys.terminalSshProfile) ?: TerminalProfile.EMPTY
+
+    fun save(profile: TerminalProfile) {
+        secureStore.writeCodable(CodexSecureKeys.terminalSshProfile, profile.normalizedForSave())
+    }
+}

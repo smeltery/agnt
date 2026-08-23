@@ -86,8 +86,8 @@ test("isPullRequestAlreadyExistsMessage matches both ordering of the gh error wo
 
 test("parsePullRequestUrlFromText extracts the first github.com pull URL from arbitrary text", () => {
   assert.equal(
-    parsePullRequestUrlFromText("Created PR at https://github.com/dotbrains/agnt/pull/123\nsome trailing"),
-    "https://github.com/dotbrains/agnt/pull/123",
+    parsePullRequestUrlFromText("Created PR at https://github.com/smeltery/agnt/pull/123\nsome trailing"),
+    "https://github.com/smeltery/agnt/pull/123",
   );
   assert.equal(parsePullRequestUrlFromText("no url here"), null);
   assert.equal(parsePullRequestUrlFromText(""), null);

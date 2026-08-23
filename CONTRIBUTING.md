@@ -35,7 +35,7 @@ Opening a PR does not create an obligation on my side. I may close it. I may ign
 agnt is **source-available** under [PolyForm Shield 1.0.0](LICENSE), not open source. By submitting a pull request, you agree that:
 
 - Your contribution will be released under PolyForm Shield 1.0.0, the same license as the rest of the project.
-- The PolyForm Shield non-compete applies to your contribution: it cannot be used to provide a product or service that competes with agnt or with anything dotbrains offers that includes agnt.
+- The PolyForm Shield non-compete applies to your contribution: it cannot be used to provide a product or service that competes with agnt or with anything smeltery offers that includes agnt.
 - You have the right to license the code you're submitting under those terms — i.e. you wrote it yourself, or you have permission from your employer / co-authors.
 
 If you're unsure whether your employer's IP policy allows you to contribute, please clear it on your side before opening a PR. There is no separate CLA to sign; the act of submitting the PR is the agreement.
@@ -70,7 +70,7 @@ pins the exact Node 20, Bun 1.3.11, JDK 17, and Rust toolchain used by CI — so
 environment from the repo root:
 
 ```sh
-git clone https://github.com/dotbrains/agnt.git
+git clone https://github.com/smeltery/agnt.git
 cd agnt
 
 flox activate            # drops you into a shell with the full toolchain
@@ -100,7 +100,7 @@ provisioned by Gradle/AGP (Flox owns the JDK, not the platform SDK).
 
 ```sh
 # Clone the repo
-git clone https://github.com/dotbrains/agnt.git
+git clone https://github.com/smeltery/agnt.git
 cd agnt
 
 # Start a local relay + bridge together (macOS / Linux)

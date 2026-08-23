@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@dotbrains/agnt-web",
+      "name": "@smeltery/agnt-web",
       "dependencies": {
         "@noble/ciphers": "^2.2.0",
         "@noble/curves": "^2.2.0",

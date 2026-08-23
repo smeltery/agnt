@@ -442,7 +442,7 @@ test("desktop/bridge/updateAndRestart forwards bridge package update requests", 
       updateCallCount += 1;
       return {
         success: true,
-        command: "npm install -g @dotbrains/agnt@latest",
+        command: "npm install -g @smeltery/agnt@latest",
         restartScheduled: true,
         restartDelayMs: 750,
       };
@@ -457,7 +457,7 @@ test("desktop/bridge/updateAndRestart forwards bridge package update requests", 
     id: "request-7",
     result: {
       success: true,
-      command: "npm install -g @dotbrains/agnt@latest",
+      command: "npm install -g @smeltery/agnt@latest",
       restartScheduled: true,
       restartDelayMs: 750,
     },

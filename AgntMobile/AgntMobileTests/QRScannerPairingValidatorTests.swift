@@ -21,7 +21,7 @@ final class QRScannerPairingValidatorTests: XCTestCase {
         }
 
         XCTAssertEqual(prompt.title, "Update agnt on your Mac before scanning")
-        XCTAssertEqual(prompt.command, "npm install -g @dotbrains/agnt@latest")
+        XCTAssertEqual(prompt.command, "npm install -g @smeltery/agnt@latest")
         XCTAssertTrue(prompt.message.contains("different agnt npm version"))
     }
 
@@ -34,7 +34,7 @@ final class QRScannerPairingValidatorTests: XCTestCase {
             return XCTFail("Expected a bridge update prompt for legacy pairing payloads.")
         }
 
-        XCTAssertEqual(prompt.command, "npm install -g @dotbrains/agnt@latest")
+        XCTAssertEqual(prompt.command, "npm install -g @smeltery/agnt@latest")
         XCTAssertTrue(prompt.message.contains("older agnt bridge"))
     }
 

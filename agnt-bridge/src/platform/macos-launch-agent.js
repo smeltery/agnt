@@ -42,7 +42,7 @@ const {
   writePairingSession,
 } = require("../daemon-state");
 
-const SERVICE_LABEL = "com.dotbrains.agnt.bridge";
+const SERVICE_LABEL = "com.smeltery.agnt.bridge";
 const DEFAULT_PAIRING_WAIT_TIMEOUT_MS = 10_000;
 const DEFAULT_PAIRING_WAIT_INTERVAL_MS = 200;
 

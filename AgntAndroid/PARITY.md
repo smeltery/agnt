@@ -16,7 +16,7 @@ lands or its scope changes.
 | Workspace checkpoint ref prefix          | `refs/agnt/checkpoints`                | `refs/agnt/checkpoints`                 | `refs/agnt/checkpoints`          | parity |
 
 The Android module imports the secure-transport constants from
-`app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt`
+`app/src/main/kotlin/com/smeltery/agnt/mobile/core/model/SecureTransportModels.kt`
 and the envelope cipher from `core/crypto/`. Both mirror `agnt-bridge/src/secure-transport.js`.
 
 ## Provider-agnostic protocol

@@ -194,7 +194,7 @@ final class CodexServiceTierTests: XCTestCase {
             service.bridgeUpdatePrompt?.message,
             "This Mac bridge does not support the selected speed setting yet. Update the agnt npm package to use Fast Mode and other speed controls."
         )
-        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g @dotbrains/agnt@1.1.4")
+        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g @smeltery/agnt@1.1.4")
     }
 
     private func makeService() -> CodexService {

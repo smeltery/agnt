@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Agnt Host",
   "version": "0.1.0",
-  "identifier": "com.dotbrains.agnt.host",
+  "identifier": "com.smeltery.agnt.host",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -48,7 +48,7 @@
     "updater": {
       "pubkey": "REPLACE_BEFORE_RELEASE_minisign_pubkey",
       "endpoints": [
-        "https://github.com/dotbrains/agnt/releases/latest/download/latest.json"
+        "https://github.com/smeltery/agnt/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

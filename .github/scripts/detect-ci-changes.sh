@@ -75,7 +75,7 @@ bun_common="$flox_common|$bun_ci_action"
 secure_bridge='^agnt-bridge/src/(transport/)?secure-transport\.js'
 secure_web='^agnt-web/src/crypto/'
 secure_ios='^(AgntMobile/AgntMobile/Core/Networking/CodexSecureTransportModels\.swift|AgntMobile/AgntMobile/Services/CodexService/Transport/CodexService\+SecureTransport\.swift)'
-secure_android='^(AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/dotbrains/agnt/mobile/core/crypto/)'
+secure_android='^(AgntAndroid/app/src/main/kotlin/com/smeltery/agnt/mobile/core/model/SecureTransportModels\.kt|AgntAndroid/app/src/main/kotlin/com/smeltery/agnt/mobile/core/crypto/)'
 # These files implement one shared encrypted transport contract across clients.
 # Any change fans out to every parity surface that can compile-test it.
 secure_transport="$secure_bridge|$secure_web|$secure_ios|$secure_android"

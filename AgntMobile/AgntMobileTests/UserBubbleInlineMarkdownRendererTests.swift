@@ -33,10 +33,10 @@ final class UserBubbleInlineMarkdownRendererTests: XCTestCase {
 
     func testMarkdownLinkUsesLabelText() {
         let rendered = UserBubbleInlineMarkdownRenderer.render(
-            "[dotbrains/agnt#133](https://github.com/dotbrains/agnt/pull/133)"
+            "[smeltery/agnt#133](https://github.com/smeltery/agnt/pull/133)"
         )
 
-        XCTAssertEqual(rendered.visibleText, "dotbrains/agnt#133")
+        XCTAssertEqual(rendered.visibleText, "smeltery/agnt#133")
         XCTAssertTrue(rendered.hasUnderlinedLink)
     }
 

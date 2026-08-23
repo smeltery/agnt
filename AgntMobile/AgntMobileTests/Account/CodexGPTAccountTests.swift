@@ -148,7 +148,7 @@ final class CodexGPTAccountTests: CodexGPTAccountTestCase {
             service.bridgeUpdatePrompt?.title,
             "A newer agnt update is available on your Mac"
         )
-        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g @dotbrains/agnt@latest")
+        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g @smeltery/agnt@latest")
         XCTAssertEqual(service.gptAccountSnapshot.status, .unknown)
     }
 

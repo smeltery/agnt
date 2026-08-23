@@ -13,7 +13,7 @@ extension CodexService {
         bridgeUpdatePrompt = CodexBridgeUpdatePrompt(
             title: "Update the agnt package on your computer",
             message: message,
-            command: "npm install -g @dotbrains/agnt@latest"
+            command: "npm install -g @smeltery/agnt@latest"
         )
     }
 

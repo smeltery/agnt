@@ -57,7 +57,7 @@ nonisolated struct CodexComposerDraftPersistence {
         let fm = FileManager.default
         let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fm.temporaryDirectory
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.dotbrains.agnt.mobile"
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.smeltery.agnt.mobile"
         let rootDirectory = base.appendingPathComponent(bundleID, isDirectory: true)
         let scopedDirectory: URL
         if let normalizedId = normalizedMacDeviceId(macDeviceId) {

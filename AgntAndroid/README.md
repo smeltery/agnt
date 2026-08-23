@@ -58,7 +58,7 @@ Per `/CLAUDE.md`:
 > nonce layout, or HKDF info must land in both modules in the same PR.
 
 The same rule applies here. Constants in
-`app/src/main/kotlin/com/dotbrains/agnt/mobile/core/model/SecureTransportModels.kt`
+`app/src/main/kotlin/com/smeltery/agnt/mobile/core/model/SecureTransportModels.kt`
 mirror the bridge constants — do not edit one without the other and without
 updating `../agnt-web/src/crypto/transcript.ts`.
 

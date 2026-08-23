@@ -69,7 +69,7 @@ test("resolveSystemdUserUnitPath uses XDG_CONFIG_HOME when set", () => {
       env: { HOME: "/home/tester", XDG_CONFIG_HOME: "/home/tester/.xdg" },
       osImpl: { homedir: () => "/home/fallback" },
     }),
-    path.join("/home/tester/.xdg", "systemd", "user", "com.dotbrains.agnt.bridge.service")
+    path.join("/home/tester/.xdg", "systemd", "user", "com.smeltery.agnt.bridge.service")
   );
 });
 
@@ -79,7 +79,7 @@ test("resolveSystemdUserUnitPath falls back to ~/.config/systemd/user", () => {
       env: { HOME: "/home/tester" },
       osImpl: { homedir: () => "/home/fallback" },
     }),
-    path.join("/home/tester", ".config", "systemd", "user", "com.dotbrains.agnt.bridge.service")
+    path.join("/home/tester", ".config", "systemd", "user", "com.smeltery.agnt.bridge.service")
   );
 });
 
@@ -127,10 +127,10 @@ test("startLinuxBridgeService writes a unit, daemon-reloads, and restarts the se
     assert.deepEqual(calls, [
       ["systemctl", "--user", "--version", undefined],
       ["systemctl", "--user", "daemon-reload", undefined],
-      ["systemctl", "--user", "restart", "com.dotbrains.agnt.bridge.service"],
+      ["systemctl", "--user", "restart", "com.smeltery.agnt.bridge.service"],
     ]);
     assert.ok(
-      fs.existsSync(path.join(rootDir, ".config", "systemd", "user", "com.dotbrains.agnt.bridge.service")),
+      fs.existsSync(path.join(rootDir, ".config", "systemd", "user", "com.smeltery.agnt.bridge.service")),
       "expected unit file to be written under XDG_CONFIG_HOME"
     );
   });
@@ -190,7 +190,7 @@ test("getLinuxBridgeServiceStatus reports systemd metadata together with bridge 
     writePairingSession({ sessionId: "session-status" });
     writeBridgeStatus({ state: "running", connectionStatus: "connected", pid: 77 });
 
-    const unitPath = path.join(rootDir, ".config", "systemd", "user", "com.dotbrains.agnt.bridge.service");
+    const unitPath = path.join(rootDir, ".config", "systemd", "user", "com.smeltery.agnt.bridge.service");
     fs.mkdirSync(path.dirname(unitPath), { recursive: true });
     fs.writeFileSync(unitPath, "ignored");
 

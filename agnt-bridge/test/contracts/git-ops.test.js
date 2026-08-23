@@ -148,10 +148,10 @@ test("trackingRemoteName returns null for malformed or non-remote inputs", () =>
 // ── parseOwnerRepo ──────────────────────────────────────────────────────
 
 test("parseOwnerRepo extracts owner/repo from https + ssh + .git suffix", () => {
-  assert.equal(parseOwnerRepo("https://github.com/dotbrains/agnt.git"), "dotbrains/agnt");
-  assert.equal(parseOwnerRepo("https://github.com/dotbrains/agnt"), "dotbrains/agnt");
-  assert.equal(parseOwnerRepo("git@github.com:dotbrains/agnt.git"), "dotbrains/agnt");
-  assert.equal(parseOwnerRepo("ssh://git@github.com/dotbrains/agnt"), "dotbrains/agnt");
+  assert.equal(parseOwnerRepo("https://github.com/smeltery/agnt.git"), "smeltery/agnt");
+  assert.equal(parseOwnerRepo("https://github.com/smeltery/agnt"), "smeltery/agnt");
+  assert.equal(parseOwnerRepo("git@github.com:smeltery/agnt.git"), "smeltery/agnt");
+  assert.equal(parseOwnerRepo("ssh://git@github.com/smeltery/agnt"), "smeltery/agnt");
 });
 
 test("parseOwnerRepo returns null for non-URL strings", () => {

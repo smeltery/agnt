@@ -5,7 +5,7 @@ agnt is three components running on three machines:
 | Where | What | Lang | Source |
 |---|---|---|---|
 | Phone | iOS app (`AgntMobile`) | SwiftUI | `AgntMobile/` |
-| Mac or Linux | Bridge daemon (`@dotbrains/agnt`) | Node.js (CommonJS) | `agnt-bridge/` |
+| Mac or Linux | Bridge daemon (`@smeltery/agnt`) | Node.js (CommonJS) | `agnt-bridge/` |
 | Mac, Linux (or your VPS) | Relay (`agnt-relay`) | Node.js | `relay/` |
 
 Plus whichever **agent CLI** you've configured a provider for: `codex`, `claude`, `opencode`, or `cursor-agent`. The agent CLI is a separate process spawned (or spoken to) by the bridge.

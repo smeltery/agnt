@@ -48,7 +48,7 @@ const {
   stopSystemdUserUnit,
 } = require("./linux-systemd-agent-systemd");
 
-const SERVICE_LABEL = "com.dotbrains.agnt.bridge";
+const SERVICE_LABEL = "com.smeltery.agnt.bridge";
 const SERVICE_UNIT_NAME = `${SERVICE_LABEL}.service`;
 const DEFAULT_PAIRING_WAIT_TIMEOUT_MS = 10_000;
 const DEFAULT_PAIRING_WAIT_INTERVAL_MS = 200;

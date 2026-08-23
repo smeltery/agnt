@@ -221,7 +221,7 @@ Open follow-ups:
       compiler's unresolved-reference log, some by inspection).
       Additional cleanup: an over-greedy regex for fully-qualified
       reference rewriting briefly damaged ~56 files (turned
-      `com.dotbrains.agnt.mobile.ui.turn.composer.X` →
+      `com.smeltery.agnt.mobile.ui.turn.composer.X` →
       `composer.X` everywhere) — patched back with targeted scripts.
       One private extension function (`SmartScrollAction.displayLabel`
       in `timeline/TurnSmartScrollNavigation.kt`) had to be widened to

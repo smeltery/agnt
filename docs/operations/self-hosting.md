@@ -46,7 +46,7 @@ This is the easiest way to try the public repo, but on iPhone it should be treat
 From the repo root:
 
 ```sh
-git clone https://github.com/dotbrains/agnt.git
+git clone https://github.com/smeltery/agnt.git
 cd agnt
 ./scripts/run-local-agnt.sh
 ```
@@ -122,7 +122,7 @@ On your iPhone:
 From the public repo:
 
 ```sh
-git clone https://github.com/dotbrains/agnt.git
+git clone https://github.com/smeltery/agnt.git
 cd agnt/relay
 bun install
 bun run start
@@ -182,7 +182,7 @@ After the first successful scan:
 - the relay can resolve the current live session for that trusted Mac
 - the app can reconnect without requiring a new QR every time
 
-Today, the built-in background-service path supports macOS (launchd, via `~/Library/LaunchAgents/com.dotbrains.agnt.bridge.plist`) and Linux (systemd-user, via `~/.config/systemd/user/com.dotbrains.agnt.bridge.service`). Both are managed transparently by `agnt up` / `agnt start` / `agnt stop` / `agnt status`.
+Today, the built-in background-service path supports macOS (launchd, via `~/Library/LaunchAgents/com.smeltery.agnt.bridge.plist`) and Linux (systemd-user, via `~/.config/systemd/user/com.smeltery.agnt.bridge.service`). Both are managed transparently by `agnt up` / `agnt start` / `agnt stop` / `agnt status`.
 
 On Linux, the systemd-user installer requires:
 

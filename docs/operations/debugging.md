@@ -13,7 +13,7 @@ flowchart TD
     Q4{Thread history<br/>empty/missing?}
 
     Start --> Q1
-    Q1 -->|"no"| StartLogs[Check ~/.agnt/logs/*<br/>and `launchctl print` for<br/>com.dotbrains.agnt.bridge]
+    Q1 -->|"no"| StartLogs[Check ~/.agnt/logs/*<br/>and `launchctl print` for<br/>com.smeltery.agnt.bridge]
     Q1 -->|"yes"| Q2
     Q2 -->|"no"| Pairing[QR pairing failed →<br/>see Pairing section]
     Q2 -->|"yes"| Q3
@@ -40,7 +40,7 @@ The bridge redacts live `sessionId` values and other bearer-like identifiers in 
 
 ```sh
 # What does launchd think is happening?
-launchctl print "gui/$UID/com.dotbrains.agnt.bridge"
+launchctl print "gui/$UID/com.smeltery.agnt.bridge"
 
 # Tail bridge logs
 tail -f ~/.agnt/logs/bridge.stdout.log ~/.agnt/logs/bridge.stderr.log

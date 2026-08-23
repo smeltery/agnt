@@ -96,7 +96,7 @@ enum BridgeCLIAvailability: Equatable {
     case missing
     case broken(message: String)
 
-    static let installCommand = "npm install -g @dotbrains/agnt@latest"
+    static let installCommand = "npm install -g @smeltery/agnt@latest"
 
     var isAvailable: Bool {
         if case .available = self {

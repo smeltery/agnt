@@ -200,7 +200,7 @@ async function main({
         plistPath: result?.plistPath,
         removed: result?.removed,
       },
-      message: "[agnt] Removed the macOS bridge service. You can now run `npm uninstall -g @dotbrains/agnt`.",
+      message: "[agnt] Removed the macOS bridge service. You can now run `npm uninstall -g @smeltery/agnt`.",
       jsonOutput,
       consoleImpl,
     });

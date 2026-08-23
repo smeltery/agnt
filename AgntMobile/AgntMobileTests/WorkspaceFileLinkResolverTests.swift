@@ -55,13 +55,13 @@ final class WorkspaceFileLinkResolverTests: XCTestCase {
     }
 
     func testRejectsWebUrls() throws {
-        let url = try XCTUnwrap(URL(string: "https://github.com/dotbrains/agnt"))
+        let url = try XCTUnwrap(URL(string: "https://github.com/smeltery/agnt"))
 
         XCTAssertNil(WorkspaceFileLinkResolver.localPath(from: url))
     }
 
     func testRejectsSchemeLessWebUrls() throws {
-        let url = try XCTUnwrap(URL(string: "github.com/dotbrains/agnt"))
+        let url = try XCTUnwrap(URL(string: "github.com/smeltery/agnt"))
 
         XCTAssertNil(WorkspaceFileLinkResolver.localPath(from: url))
     }

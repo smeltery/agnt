@@ -43,7 +43,7 @@ struct OnboardingView: View {
                         icon: "link",
                         title: "Install the Bridge",
                         description: "A lightweight relay that securely connects your computer to your iPhone.",
-                        command: "npm install -g @dotbrains/agnt@latest",
+                        command: "npm install -g @smeltery/agnt@latest",
                         commandCaption: "agnt can keep your computer awake while the bridge is running, but it starts disabled by default. You can enable it later in Settings if you want."
                     )
                     .tag(3)

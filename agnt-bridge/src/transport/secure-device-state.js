@@ -12,7 +12,7 @@ const { execFileSync } = require("child_process");
 
 const DEFAULT_STORE_DIR = path.join(os.homedir(), ".agnt");
 const DEFAULT_STORE_FILE = path.join(DEFAULT_STORE_DIR, "device-state.json");
-const KEYCHAIN_SERVICE = "com.dotbrains.agnt.bridge.device-state";
+const KEYCHAIN_SERVICE = "com.smeltery.agnt.bridge.device-state";
 const KEYCHAIN_ACCOUNT = "default";
 let hasLoggedKeychainMismatch = false;
 

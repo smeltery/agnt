@@ -41,7 +41,7 @@ The target ships three things:
 
 ## Build settings reference (already applied)
 
-- `PRODUCT_BUNDLE_IDENTIFIER = com.dotbrains.agnt.AgntMobile.AgntWidget`
+- `PRODUCT_BUNDLE_IDENTIFIER = com.smeltery.agnt.AgntMobile.AgntWidget`
   (`<mainAppBundleId>.AgntWidget`; matches the `static let kind` prefixes).
 - `IPHONEOS_DEPLOYMENT_TARGET = 18.6` (matches the app target).
 - `INFOPLIST_FILE = AgntWidget/Info.plist`,

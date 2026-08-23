@@ -7,7 +7,7 @@ const {
   resolveBridgeStdoutLogPath,
 } = require("../daemon-state");
 
-const SERVICE_LABEL = "com.dotbrains.agnt.bridge";
+const SERVICE_LABEL = "com.smeltery.agnt.bridge";
 
 // If the saved Node binary or CLI entrypoint disappears (npm uninstall, deleted
 // checkout), exit 0 so launchd's KeepAlive.SuccessfulExit=false stops rescheduling

@@ -24,10 +24,10 @@ enum AppEnvironment {
     // Legal links shown in Settings.
     // Keep these pointed at a public source-of-truth until the website serves dedicated legal routes.
     static let privacyPolicyURL = URL(
-        string: "https://github.com/dotbrains/agnt/blob/main/legal/PRIVACY_POLICY.md"
+        string: "https://github.com/smeltery/agnt/blob/main/legal/PRIVACY_POLICY.md"
     )!
     static let termsOfUseURL = URL(
-        string: "https://github.com/dotbrains/agnt/blob/main/legal/TERMS_OF_USE.md"
+        string: "https://github.com/smeltery/agnt/blob/main/legal/TERMS_OF_USE.md"
     )!
 
     // Powers in-app feedback actions so every entry point targets the same inbox.

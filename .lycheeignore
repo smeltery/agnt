@@ -14,7 +14,7 @@
 # repo is renamed, at which point every other self-reference breaks
 # too — link rot isn't the right tool to catch that. External github.com
 # URLs (other repos, gists, etc.) are still checked.
-^https?://github\.com/dotbrains/agnt(?:/|\.git|$)
+^https?://github\.com/smeltery/agnt(?:/|\.git|$)
 
 # Localhost / private network refs in docs are fine — they're meant to be
 # user-local (Tailscale, LAN, dev server). Verifying them in CI would be

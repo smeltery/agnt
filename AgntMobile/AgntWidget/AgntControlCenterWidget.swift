@@ -10,7 +10,7 @@ import WidgetKit
 
 @available(iOS 18.0, *)
 struct AgntLaunchControl: ControlWidget {
-    static let kind = "com.dotbrains.agnt.AgntMobile.AgntWidget.LaunchControl.v1"
+    static let kind = "com.smeltery.agnt.AgntMobile.AgntWidget.LaunchControl.v1"
 
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: Self.kind) {

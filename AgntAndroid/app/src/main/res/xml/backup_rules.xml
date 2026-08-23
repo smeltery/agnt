@@ -4,5 +4,5 @@
     <exclude domain="sharedpref" path="agnt_session_state.xml" />
     <exclude domain="sharedpref" path="agnt_ui.xml" />
     <exclude domain="sharedpref" path="agnt_onboarding.xml" />
-    <exclude domain="file" path="com.dotbrains.agnt.mobile/" />
+    <exclude domain="file" path="com.smeltery.agnt.mobile/" />
 </full-backup-content>

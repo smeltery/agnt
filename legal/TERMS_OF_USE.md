@@ -10,7 +10,7 @@ agnt is source-available software distributed under the [PolyForm Shield License
 
 You may use, copy, modify, and distribute agnt under the terms of PolyForm Shield 1.0.0. The two practical conditions to know:
 
-- **Non-compete.** You may not use the software to provide a product or service that competes with agnt or with any product or service the licensor (dotbrains) offers that includes agnt. Self-hosting agnt for your own use is fine; reselling a hosted agnt-equivalent is not.
+- **Non-compete.** You may not use the software to provide a product or service that competes with agnt or with any product or service the licensor (smeltery) offers that includes agnt. Self-hosting agnt for your own use is fine; reselling a hosted agnt-equivalent is not.
 - **Notices stay intact.** You must not remove or obscure the copyright, license, or attribution notices, and you must include a copy of the license with any distribution or derivative work.
 
 The license includes the standard "AS IS" disclaimer of warranties and liability, which applies in full.
@@ -38,8 +38,8 @@ If you run, redistribute, or build on top of agnt, you are responsible for:
 
 ## 5. Trademarks
 
-PolyForm Shield 1.0.0 does not grant trademark rights. The "agnt" and "dotbrains" names and any associated marks are not licensed for use beyond what is necessary to refer to the project (for example, in attribution).
+PolyForm Shield 1.0.0 does not grant trademark rights. The "agnt" and "smeltery" names and any associated marks are not licensed for use beyond what is necessary to refer to the project (for example, in attribution).
 
 ## 6. Source
 
-[github.com/dotbrains/agnt](https://github.com/dotbrains/agnt). Upstream attribution is recorded in the project [README](../README.md).
+[github.com/smeltery/agnt](https://github.com/smeltery/agnt). Upstream attribution is recorded in the project [README](../README.md).

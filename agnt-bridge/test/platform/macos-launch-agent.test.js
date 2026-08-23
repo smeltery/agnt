@@ -40,7 +40,7 @@ test("buildLaunchAgentProgramArguments keeps installed paths positional in a con
       "/bin/sh",
       "-c",
       'if [ ! -x "$1" ] || [ ! -f "$2" ]; then exit 0; fi; exec "$1" "$2" run-service',
-      "com.dotbrains.agnt.bridge",
+      "com.smeltery.agnt.bridge",
       "/usr/local/bin/node",
       "/tmp/agnt/bin/agnt.js",
     ]
@@ -104,7 +104,7 @@ test("buildLaunchAgentPlist wraps run-service in the /bin/sh guard with restart-
     cliPath: "/tmp/agnt/bin/agnt.js",
   });
 
-  assert.match(plist, /<string>com\.dotbrains\.agnt\.bridge<\/string>/);
+  assert.match(plist, /<string>com\.smeltery\.agnt\.bridge<\/string>/);
   assert.match(plist, /<string>\/bin\/sh<\/string>/);
   assert.ok(plist.includes("exec &quot;$1&quot; &quot;$2&quot; run-service"));
   assert.match(plist, /<string>\/usr\/local\/bin\/node<\/string>/);
@@ -120,7 +120,7 @@ test("resolveLaunchAgentPlistPath writes into the user's LaunchAgents folder", (
       env: { HOME: "/Users/tester" },
       osImpl: { homedir: () => "/Users/fallback" },
     }),
-    path.join("/Users/tester", "Library", "LaunchAgents", "com.dotbrains.agnt.bridge.plist")
+    path.join("/Users/tester", "Library", "LaunchAgents", "com.smeltery.agnt.bridge.plist")
   );
 });
 
@@ -165,14 +165,14 @@ test("stopMacOSBridgeService falls back to label bootout when plist bootout fail
         [
           "bootout",
           `gui/${process.getuid()}`,
-          path.join(process.env.HOME, "Library", "LaunchAgents", "com.dotbrains.agnt.bridge.plist"),
+          path.join(process.env.HOME, "Library", "LaunchAgents", "com.smeltery.agnt.bridge.plist"),
         ],
       ],
       [
         "launchctl",
         [
           "bootout",
-          `gui/${process.getuid()}/com.dotbrains.agnt.bridge`,
+          `gui/${process.getuid()}/com.smeltery.agnt.bridge`,
         ],
       ],
     ]);
@@ -206,10 +206,10 @@ test("startMacOSBridgeService kickstarts the launch agent after bootstrap", () =
     assert.deepEqual(
       calls.map(([command, args]) => [command, args[0], args[1], args[2]]),
       [
-        ["launchctl", "bootout", `gui/${process.getuid()}`, path.join(rootDir, "Library", "LaunchAgents", "com.dotbrains.agnt.bridge.plist")],
-        ["launchctl", "bootout", `gui/${process.getuid()}/com.dotbrains.agnt.bridge`, undefined],
-        ["launchctl", "bootstrap", `gui/${process.getuid()}`, path.join(rootDir, "Library", "LaunchAgents", "com.dotbrains.agnt.bridge.plist")],
-        ["launchctl", "kickstart", "-k", `gui/${process.getuid()}/com.dotbrains.agnt.bridge`],
+        ["launchctl", "bootout", `gui/${process.getuid()}`, path.join(rootDir, "Library", "LaunchAgents", "com.smeltery.agnt.bridge.plist")],
+        ["launchctl", "bootout", `gui/${process.getuid()}/com.smeltery.agnt.bridge`, undefined],
+        ["launchctl", "bootstrap", `gui/${process.getuid()}`, path.join(rootDir, "Library", "LaunchAgents", "com.smeltery.agnt.bridge.plist")],
+        ["launchctl", "kickstart", "-k", `gui/${process.getuid()}/com.smeltery.agnt.bridge`],
       ]
     );
   });
@@ -338,7 +338,7 @@ test("getMacOSBridgeServiceStatus reports launchd + runtime metadata together", 
     writePairingSession({ sessionId: "session-2" });
     writeBridgeStatus({ state: "running", connectionStatus: "connected", pid: 55 });
 
-    const plistPath = path.join(rootDir, "LaunchAgents", "com.dotbrains.agnt.bridge.plist");
+    const plistPath = path.join(rootDir, "LaunchAgents", "com.smeltery.agnt.bridge.plist");
     fs.mkdirSync(path.dirname(plistPath), { recursive: true });
     fs.writeFileSync(plistPath, "plist");
 
@@ -517,7 +517,7 @@ test("stopMacOSBridgeService swallows SIGTERM errors so cleanup still completes"
 
 test("uninstallMacOSBridgeService unloads and terminates the orphan before removing the plist", () => {
   withTempDaemonEnv(({ rootDir }) => {
-    const plistPath = path.join(rootDir, "Library", "LaunchAgents", "com.dotbrains.agnt.bridge.plist");
+    const plistPath = path.join(rootDir, "Library", "LaunchAgents", "com.smeltery.agnt.bridge.plist");
     fs.mkdirSync(path.dirname(plistPath), { recursive: true });
     fs.writeFileSync(plistPath, "<plist />", "utf8");
     writePairingSession({ sessionId: "session-uninstall" });
@@ -556,7 +556,7 @@ test("uninstallMacOSBridgeService unloads and terminates the orphan before remov
 
 test("uninstallMacOSBridgeService is idempotent when the service and plist are already gone", () => {
   withTempDaemonEnv(({ rootDir }) => {
-    const plistPath = path.join(rootDir, "Library", "LaunchAgents", "com.dotbrains.agnt.bridge.plist");
+    const plistPath = path.join(rootDir, "Library", "LaunchAgents", "com.smeltery.agnt.bridge.plist");
 
     const result = uninstallMacOSBridgeService({
       platform: "darwin",
@@ -573,7 +573,7 @@ test("uninstallMacOSBridgeService is idempotent when the service and plist are a
 
 test("uninstallMacOSBridgeService keeps the plist when bootout fails for a real reason", () => {
   withTempDaemonEnv(({ rootDir }) => {
-    const plistPath = path.join(rootDir, "Library", "LaunchAgents", "com.dotbrains.agnt.bridge.plist");
+    const plistPath = path.join(rootDir, "Library", "LaunchAgents", "com.smeltery.agnt.bridge.plist");
     fs.mkdirSync(path.dirname(plistPath), { recursive: true });
     fs.writeFileSync(plistPath, "<plist />", "utf8");
 

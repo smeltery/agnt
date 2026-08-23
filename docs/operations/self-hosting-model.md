@@ -48,7 +48,7 @@ That means:
 For most GitHub users, the easiest first step is:
 
 ```sh
-git clone https://github.com/dotbrains/agnt.git
+git clone https://github.com/smeltery/agnt.git
 cd agnt
 ./scripts/run-local-agnt.sh                       # auto-detects an installed agent CLI
 ./scripts/run-local-agnt.sh --provider claude     # or force a specific one

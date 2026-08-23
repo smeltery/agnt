@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@dotbrains/agnt",
+      "name": "@smeltery/agnt",
       "dependencies": {
         "node-pty": "^1.1.0",
         "qrcode-terminal": "^0.12.0",
