@@ -39,13 +39,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.smeltery.agnt.mobile.R
-import com.smeltery.agnt.mobile.core.model.TurnTimelineCacheKey
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.rememberMarkdownState
+import com.smeltery.agnt.mobile.R
+import com.smeltery.agnt.mobile.core.model.TurnTimelineCacheKey
 import kotlinx.coroutines.launch
 import java.net.URI
 
