@@ -1,7 +1,7 @@
 {
   "sourceRepo": "Emanuele-web04/remodex",
   "sourceBranch": "main",
-  "lastAuditedSha": "2e612b4408d69a8405daef7e823be4577abe0f2d",
-  "lastAuditedAt": "2026-08-29T21:30:00Z",
-  "note": "Tracks the last remodex commit fully audited for feature gaps against smeltery/agnt. Updated after porting desktop IPC start-turn v2 / interrupt-turn v4 contracts plus iOS continuation project routing from 2e612b4."
+  "lastAuditedSha": "a08a6dd4bbe324fd96be1b00de189cc5d771367f",
+  "lastAuditedAt": "2026-08-29T22:34:53Z",
+  "note": "Tracks the last remodex commit fully audited for feature gaps against smeltery/agnt. Updated after porting canonical Desktop turnHistory sync, IPC stream-state v11 / read-state v2, and always-mint rootless cwd for new chats."
 }

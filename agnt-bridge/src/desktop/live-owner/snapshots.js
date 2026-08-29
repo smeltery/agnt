@@ -10,6 +10,9 @@ const {
   applyPatchesToBaselineState,
   buildConversationStatePatches,
 } = require("../desktop-ipc-state-patches");
+const {
+  synchronizeDesktopConversationCompatibility,
+} = require("../desktop-ipc-conversation-adapter");
 
 function createLiveOwnerSnapshotState({
   conversations,
@@ -78,6 +81,7 @@ function createLiveOwnerSnapshotState({
       return true;
     }
     runtimeSettingsStore?.attachToConversation?.(threadId, conversationState);
+    synchronizeDesktopConversationCompatibility(conversationState);
     if (shouldDelayInitialSnapshotForHistory(threadId)) {
       return false;
     }

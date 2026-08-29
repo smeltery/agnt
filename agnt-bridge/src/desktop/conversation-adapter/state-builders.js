@@ -9,6 +9,10 @@ const {
   readString,
 } = require("../desktop-ipc-shared");
 const {
+  normalizeTurnParamsCompatibility,
+  synchronizeDesktopConversationCompatibility,
+} = require("./conversation-compatibility");
+const {
   normalizeDesktopItemCompatibility,
   normalizeTurnInitialPrompt,
   sanitizeUserMessageItem,
@@ -31,16 +35,27 @@ function buildConversationStateFromThread(thread, {
     now,
   });
 
-  return {
+  const state = {
     id: threadId,
+    forkedFromId: previous?.forkedFromId || null,
     hostId,
     turns,
     requests: cloneJSON(previous?.requests || []),
     createdAt: createdAtMs,
     updatedAt: updatedAtMs,
+    recencyAt: updatedAtMs,
     title: readString(thread?.name) || previous?.title || null,
+    source: readString(thread?.source) || previous?.source || "vscode",
+    agentNickname: previous?.agentNickname || null,
+    threadSource: readString(thread?.threadSource) || previous?.threadSource || "user",
+    historyMode: previous?.historyMode || "legacy",
+    parentThreadId: previous?.parentThreadId || null,
+    mode: previous?.mode || "default",
+    threadStartKind: previous?.threadStartKind || "default",
+    modelProvider: readString(thread?.modelProvider) || previous?.modelProvider || "openai",
     latestModel,
     latestReasoningEffort: previous?.latestReasoningEffort || null,
+    latestServiceTier: previous?.latestServiceTier || null,
     previousTurnModel: previous?.previousTurnModel || null,
     latestCollaborationMode: previous?.latestCollaborationMode || {
       mode: "default",
@@ -50,6 +65,7 @@ function buildConversationStateFromThread(thread, {
         developer_instructions: null,
       },
     },
+    latestThreadSettings: previous?.latestThreadSettings || null,
     hasUnreadTurn: Boolean(previous?.hasUnreadTurn),
     unreadMessageCount: Number.isFinite(previous?.unreadMessageCount) ? previous.unreadMessageCount : 0,
     threadGoal: previous?.threadGoal || null,
@@ -64,7 +80,10 @@ function buildConversationStateFromThread(thread, {
     workspaceBrowserRoot: previous?.workspaceBrowserRoot || null,
     projectlessOutputDirectory: previous?.projectlessOutputDirectory || null,
     currentPermissions: cloneJSON(previous?.currentPermissions || null),
+    sessionId: readString(thread?.sessionId) || previous?.sessionId || null,
   };
+  synchronizeDesktopConversationCompatibility(state);
+  return state;
 }
 
 function mergeConversationTurnsFromThread(threadTurns, {
@@ -128,7 +147,7 @@ function createEmptyConversationState(threadId, {
   cwd = "",
 } = {}) {
   const timestamp = now();
-  return {
+  const state = {
     id: threadId,
     hostId,
     turns: [],
@@ -138,6 +157,7 @@ function createEmptyConversationState(threadId, {
     title: null,
     latestModel: "",
     latestReasoningEffort: null,
+    latestServiceTier: null,
     previousTurnModel: null,
     latestCollaborationMode: {
       mode: "default",
@@ -147,6 +167,7 @@ function createEmptyConversationState(threadId, {
         developer_instructions: null,
       },
     },
+    latestThreadSettings: null,
     hasUnreadTurn: false,
     unreadMessageCount: 0,
     threadGoal: null,
@@ -162,6 +183,8 @@ function createEmptyConversationState(threadId, {
     projectlessOutputDirectory: null,
     currentPermissions: null,
   };
+  synchronizeDesktopConversationCompatibility(state);
+  return state;
 }
 
 function buildConversationTurn(turn, {
@@ -171,7 +194,7 @@ function buildConversationTurn(turn, {
   now = () => Date.now(),
 } = {}) {
   const turnId = readString(turn?.id) || readString(turn?.turnId) || readString(turn?.turn_id);
-  const params = cloneJSON(previousTurn?.params || {
+  const params = normalizeTurnParamsCompatibility(cloneJSON(previousTurn?.params || {
     threadId,
     input: [],
     cwd: cwd || null,
@@ -186,7 +209,7 @@ function buildConversationTurn(turn, {
     outputSchema: null,
     collaborationMode: null,
     attachments: [],
-  });
+  }), { cwd });
   const builtTurn = {
     id: turnId,
     turnId,
@@ -247,6 +270,9 @@ function applyPendingTurnStartParams(
     ...turn.params,
     ...cloneJSON(pendingParams),
   };
+  turn.params = normalizeTurnParamsCompatibility(turn.params, {
+    cwd: readString(turn.params?.cwd) || readString(conversation?.cwd),
+  });
   normalizeTurnInitialPrompt(turn);
 }
 
@@ -334,5 +360,6 @@ module.exports = {
   createEmptyConversationState,
   mergeConversationTurnsFromThread,
   normalizeThreadGoal,
+  synchronizeDesktopConversationCompatibility,
   timestampSecondsToMs,
 };

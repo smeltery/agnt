@@ -113,6 +113,13 @@ extension CodexService {
                 resumedThreadIDs.insert(thread.id)
                 initialTurnsLoadedByThreadID.insert(thread.id)
                 upsertThread(thread, treatAsServerState: true)
+                if let normalizedPreferredProjectPath,
+                   decodedThread.normalizedProjectPath != normalizedPreferredProjectPath {
+                    beginAuthoritativeProjectPathTransition(
+                        threadId: thread.id,
+                        projectPath: normalizedPreferredProjectPath
+                    )
+                }
                 if let normalizedProjectPath = thread.normalizedProjectPath,
                    CodexThread.projectIconSystemName(for: normalizedProjectPath) == "arrow.triangle.branch" {
                     rememberAssociatedManagedWorktreePath(normalizedProjectPath, for: thread.id)

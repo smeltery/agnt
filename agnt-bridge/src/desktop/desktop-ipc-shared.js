@@ -21,13 +21,13 @@ const THREAD_STREAM_FOLLOWING_STATUS_REQUESTED = "thread-stream-following-status
 const DESKTOP_IPC_METHOD_VERSIONS = new Map([
   ["initialize", 1],
   [CLIENT_STATUS_CHANGED, 1],
-  // Desktop pins thread-stream-state-changed at version 8 and drops mismatches.
-  ["thread-stream-state-changed", 8],
+  // Desktop pins thread-stream-state-changed at version 11 and drops mismatches.
+  ["thread-stream-state-changed", 11],
   [THREAD_STREAM_FOLLOWING_CHANGED, 1],
   [THREAD_STREAM_FOLLOWING_STATUS_REQUESTED, 1],
   ["thread-archived", 2],
   ["thread-unarchived", 1],
-  ["thread-read-state-changed", 1],
+  ["thread-read-state-changed", 2],
   ["thread-queued-followups-changed", 1],
   ["thread-follower-start-turn", 2],
   ["thread-follower-load-complete-history", 1],
