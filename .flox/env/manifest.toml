@@ -48,7 +48,8 @@ AGNT_FLOX = "1"
 
 
 ## Activation Hook ---------------------------------------------------
-##  Runs in bash on `flox activate`. Keep it fast and idempotent — no installs.
+##  Runs in bash on `flox activate`. Keep it fast and idempotent.
+##  The mbx install below is a no-op when already present.
 [hook]
 on-activate = '''
   # Point Gradle/Kotlin at the Flox-provided JDK. All Flox packages merge into
@@ -58,6 +59,28 @@ on-activate = '''
   # Keep Bun's global cache inside the env cache dir so it survives across
   # activations without polluting $HOME.
   export BUN_INSTALL_CACHE_DIR="$FLOX_ENV_CACHE/bun"
+
+  # mr boxington (mbx) — cargo front-end for shared Rust build cache.
+  # Used for local Tauri/cargo builds (agnt-host/src-tauri). See
+  # https://mr-boxington.jdx.dev
+  if ! command -v mbx >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/bin"
+    case "$(uname -s)-$(uname -m)" in
+      Darwin-arm64) archive=mbx-aarch64-apple-darwin.tar.gz ;;
+      Linux-x86_64) archive=mbx-x86_64-unknown-linux-gnu.tar.gz ;;
+      Linux-aarch64|Linux-arm64) archive=mbx-aarch64-unknown-linux-gnu.tar.gz ;;
+      *) archive="" ;;
+    esac
+    if [ -n "$archive" ]; then
+      tmp="$(mktemp -d)"
+      if curl -fsSL "https://github.com/jdx/mr-boxington/releases/latest/download/$archive" | tar -xzf - -C "$tmp" && [ -f "$tmp/mbx" ]; then
+        mv "$tmp/mbx" "$HOME/.local/bin/mbx"
+        chmod +x "$HOME/.local/bin/mbx"
+      fi
+      rm -rf "$tmp"
+    fi
+  fi
+  case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
 '''
 
 
