@@ -36,10 +36,16 @@ test("desktop IPC request envelopes use the shared version map and source id", (
     type: "request",
     requestId: "req-1",
     sourceClientId: "client-1",
-    version: 2,
+    version: 4,
     method: "thread-follower-interrupt-turn",
     params: { conversationId: "thread-1" },
   });
+  assert.equal(buildIpcRequestEnvelope({
+    requestId: "req-start",
+    method: "thread-follower-start-turn",
+    params: { conversationId: "thread-1" },
+    clientId: "client-1",
+  }).version, 2);
   assert.equal(buildIpcRequestEnvelope({
     requestId: "req-2",
     method: "initialize",

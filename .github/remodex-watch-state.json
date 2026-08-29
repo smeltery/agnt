@@ -1,7 +1,7 @@
 {
   "sourceRepo": "Emanuele-web04/remodex",
   "sourceBranch": "main",
-  "lastAuditedSha": "8105e25038ad07443da01cda6c21e5f77ec61cd5",
-  "lastAuditedAt": "2026-08-12T15:34:58Z",
-  "note": "Tracks the last remodex commit fully audited for feature gaps against smeltery/agnt. Updated by the scheduled remodex-feature-gap-watcher routine. Manually seeded after PRs #151, #152, #153 shipped everything found as of this SHA."
+  "lastAuditedSha": "2e612b4408d69a8405daef7e823be4577abe0f2d",
+  "lastAuditedAt": "2026-08-29T21:30:00Z",
+  "note": "Tracks the last remodex commit fully audited for feature gaps against smeltery/agnt. Updated after porting desktop IPC start-turn v2 / interrupt-turn v4 contracts plus iOS continuation project routing from 2e612b4."
 }

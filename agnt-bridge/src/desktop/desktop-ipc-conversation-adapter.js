@@ -25,6 +25,7 @@ const {
   buildConversationTurn,
   createEmptyConversationState,
   mergeConversationTurnsFromThread,
+  normalizeThreadGoal,
   timestampSecondsToMs,
 } = require("./conversation-adapter/state-builders");
 const {
@@ -118,6 +119,34 @@ function applyAppServerMessageToConversationState({
       conversation.latestTokenUsageInfo = cloneJSON(
         message.params?.tokenUsage || message.params?.usage || null
       );
+      conversation.updatedAt = now();
+      return { threadId, changed: true };
+    }
+    case "thread/goal/updated": {
+      const threadId = readThreadIdFromParams(message.params);
+      const goal = normalizeThreadGoal(message.params?.goal, threadId);
+      if (!threadId || !shouldOwnThread(threadId) || !goal) {
+        return null;
+      }
+      const conversation = ensureConversationInMap(conversations, threadId, { hostId, now });
+      if (goal.status === "complete") {
+        conversation.threadGoal = null;
+        conversation.completedThreadGoal = goal;
+      } else {
+        conversation.threadGoal = goal;
+        conversation.completedThreadGoal = null;
+      }
+      conversation.updatedAt = now();
+      return { threadId, changed: true };
+    }
+    case "thread/goal/cleared": {
+      const threadId = readThreadIdFromParams(message.params);
+      if (!threadId || !shouldOwnThread(threadId)) {
+        return null;
+      }
+      const conversation = ensureConversationInMap(conversations, threadId, { hostId, now });
+      conversation.threadGoal = null;
+      conversation.completedThreadGoal = null;
       conversation.updatedAt = now();
       return { threadId, changed: true };
     }

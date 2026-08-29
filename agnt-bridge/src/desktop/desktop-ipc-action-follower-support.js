@@ -94,11 +94,9 @@ function buildDesktopFollowerRoute(message) {
     return {
       threadId,
       method: "thread-follower-start-turn",
-      params: {
-        conversationId: threadId,
-        senderRequestId: requestId,
-        turnStartParams: params,
-      },
+      params: { conversationId: threadId },
+      senderRequestId: requestId,
+      turnStartParams: params,
     };
   }
   if (method === "turn/steer") {
@@ -118,7 +116,8 @@ function buildDesktopFollowerRoute(message) {
       method: "thread-follower-interrupt-turn",
       params: {
         conversationId: threadId,
-        turnId: readString(params.turnId) || readString(params.turn_id),
+        mode: "user-stop",
+        expectedTurnId: readString(params.turnId) || readString(params.turn_id),
       },
     };
   }

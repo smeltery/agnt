@@ -65,8 +65,9 @@ function activeTurnIdFromConversation(conversation, { normalizeToken, readString
       return turnId;
     }
   }
-  const latestTurn = turns[turns.length - 1];
-  return readString(latestTurn?.turnId) || readString(latestTurn?.id);
+  // Completed/interrupted turns are not interruptible; do not fall back to the
+  // latest turn id or Desktop's stale expectedTurnId checks become no-ops.
+  return "";
 }
 
 function createDisabledDesktopIpcLiveOwner() {

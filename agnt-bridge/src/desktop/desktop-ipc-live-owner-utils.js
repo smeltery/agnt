@@ -9,20 +9,33 @@ const {
   readString,
 } = require("./desktop-ipc-shared");
 
-const ALLOWED_TURN_START_PARAM_KEYS = new Set([
+// Current app-server TurnStartParams fields. Desktop's adjacent turnStart.context
+// is presentation state, not part of this RPC shape, so it stays outside the request.
+const APP_SERVER_TURN_START_PARAM_KEYS = new Set([
   "threadId",
   "input",
+  "additionalContext",
   "cwd",
   "approvalPolicy",
   "approvalsReviewer",
   "sandboxPolicy",
   "model",
   "serviceTier",
+  "serviceTierForTurn",
   "effort",
   "summary",
   "personality",
   "outputSchema",
   "collaborationMode",
+  "clientUserMessageId",
+  "cyberAccessProgram",
+  "environments",
+  "multiAgentMode",
+  "permissions",
+  "responsesapiClientMetadata",
+  "runtimeWorkspaceRoots",
+  "toolOutput",
+  "turnTrigger",
 ]);
 
 function normalizeInputEntriesForDesktop(input) {
@@ -50,7 +63,7 @@ function normalizeInputEntriesForDesktop(input) {
 function sanitizeTurnStartParams(params) {
   const sanitized = {};
   for (const [key, value] of Object.entries(params || {})) {
-    if (ALLOWED_TURN_START_PARAM_KEYS.has(key)) {
+    if (APP_SERVER_TURN_START_PARAM_KEYS.has(key)) {
       sanitized[key] = value;
     }
   }
@@ -58,6 +71,19 @@ function sanitizeTurnStartParams(params) {
     sanitized.input = [];
   }
   return sanitized;
+}
+
+function readFollowerTurnStartParams(params) {
+  const turnStart = params?.turnStart && typeof params.turnStart === "object" && !Array.isArray(params.turnStart)
+    ? params.turnStart
+    : null;
+  if (turnStart?.request && typeof turnStart.request === "object" && !Array.isArray(turnStart.request)) {
+    return turnStart.request;
+  }
+  return params?.turnStartParams
+    || params?.turn_start_params
+    || params?.turnStart
+    || params;
 }
 
 function readThreadFromResponse(message) {
@@ -82,17 +108,20 @@ function readTurnIdFromResult(result) {
 }
 
 function readConversationIdFromFollowerParams(params) {
+  const turnStartRequest = readFollowerTurnStartParams(params);
   return readString(params?.conversationId)
     || readString(params?.conversation_id)
     || readString(params?.threadId)
     || readString(params?.thread_id)
     || readString(params?.turnStartParams?.threadId)
-    || readString(params?.turn_start_params?.threadId);
+    || readString(params?.turn_start_params?.threadId)
+    || readString(turnStartRequest?.threadId);
 }
 
 module.exports = {
   normalizeInputEntriesForDesktop,
   readConversationIdFromFollowerParams,
+  readFollowerTurnStartParams,
   readThreadFromPayload,
   readThreadFromResponse,
   readTurnIdFromResult,
