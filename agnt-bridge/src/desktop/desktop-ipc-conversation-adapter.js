@@ -26,6 +26,7 @@ const {
   createEmptyConversationState,
   mergeConversationTurnsFromThread,
   normalizeThreadGoal,
+  synchronizeDesktopConversationCompatibility,
   timestampSecondsToMs,
 } = require("./conversation-adapter/state-builders");
 const {
@@ -471,6 +472,7 @@ module.exports = {
   readThreadIdFromParams,
   readTurnIdFromParams,
   readTurnIdFromTurn,
+  synchronizeDesktopConversationCompatibility,
   timestampSecondsToMs,
   upsertItem,
   upsertTurn,

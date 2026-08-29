@@ -143,8 +143,8 @@ test("live owner broadcasts phone-owned turn snapshots over Desktop IPC", async 
       && frame.method === "thread-stream-state-changed"
       && frame.params?.conversationId === "thread-live-owner"
   );
-  assert.equal(broadcast.version, 8);
-  assert.equal(broadcast.params.version, 8);
+  assert.equal(broadcast.version, 11);
+  assert.equal(broadcast.params.version, 11);
   assert.equal(broadcast.params.agntOwnerSource, "desktop-ipc-live-owner");
   assert.equal(broadcast.params.change.type, "snapshot");
   const turn = broadcast.params.change.conversationState.turns[0];

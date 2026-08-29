@@ -270,6 +270,50 @@ final class CodexThreadProjectRoutingTests: XCTestCase {
         }
     }
 
+    func testStartThreadIfReadyMintsRootlessChatRootWhenNoProjectPathIsProvided() async throws {
+        let service = makeService()
+        service.isConnected = true
+        service.isInitialized = true
+        let rootlessPath = "/Users/me/Documents/Codex/2026-08-29/untitled-chat"
+        var requestedMethods: [String] = []
+
+        service.requestTransportOverride = { method, params in
+            requestedMethods.append(method)
+            switch method {
+            case "project/createRootlessChatRoot":
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "path": .string(rootlessPath),
+                    ]),
+                    includeJSONRPC: false
+                )
+            case "thread/start":
+                XCTAssertEqual(params?.objectValue?["cwd"]?.stringValue, rootlessPath)
+                return RPCMessage(
+                    id: .string(UUID().uuidString),
+                    result: .object([
+                        "thread": .object([
+                            "id": .string("thread-rootless"),
+                            // Server may echo process cwd; preferred mint must win.
+                            "cwd": .string("/Users/me"),
+                        ]),
+                    ]),
+                    includeJSONRPC: false
+                )
+            default:
+                throw CodexServiceError.invalidResponse("Unexpected method \(method)")
+            }
+        }
+
+        let thread = try await service.startThreadIfReady()
+
+        XCTAssertEqual(thread.id, "thread-rootless")
+        XCTAssertEqual(thread.normalizedProjectPath, rootlessPath)
+        XCTAssertEqual(requestedMethods, ["project/createRootlessChatRoot", "thread/start"])
+        XCTAssertEqual(service.currentAuthoritativeProjectPath(for: "thread-rootless"), rootlessPath)
+    }
+
     private func makeService(defaults: UserDefaults? = nil) -> CodexService {
         let resolvedDefaults: UserDefaults
         if let defaults {
