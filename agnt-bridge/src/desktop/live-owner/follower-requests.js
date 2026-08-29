@@ -22,6 +22,7 @@ const {
 } = require("../desktop-ipc-live-owner-support");
 const {
   readConversationIdFromFollowerParams,
+  readFollowerTurnStartParams,
   readThreadFromPayload,
   readTurnIdFromResult,
   sanitizeTurnStartParams,
@@ -130,10 +131,7 @@ function createLiveOwnerFollowerRequestHandler({
   }
 
   async function handleFollowerStartTurn(conversationId, params) {
-    const rawTurnStartParams = params.turnStartParams
-      || params.turn_start_params
-      || params.turnStart
-      || params;
+    const rawTurnStartParams = readFollowerTurnStartParams(params);
     const codexParams = followerRuntimeState.mergeOverrides(conversationId, sanitizeTurnStartParams({
       ...rawTurnStartParams,
       threadId: conversationId,
@@ -143,7 +141,9 @@ function createLiveOwnerFollowerRequestHandler({
       ? normalizedParams
       : codexParams;
     markOwnedThread(conversationId);
-    const senderRequestId = params.senderRequestId || params.sender_request_id;
+    const senderRequestId = params.senderRequestId
+      || params.sender_request_id
+      || rawTurnStartParams?.clientUserMessageId;
     const isKnownHeldPhoneStart = Boolean(
       requestIdKey(senderRequestId)
       && pendingTurnStarts.hasRequestId(senderRequestId)
@@ -223,16 +223,58 @@ function createLiveOwnerFollowerRequestHandler({
   }
 
   async function handleFollowerInterruptTurn(conversationId, params) {
-    const turnId = readString(params.turnId)
-      || readString(params.turn_id)
-      || activeTurnIdForConversation(conversationId);
-    if (!turnId) {
-      throw new Error("Missing turnId for follower interrupt request.");
+    const requestedTurnId = readString(params.expectedTurnId)
+      || readString(params.expected_turn_id)
+      || readString(params.turnId)
+      || readString(params.turn_id);
+    const activeTurnId = activeTurnIdForConversation(conversationId);
+    if (requestedTurnId && requestedTurnId !== activeTurnId) {
+      return {
+        interruptedTurnId: null,
+        ok: true,
+      };
     }
-    return await sendCodexRequest("turn/interrupt", {
+
+    const goalPauseError = await pauseActiveGoalForUserStop(
+      conversationId,
+      params.mode,
+      Boolean(requestedTurnId)
+    );
+    const turnId = requestedTurnId || activeTurnId;
+    if (!turnId) {
+      return followerInterruptResult(null, goalPauseError);
+    }
+    await sendCodexRequest("turn/interrupt", {
       threadId: conversationId,
       turnId,
     });
+    return followerInterruptResult(turnId, goalPauseError);
+  }
+
+  async function pauseActiveGoalForUserStop(conversationId, mode, hasRequestedTurnId) {
+    if (mode !== "user-stop" || hasRequestedTurnId) {
+      return "";
+    }
+    if (conversations.get(conversationId)?.threadGoal?.status !== "active") {
+      return "";
+    }
+    try {
+      await sendCodexRequest("thread/goal/set", {
+        threadId: conversationId,
+        status: "paused",
+      });
+      return "";
+    } catch (error) {
+      return error?.message || "Failed to pause thread goal.";
+    }
+  }
+
+  function followerInterruptResult(interruptedTurnId, goalPauseError) {
+    return {
+      interruptedTurnId,
+      ...(goalPauseError ? { goalPauseError } : {}),
+      ok: true,
+    };
   }
 
   // Desktop follower approvals only carry decision-style payloads, but app-server

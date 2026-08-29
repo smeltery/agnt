@@ -6,18 +6,45 @@
 import Foundation
 
 extension CodexService {
+    private static let runtimeReadinessRetryDelays: [UInt64] = [
+        0,
+        100_000_000,
+        250_000_000,
+        500_000_000,
+        1_000_000_000,
+    ]
+
+    // Waits briefly for initialize/initialized before rejecting chat-start entry points.
+    func awaitRuntimeInitializedIfNeeded() async throws {
+        guard isConnected else {
+            throw CodexServiceError.invalidInput("Connect to runtime first.")
+        }
+        guard !isInitialized else {
+            return
+        }
+
+        for delay in Self.runtimeReadinessRetryDelays {
+            if delay > 0 {
+                try await Task.sleep(nanoseconds: delay)
+            }
+            if isConnected && isInitialized {
+                return
+            }
+            guard isConnected else {
+                throw CodexServiceError.invalidInput("Connect to runtime first.")
+            }
+        }
+
+        throw CodexServiceError.invalidInput("Runtime is still initializing. Wait a moment and retry.")
+    }
+
     // Reuses the same runtime-readiness gate across every UI entry point that starts a new chat.
     func startThreadIfReady(
         preferredProjectPath: String? = nil,
         pendingComposerAction: CodexPendingThreadComposerAction? = nil,
         runtimeOverride: CodexThreadRuntimeOverride? = nil
     ) async throws -> CodexThread {
-        guard isConnected else {
-            throw CodexServiceError.invalidInput("Connect to runtime first.")
-        }
-        guard isInitialized else {
-            throw CodexServiceError.invalidInput("Runtime is still initializing. Wait a moment and retry.")
-        }
+        try await awaitRuntimeInitializedIfNeeded()
 
         if let pendingComposerAction {
             return try await startThread(

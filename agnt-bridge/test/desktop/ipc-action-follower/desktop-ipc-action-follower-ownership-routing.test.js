@@ -109,10 +109,14 @@ test("desktop IPC follower normalizes phone turn starts before Desktop follower 
 
   await waitFor(() => serverFrames.find((frame) => frame.method === "thread-follower-start-turn"));
   const turnStartFrame = serverFrames.find((frame) => frame.method === "thread-follower-start-turn");
-  assert.deepEqual(turnStartFrame.params.turnStartParams, {
+  assert.deepEqual(turnStartFrame.params.turnStart.request, {
     threadId: "thread-normalize",
     input: [{ type: "input_text", text: "continue" }],
     summary: "none",
+    clientUserMessageId: "phone-turn-start-normalize",
+  });
+  assert.deepEqual(turnStartFrame.params.turnStart.context, {
+    inheritThreadSettings: true,
   });
 });
 

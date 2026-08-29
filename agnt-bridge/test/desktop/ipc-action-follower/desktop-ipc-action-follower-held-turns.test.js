@@ -147,7 +147,7 @@ test("desktop IPC follower routes held phone turns once discovery confirms deskt
         writeFrame(socket, {
           type: "client-discovery-response",
           requestId: frame.requestId,
-          response: { canHandle: frame.request?.version === 1 },
+          response: { canHandle: frame.request?.version === 2 },
         });
       } else if (frame.method === "thread-follower-start-turn") {
         writeFrame(socket, {
@@ -294,7 +294,7 @@ test("desktop IPC follower coalesces duplicate held turn starts for a thread", a
   });
   const routedStarts = serverFrames.filter((frame) => frame.method === "thread-follower-start-turn");
   assert.equal(routedStarts.length, 1);
-  assert.equal(routedStarts[0].params.turnStartParams.input[0].text, "new duplicate");
+  assert.equal(routedStarts[0].params.turnStart.request.input[0].text, "new duplicate");
 });
 
 test("desktop IPC follower retries held ownership probes after IPC connects", async (t) => {

@@ -113,6 +113,27 @@ extension CodexService {
 
         return path
     }
+
+    // Asks the bridge to mint a Codex-Desktop-style rootless chat root under
+    // ~/Documents/Codex/<DATE>/<slug> so projectless continuations still get an
+    // explicit cwd instead of inheriting the app-server process directory.
+    func createRootlessChatRoot(promptHint: String?) async throws -> String {
+        var params: [String: JSONValue] = [:]
+        if let promptHint, !promptHint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            params["promptHint"] = .string(promptHint)
+        }
+
+        let response = try await sendRequest(
+            method: "project/createRootlessChatRoot",
+            params: .object(params)
+        )
+        guard let path = response.result?.objectValue?["path"]?.stringValue,
+              !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw CodexServiceError.invalidResponse("project/createRootlessChatRoot response missing path")
+        }
+
+        return path
+    }
 }
 
 private extension CodexService {

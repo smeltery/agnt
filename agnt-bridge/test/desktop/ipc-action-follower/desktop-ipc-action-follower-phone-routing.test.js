@@ -104,15 +104,20 @@ test("desktop IPC follower routes phone turns to Desktop-owned threads", async (
 
   await waitFor(() => serverFrames.find((frame) => frame.method === "thread-follower-start-turn"));
   const turnStartFrame = serverFrames.find((frame) => frame.method === "thread-follower-start-turn");
-  assert.equal(turnStartFrame.version, 1);
+  assert.equal(turnStartFrame.version, 2);
   assert.deepEqual(turnStartFrame.params, {
     conversationId: "thread-desktop-owned",
-    senderRequestId: "phone-turn-start-1",
-    turnStartParams: {
-      threadId: "thread-desktop-owned",
-      input: [{ type: "input_text", text: "continue from phone" }],
-      cwd: "/repo",
-      model: "gpt-test",
+    turnStart: {
+      request: {
+        threadId: "thread-desktop-owned",
+        input: [{ type: "input_text", text: "continue from phone" }],
+        cwd: "/repo",
+        model: "gpt-test",
+        clientUserMessageId: "phone-turn-start-1",
+      },
+      context: {
+        inheritThreadSettings: true,
+      },
     },
   });
 
@@ -148,7 +153,8 @@ test("desktop IPC follower routes phone turns to Desktop-owned threads", async (
       expectedMethod: "thread-follower-interrupt-turn",
       expectedParams: {
         conversationId: "thread-desktop-owned",
-        turnId: "turn-from-phone",
+        mode: "user-stop",
+        expectedTurnId: "turn-from-phone",
       },
     },
     {
@@ -173,10 +179,10 @@ test("desktop IPC follower routes phone turns to Desktop-owned threads", async (
     assert.equal(handledRoute, true);
     await waitFor(() => serverFrames.find((frame) => frame.method === request.expectedMethod));
     const routedFrame = serverFrames.find((frame) => frame.method === request.expectedMethod);
-    // Versions mirror Codex Desktop's bundled method map (interrupt is v2).
+    // Versions mirror Codex Desktop's bundled method map (interrupt is v4).
     assert.equal(
       routedFrame.version,
-      request.expectedMethod === "thread-follower-interrupt-turn" ? 2 : 1
+      request.expectedMethod === "thread-follower-interrupt-turn" ? 4 : 1
     );
     assert.deepEqual(routedFrame.params, request.expectedParams);
     await waitFor(() => outbound.find((message) => message.id === request.id));

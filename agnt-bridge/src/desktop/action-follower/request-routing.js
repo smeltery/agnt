@@ -63,19 +63,29 @@ function createDesktopRequestRouter({
 
   function submitDesktopFollowerRequest(route, originalMessage) {
     Promise.resolve()
-      .then(() => resolveFollowerRequestParams(route))
-      .then(async (params) => {
+      .then(() => resolveFollowerRequest(route))
+      .then(async (resolvedRequest) => {
         if (route.method === "thread-follower-start-turn") {
-          await syncDesktopOwnerRuntimeSettings(route.threadId, params.turnStartParams)
-            .catch((error) => { throw markDeliveryFailureError(error); });
+          try {
+            await syncDesktopOwnerRuntimeSettings(route.threadId, resolvedRequest.turnStartParams);
+          } catch (error) {
+            // The actual turn has not reached Desktop yet. Even if the settings
+            // request timed out after being applied, continuing through the local
+            // app-server is safe because there is no Desktop turn to duplicate.
+            throw markDeliveryFailureError(error);
+          }
         }
-        return ipc.sendRequest(route.method, params);
+        return {
+          resolvedRequest,
+          result: await ipc.sendRequest(route.method, resolvedRequest.params),
+        };
       })
-      .then((result) => {
+      .then(({ resolvedRequest, result }) => {
         sendApplicationResponse(JSON.stringify({
           id: originalMessage.id,
           result: appServerResultForFollowerRequest(route.method, result),
         }));
+        return resolvedRequest;
       })
       .catch((error) => {
         console.warn(`${logPrefix} desktop follower request failed: ${error.message}`);
@@ -118,19 +128,40 @@ function createDesktopRequestRouter({
     });
   }
 
-  async function resolveFollowerRequestParams(route) {
+  // Desktop-followed turn starts must apply the same param normalization as
+  // requests forwarded straight to the local app-server, then wrap the v2
+  // turnStart.request/context envelope Desktop expects.
+  async function resolveFollowerRequest(route) {
     if (route.method !== "thread-follower-start-turn") {
-      return route.params;
+      return {
+        params: route.params,
+        turnStartParams: null,
+      };
     }
 
+    const rawTurnStartParams = route.turnStartParams ?? route.params?.turnStartParams;
     const normalized = await Promise.resolve(
-      normalizeTurnStartParams(cloneJSON(route.params.turnStartParams))
+      normalizeTurnStartParams(cloneJSON(rawTurnStartParams))
     );
     const turnStartParams = normalized && typeof normalized === "object" && !Array.isArray(normalized)
       ? normalized
-      : route.params.turnStartParams;
+      : rawTurnStartParams;
+    const request = cloneJSON(turnStartParams);
+    if (!readString(request.clientUserMessageId)) {
+      request.clientUserMessageId = route.senderRequestId
+        || route.params?.senderRequestId
+        || route.params?.sender_request_id;
+    }
     return {
-      ...route.params,
+      params: {
+        conversationId: route.params?.conversationId || route.threadId,
+        turnStart: {
+          request,
+          context: {
+            inheritThreadSettings: true,
+          },
+        },
+      },
       turnStartParams,
     };
   }

@@ -5,6 +5,7 @@
 
 const {
   cloneJSON,
+  normalizeToken,
   readString,
 } = require("../desktop-ipc-shared");
 const {
@@ -296,11 +297,42 @@ function timestampSecondsToMs(value) {
   return Number.isFinite(value) && value > 0 ? Math.round(value * 1000) : 0;
 }
 
+function normalizeThreadGoal(value, fallbackThreadId = "") {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const threadId = readString(value.threadId) || readString(value.thread_id) || readString(fallbackThreadId);
+  const objective = readString(value.objective);
+  const statusByToken = {
+    active: "active",
+    paused: "paused",
+    blocked: "blocked",
+    usagelimited: "usageLimited",
+    budgetlimited: "budgetLimited",
+    complete: "complete",
+  };
+  const status = statusByToken[normalizeToken(value.status)] || "";
+  if (!threadId || !objective || !status) {
+    return null;
+  }
+  return {
+    threadId,
+    objective,
+    status,
+    tokenBudget: value.tokenBudget ?? value.token_budget ?? null,
+    tokensUsed: Number(value.tokensUsed ?? value.tokens_used) || 0,
+    timeUsedSeconds: Number(value.timeUsedSeconds ?? value.time_used_seconds) || 0,
+    createdAt: Number(value.createdAt ?? value.created_at) || 0,
+    updatedAt: Number(value.updatedAt ?? value.updated_at) || 0,
+  };
+}
+
 module.exports = {
   applyPendingTurnStartParams,
   buildConversationStateFromThread,
   buildConversationTurn,
   createEmptyConversationState,
   mergeConversationTurnsFromThread,
+  normalizeThreadGoal,
   timestampSecondsToMs,
 };

@@ -313,12 +313,19 @@ test("live owner routes Desktop follower turns to Codex", async (t) => {
     type: "request",
     requestId: "desktop-start-1",
     sourceClientId: "desktop-client",
+    version: 2,
     method: "thread-follower-start-turn",
     params: {
       conversationId: "thread-router-owned",
-      turnStartParams: {
-        input: [{ type: "text", text: "continue from desktop" }],
-        cwd: "/tmp/router-project",
+      turnStart: {
+        request: {
+          input: [{ type: "text", text: "continue from desktop" }],
+          cwd: "/tmp/router-project",
+          clientUserMessageId: "desktop-message-1",
+        },
+        context: {
+          inheritThreadSettings: true,
+        },
       },
     },
   });
@@ -334,8 +341,278 @@ test("live owner routes Desktop follower turns to Codex", async (t) => {
       threadId: "thread-router-owned",
       input: [{ type: "text", text: "continue from desktop" }],
       cwd: "/tmp/router-project",
+      clientUserMessageId: "desktop-message-1",
     },
   }]);
+});
+
+test("live owner handles current start-turn and interrupt follower contracts", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-live-owner-follower-contracts-");
+  const codexRequests = [];
+  let goalPauseError = null;
+  let desktopSocket = null;
+  const desktopFrames = [];
+
+  const owner = createDesktopIpcLiveOwner({
+    socketPath,
+    snapshotDebounceMs: 1,
+    reconnectMs: 10,
+    requestTimeoutMs: 500,
+    async sendCodexRequest(method, params) {
+      codexRequests.push({ method, params });
+      if (method === "thread/goal/set" && goalPauseError) {
+        throw goalPauseError;
+      }
+      return {
+        turn: {
+          id: "turn-from-follower",
+          items: [],
+          status: "inProgress",
+        },
+      };
+    },
+    sendRawCodexMessage() {},
+  });
+
+  t.after(() => {
+    owner.stopAll();
+    desktopSocket?.destroy();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  owner.observeInbound(JSON.stringify({
+    method: "turn/start",
+    params: { threadId: "thread-owned", input: [] },
+  }));
+  await waitFor(() => fs.existsSync(socketPath));
+
+  desktopSocket = net.createConnection(socketPath);
+  attachFrameReader(desktopSocket, (frame) => desktopFrames.push(frame));
+  await new Promise((resolve) => desktopSocket.once("connect", resolve));
+  writeFrame(desktopSocket, {
+    type: "request",
+    requestId: "desktop-init-contracts",
+    sourceClientId: "initializing-client",
+    version: 1,
+    method: "initialize",
+    params: { clientType: "vscode" },
+  });
+  await waitFor(() => desktopFrames.some((frame) => frame.requestId === "desktop-init-contracts"));
+
+  writeFrame(desktopSocket, {
+    type: "request",
+    requestId: "start-turn-1",
+    sourceClientId: "desktop",
+    version: 2,
+    method: "thread-follower-start-turn",
+    params: {
+      conversationId: "thread-owned",
+      turnStart: {
+        request: {
+          threadId: "thread-owned",
+          input: [
+            { type: "input_text", text: "continue" },
+          ],
+          model: "gpt-test",
+          clientUserMessageId: "desktop-message-1",
+          additionalContext: {
+            desktop: { kind: "application", value: "window-1" },
+          },
+          permissions: "workspace-write",
+          runtimeWorkspaceRoots: ["/tmp/project"],
+          responsesapiClientMetadata: { surface: "desktop" },
+          serviceTierForTurn: "priority",
+          turnTrigger: "desktop-follower",
+        },
+        context: {
+          attachments: [{ id: "display-only" }],
+          inheritThreadSettings: true,
+        },
+      },
+    },
+  });
+
+  const startResponse = await waitForMessage(
+    desktopFrames,
+    (frame) => frame.type === "response" && frame.requestId === "start-turn-1"
+  );
+  assert.equal(startResponse.resultType, "success");
+  assert.deepEqual(codexRequests.filter((request) => request.method === "turn/start"), [{
+    method: "turn/start",
+    params: {
+      threadId: "thread-owned",
+      input: [
+        { type: "input_text", text: "continue" },
+      ],
+      model: "gpt-test",
+      clientUserMessageId: "desktop-message-1",
+      additionalContext: {
+        desktop: { kind: "application", value: "window-1" },
+      },
+      permissions: "workspace-write",
+      runtimeWorkspaceRoots: ["/tmp/project"],
+      responsesapiClientMetadata: { surface: "desktop" },
+      serviceTierForTurn: "priority",
+      turnTrigger: "desktop-follower",
+    },
+  }]);
+
+  owner.observeOutbound(JSON.stringify({
+    method: "turn/started",
+    params: {
+      threadId: "thread-owned",
+      turn: {
+        id: "turn-from-follower",
+        items: [],
+        status: "inProgress",
+      },
+    },
+  }));
+
+  writeFrame(desktopSocket, {
+    type: "request",
+    requestId: "interrupt-turn-1",
+    sourceClientId: "desktop",
+    version: 4,
+    method: "thread-follower-interrupt-turn",
+    params: {
+      conversationId: "thread-owned",
+      mode: "user-stop",
+      expectedTurnId: "turn-from-follower",
+    },
+  });
+  const interruptResponse = await waitForMessage(
+    desktopFrames,
+    (frame) => frame.type === "response" && frame.requestId === "interrupt-turn-1"
+  );
+  assert.equal(interruptResponse.resultType, "success");
+  assert.deepEqual(interruptResponse.result, {
+    interruptedTurnId: "turn-from-follower",
+    ok: true,
+  });
+  assert.deepEqual(codexRequests.filter((request) => request.method === "turn/interrupt"), [{
+    method: "turn/interrupt",
+    params: {
+      threadId: "thread-owned",
+      turnId: "turn-from-follower",
+    },
+  }]);
+
+  owner.observeOutbound(JSON.stringify({
+    method: "turn/started",
+    params: {
+      threadId: "thread-owned",
+      turn: {
+        id: "turn-with-goal",
+        items: [],
+        status: "inProgress",
+      },
+    },
+  }));
+  owner.observeOutbound(JSON.stringify({
+    method: "thread/goal/updated",
+    params: {
+      threadId: "thread-owned",
+      goal: {
+        threadId: "thread-owned",
+        objective: "Finish the task",
+        status: "active",
+      },
+    },
+  }));
+
+  const requestCountBeforeStaleInterrupt = codexRequests.length;
+  writeFrame(desktopSocket, {
+    type: "request",
+    requestId: "interrupt-turn-stale",
+    sourceClientId: "desktop",
+    version: 4,
+    method: "thread-follower-interrupt-turn",
+    params: {
+      conversationId: "thread-owned",
+      mode: "user-stop",
+      expectedTurnId: "turn-already-finished",
+    },
+  });
+  const staleInterruptResponse = await waitForMessage(
+    desktopFrames,
+    (frame) => frame.type === "response" && frame.requestId === "interrupt-turn-stale"
+  );
+  assert.deepEqual(staleInterruptResponse.result, {
+    interruptedTurnId: null,
+    ok: true,
+  });
+  assert.equal(codexRequests.length, requestCountBeforeStaleInterrupt);
+
+  writeFrame(desktopSocket, {
+    type: "request",
+    requestId: "interrupt-turn-with-goal",
+    sourceClientId: "desktop",
+    version: 4,
+    method: "thread-follower-interrupt-turn",
+    params: {
+      conversationId: "thread-owned",
+      mode: "user-stop",
+    },
+  });
+  const goalInterruptResponse = await waitForMessage(
+    desktopFrames,
+    (frame) => frame.type === "response" && frame.requestId === "interrupt-turn-with-goal"
+  );
+  assert.deepEqual(goalInterruptResponse.result, {
+    interruptedTurnId: "turn-with-goal",
+    ok: true,
+  });
+  assert.deepEqual(codexRequests.slice(-2), [
+    {
+      method: "thread/goal/set",
+      params: {
+        threadId: "thread-owned",
+        status: "paused",
+      },
+    },
+    {
+      method: "turn/interrupt",
+      params: {
+        threadId: "thread-owned",
+        turnId: "turn-with-goal",
+      },
+    },
+  ]);
+
+  owner.observeOutbound(JSON.stringify({
+    method: "turn/started",
+    params: {
+      threadId: "thread-owned",
+      turn: {
+        id: "turn-with-goal-pause-error",
+        items: [],
+        status: "inProgress",
+      },
+    },
+  }));
+  goalPauseError = new Error("goal pause failed");
+  writeFrame(desktopSocket, {
+    type: "request",
+    requestId: "interrupt-turn-goal-pause-error",
+    sourceClientId: "desktop",
+    version: 4,
+    method: "thread-follower-interrupt-turn",
+    params: {
+      conversationId: "thread-owned",
+      mode: "user-stop",
+    },
+  });
+  const goalPauseErrorResponse = await waitForMessage(
+    desktopFrames,
+    (frame) => frame.type === "response" && frame.requestId === "interrupt-turn-goal-pause-error"
+  );
+  assert.deepEqual(goalPauseErrorResponse.result, {
+    interruptedTurnId: "turn-with-goal-pause-error",
+    goalPauseError: "goal pause failed",
+    ok: true,
+  });
+  assert.equal(codexRequests.at(-1).method, "turn/interrupt");
 });
 
 test("live owner replays a pending sidebar announcement when Desktop joins its fallback router", async (t) => {
