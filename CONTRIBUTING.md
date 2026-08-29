@@ -82,6 +82,11 @@ don't have to install Node/Bun/JDK/Rust yourself. The agent CLIs (Codex, Claude
 Code, opencode, Cursor) and Xcode are **not** managed by Flox — install those
 separately.
 
+For Rust/Tauri work under `agnt-host/src-tauri`, prefer
+[mr boxington](https://mr-boxington.jdx.dev) (`mbx`) when invoking cargo directly
+(e.g. `mbx build`, `mbx check`). Flox activation installs `mbx` into
+`~/.local/bin` when missing.
+
 Boot the whole local stack (relay + bridge) with the bundled services, which
 self-install their dependencies on first run:
 
