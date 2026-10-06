@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f6f3" />
+    <title>agnt — Your agents. A little more freedom.</title>
+    <meta
+      name="description"
+      content="Keep your coding agents on your machine. Pick up the conversation from your iPhone, Android, or browser. Local-first, end-to-end encrypted, and source-available."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="agnt — Your agents. A little more freedom."
+    />
+    <meta
+      property="og:description"
+      content="Your coding agents stay on your machine. You don't have to. Continue from your phone or browser with agnt."
+    />
+    <meta property="og:image" content="./assets/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="agnt — Your agents. A little more freedom. A coding session on a desktop continues on a phone."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="agnt — Your agents. A little more freedom."
+    />
+    <meta
+      name="twitter:description"
+      content="Coding agents on your machine. The conversation in your pocket."
+    />
+    <meta name="twitter:image" content="./assets/og.png" />
+    <link rel="icon" type="image/png" href="./assets/favicon.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./scene.css" />
+    <script type="module" src="./site.js"></script>
+  </head>
+  <body id="top">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <nav class="nav" aria-label="Primary navigation">
+        <a class="brand" href="#top"
+          ><img
+            src="./assets/app-icon.png"
+            alt=""
+            width="22"
+            height="22"
+          />agnt<span aria-hidden="true">.</span></a
+        >
+        <a href="#how">How it works</a>
+        <a href="#agents">Agents</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/smeltery/agnt" aria-label="agnt on GitHub"
+          ><img
+            class="nav-icon"
+            src="./assets/brands/github.svg"
+            alt=""
+            width="15"
+            height="15"
+          />GitHub ↗</a
+        >
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero shell" aria-labelledby="hero-title">
+        <p class="eyebrow">
+          <span class="status-dot"></span>A little distance from your desk.
+        </p>
+        <h1 id="hero-title">
+          Your agents.<br /><em>A little more freedom.</em>
+        </h1>
+        <p class="hero-description">
+          Your coding agents stay on your machine.<br />Pick up the conversation
+          <span class="marker">wherever you are.</span>
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="#get-started"
+            >Get started with agnt <span aria-hidden="true">↗</span></a
+          ><a class="quiet-link" href="#how"
+            >Take a closer look <span aria-hidden="true">↓</span></a
+          >
+        </div>
+        <p class="fine">iPhone, Android & browser · Your Mac or Linux host</p>
+      </section>
+
+      <figure
+        class="product-demo shell"
+        aria-label="Illustrative demo of a coding agent running on a computer and continuing on a phone"
+      >
+        <div class="scene">
+          <div class="desktop-window">
+            <div class="window-bar">
+              <span class="window-dots" aria-hidden="true"
+                ><i></i><i></i><i></i></span
+              ><span>agnt <span class="muted">/</span> workspace</span
+              ><span class="window-status"
+                ><span class="status-dot"></span>Local host</span
+              >
+            </div>
+            <div class="desktop-body">
+              <aside class="scene-sidebar" aria-hidden="true">
+                <div class="sidebar-title">YOUR PROJECTS <span>+</span></div>
+                <div class="project active">▱ &nbsp; fieldnotes</div>
+                <div class="project">▱ &nbsp; personal-site</div>
+                <div class="project">▱ &nbsp; tiny-tools</div>
+                <div class="sidebar-title conversations">CONVERSATIONS</div>
+                <div class="thread active">Make room for dark mode</div>
+                <div class="thread">Tidy up the navigation</div>
+                <div class="thread">A faster search</div>
+                <div class="sidebar-bottom">
+                  <span class="status-dot"></span> Connected to your machine
+                </div>
+              </aside>
+              <div class="desktop-chat">
+                <div class="chat-heading">
+                  <strong>Make room for dark mode</strong
+                  ><span class="branch">⑂ main</span>
+                </div>
+                <div class="chat-user">
+                  Add a dark theme that follows my system settings.
+                </div>
+                <div class="assistant-name">
+                  <img
+                    class="agent-symbol"
+                    src="./assets/brands/claude.svg"
+                    alt=""
+                    width="18"
+                    height="18"
+                  /><span data-provider-name>Claude Code</span
+                  ><span class="muted">on your machine</span>
+                </div>
+                <p class="chat-copy">
+                  I’ll use the existing color tokens and respect your system
+                  preference.
+                </p>
+                <div class="file-change">
+                  <span>▧ &nbsp; src/styles/theme.css</span
+                  ><span class="addition"
+                    >+24 <span class="deletion">−6</span></span
+                  >
+                </div>
+                <pre
+                  class="code-preview"
+                ><span class="code-muted">@media</span> (prefers-color-scheme: dark) {
+  <span class="code-muted">:root</span> {
+    <span class="addition">--surface: #1c1d1b;</span>
+    <span class="addition">--text: #f5f5f2;</span>
+  }
+}</pre>
+                <div class="test-result">
+                  <span>✓</span> Theme updated. All checks passed.
+                </div>
+                <div class="demo-composer">Ask a follow-up…<span>↑</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="connection-note" aria-hidden="true">
+            <span>same machine.<br /><em>new point of view.</em></span
+            ><svg viewBox="0 0 90 44">
+              <path d="M3 9C30 3 36 39 80 30m-8-8 10 8-11 7" />
+            </svg>
+          </div>
+          <div class="phone">
+            <div class="phone-top">
+              <span>9:41</span><span class="dynamic-island"></span
+              ><span aria-hidden="true">▰</span>
+            </div>
+            <div class="phone-header">
+              <img
+                src="./assets/app-icon.png"
+                width="29"
+                height="29"
+                alt=""
+              /><strong>agnt</strong
+              ><span class="secure-pill">● connected</span>
+            </div>
+            <div class="phone-project">fieldnotes <span>⌄</span></div>
+            <h3>Make room for<br />dark mode</h3>
+            <div class="phone-user" id="demo-prompt">
+              Nice. Add a manual toggle, too.
+            </div>
+            <div class="phone-assistant">
+              <img
+                class="agent-symbol"
+                src="./assets/brands/claude.svg"
+                alt=""
+                width="18"
+                height="18"
+              /><strong data-provider-name>Claude Code</strong>
+            </div>
+            <p id="demo-reply">
+              Added a theme toggle to the header. Your choice persists between
+              visits.
+            </p>
+            <div class="phone-file">
+              <span>▧ &nbsp; Header.tsx</span><span class="addition">+18</span>
+            </div>
+            <div class="phone-done">
+              <span class="status-dot"></span
+              ><span id="demo-state">Ready for your next idea</span>
+            </div>
+            <div class="phone-composer">Message your agent<span>↑</span></div>
+            <div class="home-indicator"></div>
+          </div>
+        </div>
+        <figcaption>
+          <span>At your desk. On the sofa. In the same conversation.</span
+          ><span class="demo-label">Illustrative demo</span>
+        </figcaption>
+        <div
+          class="demo-controls"
+          role="group"
+          aria-label="Explore an example conversation"
+        >
+          <button
+            type="button"
+            class="selected"
+            data-scene="followup"
+            aria-pressed="true"
+          >
+            01 &nbsp; Follow up</button
+          ><button type="button" data-scene="review" aria-pressed="false">
+            02 &nbsp; Review changes</button
+          ><button type="button" data-scene="next" aria-pressed="false">
+            03 &nbsp; Keep going
+          </button>
+        </div>
+      </figure>
+
+      <section
+        class="shell providers section"
+        id="agents"
+        aria-labelledby="agents-title"
+      >
+        <p class="eyebrow">Familiar agents. A new way to reach them.</p>
+        <h2 id="agents-title">Bring your <em>favorite.</em></h2>
+        <p class="section-description">
+          Keep the tools, models, and projects you already use.
+        </p>
+        <div
+          class="provider-buttons"
+          role="group"
+          aria-label="Choose an agent to preview"
+        >
+          <button type="button" data-provider="codex" aria-pressed="false">
+            <img
+              src="./assets/brands/codex.svg"
+              alt=""
+              width="26"
+              height="26"
+            />Codex</button
+          ><button
+            type="button"
+            data-provider="claude"
+            aria-pressed="true"
+            class="selected"
+          >
+            <img
+              src="./assets/brands/claude.svg"
+              alt=""
+              width="26"
+              height="26"
+            />Claude Code</button
+          ><button type="button" data-provider="opencode" aria-pressed="false">
+            <img
+              src="./assets/brands/opencode.svg"
+              alt=""
+              width="26"
+              height="26"
+            />opencode</button
+          ><button type="button" data-provider="cursor" aria-pressed="false">
+            <img
+              src="./assets/brands/cursor.svg"
+              alt=""
+              width="26"
+              height="26"
+            />Cursor
+          </button>
+        </div>
+        <p class="provider-detail" id="provider-detail" aria-live="polite">
+          Claude Code · macOS & Linux · Plan mode, reasoning, and session
+          history.
+        </p>
+        <a
+          class="text-link"
+          href="https://github.com/smeltery/agnt/tree/main/docs/providers"
+          >Explore provider capabilities ↗</a
+        >
+      </section>
+
+      <section class="shell section how" id="how" aria-labelledby="how-title">
+        <div class="section-intro">
+          <p class="eyebrow">Your setup, with a little reach</p>
+          <h2 id="how-title">
+            Leave the desk.<br /><em>Keep the context.</em>
+          </h2>
+          <p>
+            Same files. Same working directory. Your agent keeps running at home
+            while you carry on somewhere else.
+          </p>
+          <a class="text-link" href="#get-started">Let’s set it up ↓</a>
+        </div>
+        <ol class="steps">
+          <li>
+            <span>01</span>
+            <div>
+              <h3>Start on your machine.</h3>
+              <p>
+                Run the local bridge and relay on your Mac or Linux host.
+                Connect an installed coding-agent CLI.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>02</span>
+            <div>
+              <h3>Make the introduction.</h3>
+              <p>
+                Scan the pairing QR in an agnt client, or enter the pairing
+                code. Your devices establish an encrypted connection.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>03</span>
+            <div>
+              <h3>Take the conversation with you.</h3>
+              <p>
+                Send prompts, follow progress, and review changes from your
+                phone or browser. Use a VPN or self-hosted relay to connect away
+                from home.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section
+        class="shell section possibilities"
+        aria-labelledby="features-title"
+      >
+        <div class="section-heading">
+          <p class="eyebrow">More than a remote prompt</p>
+          <h2 id="features-title">
+            The little things that<br /><em>keep work moving.</em>
+          </h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <div class="feature-art queue-art" aria-hidden="true">
+              <div><span>✓</span> Add the dark theme</div>
+              <div>
+                <span>↳</span> Check the mobile layout <small>queued</small>
+              </div>
+              <div>
+                <span>↳</span> Update the screenshots <small>next</small>
+              </div>
+            </div>
+            <h3>One thought ahead.</h3>
+            <p>
+              Queue your follow-up while your agent is working. Keep your train
+              of thought without interrupting theirs.
+            </p>
+          </article>
+          <article class="feature">
+            <div class="feature-art diff-art" aria-hidden="true">
+              <div>⑂ &nbsp; feature / dark-mode <span>3 files</span></div>
+              <code
+                ><span>− background: #ffffff;</span><br /><b
+                  >+ background: var(--surface);</b
+                ></code
+              >
+              <div class="diff-footer">✓ Changes ready to review</div>
+            </div>
+            <h3>Close to the changes.</h3>
+            <p>
+              Review file changes and use Git actions from the client. The
+              repository stays on your host machine.
+            </p>
+          </article>
+          <article class="feature">
+            <div class="feature-art notification-art" aria-hidden="true">
+              <div class="notification">
+                <img
+                  src="./assets/app-icon.png"
+                  alt=""
+                  width="35"
+                  height="35"
+                />
+                <div>
+                  <strong>agnt <small>now</small></strong
+                  ><b>Your turn is complete.</b><span>Ready when you are.</span>
+                </div>
+              </div>
+            </div>
+            <h3>A little less checking.</h3>
+            <p>
+              Get in-app updates when a turn finishes or needs attention. Pick
+              up your work when you’re ready.
+            </p>
+          </article>
+        </div>
+        <p class="fine centered">
+          Available tools and actions vary by provider and client.
+        </p>
+      </section>
+
+      <section class="shell section privacy" aria-labelledby="privacy-title">
+        <div class="privacy-symbol" aria-hidden="true">
+          <svg
+            width="25"
+            height="25"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+          >
+            <rect x="5" y="10" width="14" height="11" rx="3" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3" />
+          </svg>
+        </div>
+        <p class="eyebrow">Your machine is still the heart of it</p>
+        <h2 id="privacy-title">
+          A shorter distance.<br /><em>Not a new cloud.</em>
+        </h2>
+        <p>
+          agnt connects you to the agent running on your computer. Messages
+          between your client and bridge are end-to-end encrypted. The relay
+          only routes ciphertext.
+        </p>
+        <div
+          class="connection-diagram"
+          aria-label="Your device connects through an encrypted relay to your machine"
+        >
+          <span>Your device</span><i aria-hidden="true">↔</i
+          ><span class="relay-node">Encrypted relay</span
+          ><i aria-hidden="true">↔</i><span>Your machine</span>
+        </div>
+        <p class="privacy-note">
+          Your agent’s own model service and data policies still apply. agnt
+          doesn’t turn cloud models into local models.
+        </p>
+        <a
+          class="text-link"
+          href="https://github.com/smeltery/agnt/blob/main/docs/architecture/overview.md"
+          >See how it’s built ↗</a
+        >
+      </section>
+
+      <section
+        class="shell section setup"
+        id="get-started"
+        aria-labelledby="setup-title"
+      >
+        <div class="section-intro">
+          <p class="eyebrow">Make yourself at home</p>
+          <h2 id="setup-title">
+            A small setup.<br /><em>A change of scenery.</em>
+          </h2>
+          <p>
+            Install your preferred agent CLI first. Then start agnt on your host
+            and pair a client.
+          </p>
+          <a
+            class="text-link"
+            href="https://github.com/smeltery/agnt#quickstart"
+            >Read the full setup guide ↗</a
+          >
+        </div>
+        <div class="setup-panel">
+          <div class="setup-bar">
+            <span>Mac & Linux · Terminal</span
+            ><button type="button" id="copy-command">Copy commands</button>
+          </div>
+          <pre id="setup-command">
+git clone https://github.com/smeltery/agnt.git
+cd agnt
+./scripts/run-local-agnt.sh</pre>
+          <p id="copy-status" class="fine" role="status">
+            The local relay and bridge start together.
+          </p>
+          <div class="client-links">
+            <a href="https://github.com/smeltery/agnt/tree/main/AgntMobile"
+              >iPhone setup ↗</a
+            ><a
+              href="https://github.com/smeltery/agnt/blob/main/AgntAndroid/README.md"
+              >Android setup ↗</a
+            ><a
+              href="https://github.com/smeltery/agnt/blob/main/agnt-web/README.md"
+              >Browser setup ↗</a
+            >
+          </div>
+        </div>
+      </section>
+
+      <section class="shell section faq" id="faq" aria-labelledby="faq-title">
+        <div class="section-heading">
+          <p class="eyebrow">A few useful details</p>
+          <h2 id="faq-title">Glad you <em>asked.</em></h2>
+        </div>
+        <details>
+          <summary>Does my computer need to stay on?</summary>
+          <p>
+            Yes. Your coding agent, bridge, and local relay run on your host.
+            Keep it awake and reachable while you’re connected. The optional
+            desktop host can supervise the local processes for you.
+          </p>
+        </details>
+        <details>
+          <summary>Can I use it away from home?</summary>
+          <p>
+            Yes, with a reachable relay. Use a VPN such as Tailscale, or
+            self-host a relay for access outside your local network.
+            <a
+              href="https://github.com/smeltery/agnt/blob/main/docs/operations/self-hosting.md"
+              >Read the connection guide ↗</a
+            >
+          </p>
+        </details>
+        <details>
+          <summary>Which agents and devices work?</summary>
+          <p>
+            Codex, Claude Code, opencode, and Cursor are supported. Codex
+            requires macOS and Codex.app; the other providers work on macOS and
+            Linux. Connect with the iOS app, Android app, or browser client.
+            Android is currently alpha, and features vary between clients.
+          </p>
+        </details>
+        <details>
+          <summary>Is agnt a hosted service?</summary>
+          <p>
+            No. You run the bridge and relay yourself. agnt doesn’t provide
+            hosted agents or model subscriptions; you use your own agent
+            installation and provider account.
+          </p>
+        </details>
+        <details>
+          <summary>Is it open source?</summary>
+          <p>
+            agnt is source-available under PolyForm Shield 1.0.0, which includes
+            a non-compete restriction. You can read the code and self-host it.
+            <a href="https://github.com/smeltery/agnt/blob/main/LICENSE"
+              >Read the license ↗</a
+            >
+          </p>
+        </details>
+      </section>
+
+      <section class="shell section closing">
+        <img src="./assets/app-icon.png" width="64" height="64" alt="" />
+        <h2>Away from your desk.<br /><em>Still in your flow.</em></h2>
+        <a class="button primary" href="#get-started"
+          >Get started with agnt <span aria-hidden="true">↗</span></a
+        >
+        <p class="fine">Your tools. Your machine. A little more room.</p>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-main">
+        <div class="footer-about">
+          <a class="footer-brand" href="#top"
+            ><img
+              src="./assets/app-icon.png"
+              alt=""
+              width="35"
+              height="35"
+            />agnt.</a
+          >
+          <p>Your coding agents.<br />A little closer, wherever you are.</p>
+          <a class="footer-github" href="https://github.com/smeltery/agnt"
+            ><img
+              src="./assets/brands/github.svg"
+              alt=""
+              width="17"
+              height="17"
+            />Explore the source <span aria-hidden="true">↗</span></a
+          >
+        </div>
+        <nav aria-label="Product links">
+          <h3>Product</h3>
+          <a href="#how">How it works</a><a href="#agents">Supported agents</a
+          ><a href="#get-started">Get started</a
+          ><a href="#faq">Questions & answers</a>
+        </nav>
+        <nav aria-label="Resource links">
+          <h3>Resources</h3>
+          <a href="https://github.com/smeltery/agnt/tree/main/docs"
+            >Documentation</a
+          ><a
+            href="https://github.com/smeltery/agnt/blob/main/docs/operations/self-hosting.md"
+            >Self-hosting guide</a
+          ><a href="https://github.com/smeltery/agnt/blob/main/CONTRIBUTING.md"
+            >Contributing</a
+          ><a href="https://github.com/smeltery/agnt/issues">Report an issue</a>
+        </nav>
+        <nav aria-label="Project and legal links">
+          <h3>Project</h3>
+          <a href="https://github.com/smeltery">About smeltery ↗</a
+          ><a
+            href="https://github.com/smeltery/agnt/blob/main/legal/PRIVACY_POLICY.md"
+            >Privacy</a
+          ><a
+            href="https://github.com/smeltery/agnt/blob/main/legal/TERMS_OF_USE.md"
+            >Terms of use</a
+          ><a href="https://github.com/smeltery/agnt/blob/main/LICENSE"
+            >License</a
+          >
+        </nav>
+      </div>
+      <div class="shell footer-bottom">
+        <span>© 2026 smeltery. Built for your own machine.</span
+        ><span>Local-first · Source-available</span>
+      </div>
+      <p class="shell footer-trademarks">
+        Product names and logos belong to their respective owners. agnt is an
+        independent project.
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1,5 +1,7 @@
 # agnt
 
+![agnt — Your agents. A little more freedom.](agnt-site/assets/og.png)
+
 [![CI](https://github.com/smeltery/agnt/actions/workflows/ci.yml/badge.svg)](https://github.com/smeltery/agnt/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE)
 [![Local-first](https://img.shields.io/badge/Local--first-2563EB)](#what-it-is)
@@ -14,6 +16,8 @@
 [![Tauri](https://img.shields.io/badge/Tauri-24C8D8?logo=tauri&logoColor=black)](agnt-host/)
 
 **Drive coding-agent CLIs from your iPhone, Android, or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac or Linux box and proxies an end-to-end encrypted session to your iOS app, Android app, or a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
+
+The [marketing site](agnt-site/README.md) runs locally with no build step.
 
 ## What it is
 
