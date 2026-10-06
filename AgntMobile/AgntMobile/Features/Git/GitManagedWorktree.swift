@@ -18,4 +18,3 @@ struct GitManagedWorktree: Identifiable, Sendable {
         self.isClean = object["isClean"]?.boolValue ?? false
     }
 }
-
