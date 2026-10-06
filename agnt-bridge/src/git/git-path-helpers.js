@@ -174,6 +174,7 @@ module.exports = {
   firstNonEmptyString,
   isExistingDirectory,
   isManagedWorktreePath,
+  managedWorktreesRoot,
   normalizeExistingPath,
   normalizeNonEmptyLine,
   normalizeNonEmptyMultilineString,

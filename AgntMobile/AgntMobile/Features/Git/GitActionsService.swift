@@ -201,6 +201,22 @@ final class GitActionsService {
         _ = try await request(method: "git/removeWorktree", params: params)
     }
 
+    func removeManagedWorktreeSafely(branch: String?) async throws {
+        var params: [String: JSONValue] = [:]
+        if let branch, !branch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            params["branch"] = .string(branch)
+        }
+        _ = try await request(method: "git/removeWorktreeSafely", params: params)
+    }
+
+    func managedWorktrees() async throws -> [GitManagedWorktree] {
+        let json = try await request(method: "git/listManagedWorktrees")
+        guard let entries = json["worktrees"]?.arrayValue else {
+            throw GitActionsError.invalidResponse
+        }
+        return entries.compactMap(GitManagedWorktree.init(from:))
+    }
+
     func checkout(branch: String) async throws -> GitCheckoutResult {
         let json = try await request(method: "git/checkout", params: ["branch": .string(branch)])
         let result = GitCheckoutResult(from: json)

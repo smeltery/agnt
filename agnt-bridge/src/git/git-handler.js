@@ -138,6 +138,7 @@ const {
   gitCreateManagedWorktree,
   gitTransferManagedHandoff,
   gitRemoveWorktree,
+  gitListManagedWorktrees,
 } = worktreeActions;
 
 const draftActions = createDraftActions({
@@ -298,6 +299,10 @@ async function handleGitMethod(method, params, options = {}) {
       return gitTransferManagedHandoff(cwd, params);
     case "git/removeWorktree":
       return gitRemoveWorktree(cwd, params);
+    case "git/removeWorktreeSafely":
+      return gitRemoveWorktree(cwd, params, options, true);
+    case "git/listManagedWorktrees":
+      return gitListManagedWorktrees(cwd);
     case "git/stash":
       return gitStash(cwd);
     case "git/stashPop":
@@ -409,6 +414,7 @@ module.exports = {
     gitCheckout,
     gitStash,
     gitRemoveWorktree,
+  gitListManagedWorktrees,
     isManagedWorktreePath,
     normalizeBranchListEntry,
     normalizeCreatedBranchName,

@@ -22,6 +22,7 @@ struct SidebarThreadListView: View {
     let onSelectThread: (CodexThread) -> Void
     let onCreateThreadInProjectGroup: (SidebarThreadGroup) -> Void
     var onArchiveProjectGroup: ((SidebarThreadGroup) -> Void)? = nil
+    var onManageProjectWorktrees: ((SidebarThreadGroup) -> Void)? = nil
     var onDeleteProjectGroup: ((SidebarThreadGroup) -> Void)? = nil
     var onRenameThread: ((CodexThread, String) -> Void)? = nil
     var onPinToggleThread: ((CodexThread) -> Void)? = nil
@@ -280,6 +281,12 @@ struct SidebarThreadListView: View {
             }
             .buttonStyle(.plain)
             .contextMenu {
+                if group.kind == .project, group.iconSystemName != "arrow.triangle.branch",
+                   let onManageProjectWorktrees {
+                    Button { onManageProjectWorktrees(group) } label: {
+                        Label("Manage Worktrees", systemImage: "square.stack.3d.up")
+                    }
+                }
                 if let onArchiveProjectGroup {
                     Button {
                         HapticFeedback.shared.triggerImpactFeedback(style: .light)

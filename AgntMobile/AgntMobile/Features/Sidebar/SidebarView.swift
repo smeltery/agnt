@@ -34,6 +34,7 @@ struct SidebarView: View {
     @State var isCreatingThread = false
     @State var pendingTopAction: SidebarTopAction? = nil
     @State var groupedThreads: [SidebarThreadGroup] = []
+    @State var managedWorktreeProjectPath: String?
     @State var activeSidebarSheet: SidebarPresentedSheet?
     @State var projectGroupPendingArchive: SidebarThreadGroup? = nil
     @State var projectGroupPendingDeletion: SidebarThreadGroup? = nil
@@ -180,6 +181,10 @@ struct SidebarView: View {
             },
             onArchiveProjectGroup: { group in
                 projectGroupPendingArchive = group
+            },
+            onManageProjectWorktrees: { group in
+                managedWorktreeProjectPath = group.projectPath
+                activeSidebarSheet = .managedWorktrees
             },
             onDeleteProjectGroup: { group in
                 projectGroupPendingDeletion = group

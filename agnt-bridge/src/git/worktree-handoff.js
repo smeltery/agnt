@@ -24,6 +24,7 @@
 // factory be tested in isolation with a fake `git`.
 
 const fs = require("fs");
+const { createManagedWorktreeCleanup } = require("./managed-worktree-cleanup");
 const os = require("os");
 const path = require("path");
 const { randomBytes } = require("crypto");
@@ -43,6 +44,7 @@ const { randomBytes } = require("crypto");
  *     in the handoff.
  */
 function createWorktreeHandoff({ git, gitError, diffPatchForUntrackedFiles }) {
+  const cleanup = createManagedWorktreeCleanup({ git, gitError });
   // ── stash-based handoff (the default "move" path) ──────────────────────
 
   // Stash all changes — tracked + untracked — under a unique label so we
@@ -191,21 +193,15 @@ function createWorktreeHandoff({ git, gitError, diffPatchForUntrackedFiles }) {
   }
 
   async function cleanupManagedWorktree(repoRoot, worktreeRootPath, branchName = null) {
-    try {
-      await git(repoRoot, "worktree", "remove", "--force", worktreeRootPath);
-    } catch {
-      // Fall back to the directory rm below.
+    try { await cleanup.removeClean(repoRoot, worktreeRootPath); } catch {
+      // Preserve a partial checkout and its registration for manual recovery.
+      return;
     }
-
     if (branchName) {
-      try {
-        await git(repoRoot, "branch", "-D", branchName);
-      } catch {
-        // Best-effort branch deletion; Git may refuse on safety grounds.
+      try { await git(repoRoot, "branch", "-d", branchName); } catch {
+        // Keep commits not merged into the local checkout.
       }
     }
-
-    fs.rmSync(path.dirname(worktreeRootPath), { recursive: true, force: true });
   }
 
   // ── scope helpers ──────────────────────────────────────────────────────

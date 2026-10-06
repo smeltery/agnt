@@ -1,5 +1,6 @@
 const { normalizePhoneRuntimeRequest } = require("../desktop/runtime/phone-request");
 const { handleDesktopRequest } = require("../handlers/desktop-handler");
+const { createWorktreeUsageVerifier } = require("../providers/worktree-usage");
 const { handleGitRequest } = require("../git/git-handler");
 const { handleThreadContextRequest } = require("../handlers/thread-context-handler");
 const { handleWorkspaceRequest } = require("../handlers/workspace-handler");
@@ -111,6 +112,7 @@ function createBridgeApplicationHandler({
         updateBridgePackageAndRestart,
       }),
       (msg) => handleGitRequest(msg, sendApplicationResponse, {
+        assertWorktreeUnused: createWorktreeUsageVerifier({ activeProvider, sendRequest: bridgeManagedCodex.sendRequest }),
         codexAppPath: desktopBundle.appPath,
         sendCodexRequest: bridgeManagedCodex.sendRequest,
         codexTitleGeneration: activeProvider.id === "codex",
