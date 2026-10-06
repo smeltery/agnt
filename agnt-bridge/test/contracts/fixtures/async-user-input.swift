@@ -224,6 +224,15 @@ nonisolated enum CodexSyntheticIdentifiers { static func isBridgeMintedTurnID(_ 
         let nativeText = "<send_user_message_question_reply>\n" +
             #"[{"questionItemId":"[\"request_user_input_async\",\"item_question\",0]","question":"Works?","answer":"Yes"}]"# +
             "\n</send_user_message_question_reply>"
+        precondition(CodexAsyncUserInputProjection.displayText(for: nativeText) == "Works?\nYes")
+        precondition(CodexAsyncUserInputProjection.displayText(for: "ordinary text") == "ordinary text")
+        var unmatched = [CodexMessage(id: "unmatched", threadId: "thread", role: .user, text: nativeText)]
+        CodexAsyncUserInputProjection.reconcile(&unmatched)
+        precondition(unmatched[0].text == nativeText, "Keep identity until the question page arrives")
+        precondition(unmatched[0].kind == .asyncUserInputAnswer)
+        unmatched.insert(question, at: 0)
+        CodexAsyncUserInputProjection.reconcile(&unmatched)
+        precondition(unmatched[0].asyncUserInput?.status == .answered)
         var native = [question, CodexMessage(id: "native", threadId: "thread", role: .user, text: nativeText)]
         CodexAsyncUserInputProjection.reconcile(&native)
         precondition(native[0].asyncUserInput?.status == .answered)

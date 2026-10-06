@@ -7,7 +7,8 @@ import UIKit
 
 extension MessageRow {
     func userBubble(text: String) -> some View {
-        let renderModel = UserBubbleRenderModelCache.model(for: message, text: text)
+        let displayText = CodexAsyncUserInputProjection.displayText(for: text)
+        let renderModel = UserBubbleRenderModelCache.model(for: message, text: displayText)
         let bubbleColor = selectedUserBubbleColor
         let foreground = bubbleColor.bubbleForeground(for: colorScheme)
         return HStack {
@@ -58,7 +59,7 @@ extension MessageRow {
                 if message.role == .user, !text.isEmpty {
                     Button {
                         HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                        UIPasteboard.general.string = text
+                        UIPasteboard.general.string = displayText
                     } label: {
                         Label("Copy", systemImage: "doc.on.doc")
                     }
