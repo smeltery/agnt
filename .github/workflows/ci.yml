@@ -38,7 +38,7 @@ env:
 
 jobs:
   changes:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       android: ${{ steps.filter.outputs.android }}
@@ -70,7 +70,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.lint_workflows == 'true'
     name: CI config checks
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -91,7 +91,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.bridge == 'true'
     name: Bun package CI (agnt-bridge)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout repository
@@ -109,7 +109,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relay == 'true'
     name: Bun package CI (relay)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout repository
@@ -127,7 +127,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     name: Bun package CI (agnt-web)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout repository
@@ -145,7 +145,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.host == 'true'
     name: Bun package CI (agnt-host)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout repository
@@ -163,7 +163,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.loc_budgets == 'true'
     name: LOC budget checks
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -179,7 +179,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.ios == 'true'
     name: iOS preflight checks
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -194,7 +194,7 @@ jobs:
   android:
     needs: changes
     if: needs.changes.outputs.android == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -216,7 +216,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.links == 'true'
     name: Link check
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -247,7 +247,7 @@ jobs:
       - android
       - links
     if: always()
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: Check required jobs
         run: |
