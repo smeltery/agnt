@@ -1,3 +1,4 @@
+const { desktopLiveStateForProjection } = require("./action-follower/state");
 const net = require("net");
 
 const { createDesktopConversationProjector } = require("./desktop-ipc-conversation-projector");
@@ -91,7 +92,9 @@ function createDesktopIpcActionFollower({
   snapshotDebounceMs = 0,
   onFollowerStateChanged = null,
   runtimeSettingsStore = null,
+  onActivityObservation = null,
 } = {}) {
+  let activityGeneration = 0;
   const ipc = createDesktopIpcClient({
     socketPath,
     netModule,
@@ -100,6 +103,7 @@ function createDesktopIpcActionFollower({
     logPrefix,
     onEnvelope,
     onConnected() {
+      activityGeneration += 1;
       announceDesktopFollowForActiveThreads();
       heldFollowerRequests.probeHeldRequests();
     },
@@ -290,6 +294,7 @@ function createDesktopIpcActionFollower({
     snapshotDebounceMs,
   });
   threadStateManager = createThreadStateManager({
+    onActivityObservation,
     activeThreads,
     announcedBackgroundTurnsByThreadId,
     backgroundDisconnectTimersByThreadId,
@@ -415,6 +420,7 @@ function createDesktopIpcActionFollower({
   }
 
   function stopAll() {
+    onActivityObservation?.({ type: "disconnected", sourceGeneration: activityGeneration });
     for (const threadId of desktopFollowThreadIds) {
       unfollowDesktopThread(threadId);
     }
@@ -542,6 +548,7 @@ function createDesktopIpcActionFollower({
     }
 
     rawStatesByThreadId.set(threadId, nextState);
+    notifyActivityState(threadId, nextState);
     rawStateUpdatedAtByThreadId.set(threadId, now());
     baselineRecoveryStateByThreadId.delete(threadId);
     if (!isPatch) {
@@ -559,7 +566,14 @@ function createDesktopIpcActionFollower({
     return true;
   }
 
+  function notifyActivityState(threadId, state) {
+    if (!onActivityObservation) return;
+    const liveState = desktopLiveStateForProjection(state);
+    onActivityObservation({ type: "state", threadId, state: liveState, sourceGeneration: Math.max(1, activityGeneration) });
+  }
+
   function onDisconnect() {
+    onActivityObservation?.({ type: "disconnected", sourceGeneration: activityGeneration });
     threadStateManager.onDisconnect();
   }
 
@@ -573,6 +587,7 @@ function createDesktopIpcActionFollower({
 
   function commitRecoveredState(threadId, nextState) {
     rawStatesByThreadId.set(threadId, nextState);
+    notifyActivityState(threadId, nextState);
     rawStateUpdatedAtByThreadId.set(threadId, now());
     if (backgroundOnlyThreadIds.has(threadId)) {
       syncBackgroundThreadLifecycle(threadId, nextState);

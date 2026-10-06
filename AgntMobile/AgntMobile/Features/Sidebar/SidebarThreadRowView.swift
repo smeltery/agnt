@@ -22,13 +22,15 @@ struct SidebarThreadRowView: View {
     var onPinToggle: (() -> Void)? = nil
     var onArchiveToggle: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
+    var activityDiffTotals: GitDiffTotals? = nil
+    var showsActivity = false
 
     @State private var renamePrompt = ThreadRenamePromptState()
     private let titleLeadingSlotWidth: CGFloat = 16
 
     var body: some View {
         Group {
-            if thread.isSubagent {
+            if thread.isSubagent && !showsActivity {
                 subagentRow
             } else {
                 parentRow
@@ -105,6 +107,11 @@ struct SidebarThreadRowView: View {
 
     private var parentTrailingMeta: some View {
         HStack(spacing: 6) {
+            if showsActivity, let totals = activityDiffTotals, totals.hasChanges {
+                DiffCountsLabel(additions: totals.additions, deletions: totals.deletions)
+                    .font(AppFont.mono(.caption2))
+                    .accessibilityLabel("Checkout diff total")
+            }
             if thread.syncState == .archivedLocal {
                 Text("Archived")
                     .font(AppFont.caption2())
@@ -114,7 +121,7 @@ struct SidebarThreadRowView: View {
                     .background(Color.orange.opacity(0.12), in: Capsule())
             }
 
-            if let diffTotals {
+            if !showsActivity, let diffTotals {
                 SidebarThreadDiffTotalsLabel(totals: diffTotals)
             }
 

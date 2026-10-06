@@ -15,6 +15,7 @@ function createBridgeDesktopIntegrations({
   normalizeCodexTurnStartParams,
   normalizeProviderMessage,
   readDesktopConversationState,
+  onActivityObservation,
   rememberThreadFromMessage,
   sendApplicationResponse,
 }) {
@@ -47,6 +48,7 @@ function createBridgeDesktopIntegrations({
   const desktopIpcActionFollower = !config.codexEndpoint && activeProvider.id === "codex"
     ? createDesktopIpcActionFollower({
       runtimeSettingsStore: threadRuntimeSettingsStore,
+      onActivityObservation,
       sendApplicationResponse,
       readConversationState: readDesktopConversationState,
       forwardToLocalCodex: (rawMessage) => {

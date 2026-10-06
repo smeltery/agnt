@@ -6,6 +6,9 @@
 import SwiftUI
 
 struct SidebarThreadListView: View {
+    var showsActivity = false
+    var isVisible = true
+    var activityRefreshGeneration = 0
     var isFiltering: Bool = false
     let isConnected: Bool
     let isCreatingThread: Bool
@@ -50,6 +53,13 @@ struct SidebarThreadListView: View {
                         .font(AppFont.subheadline())
                         .padding(.horizontal, 16)
                         .padding(.top, 20)
+                } else if showsActivity {
+                    SidebarActivityListView(
+                        threads: activityThreads, isVisible: isVisible,
+                        refreshGeneration: activityRefreshGeneration
+                    ) { thread, totals in
+                        threadRow(thread, activityDiffTotals: totals)
+                    }
                 } else {
                     ForEach(groups) { group in
                         groupSection(group)
@@ -88,6 +98,13 @@ struct SidebarThreadListView: View {
             revealSelectedThreadProjectGroup()
             revealSelectedSubagentAncestors()
         }
+    }
+
+    private var activityThreads: [CodexThread] {
+        // Groups already apply the current search; flatten once to retain global
+        // project coverage without duplicating pinned threads.
+        var seen: Set<String> = []
+        return groups.flatMap(\.threads).filter { seen.insert($0.id).inserted && $0.syncState != .archivedLocal }
     }
 
     @ViewBuilder
