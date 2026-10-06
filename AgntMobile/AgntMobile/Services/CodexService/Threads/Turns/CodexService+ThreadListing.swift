@@ -34,6 +34,7 @@ extension CodexService {
         var allThreads: [CodexThread] = []
         var nextCursor: JSONValue = .null
         var hasRequestedFirstPage = false
+        var seenCursors = Set<JSONValue>()
 
         repeat {
             var params: RPCObject = [
@@ -70,6 +71,9 @@ extension CodexService {
             allThreads.append(contentsOf: decodedPage)
             onPage?(decodedPage, allThreads)
             nextCursor = nextThreadListCursor(from: resultObject)
+            if cursorHasValue(nextCursor), !seenCursors.insert(nextCursor).inserted {
+                throw CodexServiceError.invalidResponse("thread/list repeated its pagination cursor")
+            }
             hasRequestedFirstPage = true
         } while shouldContinueThreadListPagination(
             nextCursor: nextCursor,

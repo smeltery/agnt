@@ -1,3 +1,5 @@
+const { listSessionCatalog } = require("./session-catalog");
+const { pageByAnchor } = require("./pagination");
 const { numberOr, readString } = require("../_shared/translator-utils");
 const { mapMessagesToTurns, mapSessionToSummary, mapSessionToThread } = require("./mappers");
 
@@ -52,10 +54,9 @@ async function handleThreadRead(request) {
   }
   if (!state.activeTurnId) state.activeThreadId = targetThreadId;
   try {
-    const [sessionRes, messagesRes] = await Promise.all([
-      transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}`),
-      transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}/message`),
-    ]);
+    const sessionRes = await transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}`);
+    transport.remember(sessionRes.json);
+    const messagesRes = await transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}/message${params.excludeTurns === true ? "?limit=1" : ""}`);
     const session = sessionRes?.json || null;
     const messages = Array.isArray(messagesRes?.json) ? messagesRes.json : [];
     const thread = mapSessionToThread(session, { id: targetThreadId });
@@ -91,15 +92,15 @@ async function handleThreadTurnsList(request) {
   try {
     const messagesRes = await transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}/message`);
     const messages = Array.isArray(messagesRes?.json) ? messagesRes.json : [];
-    const turns = mapMessagesToTurns(messages);
+    const page = pageByAnchor(mapMessagesToTurns(messages), params);
+    const turns = page.data;
     if (request?.id != null) {
       injectResponse(request.id, {
         threadId: targetThreadId,
         thread_id: targetThreadId,
         turns,
-        nextCursor: null,
-        hasMore: false,
-        page: { turns, nextCursor: null, hasMore: false },
+        ...page,
+        page: { turns, nextCursor: page.nextCursor, hasMore: page.hasMore },
       });
     }
   } catch (err) {
@@ -202,26 +203,14 @@ async function handleContextWindowRead(request) {
 
 async function handleThreadList(request) {
   try {
-    const res = await transport.httpRequest("GET", "/session");
-    const sessions = Array.isArray(res?.json) ? res.json : [];
     const params = request?.params || {};
-    const requestedLimit = numberOr(params.limit, 0);
-    // Cap unbounded lists so a phone with many sessions does not blow up
-    // the relay payload. Mirrors the Claude shim's listThreadSummaries cap.
-    const limit = Math.max(1, Math.min(requestedLimit > 0 ? requestedLimit : 200, 200));
-    const sorted = sessions
-      .slice()
-      .sort((a, b) => numberOr(b?.time?.updated, 0) - numberOr(a?.time?.updated, 0))
-      .slice(0, limit)
+    const sessions = (await listSessionCatalog(transport)).filter((session) => !session.parentID
+      && Boolean(session.time?.archived) === Boolean(params.archived));
+    const sorted = sessions.sort((a, b) => numberOr(a?.time?.updated, 0) - numberOr(b?.time?.updated, 0))
       .map((session) => mapSessionToSummary(session));
-    if (request?.id != null) {
-      injectResponse(request.id, {
-        data: sorted,
-        threads: sorted,
-        nextCursor: null,
-        hasMore: sessions.length > limit,
-      });
-    }
+    const page = pageByAnchor(sorted, { ...params, limit: params.limit || 200 }, "session");
+    if (request?.id != null) injectResponse(request.id, { ...page, threads: page.data });
+
   } catch (err) {
     respondError(request?.id, -32603, `opencode thread/list failed: ${err?.message || err}`);
   }
