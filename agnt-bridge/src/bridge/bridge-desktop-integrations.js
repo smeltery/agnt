@@ -74,9 +74,9 @@ function createBridgeDesktopIntegrations({
   const rolloutLiveMirror = !config.codexEndpoint
     ? createRolloutLiveMirrorController({
       sendApplicationResponse,
-      shouldSuppressThread: (threadId) => Boolean(
-        desktopIpcLiveOwner?.isThreadOwned(threadId)
-          || desktopIpcActionFollower?.hasFreshLiveThreadState(threadId)
+      shouldSuppressThread: (threadId, context) => Boolean(
+        desktopIpcLiveOwner?.isFreshThreadOwned(threadId)
+          || desktopIpcActionFollower?.hasFreshLiveThreadState(threadId, context)
       ),
     })
     : null;

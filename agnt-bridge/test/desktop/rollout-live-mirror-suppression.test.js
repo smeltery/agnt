@@ -313,3 +313,40 @@ function createTrackedMirrorFs() {
     },
   };
 }
+
+test("stale IPC probes reuse the rollout path and yield only to newer file activity", (t) => {
+  const { homeDir, rolloutPath } = createTemporaryRolloutHome({
+    threadId: "thread-stale-ipc", originator: "Codex Desktop", source: "desktop",
+    lines: [taskStarted("turn-stale-ipc"), agentMessage("Still working", "final_answer")],
+  });
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = homeDir;
+  t.after(() => { restoreCodexHome(previousCodexHome); fs.rmSync(homeDir, { recursive: true, force: true }); });
+  const desktopActivityAt = fs.statSync(rolloutPath).mtimeMs + 100;
+  const trackedFs = createTrackedMirrorFs();
+  const outbound = [];
+  let tick;
+  let initialTick;
+  const controller = createRolloutLiveMirrorController({
+    fsModule: trackedFs, now: () => desktopActivityAt + 30_000,
+    setIntervalFn: (callback) => { tick = callback; return 1; }, clearIntervalFn() {},
+    setImmediateFn: (callback) => { initialTick = callback; return 1; }, clearImmediateFn() {},
+    shouldSuppressThread: (_id, context) => context.probeFallbackActivity
+      ? false : (context.fallbackActivityAt || 0) <= desktopActivityAt,
+    sendApplicationResponse: (raw) => outbound.push(JSON.parse(raw)),
+  });
+  t.after(() => controller.stopAll());
+  controller.observeInbound(JSON.stringify({ method: "thread/resume", params: { threadId: "thread-stale-ipc" } }));
+  initialTick();
+  assert.deepEqual(outbound, []);
+  const scans = trackedFs.readdirCalls;
+  tick();
+  tick();
+  assert.equal(trackedFs.readdirCalls, scans, "quiet work only needs stat probes");
+  assert.deepEqual(outbound, []);
+  const newer = new Date(desktopActivityAt + 1_000);
+  fs.utimesSync(rolloutPath, newer, newer);
+  tick();
+  assert.ok(outbound.some((message) => message.method === "turn/started"));
+  assert.equal(trackedFs.readdirCalls, scans, "the recovered mirror retains its known rollout path");
+});

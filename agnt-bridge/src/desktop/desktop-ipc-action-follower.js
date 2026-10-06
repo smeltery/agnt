@@ -1,7 +1,7 @@
 const { desktopLiveStateForProjection } = require("./action-follower/state");
 const net = require("net");
 
-const { createDesktopConversationProjector } = require("./desktop-ipc-conversation-projector");
+const { createDesktopConversationProjector, projectDesktopConversationStateToThread } = require("./desktop-ipc-conversation-projector");
 const {
   createDesktopIpcClient,
   isDeliveryFailureError,
@@ -605,12 +605,23 @@ function createDesktopIpcActionFollower({
     hasLiveThreadState(threadId) {
       return rawStatesByThreadId.has(readString(threadId));
     },
-    hasFreshLiveThreadState(threadId) {
+    hasFreshLiveThreadState(threadId, { fallbackActivityAt = 0, probeFallbackActivity = false } = {}) {
       const id = readString(threadId);
-      if (!rawStatesByThreadId.has(id)) {
-        return false;
-      }
-      return now() - (rawStateUpdatedAtByThreadId.get(id) || 0) <= STALE_ACTIVE_READ_MAX_AGE_MS;
+      if (pendingSnapshotsByThreadId.has(id)) return Boolean(id);
+      const state = rawStatesByThreadId.get(id);
+      if (!state) return false;
+      const liveState = desktopLiveStateForProjection(state);
+      if (!liveState.turns?.length) return false;
+      const updatedAt = rawStateUpdatedAtByThreadId.get(id) || 0;
+      const fresh = now() - updatedAt <= STALE_ACTIVE_READ_MAX_AGE_MS;
+      const projected = projectDesktopConversationStateToThread(id, liveState, { now });
+      const active = projected.turns.some((turn) => turn.status === "inProgress")
+        || projected.status?.type === "active";
+      if (!active) return fresh;
+      // Probe stale IPC against the rollout mtime before choosing an emitter.
+      // An unrelated Desktop heartbeat must not mute newer work for this thread.
+      return ipc.hasRecentActivity(CONNECTED_IPC_ACTIVITY_LEASE_MS)
+        && (fresh || (!probeFallbackActivity && Number(fallbackActivityAt) <= updatedAt));
     },
   };
 }

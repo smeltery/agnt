@@ -848,3 +848,24 @@ test("live owner leaves IPC router creation to Desktop by default", async (t) =>
   assert.equal(fs.existsSync(socketPath), false);
   assert.equal(owner.isThreadOwned("task"), true);
 });
+
+test("idle ownership expires while a quiet local turn retains its live source", (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-owner-freshness-");
+  let now = 100_000;
+  const owner = createDesktopIpcLiveOwner({
+    socketPath, now: () => now, sendCodexRequest: async () => ({}), sendRawCodexMessage() {},
+  });
+  t.after(() => { owner.stopAll(); fs.rmSync(tempDir, { recursive: true, force: true }); });
+  owner.observeInbound(JSON.stringify({ id: "start", method: "thread/start", params: { cwd: "/tmp" } }));
+  owner.observeOutbound(JSON.stringify({ id: "start", result: { thread: { id: "task", cwd: "/tmp", turns: [] } } }));
+  assert.equal(owner.isFreshThreadOwned("task"), true);
+  now += 21_000;
+  assert.equal(owner.isThreadOwned("task"), true);
+  assert.equal(owner.isFreshThreadOwned("task"), false);
+  owner.observeOutbound(JSON.stringify({ method: "turn/started", params: { threadId: "task", turn: { id: "turn", status: "inProgress" } } }));
+  now += 60_000;
+  assert.equal(owner.isFreshThreadOwned("task"), true);
+  owner.observeOutbound(JSON.stringify({ method: "turn/completed", params: { threadId: "task", turn: { id: "turn", status: "completed" } } }));
+  now += 21_000;
+  assert.equal(owner.isFreshThreadOwned("task"), false);
+});

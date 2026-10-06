@@ -79,6 +79,9 @@ function createDisabledDesktopIpcLiveOwner() {
     isThreadOwned() {
       return false;
     },
+    isFreshThreadOwned() {
+      return false;
+    },
   };
 }
 

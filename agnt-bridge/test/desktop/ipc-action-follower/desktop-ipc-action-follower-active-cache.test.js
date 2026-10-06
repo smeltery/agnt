@@ -186,7 +186,9 @@ test("desktop IPC follower stops serving stale active-turn caches to phone reads
   // authoritative so the phone does not clear Stop from a real running turn.
   fakeNow += 21_000;
   assert.equal(follower.hasLiveThreadState("thread-stale-active"), true);
-  assert.equal(follower.hasFreshLiveThreadState("thread-stale-active"), false);
+  assert.equal(follower.hasFreshLiveThreadState("thread-stale-active"), true);
+  assert.equal(follower.hasFreshLiveThreadState("thread-stale-active", { probeFallbackActivity: true }), false);
+  assert.equal(follower.hasFreshLiveThreadState("thread-stale-active", { fallbackActivityAt: fakeNow }), false);
   const quietServed = follower.observeInbound(JSON.stringify({
     id: "read-quiet-connected",
     method: "thread/read",
