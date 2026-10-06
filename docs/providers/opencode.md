@@ -23,7 +23,7 @@ Each chat keeps its own model and effort selection. An omitted effort inherits t
 
 Text and reasoning deltas remain separate, including when full snapshots repeat or replace streamed content. Tool events retain the running chat and turn IDs. Reading another chat does not change the active turn. Retry status keeps the turn active; an explicit failure or idle status settles it. A second send while a turn is active returns `-32003`.
 
-The SSE connection reconnects with bounded backoff. After reconnecting, the bridge checks the active session's status and history to recover missed output or completion. Newer live events invalidate slow recovery snapshots, and a failed status read does not mark work complete.
+The SSE connection reconnects with bounded backoff. After reconnecting, the bridge checks the active session's status and history to recover missed output or completion. Newer live events invalidate slow recovery snapshots, and a failed status read does not mark work complete. Reopening a running session after a bridge restart restores its active turn and Stop control from the local runtime. Restoration never replaces a newer run or replays saved text as fresh output. Saved history retains user images, reasoning, tool results, timestamps, and live message identities.
 
 ## Permissions and questions
 

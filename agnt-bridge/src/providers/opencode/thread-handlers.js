@@ -3,7 +3,7 @@ const { pageByAnchor } = require("./pagination");
 const { numberOr, readString } = require("../_shared/translator-utils");
 const { mapMessagesToTurns, mapSessionToSummary, mapSessionToThread } = require("./mappers");
 
-function createOpencodeThreadHandlers({ emitNotification, injectResponse, respondError, state, transport }) {
+function createOpencodeThreadHandlers({ emitNotification, injectResponse, respondError, state, transport, recovery }) {
 async function handleThreadStart(request) {
   try {
     const res = await transport.httpRequest("POST", "/session", {}, request?.params?.cwd);
@@ -53,6 +53,7 @@ async function handleThreadRead(request) {
     return;
   }
   if (!state.activeTurnId) state.activeThreadId = targetThreadId;
+  const checkpoint = recovery.checkpoint();
   try {
     const sessionRes = await transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}`);
     transport.remember(sessionRes.json);
@@ -69,6 +70,7 @@ async function handleThreadRead(request) {
         variant: latest.variant || "",
       });
     }
+    await recovery.restoreThread(targetThreadId, session, messages, checkpoint);
     if (state.activeThreadId === targetThreadId && state.activeTurnId) {
       thread.status = { type: "active" };
       const active = thread.turns.find((turn) => turn.id === state.activeTurnId);
@@ -92,7 +94,12 @@ async function handleThreadTurnsList(request) {
   try {
     const messagesRes = await transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}/message`);
     const messages = Array.isArray(messagesRes?.json) ? messagesRes.json : [];
-    const page = pageByAnchor(mapMessagesToTurns(messages), params);
+    const history = mapMessagesToTurns(messages);
+    if (state.activeThreadId === targetThreadId) {
+      const active = history.find((turn) => turn.id === state.activeTurnId);
+      if (active) active.status = "inProgress";
+    }
+    const page = pageByAnchor(history, params);
     const turns = page.data;
     if (request?.id != null) {
       injectResponse(request.id, {
