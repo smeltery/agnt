@@ -1,8 +1,8 @@
 # agnt marketing site
 
 A standalone static marketing page inspired by the visual language of
-[loft](https://github.com/smeltery/loft) and
-[convrt](https://github.com/smeltery/convrt). It is separate from the browser
+[loft](https://github.com/smeltery/loft) and convrt (a private repository).
+It is separate from the browser
 client in `agnt-web/` and does not connect to a relay or agent.
 
 From the repository root:
