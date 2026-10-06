@@ -1,4 +1,4 @@
-# agnt
+# <img src="agnt-site/assets/app-icon.png" alt="" width="40" height="40" align="absmiddle" /> agnt
 
 ![agnt — Your agents. A little more freedom.](agnt-site/assets/og.png)
 
