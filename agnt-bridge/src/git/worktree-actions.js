@@ -17,6 +17,7 @@
 // orchestrators be reviewed as a coherent unit.
 
 const fs = require("fs");
+const { createManagedWorktreeCleanup } = require("./managed-worktree-cleanup");
 const os = require("os");
 const path = require("path");
 const { randomBytes } = require("crypto");
@@ -85,6 +86,8 @@ function createWorktreeActions({
     restoreWorktreeHandoffStash,
     rollbackFailedHandoffTransfer,
   } = worktreeHandoff;
+
+  const cleanup = createManagedWorktreeCleanup({ git, gitError });
 
   // ── named-branch worktree (the default agnt parallel-thread flow) ──────
 
@@ -180,7 +183,7 @@ function createWorktreeActions({
       if (didCreateWorktree) {
         await cleanupManagedWorktree(repoRoot, worktreeRootPath, branch);
       } else {
-        fs.rmSync(path.dirname(worktreeRootPath), { recursive: true, force: true });
+        try { fs.rmdirSync(path.dirname(worktreeRootPath)); } catch { /* Preserve partial checkout files. */ }
       }
 
       if (handoffStashRef) {
@@ -269,7 +272,7 @@ function createWorktreeActions({
       if (didCreateWorktree) {
         await cleanupManagedWorktree(repoRoot, worktreeRootPath);
       } else {
-        fs.rmSync(path.dirname(worktreeRootPath), { recursive: true, force: true });
+        try { fs.rmdirSync(path.dirname(worktreeRootPath)); } catch { /* Preserve partial checkout files. */ }
       }
 
       if (handoffStashRef) {
@@ -387,7 +390,7 @@ function createWorktreeActions({
 
   // ── remove a managed worktree ──────────────────────────────────────────
 
-  async function gitRemoveWorktree(cwd, params) {
+  async function gitRemoveWorktree(cwd, params, options = {}, verifyUsage = false) {
     const worktreeRootPath = await resolveRepoRoot(cwd).catch(() => null);
     const localCheckoutRoot = await resolveLocalCheckoutRoot(cwd).catch(() => null);
     const branch = typeof params.branch === "string" ? params.branch.trim() : "";
@@ -402,14 +405,26 @@ function createWorktreeActions({
       throw gitError("unmanaged_worktree", "Only managed worktrees can be removed automatically.");
     }
 
-    await cleanupManagedWorktree(localCheckoutRoot, worktreeRootPath, branch || null);
-    if (branch && await localBranchExists(localCheckoutRoot, branch)) {
-      throw gitError(
-        "worktree_cleanup_failed",
-        `The temporary worktree was removed, but branch '${branch}' could not be deleted automatically.`
-      );
+    const registration = (await cleanup.registeredWorktrees(localCheckoutRoot))
+      .find((entry) => sameFilePath(entry.path, worktreeRootPath));
+    if (!registration) throw gitError("worktree_not_registered", "This checkout is no longer registered with Git.");
+    if (branch && registration.branch !== branch) throw gitError("worktree_branch_mismatch", "The selected branch does not belong to this worktree.");
+    if (verifyUsage) {
+      if (typeof options.assertWorktreeUnused !== "function") throw gitError("worktree_usage_unknown", "Chat usage cannot be verified right now.");
+      try { await options.assertWorktreeUnused(worktreeRootPath); } catch (error) {
+        throw gitError("worktree_usage_unknown", error.message);
+      }
     }
-    return { success: true };
+    await cleanup.removeClean(localCheckoutRoot, worktreeRootPath);
+    let removedBranch = false;
+    if (branch && await localBranchExists(localCheckoutRoot, branch)) {
+      try { await git(localCheckoutRoot, "branch", "-d", branch); removedBranch = true; } catch { /* Retain unmerged commits. */ }
+    }
+    return { success: true, removedBranch };
+  }
+
+  async function gitListManagedWorktrees(cwd) {
+    return cleanup.list(await resolveLocalCheckoutRoot(cwd));
   }
 
   return {
@@ -417,6 +432,7 @@ function createWorktreeActions({
     gitCreateManagedWorktree,
     gitTransferManagedHandoff,
     gitRemoveWorktree,
+    gitListManagedWorktrees,
   };
 }
 

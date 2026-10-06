@@ -131,3 +131,16 @@ Worth being explicit, because the boundary matters:
 - **No provider-specific UI.** The iOS app reads `thread/initialized` events for tools/skills/slash-commands metadata and renders generically.
 
 This separation keeps the iOS app inspectable and small, and lets adding a new provider be a Mac-side-only change.
+
+### Managed checkout cleanup
+
+Use **Manage Worktrees** in a local project's sidebar menu to list its managed
+checkouts. Removal checks Git registration, branch identity, tracked changes,
+untracked and ignored files, and active/archived chat bindings. Unmerged branch
+commits are retained. Failed worktree creation also preserves partial files for
+manual recovery instead of forcing deletion.
+
+Cleanup fails closed if a chat catalog is incomplete or an inactive provider has
+saved state that the current runtime cannot verify. In that case, inspect the
+other provider's chats and clean up the checkout manually. No provider is started
+or authenticated merely to delete a checkout.

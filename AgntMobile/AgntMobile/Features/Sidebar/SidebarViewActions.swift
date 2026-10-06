@@ -376,6 +376,7 @@ enum SidebarPresentedSheet: String, Identifiable {
     case newChatProjectPicker
     case localFolderBrowser
     case devicesSettings
+    case managedWorktrees
 
     var id: String { rawValue }
 }
@@ -384,6 +385,11 @@ extension SidebarView {
     @ViewBuilder
     func sidebarSheetContent(_ sheet: SidebarPresentedSheet) -> some View {
         switch sheet {
+        case .managedWorktrees:
+            if let path = managedWorktreeProjectPath {
+                ManagedWorktreeCleanupSheet(localCheckoutPath: path)
+                    .id(codex.currentMacScopedPersistenceDeviceId ?? "local")
+            }
         case .newChatProjectPicker:
             SidebarNewChatProjectPickerSheet(
                 choices: newChatProjectChoices,
