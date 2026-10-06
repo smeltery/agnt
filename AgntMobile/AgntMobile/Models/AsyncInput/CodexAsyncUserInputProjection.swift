@@ -14,6 +14,12 @@ nonisolated enum CodexAsyncUserInputProjection {
         }
     }
 
+    /// Keep the wire envelope intact for later history reconciliation, but never
+    /// expose it as message prose when its question is outside the loaded page.
+    static func displayText(for text: String) -> String {
+        nativeReply(from: text)?.displayText ?? text
+    }
+
     static func reconcile(_ messages: inout [CodexMessage]) {
         for userIndex in messages.indices where messages[userIndex].role == .user {
             let raw = messages[userIndex].text
