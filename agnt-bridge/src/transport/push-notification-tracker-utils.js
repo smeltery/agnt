@@ -1,7 +1,9 @@
+// Shared completion-envelope parsing and local goal-state persistence.
 const fs = require("fs");
 const path = require("path");
 const MAX_GOAL_STATUS_ENTRIES = 500;
 
+// Best-effort disk persistence for goal statuses; failures must never break the bridge.
 function loadGoalPushState(filePath, logPrefix) {
   if (!filePath) {
     return new Map();
@@ -52,8 +54,8 @@ function saveGoalPushState(filePath, goalStatusByThreadId, logPrefix) {
 }
 
 // Normalizes the message envelope once so downstream helpers can share the same parsed view.
-function parseOutboundMessage(rawMessage) {
-  const parsed = safeParseJSON(rawMessage);
+function parseOutboundMessage(rawMessage, parsedMessage = null) {
+  const parsed = parsedMessage ?? safeParseJSON(rawMessage);
   if (!parsed || typeof parsed.method !== "string") {
     return null;
   }
@@ -69,6 +71,23 @@ function parseOutboundMessage(rawMessage) {
     threadId: resolveThreadId(method, params, eventObject),
     turnId: resolveTurnId(method, params, eventObject),
   };
+}
+
+function shouldIgnoreHistoricalMessage({ method, params, eventObject }) {
+  if (hasTrueFlag(params, eventObject, "agntReplayedEvent")) {
+    return true;
+  }
+  if (hasTrueFlag(params, eventObject, "agntRolloutTerminalCatchUp")) {
+    return true;
+  }
+  return hasTrueFlag(params, eventObject, "agntRolloutBootstrapReplay")
+    && method !== "turn/started";
+}
+
+function hasTrueFlag(params, eventObject, key) {
+  return parseBooleanFlag(params?.[key]) === true
+    || parseBooleanFlag(eventObject?.[key]) === true
+    || parseBooleanFlag(params?.event?.[key]) === true;
 }
 
 function envelopeEventObject(params) {
@@ -266,107 +285,82 @@ function extractFailureMessage(params, eventObject) {
 }
 
 function resolveCompletionResult(params, eventObject) {
-  const rawStatus = readString(
-    params?.turn?.status
-      || params?.status
-      || eventObject?.turn?.status
-      || eventObject?.status
-  ) || "completed";
+  const rawStatus = readTurnStatus(params, eventObject);
+  if (!rawStatus) {
+    return extractFailureMessage(params, eventObject) ? "failed" : "completed";
+  }
 
-  const normalizedStatus = rawStatus.toLowerCase();
+  const normalizedStatus = normalizeToken(rawStatus);
   if (normalizedStatus.includes("fail") || normalizedStatus.includes("error")) {
     return "failed";
   }
-  if (normalizedStatus.includes("interrupt") || normalizedStatus.includes("stop")) {
-    return null;
-  }
-
-  return "completed";
-}
-
-function completionDedupeKey({ sessionId, threadId, turnId, result, now }) {
-  if (turnId) {
-    return [sessionId || "", threadId, turnId, result].join("|");
-  }
-
-  const timeBucket = Math.floor(now() / 30_000);
-  return [sessionId || "", threadId, "no-turn", result, `bucket-${timeBucket}`].join("|");
-}
-
-// Mirrors the iOS terminal-state mapping so managed pushes fire on the same end states.
-function resolveThreadStatusResult(params, eventObject) {
-  const statusObject = objectValue(params?.status)
-    || objectValue(eventObject?.status)
-    || objectValue(params?.event?.status);
-  const rawStatus = readString(
-    statusObject?.type
-      || statusObject?.statusType
-      || statusObject?.status_type
-      || params?.status
-      || eventObject?.status
-      || params?.event?.status
-  );
-  const normalizedStatus = normalizeStatusToken(rawStatus);
-  if (!normalizedStatus) {
-    return null;
-  }
-
-  if (
-    normalizedStatus.includes("cancel")
-    || normalizedStatus.includes("abort")
-    || normalizedStatus.includes("interrupt")
-    || normalizedStatus.includes("stopped")
-  ) {
-    return null;
-  }
-
-  if (normalizedStatus.includes("fail") || normalizedStatus.includes("error")) {
-    return "failed";
-  }
-
-  if (
-    normalizedStatus === "idle"
-    || normalizedStatus === "notloaded"
-    || normalizedStatus === "completed"
-    || normalizedStatus === "done"
-    || normalizedStatus === "finished"
-  ) {
+  if (["completed", "complete", "done", "finished", "succeeded", "success"].includes(
+    normalizedStatus
+  )) {
     return "completed";
   }
-
   return null;
 }
 
-function isTerminalThreadStatusMethod(method) {
-  return method === "thread/status/changed"
-    || method === "thread/status"
-    || method === "codex/event/thread_status_changed";
+function canStartLiveRun(params, eventObject) {
+  const status = normalizeToken(readTurnStatus(params, eventObject));
+  return !status || ![
+    "completed",
+    "complete",
+    "done",
+    "finished",
+    "succeeded",
+    "success",
+    "failed",
+    "failure",
+    "error",
+    "stopped",
+    "interrupted",
+    "cancelled",
+    "canceled",
+    "aborted",
+  ].includes(status);
 }
 
-function isActiveThreadStatus(method, params, eventObject) {
-  if (!isTerminalThreadStatusMethod(method)) {
-    return false;
-  }
-
+function readTurnStatus(params, eventObject) {
   const statusObject = objectValue(params?.status)
     || objectValue(eventObject?.status)
     || objectValue(params?.event?.status);
-  const rawStatus = readString(
-    statusObject?.type
+  return readString(
+    params?.turn?.status
+      || eventObject?.turn?.status
+      || statusObject?.type
       || statusObject?.statusType
       || statusObject?.status_type
       || params?.status
       || eventObject?.status
       || params?.event?.status
   );
-  const normalizedStatus = normalizeStatusToken(rawStatus);
+}
 
-  return normalizedStatus === "active"
-    || normalizedStatus === "running"
-    || normalizedStatus === "processing"
-    || normalizedStatus === "inprogress"
-    || normalizedStatus === "started"
-    || normalizedStatus === "pending";
+function completionReceiptKey(run) {
+  const stableTurnIdentity = run.turnId
+    ? `turn:${run.turnId}`
+    : `generated:${run.identity}`;
+  return JSON.stringify([run.threadId, stableTurnIdentity]);
+}
+
+function readCompletionTimestamp(params, eventObject) {
+  const sources = [params?.turn, params, eventObject?.turn, eventObject];
+  for (const source of sources) {
+    for (const key of ["completedAt", "completed_at", "completedAtMs", "completed_at_ms"]) {
+      const value = source?.[key];
+      if (value == null || value === "") continue;
+      if (typeof value !== "number" && typeof value !== "string") continue;
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return numeric > 10_000_000_000 ? numeric : numeric * 1000;
+      }
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
 }
 
 function shouldIgnoreRetriableFailure(params, eventObject) {
@@ -416,10 +410,6 @@ function normalizePreviewText(value) {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function normalizeStatusToken(value) {
-  return typeof value === "string" ? value.toLowerCase().replace(/[_-\s]+/g, "") : "";
-}
-
 function objectValue(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
@@ -457,7 +447,9 @@ function isAssistantMessageItem(itemObject) {
 }
 
 function normalizeToken(value) {
-  return typeof value === "string" ? value.toLowerCase().replace(/[_-\s]+/g, "") : "";
+  return typeof value === "string"
+    ? value.toLowerCase().replace(/[_-\s]+/g, "")
+    : "";
 }
 
 function safeParseJSON(value) {
@@ -468,33 +460,27 @@ function safeParseJSON(value) {
   }
 }
 
-function turnStateKey(threadId, turnId) {
-  return `${threadId}|${turnId || "no-turn"}`;
-}
-
 module.exports = {
-  buildNotificationBody,
-  completionDedupeKey,
-  extractAssistantCompletedText,
-  extractAssistantDeltaText,
-  extractFailureMessage,
-  extractThreadTitle,
-  isActiveThreadStatus,
-  isAssistantCompletedMethod,
-  isAssistantDeltaMethod,
-  isFailureEnvelope,
-  isTerminalThreadStatusMethod,
   loadGoalPushState,
   normalizeGoalPushSnapshot,
+  saveGoalPushState,
+  parseOutboundMessage,
+  shouldIgnoreHistoricalMessage,
+  extractThreadTitle,
+  isAssistantDeltaMethod,
+  isAssistantCompletedMethod,
+  isFailureEnvelope,
+  extractAssistantDeltaText,
+  extractAssistantCompletedText,
+  extractFailureMessage,
+  resolveCompletionResult,
+  canStartLiveRun,
+  completionReceiptKey,
+  readCompletionTimestamp,
+  shouldIgnoreRetriableFailure,
+  buildNotificationBody,
+  truncatePreview,
   normalizePreviewText,
   objectValue,
-  parseOutboundMessage,
-  readString,
-  resolveCompletionResult,
-  resolveThreadStatusResult,
-  resolveTurnId,
-  saveGoalPushState,
-  shouldIgnoreRetriableFailure,
-  truncatePreview,
-  turnStateKey,
+  readString
 };

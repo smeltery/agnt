@@ -55,10 +55,7 @@ final class LiveActivityCoordinator {
         applyCurrentSnapshot()
     }
 
-    func turnEnded(threadId: String, failed: Bool) {
-        guard let title = runningTitlesByThread[threadId] else {
-            return
-        }
+    func turnEnded(threadId: String, failed: Bool, title: String) {
         runningTitlesByThread.removeValue(forKey: threadId)
         runningStartedAtByThread.removeValue(forKey: threadId)
 
@@ -69,6 +66,12 @@ final class LiveActivityCoordinator {
             completedOutcomesByThread[threadId] = Outcome(title: title, createdAt: Date())
             failedOutcomesByThread.removeValue(forKey: threadId)
         }
+        applyCurrentSnapshot()
+    }
+
+    func clearRunning(threadId: String) {
+        runningTitlesByThread.removeValue(forKey: threadId)
+        runningStartedAtByThread.removeValue(forKey: threadId)
         applyCurrentSnapshot()
     }
 
@@ -90,6 +93,12 @@ final class LiveActivityCoordinator {
     }
 
     private func applyCurrentSnapshot() {
+        completedOutcomesByThread = Dictionary(uniqueKeysWithValues: completedOutcomesByThread
+            .sorted { $0.value.createdAt > $1.value.createdAt }
+            .prefix(Self.maxDisplayedConversations).map { ($0.key, $0.value) })
+        failedOutcomesByThread = Dictionary(uniqueKeysWithValues: failedOutcomesByThread
+            .sorted { $0.value.createdAt > $1.value.createdAt }
+            .prefix(Self.maxDisplayedConversations).map { ($0.key, $0.value) })
         let state = makeContentState()
         if state.isEmpty {
             endCurrent(dismissalPolicy: .immediate)

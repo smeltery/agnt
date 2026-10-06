@@ -275,7 +275,7 @@ extension CodexService {
             secureMacFingerprint = nil
         }
         pendingNotificationOpenThreadID = nil
-        lastPushRegistrationSignature = nil
+        invalidateCompletionPushRegistration()
         clearTransientConnectionPrompts()
     }
 
@@ -297,7 +297,7 @@ extension CodexService {
         secureConnectionState = .liveSessionUnresolved
         secureMacFingerprint = codexSecureFingerprint(for: trustedMac.macIdentityPublicKey)
         pendingNotificationOpenThreadID = nil
-        lastPushRegistrationSignature = nil
+        invalidateCompletionPushRegistration()
         clearTransientConnectionPrompts()
     }
 
