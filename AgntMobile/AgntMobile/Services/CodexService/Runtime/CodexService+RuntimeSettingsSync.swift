@@ -17,6 +17,7 @@ extension CodexService {
 
     func learnRuntimeSettingsSupport(_ response: RPCMessage) {
         runtimeSettingsProviderId = response.result?.objectValue?["providerId"]?.stringValue
+        supportsThreadGoals = runtimeSettingsProviderId == "codex"
         supportsRuntimeSettingsSync = runtimeSettingsProviderId == "codex"
             && response.result?.objectValue?["agntRuntimeSettingsVersion"]?.intValue == 2
     }

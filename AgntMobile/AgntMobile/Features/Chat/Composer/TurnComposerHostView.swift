@@ -51,6 +51,7 @@ struct TurnComposerHostView: View {
         let availableForkDestinations = TurnComposerForkDestination.availableDestinations(
             canForkLocally: canForkLocally,
             canCreateWorktree: showsGitControls && !isWorktreeProject && isGitBranchSelectorEnabled
+                && codex.runtimeSettingsProviderId != "opencode"
         )
         let autocompleteState = TurnComposerAutocompleteState(
             availableSlashCommands: TurnComposerSlashCommand.availableCommands(
@@ -65,7 +66,7 @@ struct TurnComposerHostView: View {
                     isPlanModeArmed: viewModel.isPlanModeArmed
                 )
                     && !availableForkDestinations.isEmpty
-            ),
+            ).filter { $0 != .goal || codex.supportsThreadGoals },
             fileAutocompleteItems: viewModel.fileAutocompleteItems,
             isFileAutocompleteVisible: viewModel.isFileAutocompleteVisible,
             isFileAutocompleteLoading: viewModel.isFileAutocompleteLoading,

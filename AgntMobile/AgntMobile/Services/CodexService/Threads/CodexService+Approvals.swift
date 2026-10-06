@@ -33,7 +33,7 @@ extension CodexService {
 
         let isCommandApproval = normalizedMethod == "item/commandExecution/requestApproval"
             || normalizedMethod == "item/command_execution/request_approval"
-        let resolvedDecision = (decision == "accept" && forSession && isCommandApproval) ? "acceptForSession" : decision
+        let resolvedDecision = (decision == "accept" && forSession && (isCommandApproval || runtimeSettingsProviderId == "opencode")) ? "acceptForSession" : decision
         return approvalDecisionResult(resolvedDecision)
     }
 

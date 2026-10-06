@@ -5,7 +5,7 @@ extension CodexService {
         threadId: String, turnId: String?, message: String, errorInfo: JSONValue?
     ) {
         guard !isApplyingReplayedBridgeEvent,
-              let turnId, !CodexSyntheticIdentifiers.isBridgeMintedTurnID(turnId),
+              let turnId, !CodexSyntheticIdentifiers.isSyntheticPlaceholderTurnID(turnId),
               CodexStreamFailure.isRecoverable(message: message, errorInfo: errorInfo),
               turnTerminalState(for: turnId, threadId: threadId) != .stopped,
               streamRecovery.lastStartedTurnIDs[threadId].map({ $0 == turnId }) ?? true,

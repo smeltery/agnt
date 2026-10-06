@@ -449,10 +449,11 @@ extension CodexService {
     func recordTurnTerminalState(
         threadId: String,
         turnId: String?,
-        state: CodexTurnTerminalState
+        state: CodexTurnTerminalState,
+        updatesThreadState: Bool = true
     ) {
         let previousState = latestTurnTerminalStateByThread[threadId]
-        latestTurnTerminalStateByThread[threadId] = state
+        if updatesThreadState { latestTurnTerminalStateByThread[threadId] = state }
         if let turnId {
             if CodexSyntheticIdentifiers.isProjectedDesktopTurnID(turnId) {
                 projectedTerminalStateByThreadID[threadId, default: [:]][turnId] = state
@@ -462,10 +463,10 @@ extension CodexService {
             }
         }
         refreshThreadTimelineState(for: threadId)
-        triggerRunCompletionHapticIfNeeded(
-            threadId: threadId,
-            state: state,
-            previousState: previousState
-        )
+        if updatesThreadState {
+            triggerRunCompletionHapticIfNeeded(
+                threadId: threadId, state: state, previousState: previousState
+            )
+        }
     }
 }
