@@ -13,7 +13,7 @@
 //   thread/read                    GET  /session/{id}/message
 //   thread/turns/list              GET  /session/{id}/message
 //   thread/list                    GET  /session
-//   turn/start                     POST /session/{id}/message     -> fire-and-forget
+//   turn/start                     POST /session/{id}/prompt_async -> acceptance ack
 //   turn/interrupt                 POST /session/{id}/abort
 //
 //   opencode SSE inbound           bridge JSON-RPC notifications
@@ -25,7 +25,7 @@
 //   message.part.updated (tool)    codex/event/exec_command_* family
 //   session.status busy            turn/started
 //   session.status idle            turn/completed (and item/completed)
-//   session.status retry/error     turn/failed (then turn/completed)
+//   session.status retry           thread/status/changed
 //   session.diff                   turn/diff/updated
 //   server.heartbeat               (ignored)
 //
@@ -107,13 +107,6 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     activeUserMessageId: "",
     activeTurnAccepted: false,
   };
-  const threadHandlers = createOpencodeThreadHandlers({
-    emitNotification,
-    injectResponse,
-    respondError,
-    state,
-    transport,
-  });
   const streamHandlers = createOpencodeStreamHandlers({
     emitNotification,
     state,
@@ -121,6 +114,14 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     turnLifecycle,
   });
   const recovery = createOpencodeStreamRecovery({ state, transport, streamHandlers });
+  const threadHandlers = createOpencodeThreadHandlers({
+    emitNotification,
+    injectResponse,
+    respondError,
+    state,
+    transport,
+    recovery,
+  });
   const approvalFlow = createOpencodeApprovalFlow({
     approvalIdToPermission,
     getActiveThreadId: () => activeThreadId,

@@ -1,3 +1,5 @@
+const { turnIdForMessage } = require("./mappers");
+
 function createOpencodeStreamRecovery({ state, transport, streamHandlers }) {
   let revision = 0;
   let stopped = false;
@@ -35,7 +37,34 @@ function createOpencodeStreamRecovery({ state, transport, streamHandlers }) {
       // An unavailable status snapshot is not evidence that the turn ended.
     }
   }
-  return { invalidate, refresh, stop() { stopped = true; invalidate(); } };
+  async function restoreThread(threadId, session, messages, expected) {
+    const current = () => !stopped && revision === expected && !state.activeTurnId
+      && state.activeThreadId === threadId;
+    if (!current()) return;
+    try {
+      const response = await transport.httpRequest("GET", "/session/status", undefined, session?.directory);
+      if (!current() || !["busy", "retry"].includes(response.json?.[threadId]?.type)) return;
+      // Metadata-only reads can contain just an assistant. Find the actual user anchor
+      // before restoring ownership so Stop and overlap rejection use a stable turn ID.
+      if (!messages.some((message) => message?.info?.role === "user")) {
+        const history = await transport.httpRequest("GET", `/session/${encodeURIComponent(threadId)}/message`);
+        if (!current()) return;
+        messages = Array.isArray(history.json) ? history.json : [];
+      }
+      const index = messages.findLastIndex((message) => message?.info?.role === "user");
+      const userId = messages[index]?.info?.id;
+      if (!userId || !current()) return;
+      state.activeTurnId = turnIdForMessage(userId);
+      state.activeUserMessageId = userId;
+      state.activeTurnAccepted = true;
+      state.didEmitTurnCompletedForActive = false;
+      streamHandlers.restoreTurnMessages(messages.slice(index));
+    } catch {
+      // Failed reads cannot establish ownership or prove a running turn completed.
+    }
+  }
+  return { invalidate, refresh, restoreThread, checkpoint: () => ++revision,
+    stop() { stopped = true; invalidate(); } };
 }
 
 module.exports = { createOpencodeStreamRecovery };

@@ -44,6 +44,10 @@ function turnIdForMessage(messageId) {
   return messageId.startsWith("msg_") ? `turn_${messageId.slice(4)}` : messageId || generateTurnId();
 }
 
+function timestamp(value) {
+  return Number.isFinite(value) && value > 0 ? { createdAt: value } : {};
+}
+
 function mapMessagesToTurns(messages) {
   const turns = [];
   let currentTurn = null;
@@ -51,32 +55,31 @@ function mapMessagesToTurns(messages) {
     if (!message || typeof message !== "object") continue;
     const info = message.info && typeof message.info === "object" ? message.info : message;
     const role = readString(info.role);
-    const messageId = readString(info.id);
+    if (role !== "user" && role !== "assistant") continue;
+    const messageId = readString(info.id) || generateItemId(role);
     const parts = Array.isArray(message.parts) ? message.parts : [];
-    if (role === "user") {
-      currentTurn = {
-        id: turnIdForMessage(messageId),
-        turnId: turnIdForMessage(messageId),
-        status: "completed",
-        input: parts.map(mapPartToInput).filter(Boolean),
-        items: [],
-      };
+    if (role === "user" || !currentTurn) {
+      const turnId = turnIdForMessage(messageId);
+      currentTurn = { id: turnId, turnId, status: "completed", input: [], items: [], ...timestamp(info.time?.created) };
       turns.push(currentTurn);
+    }
+    if (role === "user") {
+      currentTurn.input = parts.map(mapPartToInput).filter(Boolean);
+      currentTurn.items.push({ id: messageId, itemId: messageId, type: "user_message", role,
+        content: currentTurn.input, ...timestamp(info.time?.created) });
       continue;
     }
-    if (role === "assistant") {
-      if (!currentTurn) {
-        currentTurn = {
-          id: messageId || generateTurnId(),
-          turnId: messageId || generateTurnId(),
-          status: "completed",
-          input: [],
-          items: [],
-        };
-        turns.push(currentTurn);
-      }
-      for (const part of parts) {
-        const item = mapPartToItem(part, messageId);
+    let emittedText = false;
+    for (const part of parts) {
+      if (part?.type === "text") {
+        if (emittedText) continue;
+        emittedText = true;
+        // Live deltas use the message ID, including messages with multiple text parts.
+        const text = parts.filter((entry) => entry?.type === "text").map((entry) => rawText(entry.text)).join("");
+        currentTurn.items.push({ id: messageId, itemId: messageId, type: "assistant_message", role,
+          text, content: [{ type: "text", text }], ...timestamp(info.time?.created) });
+      } else {
+        const item = mapPartToItem(part, messageId, info.time?.created);
         if (item) currentTurn.items.push(item);
       }
     }
@@ -84,44 +87,39 @@ function mapMessagesToTurns(messages) {
   return turns;
 }
 
+function rawText(value) { return typeof value === "string" ? value : ""; }
+
 function mapPartToInput(part) {
   if (!part || typeof part !== "object") return null;
-  const type = readString(part.type);
-  if (type === "text") return { type: "text", text: readString(part.text) };
-  if (type === "image") return { type: "image", image_url: readString(part.url) };
+  if (part.type === "text") return { type: "text", text: rawText(part.text) };
+  if (part.type === "image" || (part.type === "file" && part.mime?.startsWith("image/"))) {
+    return { type: "image", image_url: readString(part.url) };
+  }
+  if (part.type === "file") return { type: "text", text: readString(part.filename) || readString(part.url) || "File attachment" };
   return null;
 }
 
-function mapPartToItem(part, messageId) {
+function mapPartToItem(part, messageId, createdAt) {
   if (!part || typeof part !== "object") return null;
-  const type = readString(part.type);
-  const itemId = readString(part.id) || messageId || generateItemId("assistant");
-  if (type === "text") {
-    const text = readString(part.text);
-    return {
-      id: itemId,
-      itemId,
-      type: "assistant_message",
-      role: "assistant",
-      text,
-      content: [{ type: "text", text }],
-    };
+  const itemId = readString(part.id) || `${messageId}-${part.type}`;
+  const identity = { id: itemId, itemId, ...timestamp(part.time?.start || createdAt) };
+  if (part.type === "reasoning") {
+    return { ...identity, type: "reasoning", text: rawText(part.text), content: [{ type: "text", text: rawText(part.text) }] };
   }
-  if (type === "reasoning") {
-    return {
-      id: itemId,
-      itemId,
-      type: "reasoning",
-      text: readString(part.text),
-    };
+  if (part.type === "tool") {
+    const tool = readString(part.tool) || "tool";
+    const state = part.state || {};
+    const input = state.input || {};
+    const output = rawText(state.output) || rawText(state.error);
+    return { ...identity, type: tool === "bash" ? "commandExecution" : "tool_call",
+      name: tool, tool, command: readString(input.command) || tool,
+      arguments: input, cwd: readString(input.cwd),
+      status: state.status === "error" ? "failed" : readString(state.status) || "inProgress",
+      output, aggregatedOutput: output };
   }
-  if (type === "tool") {
-    return {
-      id: itemId,
-      itemId,
-      type: "tool_call",
-      name: readString(part.tool),
-    };
+  if (part.type === "file") {
+    return { ...identity, type: "assistant_message", role: "assistant",
+      text: readString(part.filename) || readString(part.url) || "File attachment" };
   }
   return null;
 }
@@ -142,4 +140,5 @@ module.exports = {
   mapMessagesToTurns,
   mapSessionToSummary,
   mapSessionToThread,
+  turnIdForMessage,
 };

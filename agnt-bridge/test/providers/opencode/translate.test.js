@@ -309,7 +309,9 @@ test("thread/turns/list maps message GET response into turns", async () => {
   const ack = events.find((e) => e.id === "list-1");
   assert.equal(ack.result.turns.length, 1);
   assert.equal(ack.result.turns[0].input[0].text, "hi");
-  assert.equal(ack.result.turns[0].items[0].text, "hello");
+  assert.equal(ack.result.turns[0].items[0].content[0].text, "hi");
+  assert.equal(ack.result.turns[0].items[1].text, "hello");
+  assert.equal(ack.result.turns[0].items[1].id, "msg_2");
 });
 
 test("session.diff emits turn/diff/updated", () => {

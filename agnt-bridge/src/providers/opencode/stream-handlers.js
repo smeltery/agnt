@@ -399,6 +399,25 @@ function collectAssistantText() {
     && part.messageID === state.activeAssistantMessageId).map((part) => part.text || "").join("");
 }
 
+function restoreTurnMessages(messages) {
+  parts.clear();
+  messageRoles.clear();
+  state.partItemIds.clear();
+  for (const message of messages) {
+    const info = message?.info;
+    if (!info?.id) continue;
+    messageRoles.set(info.id, info.role);
+    if (info.role !== "assistant") continue;
+    state.activeAssistantMessageId = info.id;
+    if (info.tokens) state.lastTokenSnapshot = info.tokens;
+    for (const part of message.parts || []) {
+      if (!part?.id) continue;
+      parts.set(part.id, { ...part, messageID: info.id });
+      if (part.type === "text" || part.type === "reasoning") state.partItemIds.set(part.id, part.text || "");
+    }
+  }
+}
+
 function resetTurnState() {
   state.activeTurnId = "";
   state.activeTurnAccepted = false;
@@ -422,6 +441,7 @@ function mapPartItemId(partId, kind) {
 }
 
   return {
+    restoreTurnMessages,
     handleSessionStatus,
     handleMessageUpdated,
     handleMessagePartDelta,
