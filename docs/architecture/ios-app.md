@@ -149,3 +149,8 @@ Archived Chats loads the runtime's complete archived catalog in addition to loca
 rows. Unarchiving a runtime-only chat restores it to the local sidebar. History
 paging requests full items, preserves provider cursor insertion boundaries, and
 rechecks the timeline revision after background merging so live updates survive.
+
+Turn outcomes are item/turn scoped: a delayed older completion cannot update a
+newer run's badge, failure recovery, checkpoint, or haptic. Sidebar-only Desktop
+lifecycle events avoid eager transcript loads. Goals and Desktop handoff are
+Codex-only; opencode approval prompts also offer **Approve for Session**.

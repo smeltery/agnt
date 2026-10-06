@@ -479,3 +479,7 @@ private func isEmptyJSONValue(_ value: JSONValue) -> Bool {
         return false
     }
 }
+
+func isBackgroundDiscoveryBridgeEvent(_ params: IncomingParamsObject?) -> Bool {
+    params?["agntBackgroundDiscovery"]?.boolValue == true
+}

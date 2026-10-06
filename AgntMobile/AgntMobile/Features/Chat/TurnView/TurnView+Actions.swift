@@ -103,9 +103,16 @@ extension TurnView {
             }
         }
     }
+    func handleApproval(_ request: CodexApprovalRequest, forSession: Bool = false) {
+        viewModel.approve(request, codex: codex, forSession: forSession) { didSucceed in
+            if didSucceed { syncApprovalAlertPresentation() }
+            else { restoreApprovalAlert(afterFailureOf: request) }
+        }
+    }
+
     func handleSend() {
         let goalCommand = GoalCommandParser.parse(viewModel.input)
-        if goalCommand.isGoalCommand {
+        if codex.supportsThreadGoals && goalCommand.isGoalCommand {
             presentGoalSheet(objectivePrefill: goalCommand.objective)
             if goalCommand.objective == nil {
                 viewModel.input = ""

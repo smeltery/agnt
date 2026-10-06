@@ -38,6 +38,11 @@ nonisolated enum CodexSyntheticIdentifiers {
             || itemId.hasPrefix("agnt-jsonl-file-change-")
     }
 
+    static func isSyntheticPlaceholderTurnID(_ turnId: String) -> Bool {
+        isBridgeMintedTurnID(turnId) || isProjectedDesktopTurnID(turnId)
+            || turnId.hasPrefix("agnt-idless-turn-")
+    }
+
     static func isProjectedDesktopTurnID(_ turnId: String) -> Bool {
         turnId.hasPrefix("ipc-turn-")
     }

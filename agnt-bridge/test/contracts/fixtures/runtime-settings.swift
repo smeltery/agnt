@@ -4,6 +4,7 @@ enum CodexServiceError: Error { case invalidInput(String), disconnected }
 @MainActor final class CodexService {
     var asyncInput = CodexAsyncInputState()
     var streamRecovery = CodexStreamRecoveryState()
+    var supportsThreadGoals = true
     var supportsRuntimeSettingsSync = true
     var runtimeSettingsProviderId: String? = "codex"
     var isConnected = true

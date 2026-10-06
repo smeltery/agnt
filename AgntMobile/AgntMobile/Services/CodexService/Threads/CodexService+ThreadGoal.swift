@@ -145,6 +145,9 @@ extension CodexService {
         params: JSONValue,
         timeoutNanoseconds: UInt64? = nil
     ) async throws -> RPCMessage {
+        guard runtimeSettingsProviderId == "codex", supportsThreadGoals else {
+            throw CodexThreadGoalError.goalsUnsupported
+        }
         do {
             return try await sendRequest(
                 method: method,

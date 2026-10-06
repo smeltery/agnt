@@ -48,10 +48,10 @@ extension TurnView {
             requiresIdleThread: false
         )
         let disabledGitActions: Set<TurnGitActionKind> = viewModel.disabledGitActions
-        let onTapMacHandoff: (() -> Void)? = codex.isConnected && codex.supportsDesktopAppHandoff ? {
+        let onTapMacHandoff: (() -> Void)? = codex.isConnected && codex.supportsDesktopAppHandoff && codex.runtimeSettingsProviderId == "codex" ? {
             isShowingMacHandoffConfirm = true
         } : nil
-        let onTapWorktreeHandoff: (() -> Void)? = showsGitControls ? {
+        let onTapWorktreeHandoff: (() -> Void)? = showsGitControls && codex.runtimeSettingsProviderId != "opencode" ? {
             handleWorktreeHandoffTap(currentThread: resolvedThread)
         } : nil
         let onTapNewChat: (() -> Void)? = codex.isConnected && !isWorktreeProject ? {
@@ -453,15 +453,9 @@ extension TurnView {
                     }
                 }
             },
-            onApproveApproval: { request in
-                viewModel.approve(request, codex: codex) { didSucceed in
-                    if didSucceed {
-                        syncApprovalAlertPresentation()
-                    } else {
-                        restoreApprovalAlert(afterFailureOf: request)
-                    }
-                }
-            },
+            onApproveApproval: { request in handleApproval(request) },
+            onApproveForSession: codex.runtimeSettingsProviderId == "opencode"
+                ? { request in handleApproval(request, forSession: true) } : nil,
             onConfirmGitSyncAction: { alertAction in
                 viewModel.confirmGitSyncAlertAction(
                     alertAction,
