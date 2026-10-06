@@ -1,8 +1,17 @@
 # agnt
 
-[![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE) [![Built with Blacksmith](https://img.shields.io/badge/Built%20with-Blacksmith-2f2f2f?logo=github&logoColor=white)](https://blacksmith.sh)
-
 [![CI](https://github.com/smeltery/agnt/actions/workflows/ci.yml/badge.svg)](https://github.com/smeltery/agnt/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE)
+[![Local-first](https://img.shields.io/badge/Local--first-2563EB)](#what-it-is)
+[![End-to-end encrypted](https://img.shields.io/badge/End--to--end%20encrypted-15803D)](docs/architecture/overview.md)
+
+[![Swift](https://img.shields.io/badge/Swift-F05138?logo=swift&logoColor=white)](AgntMobile/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white)](AgntAndroid/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](agnt-web/)
+[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](agnt-web/)
+[![Node.js](https://img.shields.io/badge/Node.js-5FA04E?logo=nodedotjs&logoColor=white)](agnt-bridge/)
+[![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)](agnt-host/src-tauri/)
+[![Tauri](https://img.shields.io/badge/Tauri-24C8D8?logo=tauri&logoColor=black)](agnt-host/)
 
 **Drive coding-agent CLIs from your iPhone, Android, or any browser.** agnt is a local-first, source-available bridge that keeps the agent runtime on your Mac or Linux box and proxies an end-to-end encrypted session to your iOS app, Android app, or a self-hosted web client. Codex, Claude Code, opencode, and Cursor work today; the provider plugin contract makes it a small change to add another.
 
