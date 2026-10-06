@@ -20,6 +20,7 @@ test("mobile settings coordinator preserves newer edits and rejects stale acknow
   const binary = path.join(directory, "checks");
   execFileSync("xcrun", ["swiftc", "-parse-as-library",
     path.join(mobile, "Core/Models/JSONValue.swift"), path.join(mobile, "Core/Models/RPCMessage.swift"),
+    path.join(mobile, "Models/Runtime/CodexStreamFailure.swift"),
     path.join(service, "Runtime/CodexModelOption.swift"), path.join(service, "Runtime/CodexReasoningEffortOption.swift"),
     path.join(service, "Runtime/CodexServiceTier.swift"), path.join(service, "Runtime/CodexRuntimeSettings.swift"),
     path.join(service, "Runtime/CodexService+RuntimeSettingsSync.swift"), overridePath,

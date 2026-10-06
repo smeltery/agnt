@@ -8,6 +8,7 @@ import Foundation
 import UserNotifications
 
 extension CodexService {
+    static let handledRunCompletionsDefaultsKey = "agnt.notifications.handledCompletions"
     // Wires the UNUserNotificationCenter delegate once so taps can reopen the right thread.
     func configureNotifications() {
         guard !hasConfiguredNotifications else {

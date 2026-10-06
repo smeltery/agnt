@@ -55,6 +55,7 @@ extension CodexService {
     }
 
     func resetRuntimeSettingsSyncState() {
+        streamRecovery = CodexStreamRecoveryState(connectionGeneration: streamRecovery.connectionGeneration + 1)
         cancelRuntimeSettingsUpdates()
         runtimeSettingsProviderId = nil
         confirmedRuntimeSettings.removeAll()

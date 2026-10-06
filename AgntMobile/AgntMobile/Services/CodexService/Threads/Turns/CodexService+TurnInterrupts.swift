@@ -118,7 +118,8 @@ extension CodexService {
     func readThreadTurnStateSnapshot(threadId: String) async throws -> (
         interruptibleTurnID: String?,
         hasInterruptibleTurnWithoutID: Bool,
-        latestTurnID: String?
+        latestTurnID: String?,
+        latestTurnStatus: String?
     ) {
         if supportsTurnPagination {
             do {
@@ -134,12 +135,12 @@ extension CodexService {
                 )
 
                 guard let resultObject = response.result?.objectValue else {
-                    return (nil, false, nil)
+                    return (nil, false, nil, nil)
                 }
                 if let mirrorActiveTurnID = normalizedInterruptIdentifier(
                     resultObject["agntMirrorActiveTurnId"]?.stringValue
                 ) {
-                    return (mirrorActiveTurnID, false, mirrorActiveTurnID)
+                    return (mirrorActiveTurnID, false, mirrorActiveTurnID, "inprogress")
                 }
 
                 let turnObjects = (
@@ -148,7 +149,7 @@ extension CodexService {
                         ?? resultObject["turns"]?.arrayValue
                         ?? []
                 ).compactMap { $0.objectValue }
-                return turnStateSnapshot(from: turnObjects, newestFirst: true)
+                return turnStateSnapshot(from: turnObjects, newestFirst: true, knownParallelTurnIDs: knownParallelTurnIDs(for: threadId))
             } catch {
                 guard consumeUnsupportedTurnPagination(error, attemptedMethod: "thread/turns/list") else {
                     throw error
@@ -183,20 +184,22 @@ extension CodexService {
 
         let turnObjects = response.result?.objectValue?["thread"]?.objectValue?["turns"]?.arrayValue?
             .compactMap { $0.objectValue } ?? []
-        return turnStateSnapshot(from: turnObjects, newestFirst: false)
+        return turnStateSnapshot(from: turnObjects, newestFirst: false, knownParallelTurnIDs: knownParallelTurnIDs(for: threadId))
     }
 
     // Parses latest/running turn metadata from either descending pages or chronological legacy arrays.
     func turnStateSnapshot(
         from turnObjects: [RPCObject],
-        newestFirst: Bool
+        newestFirst: Bool,
+        knownParallelTurnIDs: Set<String> = []
     ) -> (
         interruptibleTurnID: String?,
         hasInterruptibleTurnWithoutID: Bool,
-        latestTurnID: String?
+        latestTurnID: String?,
+        latestTurnStatus: String?
     ) {
         guard !turnObjects.isEmpty else {
-            return (nil, false, nil)
+            return (nil, false, nil, nil)
         }
 
         let newestTurnObjects = newestFirst ? turnObjects : Array(turnObjects.reversed())
@@ -210,11 +213,21 @@ extension CodexService {
             }
             return turnID
         }.first
+        let latestTurn = newestTurnObjects.first { turn in
+            normalizedInterruptIdentifier(turn["id"]?.stringValue
+                ?? turn["turnId"]?.stringValue ?? turn["turn_id"]?.stringValue) == latestTurnID
+        }
+        let latestTurnStatus = latestTurn.flatMap { normalizedInterruptTurnStatus(from: $0) }
 
-        // Newest-first scanning trusts the latest real turn as the active-state boundary.
-        // If it is terminal, older stale in-progress rows cannot still be interruptible.
+
+        // Parallel turns can finish out of order. A newer terminal turn does not
+        // prove that an older in-progress sibling is no longer interruptible.
         var hasInterruptibleTurnWithoutID = false
+        var encounteredTerminalBoundary = false
         for turnObject in newestTurnObjects {
+            // The bridge's compaction banner ships without a real turn status
+            // (older bridges omit it entirely); reading it as interruptible
+            // flagged idle heavy threads as running.
             if let turnID = normalizedInterruptIdentifier(
                 turnObject["id"]?.stringValue
                     ?? turnObject["turnId"]?.stringValue
@@ -224,22 +237,39 @@ extension CodexService {
             }
             let turnStatus = normalizedInterruptTurnStatus(from: turnObject)
             if !isInterruptibleTurnStatus(turnStatus) {
-                break
+                encounteredTerminalBoundary = true
+                continue
             }
-
             if let interruptibleTurnID = normalizedInterruptIdentifier(
                 turnObject["id"]?.stringValue
                     ?? turnObject["turnId"]?.stringValue
                     ?? turnObject["turn_id"]?.stringValue
             ) {
-                return (interruptibleTurnID, false, latestTurnID)
+                // A terminal row is a sequential-history boundary unless local
+                // lifecycle already proves this older turn was a parallel sibling.
+                if encounteredTerminalBoundary,
+                   !knownParallelTurnIDs.contains(interruptibleTurnID) {
+                    continue
+                }
+                return (interruptibleTurnID, false, latestTurnID, latestTurnStatus)
             }
 
+            if encounteredTerminalBoundary {
+                continue
+            }
             hasInterruptibleTurnWithoutID = true
             break
         }
 
-        return (nil, hasInterruptibleTurnWithoutID, latestTurnID)
+        return (nil, hasInterruptibleTurnWithoutID, latestTurnID, latestTurnStatus)
+    }
+
+    private func knownParallelTurnIDs(for threadId: String) -> Set<String> {
+        var turnIDs = displacedActiveTurnIDsByThread[threadId] ?? []
+        if let activeTurnID = activeTurnID(for: threadId) {
+            turnIDs.insert(activeTurnID)
+        }
+        return turnIDs
     }
 
     // Keeps stop recovery compatible with runtimes that only accept snake_case thread/read params.

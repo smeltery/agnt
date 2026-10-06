@@ -142,6 +142,7 @@ extension CodexService {
 
         isConnected = false
         isInitialized = false
+        streamRecovery.connectionGeneration += 1
         cancelRuntimeSettingsUpdates()
         isLoadingThreads = false
         isLoadingModels = false

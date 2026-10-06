@@ -10,6 +10,8 @@ struct TurnErrorReportCard: View {
     let message: String
     let onReport: () -> Void
     let onDismiss: () -> Void
+    var onContinue: (() -> Void)? = nil
+    var isContinuing = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -25,6 +27,11 @@ struct TurnErrorReportCard: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+            if let onContinue {
+                Button(isContinuing ? "Continuing…" : "Continue", action: onContinue)
+                    .font(AppFont.caption(weight: .semibold))
+                    .disabled(isContinuing)
+            }
             reportButton
             dismissButton
         }
