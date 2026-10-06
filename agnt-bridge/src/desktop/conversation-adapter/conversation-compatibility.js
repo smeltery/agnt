@@ -121,14 +121,12 @@ function synchronizeDesktopConversationCompatibility(state) {
     modelProvider: readString(state.latestThreadSettings?.modelProvider)
       || readString(state.modelProvider)
       || "openai",
-    serviceTier: readString(state.latestThreadSettings?.serviceTier)
-      || readString(latestParams?.serviceTier)
-      || readString(state.latestServiceTier)
-      || null,
-    effort: state.latestThreadSettings?.effort
-      ?? latestParams?.effort
-      ?? state.latestReasoningEffort
-      ?? null,
+    serviceTier: Object.hasOwn(state.latestThreadSettings || {}, "serviceTier")
+      ? state.latestThreadSettings.serviceTier
+      : latestParams?.serviceTier ?? state.latestServiceTier ?? null,
+    effort: Object.hasOwn(state.latestThreadSettings || {}, "effort")
+      ? state.latestThreadSettings.effort
+      : latestParams?.effort ?? state.latestReasoningEffort ?? null,
     summary: latestParams?.summary ?? state.latestThreadSettings?.summary ?? "none",
     collaborationMode: cloneJSON(
       state.latestThreadSettings?.collaborationMode
@@ -191,6 +189,7 @@ function permissionProfileFromId(value) {
 }
 
 module.exports = {
+  normalizeSandboxPolicyCompatibility,
   normalizeTurnParamsCompatibility,
   synchronizeDesktopConversationCompatibility,
 };

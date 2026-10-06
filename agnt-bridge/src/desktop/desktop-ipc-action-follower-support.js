@@ -1,3 +1,5 @@
+const { normalizeThreadSettingsUpdate } = require("./runtime/settings");
+const { normalizeSandboxPolicyCompatibility } = require("./conversation-adapter/conversation-compatibility");
 // FILE: desktop-ipc-action-follower-support.js
 // Purpose: Pure helpers for Desktop IPC action follower state projection and replies.
 // Layer: CLI helper
@@ -90,6 +92,17 @@ function buildDesktopFollowerRoute(message) {
     return null;
   }
 
+  if (method === "thread/settings/update") {
+    const threadSettings = normalizeThreadSettingsUpdate(params);
+    if (threadSettings.sandboxPolicy) {
+      threadSettings.sandboxPolicy = normalizeSandboxPolicyCompatibility(threadSettings.sandboxPolicy);
+    }
+    return {
+      threadId,
+      method: "thread-follower-update-thread-settings",
+      params: { conversationId: threadId, threadSettings },
+    };
+  }
   if (method === "turn/start") {
     return {
       threadId,

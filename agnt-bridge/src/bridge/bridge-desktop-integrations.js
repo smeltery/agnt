@@ -1,3 +1,4 @@
+const { createRuntimeSettingsHandler } = require("../handlers/runtime-settings-handler");
 const { createRolloutLiveMirrorController } = require("../desktop/rollout-live-mirror");
 const { createDesktopIpcActionFollower } = require("../desktop/desktop-ipc-action-follower");
 const { createDesktopIpcLiveOwner } = require("../desktop/desktop-ipc-live-owner");
@@ -17,7 +18,13 @@ function createBridgeDesktopIntegrations({
   rememberThreadFromMessage,
   sendApplicationResponse,
 }) {
-  const threadRuntimeSettingsStore = createThreadRuntimeSettingsStore();
+  const threadRuntimeSettingsStore = createThreadRuntimeSettingsStore({
+    onChange(threadId, runtimeSettings) {
+      sendApplicationResponse(JSON.stringify({
+        method: "agnt/runtimeSettings/updated", params: { threadId, runtimeSettings },
+      }));
+    },
+  });
   // Both Desktop-owned (action follower) and bridge-owned (live owner) threads
   // can be the target of a phone-initiated auto-follow deep link, so both
   // sides forward Desktop's follow confirmation to the same refresher hook.
@@ -37,8 +44,9 @@ function createBridgeDesktopIntegrations({
     })
     : null;
 
-  const desktopIpcActionFollower = !config.codexEndpoint
+  const desktopIpcActionFollower = !config.codexEndpoint && activeProvider.id === "codex"
     ? createDesktopIpcActionFollower({
+      runtimeSettingsStore: threadRuntimeSettingsStore,
       sendApplicationResponse,
       readConversationState: readDesktopConversationState,
       forwardToLocalCodex: (rawMessage) => {
@@ -71,7 +79,16 @@ function createBridgeDesktopIntegrations({
     })
     : null;
 
+  const handleRuntimeSettings = activeProvider.id === "codex" ? createRuntimeSettingsHandler({
+    getLiveOwner: () => desktopIpcLiveOwner,
+    getFollower: () => desktopIpcActionFollower,
+    sendRequest: bridgeManagedCodex.sendRequest,
+    runtimeSettingsStore: threadRuntimeSettingsStore,
+  }) : () => false;
+
   return {
+    handleRuntimeSettings,
+    threadRuntimeSettingsStore,
     desktopIpcActionFollower,
     desktopIpcLiveOwner,
     rolloutLiveMirror,

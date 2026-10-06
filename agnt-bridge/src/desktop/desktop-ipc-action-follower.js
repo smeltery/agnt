@@ -64,6 +64,7 @@ const DESKTOP_BACKGROUND_DISCOVERY_METHODS = new Set(["thread/list"]);
 const STALE_ACTIVE_READ_MAX_AGE_MS = 20_000;
 const CONNECTED_IPC_ACTIVITY_LEASE_MS = 5 * 60_000;
 const DESKTOP_FOLLOWER_REQUEST_METHODS = new Set([
+  "thread/settings/update",
   "turn/start",
   "turn/steer",
   "turn/interrupt",
@@ -71,7 +72,6 @@ const DESKTOP_FOLLOWER_REQUEST_METHODS = new Set([
 ]);
 const DESKTOP_OWNER_UNSUPPORTED_MUTATION_ERRORS = new Map([
   ["review/start", "Start this review in Codex Desktop."],
-  ["thread/settings/update", "Change these thread settings in Codex Desktop."],
   ["thread/approveGuardianDeniedAction", "Approve this retry in Codex Desktop."],
 ]);
 
@@ -90,6 +90,7 @@ function createDesktopIpcActionFollower({
   backgroundDisconnectGraceMs = BACKGROUND_DISCONNECT_GRACE_MS,
   snapshotDebounceMs = 0,
   onFollowerStateChanged = null,
+  runtimeSettingsStore = null,
 } = {}) {
   const ipc = createDesktopIpcClient({
     socketPath,
@@ -195,6 +196,8 @@ function createDesktopIpcActionFollower({
     },
   });
   requestRouter = createDesktopRequestRouter({
+    runtimeSettingsStore,
+    isKnownDesktopOwner: (threadId) => rawStatesByThreadId.has(threadId),
     forwardToLocalCodex,
     ipc,
     isDeliveryFailureError,
@@ -262,6 +265,7 @@ function createDesktopIpcActionFollower({
     syncThreadArchiveBroadcast,
   } = lifecycleSync;
   projectionSync = createProjectionSync({
+    runtimeSettingsStore,
     canonicalHistoryReplacementSentThreadIds,
     canonicalHistoryThreadIds,
     conversationProjector,
@@ -582,6 +586,7 @@ function createDesktopIpcActionFollower({
   return {
     observeInbound,
     stopAll,
+    isLocallyAcquiredThread(threadId) { return liveOwnerThreadIds.has(readString(threadId)); },
     hasLiveThreadState(threadId) {
       return rawStatesByThreadId.has(readString(threadId));
     },

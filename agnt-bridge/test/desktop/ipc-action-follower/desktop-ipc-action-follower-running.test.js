@@ -28,7 +28,7 @@ const {
   resolveDefaultIpcSocketPath,
 } = require("../../../src/desktop/desktop-ipc-action-follower");
 
-test("desktop IPC follower falls back locally when no Desktop client can handle the request", async (t) => {
+test("desktop IPC follower preserves known Desktop ownership when its client becomes unavailable", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-follower-local-fallback-");
   const serverFrames = [];
   const localForwards = [];
@@ -110,10 +110,9 @@ test("desktop IPC follower falls back locally when no Desktop client can handle 
     },
   }));
   assert.equal(handled, true);
-  await waitFor(() => localForwards.length === 1);
-  assert.equal(localForwards[0].id, "phone-turn-start-route-fallback");
-  assert.equal(localForwards[0].method, "turn/start");
-  assert.equal(outbound.some((message) => message.id === "phone-turn-start-route-fallback"), false);
+  await waitFor(() => outbound.some((message) => message.id === "phone-turn-start-route-fallback"));
+  assert.equal(localForwards.length, 0);
+  assert.ok(outbound.find((message) => message.id === "phone-turn-start-route-fallback").error);
 
   const handledAgain = follower.observeInbound(JSON.stringify({
     id: "phone-turn-start-route-fallback-2",
@@ -123,14 +122,12 @@ test("desktop IPC follower falls back locally when no Desktop client can handle 
       input: [{ type: "input_text", text: "stay local" }],
     },
   }));
-  assert.equal(handledAgain, false);
-  assert.equal(
-    serverFrames.filter((frame) => frame.method === "thread-follower-start-turn").length,
-    1
-  );
+  assert.equal(handledAgain, true);
+  await waitFor(() => serverFrames.filter((frame) => frame.method === "thread-follower-start-turn").length === 2);
+  assert.equal(localForwards.length, 0);
 });
 
-test("desktop IPC follower falls back locally when Desktop settings sync times out before turn delivery", async (t) => {
+test("desktop IPC follower does not acquire a known Desktop task after settings sync times out", async (t) => {
   const { tempDir, socketPath } = createIpcTestSocket("agnt-ipc-follower-settings-timeout-");
   const serverFrames = [];
   const localForwards = [];
@@ -187,10 +184,10 @@ test("desktop IPC follower falls back locally when Desktop settings sync times o
     },
   })), true);
 
-  await waitFor(() => localForwards.length === 1, 1_000);
-  assert.deepEqual([localForwards[0].id, localForwards[0].method], ["phone-turn-start-settings-timeout", "turn/start"]);
+  await waitFor(() => outbound.some((message) => message.id === "phone-turn-start-settings-timeout"), 1_000);
+  assert.equal(localForwards.length, 0);
   assert.equal(serverFrames.some((frame) => frame.method === "thread-follower-start-turn"), false);
-  assert.equal(outbound.some((message) => message.id === "phone-turn-start-settings-timeout"), false);
+  assert.ok(outbound.find((message) => message.id === "phone-turn-start-settings-timeout").error);
 });
 
 test("desktop IPC follower does not rerun ambiguous Desktop failures locally", async (t) => {

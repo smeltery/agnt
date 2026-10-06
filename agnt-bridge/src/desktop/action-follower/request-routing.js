@@ -1,3 +1,5 @@
+const { createThreadMutationQueue, runtimeSettingsPatch, threadSettingsFromRuntimeSettings } = require("../runtime/settings");
+const { normalizeSandboxPolicyCompatibility } = require("../conversation-adapter/conversation-compatibility");
 const {
   appServerResultForFollowerRequest,
   desktopFollowerPayloadForResponse,
@@ -10,6 +12,8 @@ const {
 } = require("../desktop-ipc-shared");
 
 function createDesktopRequestRouter({
+  runtimeSettingsStore = null,
+  isKnownDesktopOwner = () => false,
   forwardToLocalCodex,
   ipc,
   isDeliveryFailureError,
@@ -20,6 +24,8 @@ function createDesktopRequestRouter({
   releaseDesktopThreadState,
   sendApplicationResponse,
 }) {
+  const enqueueMutation = createThreadMutationQueue();
+
   function desktopRouteForResponse(message) {
     if (!message || typeof message !== "object" || message.method) {
       return null;
@@ -62,9 +68,9 @@ function createDesktopRequestRouter({
   }
 
   function submitDesktopFollowerRequest(route, originalMessage) {
-    Promise.resolve()
-      .then(() => resolveFollowerRequest(route))
-      .then(async (resolvedRequest) => {
+    const knownOwner = isKnownDesktopOwner(route.threadId);
+    enqueueMutation(route.threadId, async () => {
+        const resolvedRequest = await resolveFollowerRequest(route);
         if (route.method === "thread-follower-start-turn") {
           try {
             await syncDesktopOwnerRuntimeSettings(route.threadId, resolvedRequest.turnStartParams);
@@ -77,19 +83,31 @@ function createDesktopRequestRouter({
         }
         return {
           resolvedRequest,
+          revisionBefore: runtimeSettingsStore?.get?.(route.threadId)?.revision,
           result: await ipc.sendRequest(route.method, resolvedRequest.params),
         };
       })
-      .then(({ resolvedRequest, result }) => {
+      .then(({ resolvedRequest, revisionBefore, result }) => {
+        let response = appServerResultForFollowerRequest(route.method, result);
+        const current = runtimeSettingsStore?.get?.(route.threadId);
+        const ownerConfirmed = current && current.revision !== revisionBefore;
+        if (route.method === "thread-follower-update-thread-settings") {
+          const settings = ownerConfirmed ? current
+            : runtimeSettingsStore?.commit?.(route.threadId, route.params.threadSettings, { source: "phone" });
+          response = { runtimeSettings: settings || null };
+        } else if (route.method === "thread-follower-start-turn" && !ownerConfirmed) {
+          runtimeSettingsStore?.observe?.(route.threadId, resolvedRequest.turnStartParams, "phone");
+        }
         sendApplicationResponse(JSON.stringify({
           id: originalMessage.id,
-          result: appServerResultForFollowerRequest(route.method, result),
+          result: response,
         }));
         return resolvedRequest;
       })
       .catch((error) => {
         console.warn(`${logPrefix} desktop follower request failed: ${error.message}`);
-        if (typeof forwardToLocalCodex === "function" && isDeliveryFailureError(error)) {
+        if (typeof forwardToLocalCodex === "function" && isDeliveryFailureError(error)
+          && !knownOwner && route.method !== "thread-follower-update-thread-settings") {
           const threadId = readString(route.threadId) || readString(route.params?.conversationId);
           if (threadId) {
             releaseDesktopThreadState(threadId);
@@ -109,22 +127,12 @@ function createDesktopRequestRouter({
 
   async function syncDesktopOwnerRuntimeSettings(threadId, turnStartParams) {
     const params = turnStartParams && typeof turnStartParams === "object" ? turnStartParams : {};
-    const collaborationMode = params.collaborationMode && typeof params.collaborationMode === "object"
-      ? cloneJSON(params.collaborationMode) : null;
-    const collaborationSettings = collaborationMode?.settings;
-    const model = readString(params.model) || readString(collaborationSettings?.model);
-    const effort = readString(params.effort) || readString(params.reasoningEffort)
-      || readString(collaborationSettings?.reasoning_effort) || readString(collaborationSettings?.reasoningEffort);
-    const serviceTier = readString(params.serviceTier) || readString(params.service_tier) || null;
-    if (!model && !effort && !collaborationMode) return;
+    const threadSettings = threadSettingsFromRuntimeSettings(runtimeSettingsPatch(params));
+    if (params.collaborationMode) threadSettings.collaborationMode = cloneJSON(params.collaborationMode);
+    if (Object.keys(threadSettings).length === 0) return;
     await ipc.sendRequest("thread-follower-update-thread-settings", {
       conversationId: threadId,
-      threadSettings: {
-        ...(model ? { model } : {}),
-        effort: effort || null,
-        serviceTier,
-        ...(collaborationMode ? { collaborationMode } : {}),
-      },
+      threadSettings,
     });
   }
 
@@ -147,6 +155,7 @@ function createDesktopRequestRouter({
       ? normalized
       : rawTurnStartParams;
     const request = cloneJSON(turnStartParams);
+    if (request.sandboxPolicy) request.sandboxPolicy = normalizeSandboxPolicyCompatibility(request.sandboxPolicy);
     if (!readString(request.clientUserMessageId)) {
       request.clientUserMessageId = route.senderRequestId
         || route.params?.senderRequestId

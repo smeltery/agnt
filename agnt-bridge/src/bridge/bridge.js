@@ -220,6 +220,8 @@ function startBridge({
     sendApplicationResponse,
   });
   const {
+    handleRuntimeSettings,
+    threadRuntimeSettingsStore,
     desktopIpcActionFollower,
     desktopIpcLiveOwner,
     rolloutLiveMirror,
@@ -235,6 +237,8 @@ function startBridge({
     rememberThreadFromMessage,
     sendApplicationResponse,
   });
+
+  if (activeProvider.id === "codex") threadRowEnrichers.push(threadRuntimeSettingsStore);
 
   const voiceHandler = createVoiceHandler({
     sendCodexRequest: bridgeManagedCodex.sendRequest,
@@ -394,6 +398,7 @@ function startBridge({
     forwardedRequestTracker,
     handshakeHandler,
     handleFallbackMessage: forwardApplicationMessageToProvider,
+    handleRuntimeSettings,
     notificationsHandler,
     rememberThreadFromMessage,
     rolloutLiveMirror,
