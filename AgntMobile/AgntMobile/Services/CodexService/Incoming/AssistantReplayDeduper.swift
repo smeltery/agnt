@@ -13,7 +13,7 @@ enum AssistantReplayDeduper {
         result.reserveCapacity(messages.count)
 
         for message in messages {
-            if message.role == .assistant,
+            if message.role == .assistant, message.asyncUserInput == nil,
                isReplayMessage(
                    in: result,
                    threadId: message.threadId,

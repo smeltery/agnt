@@ -83,12 +83,14 @@ extension CodexService {
         planState: CodexPlanState? = nil,
         planPresentation: CodexPlanPresentation? = nil,
         subagentAction: CodexSubagentAction? = nil,
-        autoApprovalReview: CodexAutoApprovalReview? = nil
+        autoApprovalReview: CodexAutoApprovalReview? = nil,
+        asyncUserInput: CodexAsyncUserInput? = nil
     ) {
         guard !text.isEmpty
             || !attachments.isEmpty
             || subagentAction != nil
-            || autoApprovalReview != nil else {
+            || autoApprovalReview != nil
+            || asyncUserInput != nil else {
             return
         }
 
@@ -115,7 +117,8 @@ extension CodexService {
                 planPresentation: planPresentation,
                 proposedPlan: role == .assistant ? CodexProposedPlanParser.parse(from: text) : nil,
                 subagentAction: subagentAction,
-                autoApprovalReview: autoApprovalReview
+                autoApprovalReview: autoApprovalReview,
+                asyncUserInput: asyncUserInput
             )
         )
     }

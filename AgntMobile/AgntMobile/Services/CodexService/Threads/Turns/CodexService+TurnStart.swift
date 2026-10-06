@@ -15,7 +15,8 @@ extension CodexService {
         shouldAppendUserMessage: Bool = true,
         collaborationMode: CodexCollaborationModeKind? = nil,
         preAppendedUserMessageID: String? = nil,
-        automaticTitleSeedOverride: String? = nil
+        automaticTitleSeedOverride: String? = nil,
+        onDispatch: (() -> Void)? = nil
     ) async throws {
         let outgoingDisplayText = displayTextForOutgoingTurn(
             userInput: userInput,
@@ -91,6 +92,7 @@ extension CodexService {
                 if let messageStartCheckpointTask {
                     await messageStartCheckpointTask.value
                 }
+                onDispatch?()
                 let response = try await sendRequestWithSandboxFallback(
                     method: "turn/start",
                     baseParams: requestParams

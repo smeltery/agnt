@@ -280,7 +280,7 @@ extension CodexService {
             return "Waiting for input..."
         case .autoApprovalReview:
             return "Reviewing approval..."
-        case .chat:
+        case .chat, .asyncUserInputAnswer:
             return "Updating..."
         }
     }

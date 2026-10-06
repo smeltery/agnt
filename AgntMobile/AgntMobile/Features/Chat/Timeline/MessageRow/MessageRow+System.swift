@@ -43,7 +43,7 @@ extension MessageRow {
             } else {
                 defaultSystemView(text: text)
             }
-        case .chat:
+        case .chat, .asyncUserInputAnswer:
             defaultSystemView(text: text)
         }
     }

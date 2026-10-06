@@ -70,7 +70,8 @@ extension CodexService {
                         itemId: itemID,
                         createdAt: timestamp,
                         timeZoneIdentifier: timeZoneIdentifier,
-                        attachments: imageAttachments
+                        attachments: imageAttachments,
+                        asyncUserInput: CodexAsyncUserInput.decode(from: itemObject)
                     )
 
                 case "message":
@@ -302,6 +303,7 @@ extension CodexService {
             }
         }
 
+        CodexAsyncUserInputProjection.reconcile(&result)
         return Self.historyMessagesMergingGeneratedImageArtifacts(result)
     }
 

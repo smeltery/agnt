@@ -215,7 +215,7 @@ extension CodexService {
             return sanitizedPetPrompt(message.text) ?? "Planning"
         case .subagentAction:
             return sanitizedPetPrompt(message.text) ?? "Working with an agent"
-        case .chat:
+        case .chat, .asyncUserInputAnswer:
             return sanitizedPetPrompt(message.text)
         }
     }

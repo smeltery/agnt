@@ -432,3 +432,16 @@ test("desktop conversation projector bootstraps fresh after explicit removal", (
     ["thread/started", "turn/started", "item/started", "item/completed"]
   );
 });
+
+test("desktop question metadata survives a simultaneous assistant text delta", () => {
+  const projector = createDesktopConversationProjector();
+  const state = (item) => ({ turns: [{ turnId: "turn", status: "inProgress", items: [item] }] });
+  const item = { id: "question", type: "agentMessage", text: "Choose" };
+  projector.project("thread", state(item));
+  const questions = [{ title: "Which branch?", options: ["Main", "New"] }];
+  const result = projector.project("thread", state({ ...item, text: "Choose a branch", delivery: "async", questions }));
+  const event = result.notifications.find((entry) => entry.method === "item/completed");
+  assert.equal(event.params.item.delivery, "async");
+  assert.deepEqual(event.params.item.questions, questions);
+  assert.equal(event.params.item.text, "Choose a branch");
+});

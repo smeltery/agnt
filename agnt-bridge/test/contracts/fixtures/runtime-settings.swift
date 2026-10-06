@@ -2,6 +2,7 @@ import Foundation
 
 enum CodexServiceError: Error { case invalidInput(String), disconnected }
 @MainActor final class CodexService {
+    var asyncInput = CodexAsyncInputState()
     var streamRecovery = CodexStreamRecoveryState()
     var supportsRuntimeSettingsSync = true
     var runtimeSettingsProviderId: String? = "codex"

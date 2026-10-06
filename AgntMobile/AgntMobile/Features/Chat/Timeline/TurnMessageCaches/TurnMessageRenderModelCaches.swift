@@ -147,7 +147,7 @@ enum MessageRowRenderModelCache {
                     thinkingActivityPreview: nil,
                     commandStatus: CommandExecutionStatusCache.status(messageID: message.id, text: displayText)
                 )
-            case .subagentAction, .plan, .userInputPrompt, .autoApprovalReview, .chat:
+            case .subagentAction, .plan, .userInputPrompt, .autoApprovalReview, .chat, .asyncUserInputAnswer:
                 return .empty
             }
         }

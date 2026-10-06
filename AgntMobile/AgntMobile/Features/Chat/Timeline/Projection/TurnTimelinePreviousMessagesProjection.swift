@@ -176,6 +176,7 @@ extension TurnTimelineRenderProjection {
 
     // Keeps user-critical artifacts visible beside the final answer instead of burying them in the disclosure.
     static func isPriorityVisibleMessage(_ message: CodexMessage, finalMessage: CodexMessage? = nil) -> Bool {
+        if message.asyncUserInput != nil { return true }
         if message.role == .system {
             switch message.kind {
             case .fileChange, .subagentAction, .userInputPrompt:
@@ -186,7 +187,7 @@ extension TurnTimelineRenderProjection {
                 return message.autoApprovalReview?.status != .approved
             case .plan:
                 return message.shouldDisplayInlinePlanResult
-            case .thinking, .toolActivity, .commandExecution, .chat:
+            case .thinking, .toolActivity, .commandExecution, .chat, .asyncUserInputAnswer:
                 return false
             }
         }

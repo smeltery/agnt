@@ -157,7 +157,7 @@ extension TurnTimelineReducer {
         switch message.kind {
         case .toolActivity, .commandExecution:
             return true
-        case .thinking, .chat, .plan, .userInputPrompt, .fileChange, .subagentAction, .autoApprovalReview:
+        case .thinking, .chat, .asyncUserInputAnswer, .plan, .userInputPrompt, .fileChange, .subagentAction, .autoApprovalReview:
             return false
         }
     }
@@ -243,7 +243,7 @@ extension TurnTimelineReducer {
         switch message.kind {
         case .thinking, .toolActivity, .commandExecution:
             return true
-        case .chat, .plan, .userInputPrompt, .fileChange, .subagentAction, .autoApprovalReview:
+        case .chat, .asyncUserInputAnswer, .plan, .userInputPrompt, .fileChange, .subagentAction, .autoApprovalReview:
             return false
         }
     }
@@ -264,7 +264,7 @@ extension TurnTimelineReducer {
                 return 3
             case .autoApprovalReview:
                 return 3
-            case .chat:
+            case .chat, .asyncUserInputAnswer:
                 return 4
             case .plan:
                 return 4

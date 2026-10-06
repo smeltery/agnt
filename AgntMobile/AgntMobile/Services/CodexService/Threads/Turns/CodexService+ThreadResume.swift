@@ -196,7 +196,9 @@ extension CodexService {
 
         threadResumeTaskByThreadID[threadId] = task
         threadResumeRequestSignatureByThreadID[threadId] = requestedSignature
-        return try await task.value
+        let result = try await task.value
+        Task { await flushQueuedAsyncUserInput(threadId: threadId) }
+        return result
     }
 
     func isThreadMissingOnServer(_ threadId: String) async -> Bool {
