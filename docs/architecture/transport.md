@@ -112,3 +112,12 @@ again after reconnect or a revision gap, and use `agnt/activity/unsubscribe` whe
 updates are no longer needed. The feed preserves runtime ownership and marks a
 lost Desktop connection stale without inventing a terminal outcome. It uses the
 same encrypted transport as other application messages.
+
+### Desktop writer confirmation
+
+Opening a Codex chat reads its metadata before acquiring a writer. A Desktop
+owner-discovery answer is confirmed with a targeted, read-only history request;
+mutations wait until that check or a local resume succeeds. An unavailable
+active writer returns an error rather than replaying the request locally.
+Metadata-only resumes keep the Desktop writer, and lightweight turn-state probes
+use its normalized live state while full transcripts still use canonical paging.

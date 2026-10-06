@@ -13,6 +13,7 @@ const {
 
 function createDesktopRequestRouter({
   runtimeSettingsStore = null,
+  targetClientId = () => undefined,
   isKnownDesktopOwner = () => false,
   forwardToLocalCodex,
   ipc,
@@ -48,7 +49,7 @@ function createDesktopRequestRouter({
       return;
     }
 
-    ipc.sendRequest(payload.method, payload.params)
+    ipc.sendRequest(payload.method, payload.params, { targetClientId: targetClientId(route.threadId) })
       .then(() => {
         pendingRoutesByRequestId.delete(route.requestId);
         sendApplicationResponse(JSON.stringify(
@@ -84,7 +85,7 @@ function createDesktopRequestRouter({
         return {
           resolvedRequest,
           revisionBefore: runtimeSettingsStore?.get?.(route.threadId)?.revision,
-          result: await ipc.sendRequest(route.method, resolvedRequest.params),
+          result: await ipc.sendRequest(route.method, resolvedRequest.params, { targetClientId: targetClientId(route.threadId) }),
         };
       })
       .then(({ resolvedRequest, revisionBefore, result }) => {
@@ -133,7 +134,7 @@ function createDesktopRequestRouter({
     await ipc.sendRequest("thread-follower-update-thread-settings", {
       conversationId: threadId,
       threadSettings,
-    });
+    }, { targetClientId: targetClientId(threadId) });
   }
 
   // Desktop-followed turn starts must apply the same param normalization as

@@ -51,6 +51,16 @@ function createBridgeDesktopIntegrations({
       onActivityObservation,
       sendApplicationResponse,
       readConversationState: readDesktopConversationState,
+      readThreadMetadata: (threadId) => bridgeManagedCodex.sendRequest("thread/read", { threadId, includeTurns: false }),
+      async resumeThreadLocally(message, isCurrent) {
+        const result = await bridgeManagedCodex.sendRequest("thread/resume", message.params);
+        if (!isCurrent() || result?.thread?.id !== message.params?.threadId) return result;
+        const response = { id: message.id, result };
+        desktopIpcLiveOwner?.observeInbound(JSON.stringify(message), message);
+        desktopIpcLiveOwner?.observeOutbound(JSON.stringify(response), response);
+        rememberThreadFromMessage("codex", JSON.stringify(response), response);
+        return result;
+      },
       forwardToLocalCodex: (rawMessage) => {
         desktopIpcLiveOwner?.observeInbound(rawMessage);
         const forwarded = normalizeProviderMessage(rawMessage);

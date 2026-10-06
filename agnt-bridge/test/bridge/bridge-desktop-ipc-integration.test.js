@@ -52,14 +52,14 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
           result: { clientId: "desktop-test" },
         });
       }
-      if (frame.method === "thread-follower-submit-user-input") {
+      if (["thread-follower-submit-user-input", "thread-owner-discovery", "thread-follower-load-complete-history"].includes(frame.method)) {
         writeFrame(socket, {
           type: "response",
           requestId: frame.requestId,
           resultType: "success",
           method: frame.method,
           handledByClientId: "desktop",
-          result: { ok: true },
+          result: { ok: true, revision: 1 },
         });
       }
     });
@@ -103,11 +103,11 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
   relaySocket.send(JSON.stringify({
     id: "resume-from-phone",
     method: "thread/resume",
-    params: { threadId: "thread-ipc" },
+    params: { threadId: "thread-ipc", excludeTurns: true },
   }));
 
-  // Opening a thread connects the IPC bus but must not eagerly read a baseline;
-  // a desktop snapshot below establishes state without any thread/read.
+  // Opening a thread confirms its writer with metadata and read-only IPC;
+  // the Desktop snapshot below supplies the pending actions.
   await waitFor(() => ipcServerSocket);
   writeFrame(ipcServerSocket, {
     type: "broadcast",
@@ -167,7 +167,10 @@ test("bridge forwards desktop IPC actions to the phone and routes replies back t
       && message.params?.requestId === "req-ipc"
   );
   assert.equal(resolvedMessage.params.threadId, "thread-ipc");
-  assert.equal(fakeCodex.sent.some((message) => message.method === "thread/read"), false);
+  assert.ok(fakeCodex.sent.some((message) => message.method === "thread/read" && message.params.includeTurns === false));
+  assert.equal(fakeCodex.sent.some((message) => message.method === "thread/resume"), false);
+  const ownerProbe = await waitForMessage(ipcFrames, (frame) => frame.method === "thread-follower-load-complete-history");
+  assert.equal(ownerProbe.targetClientId, "desktop");
 });
 
 function requireOptionalWebSocket(t) {
@@ -280,6 +283,7 @@ function createFakeCodexTransport() {
         listeners.message?.(JSON.stringify({
           id: parsed.id,
           result: {
+            thread: { id: parsed.params.threadId },
             conversationState: {
               turns: [],
               requests: [],

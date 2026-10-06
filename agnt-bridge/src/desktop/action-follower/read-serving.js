@@ -11,7 +11,8 @@ const {
   hasNormalizedHistoryOutsideRawTurns,
   readThreadId,
 } = require("../desktop-ipc-action-follower-support");
-const { readString } = require("../desktop-ipc-shared");
+const { readString, isThreadTurnStateProbeRequest } = require("../desktop-ipc-shared");
+const { desktopLiveStateForProjection } = require("./state");
 
 function createDesktopReadServer({
   activeThreads,
@@ -66,6 +67,16 @@ function createDesktopReadServer({
       return true;
     }
     if (canonicalHistoryThreadIds.has(threadId)) {
+      if (isThreadTurnStateProbeRequest(message)) {
+        const liveState = desktopLiveStateForProjection(rawState);
+        const data = (liveState.turns || []).slice().reverse().map((turn) => ({
+          id: readString(turn.id) || readString(turn.turnId) || readString(turn.turn_id),
+          status: readString(turn.status) || "completed",
+        }));
+        sendApplicationResponse(JSON.stringify({ id: message.id,
+          result: { data, nextCursor: null, hasMore: false, agntDesktopLiveState: true } }));
+        return true;
+      }
       return ownsDesktopCursor ? rejectDesktopTurnsCursor(message) : false;
     }
 
