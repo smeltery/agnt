@@ -20,6 +20,7 @@ enum CodexMessageDeliveryState: String, Codable, Hashable, Sendable {
 
 enum CodexMessageKind: String, Codable, Hashable, Sendable {
     case chat
+    case asyncUserInputAnswer
     case thinking
     case toolActivity
     case fileChange
@@ -52,6 +53,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
     var proposedPlan: CodexProposedPlan?
     var subagentAction: CodexSubagentAction?
     var structuredUserInputRequest: CodexStructuredUserInputRequest?
+    var asyncUserInput: CodexAsyncUserInput?
     var autoApprovalReview: CodexAutoApprovalReview?
 
     /// Monotonically increasing counter that preserves insertion order.
@@ -81,6 +83,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         subagentAction: CodexSubagentAction? = nil,
         structuredUserInputRequest: CodexStructuredUserInputRequest? = nil,
         autoApprovalReview: CodexAutoApprovalReview? = nil,
+        asyncUserInput: CodexAsyncUserInput? = nil,
         orderIndex: Int? = nil
     ) {
         self.id = id
@@ -118,6 +121,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         )
         self.subagentAction = subagentAction
         self.structuredUserInputRequest = structuredUserInputRequest
+        self.asyncUserInput = asyncUserInput
         self.autoApprovalReview = autoApprovalReview
         self.orderIndex = orderIndex ?? CodexMessageOrderCounter.next()
     }
@@ -145,6 +149,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
         case subagentAction
         case structuredUserInputRequest
         case autoApprovalReview
+        case asyncUserInput
         case orderIndex
     }
 
@@ -192,6 +197,7 @@ struct CodexMessage: Identifiable, Codable, Hashable, Sendable {
             CodexStructuredUserInputRequest.self,
             forKey: .structuredUserInputRequest
         )
+        asyncUserInput = try container.decodeIfPresent(CodexAsyncUserInput.self, forKey: .asyncUserInput)
         autoApprovalReview = try container.decodeIfPresent(CodexAutoApprovalReview.self, forKey: .autoApprovalReview)
         orderIndex = try container.decodeIfPresent(Int.self, forKey: .orderIndex) ?? CodexMessageOrderCounter.next()
     }

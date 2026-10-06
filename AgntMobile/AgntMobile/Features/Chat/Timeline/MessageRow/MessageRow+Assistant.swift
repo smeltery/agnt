@@ -88,6 +88,9 @@ extension MessageRow {
             return trailingAssistantImageReferences.isEmpty ? assistantBlockAccessoryState?.copyText : nil
         }()
         return VStack(alignment: .leading, spacing: 8) {
+            if let input = message.asyncUserInput {
+                AsyncUserInputMessageCard(message: message, input: input)
+            }
             if let commentContent, commentContent.hasFindings {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(commentContent.findings) { finding in

@@ -10,6 +10,7 @@ extension CodexService {
     func prepareThreadForDisplay(threadId: String) async -> Bool {
         activeThreadId = threadId
         presentRuntimeSettingsError(for: threadId)
+        presentAsyncUserInputError(threadId: threadId)
         markThreadAsViewed(threadId)
         updateCurrentOutput(for: threadId)
         var didRefreshRunningState = false

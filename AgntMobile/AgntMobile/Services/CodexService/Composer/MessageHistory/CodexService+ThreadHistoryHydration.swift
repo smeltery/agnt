@@ -276,6 +276,11 @@ extension CodexService {
                 terminalStatesByTurnID: historyTerminalStates
             )
             let historyMessages = decodeMessagesFromThreadRead(threadId: threadId, threadObject: threadObject)
+            if CodexAsyncUserInputProjection.hasMissingAnswerCandidate(
+                in: messagesByThread[threadId] ?? [], canonical: historyMessages
+            ) {
+                scheduleAsyncAnswerVerification(threadId: threadId, delay: 3)
+            }
             let isSuspiciousEmptyHistory = historyMessages.isEmpty
                 && shouldDeferEmptyThreadHistoryPage(
                     threadId: threadId,

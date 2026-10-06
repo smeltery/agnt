@@ -334,7 +334,7 @@ extension CodexService {
     func threadRunBadgeState(for threadId: String) -> CodexThreadRunBadgeState? {
         // A pending action outranks the spinner: the run is parked until the
         // user responds, and that is the row worth opening first.
-        if threadHasPendingApproval(threadId) {
+        if threadHasPendingApproval(threadId) || threadHasPendingAsyncUserInput(threadId) {
             return .waitingOnUser
         }
         if threadHasActiveOrRunningTurn(threadId) {

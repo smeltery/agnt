@@ -203,6 +203,13 @@ function diffItem(threadId, turnId, previousItem, nextItem) {
   const itemType = normalizeToken(nextItem.type);
   const snapshot = snapshotItem(previousItem);
   if (isAssistantMessageItem(nextItem)) {
+    // Question metadata can arrive alongside a text delta. Send the whole item
+    // so a question-only or newly answerable card is not lost until another tick.
+    if (nextItem.delivery === "async"
+      && (previousItem.delivery !== "async"
+        || JSON.stringify(previousItem.questions) !== JSON.stringify(nextItem.questions))) {
+      return [itemCompletedNotification(threadId, turnId, nextItem)];
+    }
     const previousText = assistantMessageText(previousItem);
     const nextText = assistantMessageText(nextItem);
     const delta = appendedDelta(previousText, nextText, snapshot.agentTextLen);

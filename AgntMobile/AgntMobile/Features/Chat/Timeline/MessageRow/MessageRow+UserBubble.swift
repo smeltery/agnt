@@ -63,7 +63,7 @@ extension MessageRow {
                         Label("Copy", systemImage: "doc.on.doc")
                     }
                 }
-                if isRetryAvailable, message.role == .user, !text.isEmpty {
+                if isRetryAvailable, message.kind != .asyncUserInputAnswer, message.role == .user, !text.isEmpty {
                     Button {
                         HapticFeedback.shared.triggerImpactFeedback(style: .light)
                         onRetryUserMessage(text)

@@ -29,9 +29,11 @@ extension CodexService {
         method: String,
         params: JSONValue?,
         timeoutNanoseconds: UInt64? = nil,
-        timeoutMessage: String? = nil
+        timeoutMessage: String? = nil,
+        onDispatch: (() -> Void)? = nil
     ) async throws -> RPCMessage {
         if let requestTransportOverride {
+            onDispatch?()
             return try await requestTransportOverride(method, params)
         }
 
@@ -70,6 +72,7 @@ extension CodexService {
 
                 Task {
                     do {
+                        onDispatch?()
                         try await sendMessage(request)
                     } catch {
                         if shouldTreatSendFailureAsDisconnect(error) {

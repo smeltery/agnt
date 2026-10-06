@@ -115,6 +115,7 @@ extension CodexService {
                 discardTurnStartWorkspaceCheckpointCopyIfNeeded(turnId: resolvedTurnID)
             }
             requestImmediateSync(threadId: threadId)
+            Task { await flushQueuedAsyncUserInput(threadId: threadId) }
             if terminalState == .completed {
                 scheduleAppReviewPromptAfterSuccessfulRun(threadId: threadId, turnId: resolvedTurnID)
             }

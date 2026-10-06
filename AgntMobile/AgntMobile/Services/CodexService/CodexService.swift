@@ -372,7 +372,7 @@ final class CodexService {
     let userNotificationCenter: CodexUserNotificationCentering
     let remoteNotificationRegistrar: CodexRemoteNotificationRegistering
 
-    static let locallyArchivedThreadIDsKey = "codex.locallyArchivedThreadIDs"
+    var asyncInput = CodexAsyncInputState()
     static let locallyDeletedThreadIDsKey = "codex.locallyDeletedThreadIDs"
     static let forkedThreadOriginsDefaultsKey = "codex.forkedThreadOrigins"
     static let renamedThreadNamesDefaultsKey = "codex.renamedThreadNames"

@@ -9,7 +9,7 @@ extension TurnTimelineReducer {
         result.reserveCapacity(messages.count)
 
         for message in messages {
-            guard message.role == .assistant else {
+            guard message.role == .assistant, message.asyncUserInput == nil else {
                 result.append(message)
                 continue
             }
@@ -99,7 +99,8 @@ extension TurnTimelineReducer {
 
     // Folds duplicate final-answer items even when history/live replay assigned different stable item ids.
     static func shouldMergeExactAssistantReplay(previous: CodexMessage, incoming: CodexMessage) -> Bool {
-        guard previous.role == .assistant,
+        guard previous.asyncUserInput == nil, incoming.asyncUserInput == nil,
+              previous.role == .assistant,
               incoming.role == .assistant,
               previous.threadId == incoming.threadId,
               normalizedIdentifier(previous.turnId) == normalizedIdentifier(incoming.turnId) else {
@@ -131,7 +132,8 @@ extension TurnTimelineReducer {
 
     // Collapses persisted replay rows where a late delta duplicated part of the final answer.
     static func shouldMergeAssistantReplay(previous: CodexMessage, incoming: CodexMessage) -> Bool {
-        guard previous.role == .assistant,
+        guard previous.asyncUserInput == nil, incoming.asyncUserInput == nil,
+              previous.role == .assistant,
               incoming.role == .assistant,
               previous.threadId == incoming.threadId,
               normalizedIdentifier(previous.turnId) == normalizedIdentifier(incoming.turnId) else {

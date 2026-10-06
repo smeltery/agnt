@@ -53,6 +53,7 @@ extension CodexService {
                 messages.map { message in
                     var value = message
                     value.isStreaming = false
+                    if value.asyncUserInput?.status == .submitting { value.asyncUserInput?.status = .uncertain }
                     return value
                 }
             }

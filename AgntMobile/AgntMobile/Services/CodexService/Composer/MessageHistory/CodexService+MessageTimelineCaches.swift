@@ -87,6 +87,10 @@ extension CodexService {
 
     // Refreshes the derived output cache and bumps the thread timeline revision.
     func updateCurrentOutput(for threadId: String) {
+        if var messages = messagesByThread[threadId], messages.contains(where: { $0.asyncUserInput != nil }) {
+            CodexAsyncUserInputProjection.reconcile(&messages)
+            if messages != messagesByThread[threadId] { messagesByThread[threadId] = messages }
+        }
         noteMessagesChanged(for: threadId)
 
         let latestAssistantText = syncLatestAssistantOutputCache(for: threadId)

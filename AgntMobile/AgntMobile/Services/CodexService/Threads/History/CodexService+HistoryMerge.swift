@@ -299,7 +299,7 @@ extension CodexService {
                 continue
             }
 
-            if message.role == .assistant,
+            if message.role == .assistant, message.asyncUserInput == nil,
                AssistantReplayDeduper.isReplayMessage(
                    in: merged,
                    threadId: message.threadId,
@@ -313,6 +313,20 @@ extension CodexService {
         }
 
         merged.sort(by: { $0.orderIndex < $1.orderIndex })
+        // Reapply local answer state after canonical item replacement, then bind
+        // native/Desktop answers by question identity.
+        let localInputs = Dictionary(existing.compactMap { message in
+            message.itemId.flatMap { id in message.asyncUserInput.map { (id, $0) } }
+        }, uniquingKeysWith: { _, latest in latest })
+        let canonicalInputs = Dictionary(history.compactMap { message in
+            message.itemId.flatMap { id in message.asyncUserInput.map { (id, $0) } }
+        }, uniquingKeysWith: { _, latest in latest })
+        for index in merged.indices {
+            if let id = merged[index].itemId, let incoming = canonicalInputs[id] ?? merged[index].asyncUserInput {
+                merged[index].asyncUserInput = .merge(local: localInputs[id], incoming: incoming)
+            }
+        }
+        CodexAsyncUserInputProjection.reconcile(&merged)
         return historyMessagesMergingGeneratedImageArtifacts(merged)
     }
 

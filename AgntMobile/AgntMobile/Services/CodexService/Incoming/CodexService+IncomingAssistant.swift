@@ -169,6 +169,12 @@ extension CodexService {
         }
 
         let text = extractIncomingMessageText(from: itemObject)
+        if let input = CodexAsyncUserInput.decode(from: itemObject),
+           let context = resolveAssistantEventContext(paramsObject: paramsObject, eventObject: eventObject, itemObject: itemObject) {
+            upsertAsyncUserInput(input, threadId: context.threadId, turnId: context.identity.turnId,
+                                itemId: context.identity.itemId, text: text, completed: true)
+            return
+        }
         guard !text.isEmpty else { return }
 
         guard let context = resolveAssistantEventContext(
@@ -311,6 +317,11 @@ extension CodexService {
             requiresTurnId: true
         ),
         let turnId = context.identity.turnId else {
+            return
+        }
+        if let input = CodexAsyncUserInput.decode(from: itemObject) {
+            upsertAsyncUserInput(input, threadId: context.threadId, turnId: turnId,
+                                itemId: context.identity.itemId, text: extractIncomingMessageText(from: itemObject), completed: false)
             return
         }
         beginAssistantMessage(

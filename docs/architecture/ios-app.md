@@ -104,6 +104,15 @@ If the WebSocket drops:
 
 Privacy policy and terms link to `legal/PRIVACY_POLICY.md` and `legal/TERMS_OF_USE.md` on GitHub. Lowercase `legal/` is intentional — GitHub URLs are case-sensitive on the web.
 
+## Async questions
+
+Assistant items with `delivery: "async"` keep their questions in the timeline while
+work continues. Answers steer the active turn when possible, queue while steering
+is unavailable, or start a turn in the same chat once idle. The answer card retains
+drafts and reports uncertain delivery instead of silently retrying. Canonical
+history confirms replies; reopening a missing reply requires two separated full
+history reads. Questions also appear as waiting-for-user sidebar activity.
+
 ## What the iOS app does NOT do
 
 Worth being explicit, because the boundary matters:
