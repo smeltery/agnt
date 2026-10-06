@@ -22,6 +22,8 @@ const { spawn } = require("child_process");
 const http = require("http");
 const { detectOpencodeBinary } = require("./detect");
 
+const { createOpencodeEventStream } = require("./event-stream");
+
 const DEFAULT_HOST = "127.0.0.1";
 
 function createOpencodeTransport({
@@ -89,7 +91,7 @@ function createOpencodeTransport({
     },
     shutdown() {
       didRequestShutdown = true;
-      try { sseRequest?.destroy(); } catch { /* best-effort */ }
+      try { sseRequest?.stop(); } catch { /* best-effort */ }
       shutdownChild(child);
       while (queuedRequests.length > 0) {
         const job = queuedRequests.shift();
@@ -169,6 +171,7 @@ function createOpencodeTransport({
     });
 
     child.on("close", (code, signal) => {
+      sseRequest?.stop();
       if (!didRequestShutdown && !didReportError && code !== 0) {
         didReportError = true;
         listeners.emitError(createCloseError({ code, signal, stderrBuffer, description }));
@@ -205,45 +208,11 @@ function createOpencodeTransport({
     });
   }
 
-  // Subscribes to the SSE event stream once the local server is up.
   function startEventStream() {
-    if (!port) return;
-    const req = httpImpl.get({ host, port, path: "/event" }, (res) => {
-      if (res.statusCode !== 200) {
-        listeners.emitError(new Error(
-          `[agnt] opencode SSE stream failed: HTTP ${res.statusCode} on /event`
-        ));
-        return;
-      }
-      let buf = "";
-      res.on("data", (chunk) => {
-        buf += chunk.toString("utf8");
-        let newlineIndex;
-        while ((newlineIndex = buf.indexOf("\n")) !== -1) {
-          const line = buf.slice(0, newlineIndex).trim();
-          buf = buf.slice(newlineIndex + 1);
-          if (!line || line.startsWith(":") || line.startsWith("event:")) continue;
-          if (line.startsWith("data:")) {
-            const payload = line.slice(5).trim();
-            if (payload.length > 0) {
-              listeners.emitMessage(payload);
-            }
-          }
-        }
-      });
-      res.on("close", () => {
-        if (!didRequestShutdown) {
-          listeners.emitClose(0, null);
-        }
-      });
-    });
-    req.on("error", (error) => {
-      if (didRequestShutdown) return;
-      didReportError = true;
-      listeners.emitError(error);
-    });
-    sseRequest = req;
+    sseRequest = createOpencodeEventStream({ httpImpl, host, port,
+      onMessage: (payload) => listeners.emitMessage(payload) });
   }
+
 }
 
 function shutdownChild(child) {

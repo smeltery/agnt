@@ -61,8 +61,8 @@ test("permission.asked emits item/commandExecution/requestApproval and reply POS
 
   assert.equal(httpCalls.length, 1);
   assert.equal(httpCalls[0].method, "POST");
-  assert.equal(httpCalls[0].pathName, "/session/ses_perm/permissions/perm_abc");
-  assert.equal(httpCalls[0].body.response, "once");
+  assert.equal(httpCalls[0].pathName, "/permission/perm_abc/reply");
+  assert.equal(httpCalls[0].body.reply, "once");
 });
 
 test("permission decline maps decision:'decline' to opencode response:'reject'", async () => {
@@ -92,7 +92,7 @@ test("permission decline maps decision:'decline' to opencode response:'reject'",
   const env = parseInjected(injected).find((e) => e.method?.endsWith("requestApproval"));
   translator.outbound(JSON.stringify({ id: env.id, result: { decision: "decline" } }));
   await new Promise((r) => setImmediate(r));
-  assert.equal(httpCalls[httpCalls.length - 1].body.response, "reject");
+  assert.equal(httpCalls[httpCalls.length - 1].body.reply, "reject");
 });
 
 test("assistant deltas continue to flow while an approval request is pending", () => {

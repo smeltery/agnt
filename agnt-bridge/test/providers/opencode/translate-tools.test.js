@@ -154,7 +154,7 @@ test("opencode webfetch tool emits a background_event with descriptive message",
   assert.equal(ev.params.message, "Fetching https://example.com");
 });
 
-test("turn/start image attachment uses opencode {type:'file', mediaType, url} schema", () => {
+test("turn/start image attachment uses opencode {type:'file', mime, url} schema", () => {
   const { translator, httpCalls } = setupTranslator();
   translator.outbound(JSON.stringify({
     id: "tu-img", method: "turn/start",
@@ -170,7 +170,7 @@ test("turn/start image attachment uses opencode {type:'file', mediaType, url} sc
   const body = httpCalls[0].body;
   const filePart = body.parts.find((p) => p.type === "file");
   assert.ok(filePart);
-  assert.equal(filePart.mediaType, "image/jpeg");
+  assert.equal(filePart.mime, "image/jpeg");
   assert.equal(filePart.url, "data:image/jpeg;base64,/9j/");
 });
 

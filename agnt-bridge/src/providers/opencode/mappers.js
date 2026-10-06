@@ -40,6 +40,10 @@ function mapSessionToSummary(session) {
   };
 }
 
+function turnIdForMessage(messageId) {
+  return messageId.startsWith("msg_") ? `turn_${messageId.slice(4)}` : messageId || generateTurnId();
+}
+
 function mapMessagesToTurns(messages) {
   const turns = [];
   let currentTurn = null;
@@ -51,8 +55,8 @@ function mapMessagesToTurns(messages) {
     const parts = Array.isArray(message.parts) ? message.parts : [];
     if (role === "user") {
       currentTurn = {
-        id: messageId || generateTurnId(),
-        turnId: messageId || generateTurnId(),
+        id: turnIdForMessage(messageId),
+        turnId: turnIdForMessage(messageId),
         status: "completed",
         input: parts.map(mapPartToInput).filter(Boolean),
         items: [],

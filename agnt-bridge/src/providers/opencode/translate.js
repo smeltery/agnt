@@ -50,9 +50,15 @@ const { createOpencodeMessageBodyBuilder } = require("./message-body");
 const { createOpencodeStreamHandlers } = require("./stream-handlers");
 const { createOpencodeThreadHandlers } = require("./thread-handlers");
 
+const { createOpencodeSessionClient } = require("./session-client");
+const { normalizeModelCatalog } = require("./model-catalog");
+
+const { createOpencodeStreamRecovery } = require("./stream-recovery");
+
 const PROTO_VERSION = "1.0.0-opencode-shim";
 
 function createOpencodeTranslator({ injectInbound, transport, env: _env = process.env } = {}) {
+  transport = createOpencodeSessionClient(transport);
   const { emitNotification, injectResponse, respondError } = createFrameEmitter(injectInbound);
   const turnLifecycle = createTurnLifecycleEmitter(emitNotification);
 
@@ -97,6 +103,9 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     get didEmitTurnCompletedForActive() { return didEmitTurnCompletedForActive; },
     set didEmitTurnCompletedForActive(value) { didEmitTurnCompletedForActive = value; },
     partItemIds,
+    sessionSettings: transport.settings,
+    activeUserMessageId: "",
+    activeTurnAccepted: false,
   };
   const threadHandlers = createOpencodeThreadHandlers({
     emitNotification,
@@ -111,6 +120,7 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     toolCallById,
     turnLifecycle,
   });
+  const recovery = createOpencodeStreamRecovery({ state, transport, streamHandlers });
   const approvalFlow = createOpencodeApprovalFlow({
     approvalIdToPermission,
     getActiveThreadId: () => activeThreadId,
@@ -125,6 +135,7 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     inbound,
     handleStarted() {},
     handleClose() {
+      recovery.stop();
       if (activeTurnId && activeThreadId && !didEmitTurnCompletedForActive) {
         turnLifecycle.emitTurnFailed(activeThreadId, activeTurnId, "opencode transport closed before turn completed");
         turnLifecycle.emitTurnCompleted(activeThreadId, activeTurnId);
@@ -209,8 +220,15 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       return null;
     }
 
-    if (method === "thread/generateTitle" || method === "thread/name/set") {
-      if (id != null) injectResponse(id, { ok: true });
+    if (method === "model/list") {
+      transport.httpRequest("GET", "/provider")
+        .then((response) => injectResponse(id, { data: normalizeModelCatalog(response.json), nextCursor: null }))
+        .catch((error) => respondError(id, -32603, error.message));
+      return null;
+    }
+
+    if (["thread/generateTitle", "thread/name/set", "thread/archive", "thread/unarchive"].includes(method)) {
+      threadHandlers.handleThreadUpdate(parsed);
       return null;
     }
 
@@ -237,9 +255,11 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       return;
     }
 
+    recovery.invalidate();
     const turnId = generateTurnId();
     activeTurnId = turnId;
     activeAssistantMessageId = "";
+    lastTokenSnapshot = null;
     partItemIds.clear();
     toolCallById.clear();
     didEmitTurnCompletedForActive = false;
@@ -257,23 +277,37 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
     turnLifecycle.emitTurnStarted(activeThreadId, turnId);
 
     const body = buildOpencodeMessageBody(params);
+    state.activeUserMessageId = `msg_${turnId.slice(5)}`;
+    state.activeTurnAccepted = false;
+    if (body) body.messageID = state.activeUserMessageId;
     if (!body) {
       turnLifecycle.emitTurnFailed(activeThreadId, turnId, "turn/start had no usable text or attachments");
       turnLifecycle.emitTurnCompleted(activeThreadId, turnId);
+      streamHandlers.resetTurnState();
       return;
     }
 
-    // Fire-and-forget: opencode streams the assistant content via SSE on /event.
-    // The HTTP response carries the final message snapshot but we do not wait
-    // on it — the iOS app's UI is driven entirely off the SSE notifications.
-    transport.httpRequest("POST", `/session/${encodeURIComponent(activeThreadId)}/message`, body)
+    // The async prompt endpoint acknowledges acceptance; live output arrives over SSE.
+    const threadId = activeThreadId;
+    transport.httpRequest("POST", `/session/${encodeURIComponent(threadId)}/prompt_async`, body)
+      .then(() => {
+        if (activeThreadId === threadId && activeTurnId === turnId) state.activeTurnAccepted = true;
+      })
       .catch((err) => {
-        turnLifecycle.emitTurnFailed(activeThreadId, turnId, `opencode POST /session/{id}/message failed: ${err?.message || err}`);
-        turnLifecycle.emitTurnCompleted(activeThreadId, turnId);
+        if (activeThreadId !== threadId || activeTurnId !== turnId) return;
+        turnLifecycle.emitTurnFailed(threadId, turnId, `opencode message failed: ${err?.message || err}`);
+        turnLifecycle.emitTurnCompleted(threadId, turnId);
+        streamHandlers.resetTurnState();
       });
   }
 
   function handleTurnInterrupt(request) {
+    recovery.invalidate();
+    const target = readString(request?.params?.threadId) || activeThreadId;
+    if (target !== activeThreadId) {
+      respondError(request?.id, -32602, "Cannot interrupt a different thread");
+      return;
+    }
     if (request?.id != null) injectResponse(request.id, { ok: true });
     if (!activeThreadId || !activeTurnId) return;
     transport.httpRequest("POST", `/session/${encodeURIComponent(activeThreadId)}/abort`, {})
@@ -287,14 +321,18 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
 
   // ── inbound (opencode SSE data line → bridge JSON-RPC) ─────────────────
   function inbound(line) {
-    const parsed = safeParseJson(line);
+    const envelope = safeParseJson(line);
+    const parsed = envelope?.payload || envelope;
     if (!parsed || typeof parsed !== "object") return null;
     const type = readString(parsed.type);
     if (!type) return null;
+    if (type === "server.connected") { void recovery.refresh(); return null; }
     const props = parsed.properties && typeof parsed.properties === "object"
       ? parsed.properties
       : {};
-    const sessionId = readString(props.sessionID) || readString(props.session_id);
+    const sessionId = readString(props.sessionID) || readString(props.session_id)
+      || readString(props.info?.sessionID) || readString(props.part?.sessionID);
+    if (type === "session.updated" && props.info?.id) transport.remember(props.info);
 
     if (sessionId && activeThreadId && sessionId !== activeThreadId) {
       // Event is for a session we did not start through this bridge connection.
@@ -302,12 +340,18 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       return null;
     }
 
+    if (sessionId === activeThreadId) recovery.invalidate();
+
     if (type === "session.status") {
       streamHandlers.handleSessionStatus(props);
       return null;
     }
     if (type === "message.updated") {
       streamHandlers.handleMessageUpdated(props);
+      return null;
+    }
+    if (type === "message.part.delta") {
+      streamHandlers.handleMessagePartDelta(props);
       return null;
     }
     if (type === "message.part.updated") {
@@ -326,12 +370,16 @@ function createOpencodeTranslator({ injectInbound, transport, env: _env = proces
       streamHandlers.handleSessionError(props);
       return null;
     }
-    if (type === "permission.asked") {
+    if (type === "permission.asked" || type === "permission.updated") {
       approvalFlow.handlePermissionAsked(parsed);
       return null;
     }
-    if (type === "permission.replied") {
-      // Mirror reply (the REST POST already handled it). Nothing to surface.
+    if (type === "question.asked" || type === "question.updated") {
+      approvalFlow.handleQuestionAsked(parsed);
+      return null;
+    }
+    if (["permission.replied", "question.replied", "question.rejected"].includes(type)) {
+      approvalFlow.handleResolved(parsed);
       return null;
     }
     if (type === "tui.toast.show") {

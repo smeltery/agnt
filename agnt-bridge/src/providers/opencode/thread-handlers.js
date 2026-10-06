@@ -4,13 +4,14 @@ const { mapMessagesToTurns, mapSessionToSummary, mapSessionToThread } = require(
 function createOpencodeThreadHandlers({ emitNotification, injectResponse, respondError, state, transport }) {
 async function handleThreadStart(request) {
   try {
-    const res = await transport.httpRequest("POST", "/session", {});
+    const res = await transport.httpRequest("POST", "/session", {}, request?.params?.cwd);
     const sessionId = readString(res?.json?.id);
     if (!sessionId) {
       respondError(request?.id, -32603, `opencode POST /session returned no id (status ${res?.status})`);
       return;
     }
-    state.activeThreadId = sessionId;
+    if (!state.activeTurnId) state.activeThreadId = sessionId;
+    transport.remember(res.json);
     const threadPayload = mapSessionToThread(res.json);
     if (request?.id != null) {
       injectResponse(request.id, { thread: threadPayload });
@@ -49,7 +50,7 @@ async function handleThreadRead(request) {
     respondError(request?.id, -32602, "thread/read requires a threadId");
     return;
   }
-  state.activeThreadId = targetThreadId;
+  if (!state.activeTurnId) state.activeThreadId = targetThreadId;
   try {
     const [sessionRes, messagesRes] = await Promise.all([
       transport.httpRequest("GET", `/session/${encodeURIComponent(targetThreadId)}`),
@@ -59,6 +60,21 @@ async function handleThreadRead(request) {
     const messages = Array.isArray(messagesRes?.json) ? messagesRes.json : [];
     const thread = mapSessionToThread(session, { id: targetThreadId });
     thread.turns = mapMessagesToTurns(messages);
+    const latest = [...messages].reverse().find((message) => message.info?.model || message.info?.modelID)?.info;
+    if (latest && !state.sessionSettings.has(targetThreadId)) {
+      state.sessionSettings.set(targetThreadId, {
+        providerID: latest.model?.providerID || latest.providerID,
+        modelID: latest.model?.modelID || latest.modelID,
+        variant: latest.variant || "",
+      });
+    }
+    if (state.activeThreadId === targetThreadId && state.activeTurnId) {
+      thread.status = { type: "active" };
+      const active = thread.turns.find((turn) => turn.id === state.activeTurnId);
+      if (active) active.status = "inProgress";
+      else thread.turns.push({ id: state.activeTurnId, status: "inProgress", items: [] });
+    }
+    if (params.excludeTurns === true) thread.turns = [];
     if (request?.id != null) {
       injectResponse(request.id, { thread });
     }
@@ -104,7 +120,7 @@ async function handleThreadCompact(request) {
     const res = await transport.httpRequest(
       "POST",
       `/session/${encodeURIComponent(targetThreadId)}/summarize`,
-      {},
+      state.sessionSettings.get(targetThreadId) || {},
     );
     const ok = res?.status >= 200 && res?.status < 300;
     if (request?.id != null) {
@@ -211,9 +227,33 @@ async function handleThreadList(request) {
   }
 }
 
+async function handleThreadUpdate(request) {
+  const id = readString(request.params?.threadId) || state.activeThreadId;
+  if (!id) return respondError(request.id, -32602, "A threadId is required");
+  try {
+    const route = `/session/${encodeURIComponent(id)}`;
+    if (request.method === "thread/generateTitle") {
+      const response = await transport.httpRequest("GET", route);
+      injectResponse(request.id, { title: readString(response.json?.title) });
+      return;
+    }
+    const name = readString(request.params?.name) || readString(request.params?.title);
+    if (request.method === "thread/name/set" && !name) throw new Error("Thread title is empty");
+    const body = request.method === "thread/name/set" ? { title: name }
+      : { time: { archived: request.method === "thread/archive" ? Date.now() : 0 } };
+    const response = await transport.httpRequest("PATCH", route, body);
+    injectResponse(request.id, { thread: mapSessionToThread(response.json, { id }) });
+    emitNotification(request.method === "thread/name/set" ? "thread/name/updated"
+      : request.method === "thread/archive" ? "thread/archived" : "thread/unarchived", { threadId: id, ...(name ? { name } : {}) });
+  } catch (error) {
+    respondError(request.id, -32603, error.message);
+  }
+}
+
 
   return {
     handleThreadStart,
+    handleThreadUpdate,
     handleThreadRead,
     handleThreadTurnsList,
     handleThreadCompact,
