@@ -8,11 +8,16 @@ import SwiftUI
 
 struct ArchivedChatsView: View {
     @Environment(CodexService.self) private var codex
+    @State private var serverArchivedThreads: [CodexThread] = []
+    @State private var loadErrorMessage: String?
+    @State private var loadedHostID: String?
     @State private var threadPendingDeletion: CodexThread? = nil
 
     private var archivedThreads: [CodexThread] {
-        codex.threads
-            .filter { $0.syncState == .archivedLocal }
+        let localIDs = Set(codex.threads.map(\.id))
+        let remoteThreads = loadedHostID == codex.currentMacScopedPersistenceDeviceId
+            ? serverArchivedThreads.filter { !localIDs.contains($0.id) && !codex.locallyDeletedThreadIDs.contains($0.id) } : []
+        return (codex.threads.filter { $0.syncState == .archivedLocal } + remoteThreads)
             .sorted {
                 let lhsDate = $0.updatedAt ?? $0.createdAt ?? .distantPast
                 let rhsDate = $1.updatedAt ?? $1.createdAt ?? .distantPast
@@ -43,6 +48,12 @@ struct ArchivedChatsView: View {
         }
         .navigationTitle("Archived Chats")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: "\(codex.currentMacScopedPersistenceDeviceId ?? "local"):\(codex.isConnected)") { await loadArchivedThreads() }
+        .refreshable { await loadArchivedThreads() }
+        .alert("Could not load archived chats", isPresented: Binding(
+            get: { loadErrorMessage != nil }, set: { if !$0 { loadErrorMessage = nil } }
+        )) { Button("OK", role: .cancel) { loadErrorMessage = nil } }
+        message: { Text(loadErrorMessage ?? "Please try again.") }
         .confirmationDialog(
             "Remove \"\(threadPendingDeletion?.displayTitle ?? "conversation")\" from this phone?",
             isPresented: Binding(
@@ -54,6 +65,7 @@ struct ArchivedChatsView: View {
             Button("Remove from Phone", role: .destructive) {
                 if let thread = threadPendingDeletion {
                     codex.deleteThreadLocally(thread.id)
+                    serverArchivedThreads.removeAll { $0.id == thread.id }
                 }
                 threadPendingDeletion = nil
             }
@@ -61,7 +73,7 @@ struct ArchivedChatsView: View {
                 threadPendingDeletion = nil
             }
         } message: {
-            Text("This only removes the chat from agnt on this phone. Nothing is removed from your computer or Codex observer.")
+            Text("This only removes the chat from agnt on this phone. Nothing is removed from your computer.")
         }
     }
 
@@ -92,7 +104,7 @@ struct ArchivedChatsView: View {
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button {
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                codex.unarchiveThread(thread.id)
+                unarchive(thread)
             } label: {
                 Label("Unarchive", systemImage: "tray.and.arrow.up")
             }
@@ -101,7 +113,7 @@ struct ArchivedChatsView: View {
         .contextMenu {
             Button {
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                codex.unarchiveThread(thread.id)
+                unarchive(thread)
             } label: {
                 Label("Unarchive", systemImage: "tray.and.arrow.up")
             }
@@ -113,4 +125,24 @@ struct ArchivedChatsView: View {
             }
         }
     }
+    private func loadArchivedThreads() async {
+        guard codex.isConnected else { return }
+        let hostID = codex.currentMacScopedPersistenceDeviceId
+        do {
+            let remote = try await codex.fetchServerThreads(archived: true)
+            guard !Task.isCancelled, codex.currentMacScopedPersistenceDeviceId == hostID else { return }
+            loadedHostID = hostID
+            serverArchivedThreads = remote.map { var thread = $0; thread.syncState = .archivedLocal; return thread }
+            loadErrorMessage = nil
+        } catch {
+            guard !Task.isCancelled, codex.currentMacScopedPersistenceDeviceId == hostID else { return }
+            loadErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func unarchive(_ thread: CodexThread) {
+        codex.unarchiveThread(thread.id, remoteSnapshot: thread)
+        serverArchivedThreads.removeAll { $0.id == thread.id }
+    }
+
 }

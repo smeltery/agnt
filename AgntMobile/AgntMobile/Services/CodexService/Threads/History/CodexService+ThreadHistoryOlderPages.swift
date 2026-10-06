@@ -16,6 +16,8 @@ extension CodexService {
             return
         }
 
+        let refreshGeneration = currentPerThreadRefreshGeneration(for: threadId)
+        let hostID = currentMacScopedPersistenceDeviceId
         loadingOlderThreadHistoryIDs.insert(threadId)
         olderHistoryLoadErrorByThreadID.removeValue(forKey: threadId)
         refreshThreadTimelineState(for: threadId)
@@ -40,7 +42,9 @@ extension CodexService {
                 let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
                 let hasNextCursor = cursorHasValue(page.nextCursor)
                 debugSyncLog("thread/turns/list older thread=\(threadId) limit=\(ThreadHistoryHydrationPolicy.olderTurnPageSize) turns=\(page.turns.count) hasNextCursor=\(hasNextCursor) elapsedMs=\(elapsedMs)")
-                guard !Task.isCancelled else {
+                guard !Task.isCancelled,
+                      currentMacScopedPersistenceDeviceId == hostID,
+                      isPerThreadRefreshCurrent(for: threadId, generation: refreshGeneration) else {
                     return
                 }
 
@@ -77,8 +81,9 @@ extension CodexService {
                     return
                 }
 
-                let existingMessages = messagesByThread[threadId] ?? []
-                let orderedOlderMessages = olderHistoryMessagesFilteredAndOrderedBeforeExisting(
+                var existingMessages = messagesByThread[threadId] ?? []
+                var existingRevision = messageRevision(for: threadId)
+                var orderedOlderMessages = olderHistoryMessagesFilteredAndOrderedBeforeExisting(
                     olderMessages,
                     existingMessages: existingMessages
                 )
@@ -104,16 +109,39 @@ extension CodexService {
                     return
                 }
 
-                let merged = try await mergeHistoryMessagesOffMainActor(
-                    existing: existingMessages,
-                    history: orderedOlderMessages,
+                var placement = HistoryPagePlacement.position(page: olderMessages, existing: existingMessages, cursor: pageCursor)
+                var merged = try await mergeHistoryMessagesOffMainActor(
+                    existing: placement?.existing ?? existingMessages,
+                    history: placement?.page ?? orderedOlderMessages,
                     activeThreadIDs: Set(activeTurnIdByThread.keys),
                     runningThreadIDs: runningThreadIDs,
                     preferRecentWindow: false
                 )
 
-                guard !Task.isCancelled else {
+                guard !Task.isCancelled,
+                      currentMacScopedPersistenceDeviceId == hostID,
+                      isPerThreadRefreshCurrent(for: threadId, generation: refreshGeneration) else {
                     return
+                }
+
+                if existingRevision != messageRevision(for: threadId)
+                    || existingMessages != (messagesByThread[threadId] ?? []) {
+                    existingMessages = messagesByThread[threadId] ?? []
+                    existingRevision = messageRevision(for: threadId)
+                    orderedOlderMessages = olderHistoryMessagesFilteredAndOrderedBeforeExisting(
+                        olderMessages, existingMessages: existingMessages
+                    )
+                    placement = orderedOlderMessages.isEmpty ? nil
+                        : HistoryPagePlacement.position(page: olderMessages, existing: existingMessages, cursor: pageCursor)
+                    merged = try await mergeHistoryMessagesOffMainActor(
+                        existing: placement?.existing ?? existingMessages, history: placement?.page ?? orderedOlderMessages,
+                        activeThreadIDs: Set(activeTurnIdByThread.keys),
+                        runningThreadIDs: runningThreadIDs, preferRecentWindow: false
+                    )
+                    guard !Task.isCancelled, currentMacScopedPersistenceDeviceId == hostID,
+                          isPerThreadRefreshCurrent(for: threadId, generation: refreshGeneration),
+                          existingRevision == messageRevision(for: threadId),
+                          existingMessages == (messagesByThread[threadId] ?? []) else { return }
                 }
 
                 if merged == existingMessages {
@@ -150,10 +178,11 @@ extension CodexService {
                 )
                 expandThreadTimelineProjectionForRemoteOlderMessages(
                     threadId: threadId,
-                    addedCount: orderedOlderMessages.count
+                    addedCount: max(0, merged.count - existingMessages.count)
                 )
                 debugSyncLog("thread/turns/list older merge thread=\(threadId) decodedMessages=\(olderMessages.count) newMessages=\(orderedOlderMessages.count) totalMessages=\(merged.count) hasNextCursor=\(hasNextCursor)")
                 messagesByThread[threadId] = merged
+                CodexMessageOrderCounter.seed(from: [threadId: merged])
                 persistMessages()
                 updateCurrentOutput(for: threadId)
                 return

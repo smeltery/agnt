@@ -40,3 +40,8 @@ Runtime approvals, questions, reasoning, model discovery, compact and fork are s
 Provider code lives under `agnt-bridge/src/providers/opencode/`: `translate.js` dispatches protocol messages; thread, stream, recovery, model and approval modules own their respective behavior; `transport.js` and `event-stream.js` handle the local process, HTTP and SSE. Regression tests live under `agnt-bridge/test/providers/opencode/`.
 
 See [provider architecture](../architecture/translator-shim.md) and the [opencode server API](https://opencode.ai/docs/server/).
+
+The chat catalog spans all local project roots and separates active from archived
+sessions. Session and turn pages use stable ID anchors, so new work does not shift
+an older-page cursor. Invalid or incomplete catalogs report an error rather than
+silently hiding chats.

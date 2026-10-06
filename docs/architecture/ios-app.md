@@ -144,3 +144,8 @@ Cleanup fails closed if a chat catalog is incomplete or an inactive provider has
 saved state that the current runtime cannot verify. In that case, inspect the
 other provider's chats and clean up the checkout manually. No provider is started
 or authenticated merely to delete a checkout.
+
+Archived Chats loads the runtime's complete archived catalog in addition to local
+rows. Unarchiving a runtime-only chat restores it to the local sidebar. History
+paging requests full items, preserves provider cursor insertion boundaries, and
+rechecks the timeline revision after background merging so live updates survive.
