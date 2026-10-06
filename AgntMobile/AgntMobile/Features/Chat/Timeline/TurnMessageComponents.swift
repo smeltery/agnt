@@ -16,7 +16,10 @@ let enablesInlineMarkdownSelectionInTimeline = false
 // Normalizes streaming placeholders once so assistant rows do not render transient status text
 // as if it were final message content.
 func timelineDisplayText(for message: CodexMessage) -> String {
-    let trimmedText = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let presentationText = message.role == .assistant
+        ? AssistantMemoryCitationParser.visibleText(in: message.text, isStreaming: message.isStreaming)
+        : message.text
+    let trimmedText = presentationText.trimmingCharacters(in: .whitespacesAndNewlines)
     if message.isStreaming {
         let placeholderTexts: Set<String> = [
             "...",

@@ -63,7 +63,7 @@ extension TurnTimelineView {
             cachedBlockInfoByMessageID = rehomed
         }
 
-        let newestStreamingMessageID = visible.last(where: { $0.isStreaming })?.id
+        let newestStreamingMessageID = visible.last(where: { $0.role == .assistant && $0.isStreaming })?.id
         if newestStreamingMessageID != cachedNewestStreamingMessageID {
             cachedNewestStreamingMessageID = newestStreamingMessageID
         }
@@ -118,7 +118,7 @@ extension TurnTimelineView {
             let blockStart = assistantBlockStartIndex(endingAt: blockEnd, messages: messages)
             let blockTextParts = messages[blockStart...blockEnd]
                 .filter { $0.role == .assistant }
-                .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .map { timelineDisplayText(for: $0) }
                 .filter { !$0.isEmpty }
             let hasAssistantText = !blockTextParts.isEmpty
             let blockTurnID = messages[blockStart...blockEnd]
