@@ -88,6 +88,7 @@ const gitOps = createGitOps({
   scopedLocalCheckoutPath: (checkoutRoot, projectRelativePath) => scopedLocalCheckoutPath(checkoutRoot, projectRelativePath),
   gitWorktreePathByBranch: (cwd, options) => gitWorktreePathByBranch(cwd, options),
   repoDiffTotals: (cwd, context) => repoDiffTotals(cwd, context),
+  repoUntrackedPaths: (cwd) => repoUntrackedPaths(cwd),
   countLocalOnlyCommits: (cwd, context) => countLocalOnlyCommits(cwd, context),
   resolveRepoDiffBase: (cwd, tracking) => resolveRepoDiffBase(cwd, tracking),
   gitDiffAgainstBase: (cwd, baseRef) => gitDiffAgainstBase(cwd, baseRef),
@@ -186,6 +187,7 @@ const {
   diffTotalsForUntrackedFiles,
   gitDiffAgainstBase,
   repoDiffTotals,
+  repoUntrackedPaths,
   resolveRepoDiffBase,
 } = diffHelpers;
 

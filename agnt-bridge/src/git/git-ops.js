@@ -63,6 +63,7 @@ function createGitOps({
   scopedLocalCheckoutPath,
   gitWorktreePathByBranch,
   repoDiffTotals,
+  repoUntrackedPaths,
   countLocalOnlyCommits,
   resolveRepoDiffBase,
   gitDiffAgainstBase,
@@ -114,7 +115,7 @@ function createGitOps({
     const localOnlyCommitCount = await countLocalOnlyCommits(cwd, { detached }).catch(() => 0);
     const state = computeState(dirty, ahead, behind, detached, noUpstream);
     const canPush = hasPushRemote && hasHeadCommit && (ahead > 0 || noUpstream) && !detached;
-    const diff = await repoDiffTotals(cwd, { tracking, fileLines })
+    const diff = await repoDiffTotals(repoRoot || cwd, { tracking })
       .catch(() => ({ additions: 0, deletions: 0, binaryFiles: 0 }));
 
     return {
@@ -160,18 +161,14 @@ function createGitOps({
   }
 
   async function gitDiff(cwd) {
-    const porcelain = await git(cwd, "status", "--porcelain=v1", "-b");
-    const lines = porcelain.trim().split("\n").filter(Boolean);
-    const branchLine = lines[0] || "";
-    const fileLines = lines.slice(1);
+    const repoRoot = await resolveRepoRoot(cwd);
+    const porcelain = await git(repoRoot, "status", "--porcelain=v1", "-b");
+    const branchLine = porcelain.split("\n")[0] || "";
     const tracking = parseTrackingFromStatus(branchLine);
-    const baseRef = await resolveRepoDiffBase(cwd, tracking);
-    const trackedPatch = await gitDiffAgainstBase(cwd, baseRef);
-    const untrackedPaths = fileLines
-      .filter((line) => line.startsWith("?? "))
-      .map((line) => line.substring(3).trim())
-      .filter(Boolean);
-    const untrackedPatch = await diffPatchForUntrackedFiles(cwd, untrackedPaths);
+    const baseRef = await resolveRepoDiffBase(repoRoot, tracking);
+    const trackedPatch = await gitDiffAgainstBase(repoRoot, baseRef);
+    const untrackedPaths = await repoUntrackedPaths(repoRoot);
+    const untrackedPatch = await diffPatchForUntrackedFiles(repoRoot, untrackedPaths);
     const patch = [trackedPatch.trim(), untrackedPatch.trim()].filter(Boolean).join("\n\n").trim();
     return { patch };
   }
