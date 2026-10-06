@@ -280,6 +280,16 @@ test("desktop IPC follower yields normalized history reads while keeping live ta
   ));
   await waitFor(() => outbound.some((message) => message.method === "turn/started"));
 
+  assert.equal(follower.observeInbound(JSON.stringify({
+    id: "resume-normalized-metadata",
+    method: "thread/resume",
+    params: { threadId: "thread-normalized-live-tail", excludeTurns: true },
+  })), true);
+  const resume = outbound.find((message) => message.id === "resume-normalized-metadata");
+  assert.equal(resume.result.thread.id, "thread-normalized-live-tail");
+  assert.deepEqual(resume.result.thread.turns, []);
+  assert.equal(resume.result.agntDesktopIpcMirror, true);
+
   const handledRead = follower.observeInbound(JSON.stringify({
     id: "read-normalized-history",
     method: "thread/read",

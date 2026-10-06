@@ -16,6 +16,21 @@ extension TurnView {
             )
         }
 
+        if let failure = codex.recoverableStreamFailure(for: thread.id) {
+            return AnyView(TurnErrorReportCard(
+                message: CodexStreamFailure.explanation,
+                onReport: {
+                    openURL(AppEnvironment.feedbackMailtoURL(
+                        errorMessage: failure.message, threadId: thread.id,
+                        isConnected: codex.isConnected, cliVersion: codex.bridgeInstalledVersion
+                    ))
+                },
+                onDismiss: { codex.dismissStreamFailure(threadId: thread.id, failureID: failure.id) },
+                onContinue: { viewModel.continueAfterStreamFailure(failure, codex: codex, threadID: thread.id) },
+                isContinuing: viewModel.isSending
+            ))
+        }
+
         guard let snapshot = connectionRecoverySnapshot else {
             return nil
         }
@@ -29,6 +44,7 @@ extension TurnView {
 
     // Keeps reconnect prompts out of the red footer error slot; recovery UI owns that state.
     var timelineFooterErrorMessage: String? {
+        guard codex.recoverableStreamFailure(for: thread.id) == nil else { return nil }
         guard let message = codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
               !message.isEmpty else {
             return nil

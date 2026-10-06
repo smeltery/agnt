@@ -54,6 +54,17 @@ function createDesktopReadServer({
     if (hasNormalizedHistoryOutsideRawTurns(rawState)) {
       canonicalHistoryThreadIds.add(threadId);
     }
+    // A metadata-only resume must retain the Desktop writer even when full
+    // history needs canonical paging through the runtime.
+    if (canonicalHistoryThreadIds.has(threadId)
+      && method === "thread/resume" && message.params?.excludeTurns === true) {
+      const thread = projectDesktopConversationStateToThread(threadId, rawState, { now });
+      sendApplicationResponse(JSON.stringify({
+        id: message.id,
+        result: { thread: { ...thread, turns: [] }, agntDesktopIpcMirror: true },
+      }));
+      return true;
+    }
     if (canonicalHistoryThreadIds.has(threadId)) {
       return ownsDesktopCursor ? rejectDesktopTurnsCursor(message) : false;
     }

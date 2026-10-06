@@ -14,6 +14,17 @@ extension CodexService {
         let wasThreadRunning = threadId.map { threadHasActiveOrRunningTurn($0) } ?? false
 
         if let threadId, !isReplayedEvent {
+            let previousKnownTurnID = streamRecovery.lastStartedTurnIDs[threadId] ?? previousActiveTurnID
+            let repeatsKnownTurn = turnID != nil && turnID == previousKnownTurnID
+            let startsDistinctTurn = turnID != nil && previousKnownTurnID != nil && turnID != previousKnownTurnID
+            if !repeatsKnownTurn && (!wasThreadRunning || startsDistinctTurn || (turnID == nil && previousActiveTurnID != nil)) {
+                streamRecovery.runGenerations[threadId, default: 0] += 1
+                streamRecovery.failures.removeValue(forKey: threadId)
+            }
+            if let turnID { streamRecovery.lastStartedTurnIDs[threadId] = turnID }
+            else if !wasThreadRunning || previousActiveTurnID != nil {
+                streamRecovery.lastStartedTurnIDs.removeValue(forKey: threadId)
+            }
             markThreadAsRunning(threadId)
         }
 
@@ -58,6 +69,7 @@ extension CodexService {
         let turnFailureMessage = parseTurnFailureMessage(from: paramsObject)
 
         if let threadId = resolveThreadID(from: paramsObject, turnIdHint: completedTurnID) {
+            if reconcileRepeatedStreamFailure(threadId: threadId, turnId: completedTurnID) { return }
             let notificationTurnID = trackedCompletionNotificationTurnID(
                 threadId: threadId, turnId: completedTurnID, paramsObject: paramsObject
             )
@@ -72,6 +84,13 @@ extension CodexService {
                 from: paramsObject,
                 turnFailureMessage: turnFailureMessage
             )
+            if terminalState == .failed, let turnFailureMessage, !isHistoricalCompletionEvent(paramsObject) {
+                recordRecoverableStreamFailure(
+                    threadId: threadId, turnId: resolvedTurnID, message: turnFailureMessage,
+                    errorInfo: paramsObject?["turn"]?.objectValue?["error"]?.objectValue?["codexErrorInfo"]
+                        ?? paramsObject?["error"]?.objectValue?["codexErrorInfo"]
+                )
+            }
             recordTurnTerminalState(threadId: threadId, turnId: resolvedTurnID, state: terminalState)
             noteTurnFinished(threadId: threadId, turnId: resolvedTurnID)
             markTurnCompleted(threadId: threadId, turnId: resolvedTurnID)
@@ -157,15 +176,22 @@ extension CodexService {
         ]) ?? "Server error"
         let shouldSuppressErrorMessage = shouldSuppressRuntimeMessageInChat(errorMessage)
         let userFacingErrorMessage = userFacingRuntimeMessage(for: errorMessage) ?? errorMessage
-        lastErrorMessage = shouldSuppressErrorMessage ? nil : userFacingErrorMessage
 
         let turnId = extractTurnID(from: paramsObject)
         if let threadId = resolveThreadID(from: paramsObject, turnIdHint: turnId) {
             let resolvedTurnID = turnId ?? activeTurnIdByThread[threadId]
+            if reconcileRepeatedStreamFailure(threadId: threadId, turnId: resolvedTurnID) { return }
+            if !isHistoricalCompletionEvent(paramsObject) {
+                recordRecoverableStreamFailure(
+                    threadId: threadId, turnId: resolvedTurnID, message: errorMessage,
+                    errorInfo: paramsErrorObject?["codexErrorInfo"] ?? eventErrorObject?["codexErrorInfo"]
+                )
+            }
             let notificationTurnID = trackedCompletionNotificationTurnID(
                 threadId: threadId, turnId: resolvedTurnID, paramsObject: paramsObject
             )
             if !shouldSuppressErrorMessage {
+                lastErrorMessage = userFacingErrorMessage
                 appendSystemMessage(threadId: threadId, text: "Error: \(userFacingErrorMessage)", turnId: turnId)
             }
             recordTurnTerminalState(threadId: threadId, turnId: resolvedTurnID, state: .failed)
@@ -177,6 +203,7 @@ extension CodexService {
                 notifyRunCompletionIfNeeded(threadId: threadId, turnId: notificationTurnID, result: .failed)
             }
         } else {
+            lastErrorMessage = shouldSuppressErrorMessage ? nil : userFacingErrorMessage
             finalizeAllStreamingState()
         }
     }

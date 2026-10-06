@@ -19,6 +19,7 @@ extension CodexService {
         let disposition = receiveErrorDisposition(for: error, relayCloseCode: relayCloseCode)
         isConnected = false
         isInitialized = false
+        streamRecovery.connectionGeneration += 1
         cancelRuntimeSettingsUpdates()
         shouldAutoReconnectOnForeground = disposition.shouldAutoReconnectOnForeground
         if disposition.shouldClearSavedRelaySession {

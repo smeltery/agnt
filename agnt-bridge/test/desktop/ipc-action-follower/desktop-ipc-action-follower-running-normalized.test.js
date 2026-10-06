@@ -108,7 +108,10 @@ test("desktop IPC follower bootstraps normalized active turns when opened from b
     method: "thread/resume",
     params: { threadId, excludeTurns: true },
   }));
-  assert.equal(handled, false);
+  assert.equal(handled, true);
+  const resume = outbound.find((message) => message.id === "metadata-only-resume");
+  assert.deepEqual(resume.result.thread.turns, []);
+  assert.equal(resume.result.agntDesktopIpcMirror, true);
   await waitFor(() => outbound.some((message) => (
     message.method === "item/started"
       && message.params?.itemId === "assistant-background-second"

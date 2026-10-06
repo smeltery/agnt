@@ -137,6 +137,15 @@ Check the bridge log for a `system/notice` event mentioning MCP-auth — opencod
 
 cursor's stream-json sends cumulative text snapshots; the translator slices off the running accumulator. If a model rewrites a chunk, the translator falls back to treating the whole frame as a delta — you'll see a pretty rendering glitch but no data loss. If you see actual content loss, file an issue with the rollout.
 
+### Model stream interrupted
+
+When a model-service stream fails temporarily, iOS offers **Continue** on the
+original chat. It verifies that the failed turn is still the latest turn before
+sending a request to continue, preserving the current runtime settings. Completed
+actions should be checked before being repeated. Authentication, quota, and
+permission errors do not offer this action. If delivery becomes uncertain after
+tapping Continue, refresh the chat before sending another message.
+
 ## Where to look in the source
 
 | Symptom | Start here |
