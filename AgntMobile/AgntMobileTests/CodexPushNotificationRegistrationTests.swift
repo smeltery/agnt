@@ -370,6 +370,68 @@ final class CodexPushNotificationRegistrationTests: XCTestCase {
         XCTAssertNil(service.missingNotificationThreadPrompt)
     }
 
+    func testCompletionPushOwnershipRequiresExplicitRelayCapability() async {
+        let service = makeService(
+            userNotificationCenter: MockUserNotificationCenter(status: .authorized),
+            remoteNotificationRegistrar: MockRemoteNotificationRegistrar()
+        )
+        service.isConnected = true
+        service.isInitialized = true
+        service.relaySessionId = "session-push"
+        service.remoteNotificationDeviceToken = "abcdef"
+        await service.refreshNotificationAuthorizationStatus()
+        service.requestTransportOverride = { _, _ in
+            RPCMessage(id: .string("register"), result: .object([
+                "ok": .bool(true), "completionPushEnabled": .bool(true),
+            ]), includeJSONRPC: false)
+        }
+        await service.syncManagedPushRegistrationIfNeeded(force: true)
+        XCTAssertTrue(service.usesRemoteCompletionNotifications)
+        service.invalidateCompletionPushRegistration(preservingRemoteOwnership: true)
+        XCTAssertTrue(service.usesRemoteCompletionNotifications)
+        service.relaySessionId = "another-session"
+        XCTAssertFalse(service.usesRemoteCompletionNotifications)
+    }
+
+    func testCompletionAdmissionRejectsHistoryUntrackedAndStaleTurns() {
+        let service = makeService(
+            userNotificationCenter: MockUserNotificationCenter(status: .authorized),
+            remoteNotificationRegistrar: MockRemoteNotificationRegistrar()
+        )
+        XCTAssertNil(service.trackedCompletionNotificationTurnID(
+            threadId: "thread", turnId: "turn", paramsObject: nil
+        ))
+        service.activeTurnIdByThread["thread"] = "turn"
+        XCTAssertEqual(service.trackedCompletionNotificationTurnID(
+            threadId: "thread", turnId: "turn", paramsObject: nil
+        ), "turn")
+        for flag in ["agntReplayedEvent", "agntRolloutBootstrapReplay", "agntRolloutTerminalCatchUp"] {
+            XCTAssertNil(service.trackedCompletionNotificationTurnID(
+                threadId: "thread", turnId: "turn", paramsObject: [flag: .bool(true)]
+            ))
+        }
+        XCTAssertNil(service.trackedCompletionNotificationTurnID(
+            threadId: "thread", turnId: "older-turn", paramsObject: nil
+        ))
+        XCTAssertFalse(service.isFreshCompletionNotification(completedAt: Date(timeIntervalSinceNow: -600)))
+        XCTAssertFalse(service.isSuccessfulCompletionNotification(["status": .string("interrupted")]))
+    }
+
+    func testForegroundCompletionReceiptPreventsLaterBackgroundAlert() async {
+        let center = MockUserNotificationCenter(status: .authorized)
+        let service = makeService(
+            userNotificationCenter: center,
+            remoteNotificationRegistrar: MockRemoteNotificationRegistrar()
+        )
+        service.isAppInForeground = true
+        service.activeThreadId = "thread"
+        service.notifyRunCompletionIfNeeded(threadId: "thread", turnId: "turn", result: .completed)
+        service.isAppInForeground = false
+        service.notifyRunCompletionIfNeeded(threadId: "thread", turnId: "turn", result: .completed)
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertTrue(center.addRequests.isEmpty)
+    }
+
     private func makeService(
         userNotificationCenter: CodexUserNotificationCentering,
         remoteNotificationRegistrar: CodexRemoteNotificationRegistering

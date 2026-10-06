@@ -7,8 +7,8 @@ function createBridgeStatusRuntime({
   isShuttingDown,
   getSocket,
   onBridgeStatus,
+  heartbeat = createBridgeRelayHeartbeat(),
 }) {
-  const heartbeat = createBridgeRelayHeartbeat();
   const reconnectScheduler = createRelayReconnectScheduler();
   let lastPublishedBridgeStatus = null;
   let lastConnectionStatus = null;
@@ -53,7 +53,7 @@ function createBridgeStatusRuntime({
   }
 
   function startRelayWatchdog(trackedSocket) {
-    heartbeat.startWatchdog(({ isStale }) => {
+    heartbeat.startWatchdog(({ isStale, shouldProbe }) => {
       if (isShuttingDown() || getSocket() !== trackedSocket) {
         heartbeat.clearWatchdog();
         return;
@@ -64,15 +64,19 @@ function createBridgeStatusRuntime({
       }
 
       if (isStale) {
+        heartbeat.clearWatchdog();
         console.warn("[agnt] relay heartbeat stalled; forcing reconnect");
         logConnectionStatus("disconnected");
         trackedSocket.terminate();
         return;
       }
 
+      if (!shouldProbe) return;
+
       try {
         trackedSocket.ping();
       } catch {
+        heartbeat.clearWatchdog();
         trackedSocket.terminate();
       }
     });

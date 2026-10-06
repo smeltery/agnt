@@ -19,7 +19,7 @@ function createNotificationsHandler({ pushServiceClient, logPrefix = "[agnt]" } 
 
   async function handleNotificationsMethod(method, params) {
     if (!pushServiceClient?.hasConfiguredBaseUrl) {
-      return { ok: false, skipped: true };
+      return { ok: false, skipped: true, completionPushEnabled: false };
     }
 
     const deviceToken = readString(params.deviceToken);
@@ -32,14 +32,19 @@ function createNotificationsHandler({ pushServiceClient, logPrefix = "[agnt]" } 
       );
     }
 
-    await pushServiceClient.registerDevice({
+    const registration = await pushServiceClient.registerDevice({
       deviceToken,
       alertsEnabled,
       apnsEnvironment,
     });
 
     return {
-      ok: true,
+      ok: registration?.ok === true,
+      skipped: registration?.skipped === true,
+      completionPushEnabled: registration?.ok === true
+        && registration?.skipped !== true
+        && alertsEnabled
+        && registration?.pushEnabled === true,
       alertsEnabled,
       apnsEnvironment,
     };

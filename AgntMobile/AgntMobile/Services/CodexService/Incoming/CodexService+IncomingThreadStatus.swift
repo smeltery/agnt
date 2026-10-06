@@ -75,13 +75,7 @@ extension CodexService {
                     state: terminalState
                 )
                 noteTurnFinished(threadId: threadId, turnId: activeTurnIdForThread)
-                if let completionResult = runCompletionResult(for: terminalState) {
-                    notifyRunCompletionIfNeeded(
-                        threadId: threadId,
-                        turnId: activeTurnIdForThread,
-                        result: completionResult
-                    )
-                }
+
             }
             markTurnCompleted(threadId: threadId, turnId: activeTurnIdForThread)
             clearRunningState(for: threadId)

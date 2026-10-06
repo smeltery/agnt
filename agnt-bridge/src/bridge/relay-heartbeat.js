@@ -2,9 +2,9 @@
 // Purpose: Owns the relay socket's liveness state machine. Two intervals
 //          cooperate to keep the daemon self-healing across macOS sleep /
 //          wake cycles:
-//          1. The relay watchdog pings the upstream every 10 s and forces
+//          1. The relay watchdog probes quiet sockets and forces
 //             a reconnect when the last inbound activity is older than the
-//             stale-after threshold (default 25 s).
+//             stale-after threshold (default 45 s).
 //          2. The bridge status heartbeat re-publishes the last bridge
 //             status every 5 s, downgrading "connected" → "disconnected"
 //             when the watchdog's timestamp says the socket is stale.
@@ -21,8 +21,9 @@
 //     BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS, STALE_RELAY_STATUS_MESSAGE
 
 const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
-// Keep the watchdog tight enough to recover quickly from sleep/wake zombie sockets.
-const RELAY_WATCHDOG_STALE_AFTER_MS = 25_000;
+// The relay sends a heartbeat every 30 s; allow a quiet probe before reconnecting.
+const RELAY_WATCHDOG_PROBE_AFTER_IDLE_MS = 30_000;
+const RELAY_WATCHDOG_STALE_AFTER_MS = 45_000;
 const BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS = 5_000;
 const STALE_RELAY_STATUS_MESSAGE = "Relay heartbeat stalled; reconnect pending.";
 
@@ -70,6 +71,7 @@ function buildHeartbeatBridgeStatus(
 function createBridgeRelayHeartbeat({
   pingIntervalMs = RELAY_WATCHDOG_PING_INTERVAL_MS,
   staleAfterMs = RELAY_WATCHDOG_STALE_AFTER_MS,
+  probeAfterIdleMs = RELAY_WATCHDOG_PROBE_AFTER_IDLE_MS,
   statusHeartbeatIntervalMs = BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS,
   staleMessage = STALE_RELAY_STATUS_MESSAGE,
   setIntervalImpl = setInterval,
@@ -105,7 +107,10 @@ function createBridgeRelayHeartbeat({
     clearWatchdog();
     markActivity();
     watchdogTimer = setIntervalImpl(() => {
-      onTick({ isStale: isStale() });
+      onTick({
+        isStale: isStale(),
+        shouldProbe: nowImpl() - lastActivityAt >= probeAfterIdleMs,
+      });
     }, pingIntervalMs);
     watchdogTimer.unref?.();
   }
@@ -143,6 +148,7 @@ function createBridgeRelayHeartbeat({
 
 module.exports = {
   RELAY_WATCHDOG_PING_INTERVAL_MS,
+  RELAY_WATCHDOG_PROBE_AFTER_IDLE_MS,
   RELAY_WATCHDOG_STALE_AFTER_MS,
   BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS,
   STALE_RELAY_STATUS_MESSAGE,

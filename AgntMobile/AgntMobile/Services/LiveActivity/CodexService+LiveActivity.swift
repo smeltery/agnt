@@ -12,16 +12,14 @@ extension CodexService {
     // Provider-agnostic: only the thread title and a coarse failed flag cross over.
     func syncLiveActivity(threadId: String, turnActive: Bool) {
         if turnActive {
+            guard !isApplyingReplayedBridgeEvent else { return }
             LiveActivityCoordinator.shared.turnStarted(
                 threadId: threadId,
                 title: liveActivityTitle(for: threadId),
                 isActiveChat: activeThreadId == threadId
             )
         } else {
-            LiveActivityCoordinator.shared.turnEnded(
-                threadId: threadId,
-                failed: failedThreadIDs.contains(threadId)
-            )
+            LiveActivityCoordinator.shared.clearRunning(threadId: threadId)
         }
     }
 

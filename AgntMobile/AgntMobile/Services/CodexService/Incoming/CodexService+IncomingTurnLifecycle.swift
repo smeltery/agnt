@@ -54,9 +54,13 @@ extension CodexService {
 
     func handleTurnCompleted(_ paramsObject: IncomingParamsObject?) {
         let completedTurnID = extractTurnIDForTurnLifecycleEvent(from: paramsObject)
+        if completedTurnID == nil, isHistoricalCompletionEvent(paramsObject) { return }
         let turnFailureMessage = parseTurnFailureMessage(from: paramsObject)
 
         if let threadId = resolveThreadID(from: paramsObject, turnIdHint: completedTurnID) {
+            let notificationTurnID = trackedCompletionNotificationTurnID(
+                threadId: threadId, turnId: completedTurnID, paramsObject: paramsObject
+            )
             if let completedTurnID {
                 promoteProvisionalIDLessTurnIfNeeded(threadId: threadId, canonicalTurnID: completedTurnID)
                 confirmLatestPendingUserMessage(threadId: threadId, turnId: completedTurnID)
@@ -79,11 +83,15 @@ extension CodexService {
                     )
                 }
                 markReadyIfUnread(threadId: threadId)
-                notifyRunCompletionIfNeeded(threadId: threadId, turnId: resolvedTurnID, result: .completed)
+                if let notificationTurnID, isSuccessfulCompletionNotification(paramsObject) {
+                    notifyRunCompletionIfNeeded(threadId: threadId, turnId: notificationTurnID, result: .completed)
+                }
             } else if terminalState == .failed {
                 discardTurnStartWorkspaceCheckpointCopyIfNeeded(turnId: resolvedTurnID)
                 markFailedIfUnread(threadId: threadId)
-                notifyRunCompletionIfNeeded(threadId: threadId, turnId: resolvedTurnID, result: .failed)
+                if let notificationTurnID {
+                    notifyRunCompletionIfNeeded(threadId: threadId, turnId: notificationTurnID, result: .failed)
+                }
             } else {
                 discardTurnStartWorkspaceCheckpointCopyIfNeeded(turnId: resolvedTurnID)
             }
@@ -131,6 +139,7 @@ extension CodexService {
     }
 
     func handleErrorNotification(_ paramsObject: IncomingParamsObject?) {
+        if extractTurnID(from: paramsObject) == nil, isHistoricalCompletionEvent(paramsObject) { return }
         if shouldRetryTurnError(from: paramsObject) {
             return
         }
@@ -153,6 +162,9 @@ extension CodexService {
         let turnId = extractTurnID(from: paramsObject)
         if let threadId = resolveThreadID(from: paramsObject, turnIdHint: turnId) {
             let resolvedTurnID = turnId ?? activeTurnIdByThread[threadId]
+            let notificationTurnID = trackedCompletionNotificationTurnID(
+                threadId: threadId, turnId: resolvedTurnID, paramsObject: paramsObject
+            )
             if !shouldSuppressErrorMessage {
                 appendSystemMessage(threadId: threadId, text: "Error: \(userFacingErrorMessage)", turnId: turnId)
             }
@@ -161,7 +173,9 @@ extension CodexService {
             markTurnCompleted(threadId: threadId, turnId: resolvedTurnID)
             discardTurnStartWorkspaceCheckpointCopyIfNeeded(turnId: resolvedTurnID)
             markFailedIfUnread(threadId: threadId)
-            notifyRunCompletionIfNeeded(threadId: threadId, turnId: resolvedTurnID, result: .failed)
+            if let notificationTurnID {
+                notifyRunCompletionIfNeeded(threadId: threadId, turnId: notificationTurnID, result: .failed)
+            }
         } else {
             finalizeAllStreamingState()
         }

@@ -136,6 +136,10 @@ function startBridge({
     sessionId,
     pushServiceClient,
     previewMaxChars: config.pushPreviewMaxChars,
+    readThread: (threadId) => bridgeManagedCodex.sendRequest("thread/read", {
+      threadId,
+      includeTurns: true,
+    }),
   });
   const readBridgePackageVersionStatus = createBridgePackageVersionStatusReader();
 
@@ -350,11 +354,10 @@ function startBridge({
       (msg) => handshakeHandler.observeCodexResponse(msg),
       (msg) => desktopRefresher.handleOutbound(msg),
       (msg) => { desktopIpcLiveOwner?.observeOutbound(msg); return false; },
-      (msg) => pushNotificationTracker.handleOutbound(msg),
       (msg) => rememberThreadFromMessage("codex", msg),
     ],
     sanitize: sanitizeRelayBoundCodexMessage,
-    forward: (payload) => secureTransport.queueOutboundApplicationMessage(payload, sendRelayWireMessage),
+    forward: forwardApplicationMessage,
   }));
 
   codex.onClose(() => {
@@ -425,10 +428,13 @@ function startBridge({
 
   // Encrypts bridge-generated responses instead of letting the relay see plaintext.
   function sendApplicationResponse(rawMessage) {
-    secureTransport.queueOutboundApplicationMessage(
-      sanitizeRelayBoundCodexMessage(rawMessage),
-      sendRelayWireMessage
-    );
+    forwardApplicationMessage(sanitizeRelayBoundCodexMessage(rawMessage));
+  }
+
+  function forwardApplicationMessage(payload) {
+    if (payload == null) return;
+    pushNotificationTracker.handleOutbound(payload);
+    secureTransport.queueOutboundApplicationMessage(payload, sendRelayWireMessage);
   }
 
   // Seeds the desktop IPC follower without pulling huge turn history into baseline recovery.
