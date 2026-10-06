@@ -14,7 +14,6 @@ const {
 } = require("../rollout-live-mirror-bootstrap");
 const {
   createNotification,
-  readFileSize,
   readFileSlice,
   readString,
   readThreadId,
@@ -71,14 +70,19 @@ function createRolloutLiveMirrorController({
     }
 
     let mirror;
+    let suppressionContext = {};
+    const isThreadSuppressed = () => Boolean(shouldSuppressThread(threadId, suppressionContext));
     mirror = createThreadRolloutLiveMirror({
       threadId,
       sendApplicationResponse: (rawNotification) => {
-        if (!shouldSuppressThread(threadId)) {
+        if (!isThreadSuppressed()) {
           sendApplicationResponse(rawNotification);
         }
       },
-      isSuppressed: () => Boolean(shouldSuppressThread(threadId)),
+      isSuppressed: (context) => {
+        suppressionContext = context || {};
+        return isThreadSuppressed();
+      },
       logPrefix,
       fsModule,
       now,
@@ -173,14 +177,13 @@ function createThreadRolloutLiveMirror({
 
     try {
       const currentTime = now();
-      const suppressed = isSuppressed();
+      const suppressed = isSuppressed({ probeFallbackActivity: true });
       if (suppressed) {
-        // Owned by another live source: skip every bit of filesystem work
+        // A fresh authoritative source needs no fallback filesystem work
         // (lookup, stat, bootstrap) until suppression lifts. Reset internal
         // state once on the leading edge so a resumed mirror re-bootstraps
         // cleanly instead of resuming a stale offset.
         if (!wasSuppressed) {
-          rolloutPath = null;
           lastSize = 0;
           partialLine = "";
           didBootstrap = false;
@@ -190,7 +193,6 @@ function createThreadRolloutLiveMirror({
         return;
       }
       if (wasSuppressed) {
-        rolloutPath = null;
         lastSize = 0;
         partialLine = "";
         didBootstrap = false;
@@ -214,7 +216,16 @@ function createThreadRolloutLiveMirror({
         }
       }
 
-      const fileSize = readFileSize(rolloutPath, fsModule);
+      const stat = fsModule.statSync(rolloutPath);
+      const fileSize = stat.size;
+      if (isSuppressed({ fallbackActivityAt: Number(stat.mtimeMs) || 0 })) {
+        lastSize = 0;
+        partialLine = "";
+        didBootstrap = false;
+        resetRunState(state);
+        wasSuppressed = true;
+        return;
+      }
       if (!didBootstrap) {
         didBootstrap = true;
         bootstrapFromExistingRollout({

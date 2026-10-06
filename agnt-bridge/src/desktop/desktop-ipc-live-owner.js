@@ -85,6 +85,7 @@ function createDesktopIpcLiveOwner({
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   reconnectMs = DEFAULT_RECONNECT_MS,
   startRouterWhenMissing = false,
+  liveOwnershipFreshnessMs = 20_000,
   initialHistoryRetryMs = DEFAULT_INITIAL_HISTORY_RETRY_MS,
   initialHistoryMaxAttempts = DEFAULT_INITIAL_HISTORY_MAX_ATTEMPTS,
   runtimeSettingsStore = null,
@@ -537,6 +538,13 @@ function createDesktopIpcLiveOwner({
     stopAll,
     isThreadOwned(threadId) {
       return ownedThreadIds.has(readString(threadId));
+    },
+    isFreshThreadOwned(threadId) {
+      const id = readString(threadId);
+      if (!ownedThreadIds.has(id)) return false;
+      // Quiet local tools and queued drafts retain a single authoritative writer.
+      if (followerRequests.hasActiveLocalTurn(id)) return true;
+      return now() - (Number(conversations.get(id)?.updatedAt) || 0) <= liveOwnershipFreshnessMs;
     },
     _debugSnapshot(threadId) {
       return cloneJSON(conversations.get(threadId) || null);
