@@ -139,7 +139,7 @@ final class CodexThreadRuntimeOverrideTests: XCTestCase {
         let thread = try await service.startThread(runtimeOverride: override)
 
         XCTAssertEqual(thread.id, "thread-new")
-        XCTAssertEqual(capturedThreadStartParams.first?.objectValue?["serviceTier"]?.stringValue, "fast")
+        XCTAssertEqual(capturedThreadStartParams.first?.objectValue?["serviceTier"]?.stringValue, "priority")
         XCTAssertEqual(service.effectiveServiceTier(for: "thread-new"), .fast)
     }
 

@@ -73,6 +73,11 @@ function createRelayResponseSanitizer({
     if (!trackedRequest) {
       return normalizedMessage;
     }
+    if (trackedRequest.method === "initialize" && parsed?.result) {
+      parsed.result.providerId = activeProvider.id;
+      if (activeProvider.id === "codex") parsed.result.agntRuntimeSettingsVersion = 2;
+      return JSON.stringify(parsed);
+    }
     return sanitizeThreadHistoryImagesForRelay(normalizedMessage, trackedRequest.method, {
       activeProviderId: activeProvider.id,
       threadRowEnrichers,

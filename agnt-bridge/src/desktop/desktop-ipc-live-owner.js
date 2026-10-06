@@ -1,3 +1,4 @@
+const { normalizeThreadSettingsUpdate, applyRuntimeSettingsToConversation } = require("./runtime/settings");
 const net = require("net");
 
 const {
@@ -210,6 +211,7 @@ function createDesktopIpcLiveOwner({
   }
 
   const followerRuntimeState = createFollowerRuntimeState({
+    sendCodexRequest,
     conversations,
     followerRuntimeOverridesByThreadId,
     runtimeSettingsStore,
@@ -364,6 +366,20 @@ function createDesktopIpcLiveOwner({
       return;
     }
 
+    if (message.method === "thread/settings/updated") {
+      const threadId = readString(message.params?.threadId);
+      const settings = message.params?.threadSettings;
+      if (threadId && settings && ownedThreadIds.has(threadId)) {
+        followerRuntimeOverridesByThreadId.set(threadId, {
+          ...(followerRuntimeOverridesByThreadId.get(threadId) || {}),
+          ...normalizeThreadSettingsUpdate(settings, { authoritative: true }),
+        });
+        applyRuntimeSettingsToConversation(conversations.get(threadId), settings, { authoritative: true });
+        runtimeSettingsStore?.observe?.(threadId, settings, "runtime");
+        scheduleSnapshot(threadId);
+      }
+    }
+
     const responseId = message.id == null ? "" : String(message.id);
     if (responseId && !message.method) {
       pendingTurnStarts.resolveResponse(responseId, message);
@@ -504,6 +520,7 @@ function createDesktopIpcLiveOwner({
   return {
     observeInbound,
     observeOutbound,
+    updateThreadSettings: (threadId, settings) => followerRuntimeState.applyThreadSettings(threadId, settings, "phone"),
     stopAll,
     isThreadOwned(threadId) {
       return ownedThreadIds.has(readString(threadId));

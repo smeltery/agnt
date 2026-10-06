@@ -113,6 +113,7 @@ extension CodexService {
             override.reasoningEffort = normalizedEffort
             override.overridesReasoning = true
         }
+        queueThreadRuntimeSettingsUpdate(threadId: normalizedThreadID, fields: ["effort"])
     }
 
     func clearThreadReasoningEffortOverride(for threadId: String?) {
@@ -124,6 +125,7 @@ extension CodexService {
             override.reasoningEffort = nil
             override.overridesReasoning = false
         }
+        queueThreadRuntimeSettingsUpdate(threadId: normalizedThreadID, fields: ["effort"])
     }
 
     func setSelectedServiceTier(_ serviceTier: CodexServiceTier?) {
@@ -136,11 +138,12 @@ extension CodexService {
             return
         }
 
-        let normalizedServiceTier = normalizedServiceTierForSelectedModel(serviceTier)
+        let normalizedServiceTier = normalizedServiceTierForSelectedModel(serviceTier, threadId: normalizedThreadID)
         mutateThreadRuntimeOverride(for: normalizedThreadID) { override in
             override.serviceTierRawValue = normalizedServiceTier?.rawValue
             override.overridesServiceTier = true
         }
+        queueThreadRuntimeSettingsUpdate(threadId: normalizedThreadID, fields: ["serviceTier"])
     }
 
     func clearThreadServiceTierOverride(for threadId: String?) {
@@ -152,6 +155,7 @@ extension CodexService {
             override.serviceTierRawValue = nil
             override.overridesServiceTier = false
         }
+        queueThreadRuntimeSettingsUpdate(threadId: normalizedThreadID, fields: ["serviceTier"])
     }
 
     func applyThreadRuntimeOverride(_ runtimeOverride: CodexThreadRuntimeOverride?, to threadId: String?) {
@@ -174,8 +178,12 @@ extension CodexService {
         persistRuntimeSelections()
     }
 
-    func selectedModelOption() -> CodexModelOption? {
-        selectedModelOption(from: availableModels)
+    func selectedModelOption(threadId: String? = nil) -> CodexModelOption? {
+        if let override = threadRuntimeOverride(for: threadId), override.overridesModel,
+           let modelId = override.modelId {
+            return availableModels.first { $0.id == modelId || $0.model == modelId }
+        }
+        return selectedModelOption(from: availableModels)
     }
 
     func selectedGitWriterModelOption() -> CodexModelOption? {
@@ -190,8 +198,8 @@ extension CodexService {
         selectedGitWriterModelOption()?.model
     }
 
-    func supportedReasoningEffortsForSelectedModel() -> [CodexReasoningEffortOption] {
-        selectedModelOption()?.supportedReasoningEfforts ?? []
+    func supportedReasoningEffortsForSelectedModel(threadId: String? = nil) -> [CodexReasoningEffortOption] {
+        selectedModelOption(threadId: threadId)?.supportedReasoningEfforts ?? []
     }
 
     func isThreadReasoningEffortOverridden(_ threadId: String?) -> Bool {
@@ -212,7 +220,9 @@ extension CodexService {
     }
 
     func selectedReasoningEffortForSelectedModel(threadId: String? = nil) -> String? {
-        guard let model = selectedModelOption() else {
+        guard let model = selectedModelOption(threadId: threadId) else {
+            if let override = threadRuntimeOverride(for: threadId), override.overridesReasoning,
+               let effort = override.reasoningEffort { return effort }
             return selectedReasoningEffort ?? RuntimeSelectionDefaults.reasoningEffort
         }
 
@@ -221,11 +231,10 @@ extension CodexService {
             return nil
         }
 
-        if let threadOverride = threadRuntimeOverride(for: threadId),
-           threadOverride.overridesReasoning,
-           let selected = threadOverride.reasoningEffort,
-           supported.contains(selected) {
-            return selected
+        if let threadOverride = threadRuntimeOverride(for: threadId), threadOverride.overridesReasoning {
+            if let selected = threadOverride.reasoningEffort, supported.contains(selected) { return selected }
+            return model.defaultReasoningEffort.flatMap { supported.contains($0) ? $0 : nil }
+                ?? model.supportedReasoningEfforts.first?.reasoningEffort
         }
 
         if let selected = selectedReasoningEffort,
@@ -245,11 +254,23 @@ extension CodexService {
         return model.supportedReasoningEfforts.first?.reasoningEffort
     }
 
-    func runtimeModelIdentifierForTurn() -> String? {
-        selectedModelOption()?.model ?? selectedModelId ?? RuntimeSelectionDefaults.modelId
+    func runtimeModelIdentifierForTurn(threadId: String? = nil) -> String? {
+        let override = threadRuntimeOverride(for: threadId)
+        return selectedModelOption(threadId: threadId)?.model
+            ?? (override?.overridesModel == true ? override?.modelId : nil)
+            ?? selectedModelId ?? RuntimeSelectionDefaults.modelId
+    }
+
+    func setThreadModelOverride(_ modelId: String, for threadId: String) {
+        mutateThreadRuntimeOverride(for: threadId) { override in
+            override.modelId = modelId
+            override.overridesModel = true
+        }
+        queueThreadRuntimeSettingsUpdate(threadId: threadId, fields: ["model"])
     }
 
     func effectiveServiceTier(for threadId: String? = nil) -> CodexServiceTier? {
+        guard !inheritsOwnerServiceTier(for: threadId) else { return nil }
         let candidate: CodexServiceTier?
         if let threadOverride = threadRuntimeOverride(for: threadId),
            threadOverride.overridesServiceTier {
@@ -261,14 +282,20 @@ extension CodexService {
         guard let candidate else {
             return nil
         }
-        return selectedModelSupportsServiceTier(candidate) ? candidate : nil
+        return selectedModelOption(threadId: threadId)?.supportsServiceTier(candidate) == true ? candidate : nil
+    }
+
+    func inheritsOwnerServiceTier(for threadId: String?) -> Bool {
+        threadId != nil && supportsRuntimeSettingsSync
+            && threadRuntimeOverride(for: threadId)?.overridesServiceTier != true
     }
 
     func runtimeServiceTierForTurn(threadId: String? = nil) -> String? {
         guard supportsServiceTier else {
             return nil
         }
-        return effectiveServiceTier(for: threadId)?.rawValue
+        if inheritsOwnerServiceTier(for: threadId) { return nil }
+        return effectiveServiceTier(for: threadId)?.rawValue ?? (supportsRuntimeSettingsSync ? "default" : nil)
     }
 
     // Copies per-chat runtime overrides forward when we continue an archived thread.
@@ -284,7 +311,13 @@ extension CodexService {
             return
         }
 
-        applyThreadRuntimeOverride(sourceOverride, to: normalizedDestinationThreadID)
+        var inherited = sourceOverride
+        inherited.runtimeSettingsEpoch = nil
+        inherited.runtimeSettingsRevision = 0
+        inherited.runtimeSettingsUpdatedAt = 0
+        inherited.pendingRuntimeSettings = [:]
+        applyThreadRuntimeOverride(inherited, to: normalizedDestinationThreadID)
+        queueThreadRuntimeSettingsUpdate(threadId: normalizedDestinationThreadID)
     }
 
     func handleModelListFailure(_ error: Error) {
@@ -294,11 +327,11 @@ extension CodexService {
         debugRuntimeLog("model/list failed: \(normalized)")
     }
 
-    func normalizedServiceTierForSelectedModel(_ serviceTier: CodexServiceTier?) -> CodexServiceTier? {
+    func normalizedServiceTierForSelectedModel(_ serviceTier: CodexServiceTier?, threadId: String? = nil) -> CodexServiceTier? {
         guard let serviceTier else {
             return nil
         }
-        guard let selectedModel = selectedModelOption() else {
+        guard let selectedModel = selectedModelOption(threadId: threadId) else {
             return serviceTier
         }
         return selectedModel.supportsServiceTier(serviceTier) ? serviceTier : nil

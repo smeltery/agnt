@@ -156,6 +156,7 @@ extension CodexService {
         }
 
         let initialThreadId = try await resolveThreadID(threadId)
+        try await waitForRuntimeSettingsUpdate(threadId: initialThreadId)
         let effectiveCollaborationMode = collaborationModeForOutgoingTurn(
             threadId: initialThreadId,
             requestedMode: collaborationMode,

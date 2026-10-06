@@ -8,6 +8,7 @@ const { desktopThreadReplacedNotification } = require("./read-serving");
 const { drainPendingReviewOverlays } = require("./review-overlay-replay");
 
 function createProjectionSync({
+  runtimeSettingsStore = null,
   canonicalHistoryReplacementSentThreadIds,
   canonicalHistoryThreadIds,
   conversationProjector,
@@ -48,6 +49,7 @@ function createProjectionSync({
   }
 
   function syncProjectedConversationState(threadId, nextState, { isFullSnapshot = false } = {}) {
+    runtimeSettingsStore?.observeConversation?.(threadId, nextState);
     const resumedAfterStaleYield = staleYieldedThreadIds.delete(threadId);
     if (!canonicalHistoryThreadIds.has(threadId) && hasNormalizedHistoryOutsideRawTurns(nextState)) {
       canonicalHistoryThreadIds.add(threadId);

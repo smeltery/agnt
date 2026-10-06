@@ -253,6 +253,7 @@ function projectConversationState(threadId, rawState, {
       || readString(rawState?.latestModel)
       || readString(rawState?.latest_model)
       || "",
+    ...(runtimeSettings ? { runtimeSettings: cloneJSON(runtimeSettings) } : {}),
     reasoningEffort: readString(runtimeSettings?.reasoningEffort) || null,
     serviceTier: readString(runtimeSettings?.serviceTier) || null,
     runtimeSettingsRevision: Number(runtimeSettings?.revision) || 0,

@@ -107,6 +107,13 @@ final class CodexService {
     var supportsTurnCollaborationMode = false
     // Runtime compatibility flag for `thread/start|turn/start.serviceTier` speed controls.
     var supportsServiceTier = true
+    var supportsRuntimeSettingsSync = false
+    var runtimeSettingsProviderId: String?
+    @ObservationIgnored var runtimeSettingsUpdateTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored var runtimeSettingsUpdateIDs: [String: UUID] = [:]
+    @ObservationIgnored var retiredRuntimeSettingsEpochs: [String: Set<String>] = [:]
+    var runtimeSettingsUpdateErrors: [String: String] = [:]
+    var confirmedRuntimeSettings: [String: CodexRuntimeSettings] = [:]
     // Runtime compatibility flag for the bridge-owned voice transcription flow.
     var supportsBridgeVoiceAuth = true
     // Runtime compatibility flag for native `thread/fork` conversation branching.
@@ -365,13 +372,6 @@ final class CodexService {
     let userNotificationCenter: CodexUserNotificationCentering
     let remoteNotificationRegistrar: CodexRemoteNotificationRegistering
 
-    static let selectedModelIdDefaultsKey = "codex.selectedModelId"
-    static let selectedGitWriterModelIdDefaultsKey = "codex.selectedGitWriterModelId"
-    static let selectedReasoningEffortDefaultsKey = "codex.selectedReasoningEffort"
-    static let selectedServiceTierDefaultsKey = "codex.selectedServiceTier"
-    static let threadRuntimeOverridesDefaultsKey = "codex.threadRuntimeOverrides"
-    static let planSessionSourcesDefaultsKey = "codex.planSessionSources"
-    static let selectedAccessModeDefaultsKey = "codex.selectedAccessMode"
     static let locallyArchivedThreadIDsKey = "codex.locallyArchivedThreadIDs"
     static let locallyDeletedThreadIDsKey = "codex.locallyDeletedThreadIDs"
     static let forkedThreadOriginsDefaultsKey = "codex.forkedThreadOrigins"

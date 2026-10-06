@@ -37,6 +37,19 @@ flowchart TD
 
 Implementation: `agnt-bridge/src/providers/codex/transport.js`.
 
+## Per-chat runtime controls
+
+On a compatible local bridge, the iOS composer keeps model, reasoning, and speed
+choices per chat. Settings are applied to the task's current runtime owner and
+acknowledged before the next message is sent. Desktop edits flow back to the
+phone; pending phone edits survive reconnects. A rejected edit remains visible
+and blocks sending until it can be applied.
+
+Speed options come from the model catalog. Normal explicitly resets speed;
+an existing chat without a confirmed speed choice inherits its owner's setting.
+Settings defaults still apply when creating chats. These synchronization RPCs
+are Codex-specific; other providers retain their per-turn controls.
+
 ## Account / auth
 
 Codex uses ChatGPT account auth. The bridge hosts these RPCs and forwards them through the secure transport:
@@ -65,7 +78,7 @@ Implementation: `agnt-bridge/src/providers/codex/desktop-refresher.js`. The agnt
 
 Separate from the desktop refresher: the **rollout live mirror** (`agnt-bridge/src/rollout-live-mirror.js`) tails Codex's rollout JSONL file so iOS can render terminal-side activity in real time. Codex writes rollouts as the user types in the terminal app; agnt's bridge reads them and emits synthetic JSON-RPC notifications to the phone.
 
-This is the only mechanism by which iOS sees activity that didn't originate on the phone. It's intentionally Codex-only: other providers don't have a companion desktop app to mirror.
+Local Desktop IPC also follows active Desktop-owned conversations. Rollout mirroring provides a file-backed recovery path. Both mechanisms are Codex-only: other providers do not have an equivalent companion desktop app.
 
 The schema parsed:
 

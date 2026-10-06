@@ -1,25 +1,32 @@
 // FILE: thread-runtime-settings-store.js
-// Purpose: Persists the phone-accepted runtime settings for each local thread.
+// Purpose: Persists the last accepted model, reasoning effort, and service tier for each local thread.
 // Layer: CLI helper
 // Exports: createThreadRuntimeSettingsStore, runtimeSettingsFromTurnParams
-// Depends on: fs, os, path
+// Depends on: fs, os, path, ../bridge/thread-row-enrichment
 
+const { readFirstDefinedEnv } = require("../bridge/bridge-config");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { forEachThreadRowInResponse } = require("../bridge/thread-row-enrichment");
 
-const STORE_VERSION = 1;
+const { randomUUID } = require("crypto");
+const { runtimeSettingsPatch, runtimeSettingsFromConversation } = require("./runtime/settings");
+
+const STORE_VERSION = 2;
 const DEFAULT_MAX_THREADS = 500;
 const DEFAULT_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1_000;
 const DEFAULT_STORE_DIR = path.join(os.homedir(), ".agnt");
 
 function createThreadRuntimeSettingsStore({
-  storeFile = process.env.AGNT_THREAD_RUNTIME_STATE_FILE
-    || path.join(process.env.AGNT_DEVICE_STATE_DIR || DEFAULT_STORE_DIR, "thread-runtime-settings.json"),
+  storeFile = readFirstDefinedEnv(["AGNT_THREAD_RUNTIME_STATE_FILE"],
+    path.join(readFirstDefinedEnv(["AGNT_DEVICE_STATE_DIR"], DEFAULT_STORE_DIR), "thread-runtime-settings.json")),
   fsImpl = fs,
   now = () => Date.now(),
   maxThreads = DEFAULT_MAX_THREADS,
   maxAgeMs = DEFAULT_MAX_AGE_MS,
+  onChange = () => {},
+  onError = (error) => console.warn(`[agnt] runtime settings persistence failed: ${error.message}`),
 } = {}) {
   let state = readState({ storeFile, fsImpl });
 
@@ -28,27 +35,24 @@ function createThreadRuntimeSettingsStore({
     if (!normalizedThreadId) {
       return null;
     }
-    return cloneSettings(state.threads[normalizedThreadId]);
+    const settings = state.threads[normalizedThreadId];
+    return settings?.confirmed ? cloneSettings(settings) : null;
   }
 
   function commit(threadId, turnParams, { source = "unknown", turnId = "" } = {}) {
     const normalizedThreadId = normalizeString(threadId);
     const nextSource = normalizeString(source) || "unknown";
-    // Runtime choices are phone-authoritative: Desktop can use live overrides for
-    // its own turns, but those local choices must not overwrite phone settings.
-    if (!normalizedThreadId || nextSource !== "phone") {
+    if (!normalizedThreadId || !["phone", "desktop", "runtime"].includes(nextSource)) {
       return null;
     }
-
-    const previous = state.threads[normalizedThreadId] || null;
-    const nextValues = runtimeSettingsFromTurnParams(turnParams, previous);
-    if (!nextValues.model && !nextValues.reasoningEffort && !previous) {
+    const previous = get(normalizedThreadId);
+    const nextValues = runtimeSettingsFromTurnParams(turnParams, previous, { authoritative: source === "runtime" });
+    if (Object.keys(nextValues).length === 0) {
       return null;
     }
 
     const normalizedTurnId = normalizeString(turnId);
     if (previous
-      && previous.turnId === normalizedTurnId
       && previous.model === nextValues.model
       && previous.reasoningEffort === nextValues.reasoningEffort
       && previous.serviceTier === nextValues.serviceTier) {
@@ -56,18 +60,31 @@ function createThreadRuntimeSettingsStore({
     }
 
     const next = {
-      model: nextValues.model || null,
-      reasoningEffort: nextValues.reasoningEffort || null,
-      serviceTier: nextValues.serviceTier,
+      ...nextValues,
       revision: Math.max(0, Number(previous?.revision) || 0) + 1,
-      updatedAt: now(),
+      updatedAt: Math.max(now(), (previous?.updatedAt || 0) + 1),
+      epoch: previous?.epoch || randomUUID(),
+      confirmed: true,
       source: nextSource,
       turnId: normalizedTurnId || null,
     };
-    state.threads[normalizedThreadId] = next;
-    pruneState(state, { now: now(), maxThreads, maxAgeMs });
-    writeState(state, { storeFile, fsImpl });
+    const nextState = { ...state, threads: { ...state.threads, [normalizedThreadId]: next } };
+    pruneState(nextState, { now: now(), maxThreads, maxAgeMs });
+    writeState(nextState, { storeFile, fsImpl });
+    state = nextState;
+    onChange(normalizedThreadId, cloneSettings(next));
     return cloneSettings(next);
+  }
+
+  // Unsolicited owner notifications must not interrupt the live event stream
+  // when the local settings cache cannot be written. A later snapshot retries.
+  function observe(threadId, settings, source = "runtime") {
+    try {
+      return commit(threadId, settings, { source });
+    } catch (error) {
+      onError(error);
+      return get(threadId);
+    }
   }
 
   function attachToConversation(threadId, conversation) {
@@ -78,61 +95,12 @@ function createThreadRuntimeSettingsStore({
     if (!settings) {
       return conversation;
     }
-
     conversation.agntRuntimeSettings = settings;
-    if (settings.model) {
-      conversation.latestModel = settings.model;
-    }
-    if (settings.reasoningEffort) {
-      conversation.latestReasoningEffort = settings.reasoningEffort;
-    }
-    conversation.latestServiceTier = settings.serviceTier;
-    conversation.latestThreadSettings = {
-      ...(conversation.latestThreadSettings && typeof conversation.latestThreadSettings === "object"
-        ? conversation.latestThreadSettings
-        : {}),
-      model: settings.model,
-      effort: settings.reasoningEffort,
-      serviceTier: settings.serviceTier,
-    };
-
-    const collaborationSettings = conversation.latestCollaborationMode?.settings;
-    conversation.latestCollaborationMode = {
-      mode: conversation.latestCollaborationMode?.mode || "default",
-      settings: {
-        ...(collaborationSettings && typeof collaborationSettings === "object"
-          ? collaborationSettings
-          : { developer_instructions: null }),
-        model: settings.model || collaborationSettings?.model || "",
-        reasoning_effort: settings.reasoningEffort
-          || collaborationSettings?.reasoning_effort
-          || null,
-      },
-    };
     return conversation;
   }
 
   function enrichResponse(method, envelope) {
-    if (!envelope || typeof envelope !== "object" || envelope.error) {
-      return envelope;
-    }
-    const result = envelope.result;
-    if (!result || typeof result !== "object") {
-      return envelope;
-    }
-    if (method === "thread/read" || method === "thread/resume") {
-      if (result.thread && typeof result.thread === "object") {
-        attachToThread(result.thread);
-      }
-      return envelope;
-    }
-    if (method === "thread/list") {
-      const key = ["data", "items", "threads"].find((candidate) => Array.isArray(result[candidate]));
-      for (const thread of key ? result[key] : []) {
-        attachToThread(thread);
-      }
-    }
-    return envelope;
+    return forEachThreadRowInResponse(method, envelope, attachToThread);
   }
 
   function attachToThread(thread) {
@@ -141,9 +109,12 @@ function createThreadRuntimeSettingsStore({
     if (!settings || !thread || typeof thread !== "object") {
       return thread;
     }
-    thread.model = settings.model || thread.model || null;
-    thread.reasoningEffort = settings.reasoningEffort;
-    thread.serviceTier = settings.serviceTier;
+    thread.runtimeSettings = settings;
+    // Legacy phone fields remain readable, while the v2 object explicitly
+    // represents next-turn choices rather than an executing turn's metadata.
+    thread.model ||= settings.model;
+    if (Object.hasOwn(settings, "reasoningEffort")) thread.reasoningEffort = settings.reasoningEffort;
+    if (Object.hasOwn(settings, "serviceTier")) thread.serviceTier = settings.serviceTier === "priority" ? "fast" : settings.serviceTier;
     thread.runtimeSettingsRevision = settings.revision;
     thread.runtimeSettingsUpdatedAt = settings.updatedAt;
     thread.runtimeSettingsSource = settings.source;
@@ -153,31 +124,25 @@ function createThreadRuntimeSettingsStore({
   return {
     get,
     commit,
+    observe,
     attachToConversation,
     attachToThread,
     enrichResponse,
+    observeConversation(threadId, conversation) {
+      const patch = runtimeSettingsFromConversation(conversation);
+      if (!patch.model) return get(threadId);
+      const settings = observe(threadId, patch, "desktop");
+      attachToConversation(threadId, conversation);
+      return settings;
+    },
   };
 }
 
-function runtimeSettingsFromTurnParams(turnParams, previous = null) {
-  const params = turnParams && typeof turnParams === "object" ? turnParams : {};
-  const collaborationSettings = params.collaborationMode?.settings
-    || params.collaboration_mode?.settings
-    || {};
-  const model = normalizeString(params.model)
-    || normalizeString(collaborationSettings.model)
-    || normalizeString(previous?.model)
-    || null;
-  const reasoningEffort = normalizeString(params.effort)
-    || normalizeString(params.reasoningEffort)
-    || normalizeString(collaborationSettings.reasoning_effort)
-    || normalizeString(collaborationSettings.reasoningEffort)
-    || normalizeString(previous?.reasoningEffort)
-    || null;
-  const serviceTier = normalizeString(params.serviceTier)
-    || normalizeString(params.service_tier)
-    || null;
-  return { model, reasoningEffort, serviceTier };
+function runtimeSettingsFromTurnParams(turnParams, previous = null, options = {}) {
+  return {
+    ...runtimeSettingsPatch(previous || {}),
+    ...runtimeSettingsPatch(turnParams, options),
+  };
 }
 
 function readState({ storeFile, fsImpl }) {
@@ -185,7 +150,7 @@ function readState({ storeFile, fsImpl }) {
     const parsed = JSON.parse(fsImpl.readFileSync(storeFile, "utf8"));
     return normalizeState(parsed);
   } catch {
-    return { version: STORE_VERSION, threads: {} };
+    return { version: STORE_VERSION, epoch: randomUUID(), threads: {} };
   }
 }
 
@@ -194,23 +159,26 @@ function normalizeState(rawState) {
     ? rawState.threads
     : {};
   const threads = {};
+  const epoch = normalizeString(rawState?.epoch) || randomUUID();
   for (const [threadId, rawSettings] of Object.entries(rawThreads)) {
     const normalizedThreadId = normalizeString(threadId);
     const source = normalizeString(rawSettings?.source) || "unknown";
-    if (!normalizedThreadId || !rawSettings || typeof rawSettings !== "object" || source !== "phone") {
+    if (!normalizedThreadId || !rawSettings || typeof rawSettings !== "object") {
       continue;
     }
     threads[normalizedThreadId] = {
-      model: normalizeString(rawSettings.model) || null,
-      reasoningEffort: normalizeString(rawSettings.reasoningEffort) || null,
-      serviceTier: normalizeString(rawSettings.serviceTier) || null,
+      ...runtimeSettingsFromTurnParams(rawSettings),
+      epoch: normalizeString(rawSettings.epoch) || epoch,
+      // Preserve old preferences on disk, but require fresh owner evidence
+      // before exposing them as confirmed runtime state.
+      confirmed: rawState.version === STORE_VERSION && rawSettings.confirmed === true,
       revision: Math.max(0, Number(rawSettings.revision) || 0),
       updatedAt: Math.max(0, Number(rawSettings.updatedAt) || 0),
       source,
       turnId: normalizeString(rawSettings.turnId) || null,
     };
   }
-  return { version: STORE_VERSION, threads };
+  return { version: STORE_VERSION, epoch, threads };
 }
 
 function pruneState(storeState, { now, maxThreads, maxAgeMs }) {
@@ -230,7 +198,7 @@ function writeState(storeState, { storeFile, fsImpl }) {
   try {
     fsImpl.chmodSync(storeFile, 0o600);
   } catch {
-    // Best effort only on filesystems without POSIX permissions.
+    // Best-effort only on filesystems without POSIX permissions.
   }
 }
 

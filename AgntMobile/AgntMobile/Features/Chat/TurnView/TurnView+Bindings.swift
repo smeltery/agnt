@@ -107,12 +107,12 @@ extension TurnView {
 
     var reasoningDisplayOptions: [TurnComposerReasoningDisplayOption] {
         TurnComposerMetaMapper.reasoningDisplayOptions(
-            from: codex.supportedReasoningEffortsForSelectedModel().map(\.reasoningEffort)
+            from: codex.supportedReasoningEffortsForSelectedModel(threadId: codex.activeThreadId).map(\.reasoningEffort)
         )
     }
 
     var selectedModelTitle: String {
-        if let selectedModel = codex.selectedModelOption() {
+        if let selectedModel = codex.selectedModelOption(threadId: codex.activeThreadId) {
             return TurnComposerMetaMapper.modelTitle(for: selectedModel)
         }
 

@@ -69,7 +69,7 @@ function createLiveOwnerFollowerRequestHandler({
 
     switch (method) {
       case "thread-follower-start-turn":
-        return await handleFollowerStartTurn(conversationId, params);
+        return await followerRuntimeState.enqueueMutation(conversationId, () => handleFollowerStartTurn(conversationId, params));
       case "thread-follower-load-complete-history":
         return await handleFollowerLoadCompleteHistory(conversationId);
       case "thread-follower-compact-thread":

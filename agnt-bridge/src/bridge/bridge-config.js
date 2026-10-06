@@ -165,5 +165,6 @@ function readString(value) {
 }
 
 module.exports = {
+  readFirstDefinedEnv,
   readBridgeConfig,
 };

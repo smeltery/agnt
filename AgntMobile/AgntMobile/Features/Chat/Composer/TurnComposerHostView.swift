@@ -109,7 +109,8 @@ struct TurnComposerHostView: View {
             reasoningDisplayOptions: reasoningDisplayOptions
         )
         let runtimeActions = TurnComposerRuntimeActions.resolve(codex: codex)
-        let selectedModelID = codex.selectedModelOption()?.id
+        let selectedModelID = codex.selectedModelOption(threadId: codex.activeThreadId)?.id
+            ?? codex.threadRuntimeOverride(for: codex.activeThreadId)?.modelId
             ?? (codex.hasPersistedSelectedModelId ? codex.selectedModelId : nil)
         let hasVisibleModelSelection = selectedModelID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
         // Keep the saved model visible while the bridge refreshes models in the background.

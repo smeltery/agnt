@@ -13,6 +13,8 @@ struct TurnComposerRuntimeState: Equatable {
     let reasoningMenuDisabled: Bool
     let selectedServiceTier: CodexServiceTier?
     let supportsFastMode: Bool
+    var serviceTiers: [CodexServiceTier] = [.fast]
+    var serviceTierIsInherited = false
 
     var selectedReasoningTitle: String {
         effectiveReasoningEffort.map(TurnComposerMetaMapper.reasoningTitle(for:)) ?? "Select reasoning"
@@ -27,7 +29,7 @@ struct TurnComposerRuntimeState: Equatable {
     }
 
     func isSelectedServiceTier(_ serviceTier: CodexServiceTier?) -> Bool {
-        selectedServiceTier == serviceTier
+        !serviceTierIsInherited && selectedServiceTier == serviceTier
     }
 
     static func resolve(
@@ -36,11 +38,13 @@ struct TurnComposerRuntimeState: Equatable {
     ) -> TurnComposerRuntimeState {
         return TurnComposerRuntimeState(
             reasoningDisplayOptions: reasoningDisplayOptions,
-            effectiveReasoningEffort: codex.selectedReasoningEffortForSelectedModel(),
-            selectedReasoningEffort: codex.selectedReasoningEffort,
-            reasoningMenuDisabled: reasoningDisplayOptions.isEmpty || codex.selectedModelOption() == nil,
-            selectedServiceTier: codex.effectiveServiceTier(),
-            supportsFastMode: codex.selectedModelSupportsServiceTier(.fast)
+            effectiveReasoningEffort: codex.selectedReasoningEffortForSelectedModel(threadId: codex.activeThreadId),
+            selectedReasoningEffort: codex.selectedReasoningEffortForSelectedModel(threadId: codex.activeThreadId),
+            reasoningMenuDisabled: reasoningDisplayOptions.isEmpty || codex.selectedModelOption(threadId: codex.activeThreadId) == nil,
+            selectedServiceTier: codex.effectiveServiceTier(for: codex.activeThreadId),
+            supportsFastMode: codex.selectedModelOption(threadId: codex.activeThreadId)?.supportsServiceTier(.fast) == true,
+            serviceTiers: codex.selectedModelOption(threadId: codex.activeThreadId)?.serviceTiers ?? [],
+            serviceTierIsInherited: codex.inheritsOwnerServiceTier(for: codex.activeThreadId)
         )
     }
 }

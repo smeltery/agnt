@@ -198,6 +198,7 @@ function createHandshakeHandler({
     const result = (base && typeof base === "object") ? { ...base } : {};
     if (normalizedProviderId) {
       result.providerId = normalizedProviderId;
+      if (normalizedProviderId === "codex") result.agntRuntimeSettingsVersion = 2;
     }
     return result;
   }

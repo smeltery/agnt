@@ -107,6 +107,7 @@ extension CodexService {
     }
 
     func loadMacScopedDefaultsState(for macDeviceId: String?) {
+        resetRuntimeSettingsSyncState()
         withApplyingMacScopedState {
             if let savedThreadRuntimeOverrides = defaults.data(forKey: macScopedDefaultsKey(Self.threadRuntimeOverridesDefaultsKey, macDeviceId: macDeviceId)),
                let decodedThreadRuntimeOverrides = try? decoder.decode(

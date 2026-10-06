@@ -4,6 +4,9 @@
 // Exports: createFollowerRuntimeState
 // Depends on: ./desktop-ipc-shared
 
+const { applyRuntimeSettingsToConversation, createThreadMutationQueue, hasOwn,
+  normalizeThreadSettingsUpdate, threadSettingsFromRuntimeSettings } = require("./runtime/settings");
+
 const {
   cloneJSON,
   readString,
@@ -13,85 +16,40 @@ function createFollowerRuntimeState({
   conversations,
   followerRuntimeOverridesByThreadId,
   runtimeSettingsStore = null,
+  sendCodexRequest,
   scheduleSnapshot,
   logPrefix = "[agnt]",
 } = {}) {
+  const enqueueMutation = createThreadMutationQueue();
+
   function applyModelAndReasoning(conversationId, params) {
-    const overrides = followerRuntimeOverridesByThreadId.get(conversationId) || {};
-    const conversation = conversations.get(conversationId);
-    if (Object.prototype.hasOwnProperty.call(params, "model")) {
-      overrides.model = readString(params.model);
-      if (conversation) {
-        conversation.latestModel = overrides.model;
-      }
-    }
-    if (Object.prototype.hasOwnProperty.call(params, "reasoningEffort")) {
-      overrides.effort = params.reasoningEffort || null;
-      if (conversation) {
-        conversation.latestReasoningEffort = overrides.effort;
-      }
-    }
-    followerRuntimeOverridesByThreadId.set(conversationId, overrides);
-    if (conversation) {
-      scheduleSnapshot(conversationId);
-    }
-    return { ok: true };
+    const settings = normalizeThreadSettingsUpdate(params);
+    if (hasOwn(params, "reasoningEffort")) settings.effort = params.reasoningEffort;
+    return applyThreadSettings(conversationId, settings);
   }
 
   function applyCollaborationMode(conversationId, params) {
-    if (!params.collaborationMode) {
-      return { ok: true };
-    }
-    const overrides = followerRuntimeOverridesByThreadId.get(conversationId) || {};
-    overrides.collaborationMode = cloneJSON(params.collaborationMode);
-    followerRuntimeOverridesByThreadId.set(conversationId, overrides);
-    const conversation = conversations.get(conversationId);
-    if (conversation) {
-      conversation.latestCollaborationMode = cloneJSON(params.collaborationMode);
-      scheduleSnapshot(conversationId);
-    }
-    return { ok: true };
+    return applyThreadSettings(conversationId, { collaborationMode: params.collaborationMode });
   }
 
-  function applyThreadSettings(conversationId, threadSettings) {
-    if (!threadSettings || typeof threadSettings !== "object" || Array.isArray(threadSettings)) {
-      return { ok: true };
-    }
-    const overrides = followerRuntimeOverridesByThreadId.get(conversationId) || {};
-    const model = readString(threadSettings.model)
-      || readString(threadSettings.collaborationMode?.settings?.model);
-    const effort = threadSettings.effort;
-    if (model) {
-      overrides.model = model;
-    }
-    if (effort !== undefined) {
-      overrides.effort = effort ?? null;
-    }
-    if (threadSettings.collaborationMode && typeof threadSettings.collaborationMode === "object") {
-      overrides.collaborationMode = cloneJSON(threadSettings.collaborationMode);
-    }
-    followerRuntimeOverridesByThreadId.set(conversationId, overrides);
-
-    const conversation = conversations.get(conversationId);
-    if (conversation) {
-      conversation.latestThreadSettings = {
-        ...(conversation.latestThreadSettings && typeof conversation.latestThreadSettings === "object"
-          ? conversation.latestThreadSettings
-          : {}),
-        ...cloneJSON(threadSettings),
-      };
-      if (model) {
-        conversation.latestModel = model;
+  function applyThreadSettings(conversationId, threadSettings, source = "desktop") {
+    return enqueueMutation(conversationId, async () => {
+      if (!threadSettings || typeof threadSettings !== "object" || Array.isArray(threadSettings)) {
+        throw new Error("Missing thread settings.");
       }
-      if (effort !== undefined) {
-        conversation.latestReasoningEffort = effort ?? null;
-      }
-      if (overrides.collaborationMode) {
-        conversation.latestCollaborationMode = cloneJSON(overrides.collaborationMode);
-      }
+      const revisionBefore = runtimeSettingsStore?.get?.(conversationId)?.revision;
+      const settings = normalizeThreadSettingsUpdate(threadSettings);
+      await sendCodexRequest("thread/settings/update", { threadId: conversationId, ...settings });
+      const current = runtimeSettingsStore?.get?.(conversationId);
+      const confirmed = current && current.revision !== revisionBefore
+        ? current : runtimeSettingsStore?.commit?.(conversationId, settings, { source });
+      const applied = confirmed ? { ...settings, ...threadSettingsFromRuntimeSettings(confirmed) } : settings;
+      const overrides = followerRuntimeOverridesByThreadId.get(conversationId) || {};
+      followerRuntimeOverridesByThreadId.set(conversationId, { ...overrides, ...applied });
+      applyRuntimeSettingsToConversation(conversations.get(conversationId), applied, { authoritative: !!confirmed });
       scheduleSnapshot(conversationId);
-    }
-    return { ok: true };
+      return { ok: true, runtimeSettings: confirmed || null };
+    });
   }
 
   function mergeOverrides(conversationId, params) {
@@ -114,10 +72,10 @@ function createFollowerRuntimeState({
     if (overrides.model && !readString(merged.model)) {
       merged.model = overrides.model;
     }
-    if (overrides.effort != null && merged.effort == null) {
+    if (hasOwn(overrides, "effort") && !hasOwn(merged, "effort")) {
       merged.effort = overrides.effort;
     }
-    if (overrides.serviceTier && !readString(merged.serviceTier)) {
+    if (hasOwn(overrides, "serviceTier") && !hasOwn(merged, "serviceTier")) {
       merged.serviceTier = overrides.serviceTier;
     }
     if (overrides.collaborationMode && merged.collaborationMode == null) {
@@ -142,6 +100,7 @@ function createFollowerRuntimeState({
   }
 
   return {
+    enqueueMutation,
     applyCollaborationMode,
     applyModelAndReasoning,
     applyThreadSettings,

@@ -13,11 +13,25 @@ struct TurnComposerRuntimeActions {
     let selectServiceTier: (CodexServiceTier?) -> Void
 
     static func resolve(codex: CodexService) -> TurnComposerRuntimeActions {
-        TurnComposerRuntimeActions(
-            selectModel: codex.setSelectedModelId,
-            selectAutomaticReasoning: { codex.setSelectedReasoningEffort(nil) },
-            selectReasoning: { effort in codex.setSelectedReasoningEffort(effort) },
-            selectServiceTier: codex.setSelectedServiceTier
+        let threadId = codex.activeThreadId
+        let synchronizes = codex.runtimeSettingsProviderId == "codex" && threadId != nil
+        return TurnComposerRuntimeActions(
+            selectModel: { model in
+                if synchronizes, let threadId { codex.setThreadModelOverride(model, for: threadId) }
+                else { codex.setSelectedModelId(model) }
+            },
+            selectAutomaticReasoning: {
+                if synchronizes { codex.clearThreadReasoningEffortOverride(for: threadId) }
+                else { codex.setSelectedReasoningEffort(nil) }
+            },
+            selectReasoning: { effort in
+                if synchronizes { codex.setThreadReasoningEffortOverride(effort, for: threadId) }
+                else { codex.setSelectedReasoningEffort(effort) }
+            },
+            selectServiceTier: { tier in
+                if synchronizes { codex.setThreadServiceTierOverride(tier, for: threadId) }
+                else { codex.setSelectedServiceTier(tier) }
+            }
         )
     }
 }
