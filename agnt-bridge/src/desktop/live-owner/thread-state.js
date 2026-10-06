@@ -1,3 +1,4 @@
+const { buildThreadReadStateContext } = require("./read-state-context");
 const {
   normalizeToken,
   readString,
@@ -12,6 +13,8 @@ const {
 
 function createLiveOwnerThreadState({
   announcedReadStateThreadIds,
+  pendingReadStateByThreadId,
+  sendCodexRequest,
   cachedThreadsByThreadId,
   conversations,
   hostId,
@@ -35,16 +38,44 @@ function createLiveOwnerThreadState({
     if (hadUnread) {
       conversation.hasUnreadTurn = false;
       conversation.unreadMessageCount = 0;
+      announcedReadStateThreadIds.delete(normalizedThreadId);
       scheduleSnapshot(normalizedThreadId);
     } else if (announcedReadStateThreadIds.has(normalizedThreadId)) {
       return;
     }
-    if (ipc.sendBroadcast(THREAD_READ_STATE_CHANGED, {
-      conversationId: normalizedThreadId,
-      hasUnreadTurn: false,
-    })) {
-      announcedReadStateThreadIds.add(normalizedThreadId);
+    if (pendingReadStateByThreadId.has(normalizedThreadId)) {
+      return;
     }
+    const request = Symbol();
+    pendingReadStateByThreadId.set(normalizedThreadId, request);
+    Promise.resolve()
+      .then(() => sendCodexRequest("getAuthStatus", { includeToken: true, refreshToken: false }))
+      .then((authStatus) => {
+        if (pendingReadStateByThreadId.get(normalizedThreadId) !== request
+          || !ownedThreadIds.has(normalizedThreadId)) {
+          return;
+        }
+        const current = conversations.get(normalizedThreadId);
+        if (current?.hasUnreadTurn || current?.unreadMessageCount > 0) {
+          return;
+        }
+        const context = buildThreadReadStateContext(authStatus, hostId);
+        if (context && ipc.sendBroadcast(THREAD_READ_STATE_CHANGED, {
+          conversationId: normalizedThreadId,
+          hostId,
+          hasUnreadTurn: false,
+          context,
+        })) {
+          announcedReadStateThreadIds.add(normalizedThreadId);
+        }
+      })
+      // A failed identity lookup leaves the next phone read free to retry.
+      .catch(() => {})
+      .finally(() => {
+        if (pendingReadStateByThreadId.get(normalizedThreadId) === request) {
+          pendingReadStateByThreadId.delete(normalizedThreadId);
+        }
+      });
   }
 
   function markTurnInterruptedOptimistically(threadId, params) {

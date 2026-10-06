@@ -273,6 +273,7 @@ test("live owner routes Desktop follower turns to Codex", async (t) => {
   let desktopSocket = null;
 
   const owner = createDesktopIpcLiveOwner({
+    startRouterWhenMissing: true,
     socketPath,
     snapshotDebounceMs: 1,
     reconnectMs: 10,
@@ -354,6 +355,7 @@ test("live owner handles current start-turn and interrupt follower contracts", a
   const desktopFrames = [];
 
   const owner = createDesktopIpcLiveOwner({
+    startRouterWhenMissing: true,
     socketPath,
     snapshotDebounceMs: 1,
     reconnectMs: 10,
@@ -621,6 +623,7 @@ test("live owner replays a pending sidebar announcement when Desktop joins its f
   let desktopSocket = null;
 
   const owner = createDesktopIpcLiveOwner({
+    startRouterWhenMissing: true,
     socketPath,
     sidebarRefreshDelayMs: 5,
     snapshotDebounceMs: 1,
@@ -832,3 +835,16 @@ function createIpcTestSocket(prefix) {
     : path.join(tempDir, "ipc.sock");
   return { tempDir, socketPath };
 }
+
+test("live owner leaves IPC router creation to Desktop by default", async (t) => {
+  const { tempDir, socketPath } = createIpcTestSocket("agnt-owner-no-router-");
+  const owner = createDesktopIpcLiveOwner({
+    socketPath, reconnectMs: 10,
+    sendCodexRequest: async () => ({}), sendRawCodexMessage() {},
+  });
+  t.after(() => { owner.stopAll(); fs.rmSync(tempDir, { recursive: true, force: true }); });
+  owner.observeInbound(JSON.stringify({ method: "turn/start", params: { threadId: "task", input: [] } }));
+  await wait(40);
+  assert.equal(fs.existsSync(socketPath), false);
+  assert.equal(owner.isThreadOwned("task"), true);
+});

@@ -12,6 +12,7 @@ const {
 
 function createLiveOwnerLifecycle({
   announcedReadStateThreadIds,
+  pendingReadStateByThreadId,
   cachedThreadsByThreadId,
   conversations,
   dirtyThreadIds,
@@ -61,6 +62,7 @@ function createLiveOwnerLifecycle({
     queuedFollowUpsByThreadId.clear();
     runningQueuedFollowUpThreadIds.clear();
     announcedReadStateThreadIds.clear();
+    pendingReadStateByThreadId.clear();
     ownedThreadIds.clear();
     conversations.clear();
     ipc.close();

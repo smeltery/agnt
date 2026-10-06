@@ -138,10 +138,10 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
     },
   });
   assert.equal(macConfig.refreshEnabled, false);
-  assert.equal(macConfig.desktopAutoFollowEnabled, true);
+  assert.equal(macConfig.desktopAutoFollowEnabled, false);
   assert.equal(macEndpointConfig.desktopAutoFollowEnabled, false);
   assert.equal(linuxConfig.desktopAutoFollowEnabled, false);
-  assert.equal(explicitOffConfig.desktopAutoFollowEnabled, true);
+  assert.equal(explicitOffConfig.desktopAutoFollowEnabled, false);
   assert.equal(explicitAutoFollowOffConfig.desktopAutoFollowEnabled, false);
   assert.equal(macConfig.keepMacAwakeEnabled, false);
   assert.equal(macConfig.relayUrl, "");
@@ -253,4 +253,12 @@ test("readBridgeConfig disables managed push defaults when a self-hosted relay o
 
   assert.equal(config.relayUrl, "wss://self-host.example/relay");
   assert.equal(config.pushServiceUrl, "");
+});
+
+test("Desktop navigation can be explicitly enabled", () => {
+  const config = readBridgeConfig({
+    env: { AGNT_DESKTOP_AUTO_FOLLOW: "true" }, platform: "darwin", runtimeRoot: "/tmp/agnt-package",
+    fsImpl: { existsSync: () => false, readFileSync: () => { throw new Error("unexpected read"); } },
+  });
+  assert.equal(config.desktopAutoFollowEnabled, true);
 });

@@ -11,6 +11,7 @@ const { createEmptyConversationState } = require("../desktop-ipc-conversation-ad
 
 function createOwnedThreadState({
   announcedReadStateThreadIds,
+  pendingReadStateByThreadId,
   cachedThreadsByThreadId,
   conversations,
   dirtyThreadIds,
@@ -72,6 +73,7 @@ function createOwnedThreadState({
     }
     runningQueuedFollowUpThreadIds.delete(normalizedThreadId);
     announcedReadStateThreadIds.delete(normalizedThreadId);
+    pendingReadStateByThreadId.delete(normalizedThreadId);
     listMetadataRef.current?.forgetThread(normalizedThreadId);
     pendingTurnStarts.removeThread(normalizedThreadId);
     followerRuntimeOverridesByThreadId.delete(normalizedThreadId);

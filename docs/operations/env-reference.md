@@ -43,7 +43,8 @@ Provider-specific env that sit alongside agnt's:
 
 | Var | Default | Purpose |
 |---|---|---|
-| `AGNT_REFRESH_ENABLED` | `true` if Codex.app is detected | Enable/disable the macOS Codex.app companion refresh. |
+| `AGNT_REFRESH_ENABLED` | `false` | Enable/disable the macOS Codex.app companion refresh. |
+| `AGNT_DESKTOP_AUTO_FOLLOW` | `false` | Opt into navigating Codex.app to a phone-selected thread. Manual Desktop navigation establishes live sync without this option. |
 | `AGNT_REFRESH_DEBOUNCE_MS` | `2000` | Debounce window for refresh signals. |
 | `AGNT_REFRESH_COMMAND` | (built-in) | Override the AppleScript / shell command used to refresh Codex.app. |
 | `AGNT_CODEX_BUNDLE_ID` | `com.openai.codex` | Override Codex.app bundle id (advanced — for non-default Codex builds). |

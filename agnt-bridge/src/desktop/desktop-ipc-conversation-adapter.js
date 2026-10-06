@@ -93,11 +93,13 @@ function applyAppServerMessageToConversationState({
         return null;
       }
       const conversation = ensureConversationInMap(conversations, threadId, { hostId, now });
-      conversation.title = readString(message.params?.threadName)
+      const title = readString(message.params?.threadName)
         || readString(message.params?.thread_name)
         || readString(message.params?.name)
         || readString(message.params?.title)
         || conversation.title;
+      if (title === conversation.title) return { threadId, changed: false };
+      conversation.title = title;
       conversation.updatedAt = now();
       return { threadId, changed: true };
     }

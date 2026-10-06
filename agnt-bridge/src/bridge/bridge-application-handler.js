@@ -37,7 +37,6 @@ function createBridgeApplicationHandler({
   rolloutLiveMirror,
   sanitizeThreadHistoryImagesForRelay,
   sendApplicationResponse,
-  sendThreadNameUpdatedNotification,
   terminalHandler,
   threadTurnsListFastPageCoordinator,
   updateBridgePackageAndRestart,
@@ -113,7 +112,7 @@ function createBridgeApplicationHandler({
       }),
       (msg) => handleGitRequest(msg, sendApplicationResponse, {
         codexAppPath: desktopBundle.appPath,
-        onThreadNameSet: sendThreadNameUpdatedNotification,
+        sendCodexRequest: bridgeManagedCodex.sendRequest,
         codexTitleGeneration: activeProvider.id === "codex",
       }),
       (msg) => { desktopRefresher.handleInbound(msg); return false; },
