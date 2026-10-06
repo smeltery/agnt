@@ -54,10 +54,7 @@ function createDiffHelpers({ git, refExists }) {
   async function repoDiffTotals(cwd, context) {
     const baseRef = await resolveRepoDiffBase(cwd, context.tracking);
     const trackedTotals = await diffTotalsAgainstBase(cwd, baseRef);
-    const untrackedPaths = context.fileLines
-      .filter((line) => line.startsWith("?? "))
-      .map((line) => line.substring(3).trim())
-      .filter(Boolean);
+    const untrackedPaths = await repoUntrackedPaths(cwd);
     const untrackedTotals = await diffTotalsForUntrackedFiles(cwd, untrackedPaths);
 
     return {
@@ -65,6 +62,11 @@ function createDiffHelpers({ git, refExists }) {
       deletions: trackedTotals.deletions + untrackedTotals.deletions,
       binaryFiles: trackedTotals.binaryFiles + untrackedTotals.binaryFiles,
     };
+  }
+
+  async function repoUntrackedPaths(cwd) {
+    const output = await git(cwd, "ls-files", "--others", "--exclude-standard", "-z");
+    return output.split("\0").filter(Boolean);
   }
 
   // Uses upstream when available; otherwise falls back to commits not yet
@@ -173,6 +175,7 @@ function createDiffHelpers({ git, refExists }) {
     diffTotalsForUntrackedFiles,
     gitDiffAgainstBase,
     repoDiffTotals,
+    repoUntrackedPaths,
     resolveRepoDiffBase,
   };
 }
