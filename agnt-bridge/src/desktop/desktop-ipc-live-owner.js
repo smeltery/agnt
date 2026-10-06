@@ -84,6 +84,7 @@ function createDesktopIpcLiveOwner({
   maxPatchBytes = DEFAULT_MAX_PATCH_BYTES,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   reconnectMs = DEFAULT_RECONNECT_MS,
+  startRouterWhenMissing = false,
   initialHistoryRetryMs = DEFAULT_INITIAL_HISTORY_RETRY_MS,
   initialHistoryMaxAttempts = DEFAULT_INITIAL_HISTORY_MAX_ATTEMPTS,
   runtimeSettingsStore = null,
@@ -118,6 +119,7 @@ function createDesktopIpcLiveOwner({
   const queuedFollowUpsByThreadId = new Map();
   const runningQueuedFollowUpThreadIds = new Set();
   const announcedReadStateThreadIds = new Set();
+  const pendingReadStateByThreadId = new Map();
   const dirtyThreadIds = new Set();
   let snapshotState = null;
   let ownedThreadState = null;
@@ -127,7 +129,9 @@ function createDesktopIpcLiveOwner({
   const listMetadataRef = { current: null };
   const followerRequestsRef = { current: null };
   threadState = createLiveOwnerThreadState({
+    sendCodexRequest,
     announcedReadStateThreadIds,
+    pendingReadStateByThreadId,
     cachedThreadsByThreadId,
     conversations,
     hostId,
@@ -165,6 +169,7 @@ function createDesktopIpcLiveOwner({
     now,
     requestTimeoutMs,
     reconnectMs,
+    startRouterWhenMissing,
     logPrefix,
     onConnected() {
       listMetadata.flushPendingThreadArchiveMetadataBroadcasts();
@@ -264,6 +269,7 @@ function createDesktopIpcLiveOwner({
     upsertConversationFromThread,
   });
   const followerRequests = createLiveOwnerFollowerRequestHandler({
+    hostId,
     conversations,
     followerRuntimeState,
     ipc,
@@ -287,6 +293,7 @@ function createDesktopIpcLiveOwner({
   followerRequestsRef.current = followerRequests;
   ownedThreadState = createOwnedThreadState({
     announcedReadStateThreadIds,
+    pendingReadStateByThreadId,
     cachedThreadsByThreadId,
     conversations,
     dirtyThreadIds,
@@ -310,6 +317,7 @@ function createDesktopIpcLiveOwner({
   });
   lifecycleState = createLiveOwnerLifecycle({
     announcedReadStateThreadIds,
+    pendingReadStateByThreadId,
     cachedThreadsByThreadId,
     conversations,
     dirtyThreadIds,
@@ -366,6 +374,10 @@ function createDesktopIpcLiveOwner({
       return;
     }
 
+    if (message.method === "account/updated") {
+      announcedReadStateThreadIds.clear();
+      pendingReadStateByThreadId.clear();
+    }
     if (message.method === "thread/settings/updated") {
       const threadId = readString(message.params?.threadId);
       const settings = message.params?.threadSettings;
@@ -426,6 +438,7 @@ function createDesktopIpcLiveOwner({
       pendingTurnStarts.refreshFallback(update.threadId);
       scheduleSnapshot(update.threadId);
       listMetadata.replaySidebarAnnouncementAfterMaterialization(message, update.threadId);
+      if (message.method === "thread/name/updated") listMetadata.broadcastThreadUnarchived(update.threadId);
     }
 
     if (readString(message.method) === "turn/completed") {

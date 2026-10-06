@@ -70,6 +70,7 @@ class CodexDesktopRefresher {
   }
 
   handleInbound(rawMessage) {
+    if (!this.canRefresh()) return;
     const parsed = safeParseJSON(rawMessage);
     if (!parsed) {
       return;
@@ -116,6 +117,7 @@ class CodexDesktopRefresher {
   }
 
   handleOutbound(rawMessage) {
+    if (!this.canRefresh()) return;
     const parsed = safeParseJSON(rawMessage);
     if (!parsed) {
       return;

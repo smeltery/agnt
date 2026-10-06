@@ -11,6 +11,7 @@ const THREAD_QUEUED_FOLLOWUPS_CHANGED = "thread-queued-followups-changed";
 const AGNT_LIVE_OWNER_SOURCE = "desktop-ipc-live-owner";
 
 const SUPPORTED_FOLLOWER_REQUEST_METHODS = new Set([
+  "thread-owner-discovery",
   "thread-follower-start-turn",
   "thread-follower-load-complete-history",
   "thread-follower-update-thread-settings",

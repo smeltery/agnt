@@ -79,7 +79,20 @@ function sanitizeUserInputEntries(entries) {
       text: visible,
     });
   }
-  return sanitized;
+  return normalizeDesktopInputEntries(sanitized);
+}
+
+function normalizeDesktopInputEntries(entries) {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+  return entries.map((entry) => {
+    if (!entry || typeof entry !== "object" || entry.type !== "text"
+      || Array.isArray(entry.text_elements)) {
+      return entry;
+    }
+    return { ...entry, text_elements: [] };
+  });
 }
 
 function sanitizeUserMessageItem(item) {
@@ -101,9 +114,12 @@ function sanitizeUserMessageItem(item) {
 }
 
 function normalizeDesktopItemCompatibility(item) {
-  if (!item || typeof item !== "object" || normalizeToken(item.type) !== "collabagenttoolcall") {
-    return item;
+  if (!item || typeof item !== "object") return item;
+  if (item.type === "userMessage" || item.type === "steeringUserMessage") {
+    const key = item.type === "userMessage" ? "content" : "input";
+    return { ...item, [key]: normalizeDesktopInputEntries(item[key]) };
   }
+  if (normalizeToken(item.type) !== "collabagenttoolcall") return item;
 
   const receiverThreads = Array.isArray(item.receiverThreads)
     ? item.receiverThreads
@@ -198,17 +214,23 @@ function normalizeTurnInitialPrompt(turn) {
 function userMessageContentFromTurnInput(entry) {
   if (typeof entry === "string") {
     const text = readString(entry);
-    return text ? { type: "text", text } : null;
+    return text ? { type: "text", text, text_elements: [] } : null;
   }
   if (!entry || typeof entry !== "object") {
     return null;
   }
   const type = normalizeToken(entry.type);
   if (type === "inputtext" || type === "text") {
-    return { type: "text", text: readString(entry.text) };
+    return {
+      ...cloneJSON(entry),
+      type: "text",
+      text: typeof entry.text === "string" ? entry.text : "",
+      text_elements: Array.isArray(entry.text_elements) ? cloneJSON(entry.text_elements) : [],
+    };
   }
   return cloneJSON(entry);
 }
+
 
 function adoptInitialPromptUserMessage(turn, item) {
   if (!isUserMessageItem(item) || !Array.isArray(item?.content)) {
@@ -228,6 +250,7 @@ function adoptInitialPromptUserMessage(turn, item) {
 }
 
 module.exports = {
+  normalizeDesktopInputEntries,
   adoptInitialPromptUserMessage,
   extractUserText,
   isInitialPromptUserMessageItem,

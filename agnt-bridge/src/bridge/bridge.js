@@ -78,7 +78,6 @@ const {
 const {
   createRelayResponseSanitizer,
   createThreadMemoryObserver,
-  createThreadNameNotifier,
 } = require("./bridge-message-helpers");
 const { createThreadListProvenanceEnricher } = require("./thread-list-provenance");
 const { createWorktreeOriginEnricher } = require("./worktree-origin");
@@ -220,9 +219,6 @@ function startBridge({
     parseJson: safeParseJSON,
     sanitizeThreadHistoryImagesForRelay,
     threadRowEnrichers,
-  });
-  const sendThreadNameUpdatedNotification = createThreadNameNotifier({
-    sendApplicationResponse,
   });
   const {
     handleRuntimeSettings,
@@ -414,7 +410,6 @@ function startBridge({
     rolloutLiveMirror,
     sanitizeThreadHistoryImagesForRelay,
     sendApplicationResponse,
-    sendThreadNameUpdatedNotification,
     terminalHandler,
     threadTurnsListFastPageCoordinator,
     updateBridgePackageAndRestart,

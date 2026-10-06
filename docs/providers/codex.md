@@ -118,3 +118,8 @@ agnt-bridge/src/providers/codex/
 
 - [`../architecture/adaptive-pager.md`](../architecture/adaptive-pager.md) — how the Codex JSONL fallback fits into `thread/turns/list`
 - [`../operations/debugging.md`](../operations/debugging.md) — `agnt-jsonl-diagnose` for inspecting rollout files
+
+Desktop navigation is opt-in with `AGNT_DESKTOP_AUTO_FOLLOW=true`. By default,
+open the thread in Codex.app to establish live IPC sync. The bridge connects to
+Desktop's IPC router without creating a replacement router when Desktop is closed.
+Thread renames are acknowledged only after the local runtime persists them.

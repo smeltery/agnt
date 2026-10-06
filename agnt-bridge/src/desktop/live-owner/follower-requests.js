@@ -29,6 +29,7 @@ const {
 } = require("../desktop-ipc-live-owner-utils");
 
 function createLiveOwnerFollowerRequestHandler({
+  hostId = "local",
   conversations,
   followerRuntimeState,
   ipc,
@@ -55,6 +56,9 @@ function createLiveOwnerFollowerRequestHandler({
     if (!SUPPORTED_FOLLOWER_REQUEST_METHODS.has(method)) {
       return false;
     }
+    const requestedHostId = readString(params.hostId || envelope.request?.hostId || envelope.hostId);
+    if (method === "thread-owner-discovery" && !requestedHostId) return false;
+    if (requestedHostId && requestedHostId !== hostId) return false;
     const threadId = readConversationIdFromFollowerParams(params);
     return Boolean(threadId && ownedThreadIds.has(threadId));
   }
@@ -63,11 +67,13 @@ function createLiveOwnerFollowerRequestHandler({
     const method = readString(envelope?.method);
     const params = envelope?.params && typeof envelope.params === "object" ? envelope.params : {};
     const conversationId = readConversationIdFromFollowerParams(params);
-    if (!conversationId || !ownedThreadIds.has(conversationId)) {
+    if (!conversationId || !canHandleFollowerRequest(envelope)) {
       throw new Error("conversation-not-owned");
     }
 
     switch (method) {
+      case "thread-owner-discovery":
+        return { supportsUntrustedAppInput: false };
       case "thread-follower-start-turn":
         return await followerRuntimeState.enqueueMutation(conversationId, () => handleFollowerStartTurn(conversationId, params));
       case "thread-follower-load-complete-history":
@@ -131,6 +137,9 @@ function createLiveOwnerFollowerRequestHandler({
   }
 
   async function handleFollowerStartTurn(conversationId, params) {
+    if (params.turnStart?.context?.responseItems?.length > 0) {
+      throw new Error("Untrusted application input is not supported by this bridge.");
+    }
     const rawTurnStartParams = readFollowerTurnStartParams(params);
     const codexParams = followerRuntimeState.mergeOverrides(conversationId, sanitizeTurnStartParams({
       ...rawTurnStartParams,

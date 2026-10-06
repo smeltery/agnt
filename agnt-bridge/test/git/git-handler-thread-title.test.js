@@ -47,11 +47,13 @@ test("threadGenerateTitle falls back to a sanitized first-message title", async 
   assert.equal(result.title, "Rename this conversation after");
 });
 
-test("threadNameSet normalizes mobile rename params", () => {
-  const result = __test.threadNameSet({
+test("threadNameSet normalizes mobile rename params", async () => {
+  const requests = [];
+  const result = await __test.threadNameSet({
     thread_id: " thread-1 ",
     name: "  Fix Thread Naming  ",
-  });
+  }, { sendCodexRequest: async (method, params) => { requests.push({ method, params }); } });
+  assert.deepEqual(requests, [{ method: "thread/name/set", params: { threadId: "thread-1", name: "Fix Thread Naming" } }]);
 
   assert.deepEqual(result, {
     threadId: "thread-1",
@@ -61,9 +63,9 @@ test("threadNameSet normalizes mobile rename params", () => {
   });
 });
 
-test("handleGitRequest owns thread rename and emits the rename hook", async () => {
+test("handleGitRequest persists thread rename through the runtime", async () => {
   const responses = [];
-  const notifications = [];
+  const requests = [];
   const handled = handleGitRequest(
     JSON.stringify({
       id: "rename-1",
@@ -75,7 +77,7 @@ test("handleGitRequest owns thread rename and emits the rename hook", async () =
     }),
     (response) => responses.push(JSON.parse(response)),
     {
-      onThreadNameSet: (result) => notifications.push(result),
+      sendCodexRequest: async (method, params) => requests.push({ method, params }),
     }
   );
 
@@ -92,7 +94,7 @@ test("handleGitRequest owns thread rename and emits the rename hook", async () =
       title: "Polish loading states",
     },
   });
-  assert.deepEqual(notifications, [responses[0].result]);
+  assert.deepEqual(requests, [{ method: "thread/name/set", params: { threadId: "thread-1", name: "Polish loading states" } }]);
 });
 
 test("handleGitRequest skips thread/generateTitle when codexTitleGeneration is false", () => {
@@ -129,4 +131,11 @@ test("handleGitRequest still handles thread/generateTitle for Codex by default",
     );
     assert.equal(handled, true);
   });
+});
+
+ test("thread rename failures do not report optimistic success", async () => {
+  await assert.rejects(__test.threadNameSet({ threadId: "task", name: "Title" }), /connection is unavailable/);
+  await assert.rejects(__test.threadNameSet({ threadId: "task", name: "Title" }, {
+    sendCodexRequest: async () => { throw new Error("owner rejected rename"); },
+  }), /owner rejected rename/);
 });

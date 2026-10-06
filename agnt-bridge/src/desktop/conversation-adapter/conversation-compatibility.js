@@ -1,3 +1,4 @@
+const { normalizeDesktopInputEntries, normalizeDesktopItemCompatibility } = require("./item-normalization");
 // FILE: conversation-compatibility.js
 // Purpose: Mirror legacy Desktop conversation turns into the canonical history graph.
 // Layer: CLI helper
@@ -30,7 +31,7 @@ function synchronizeDesktopConversationCompatibility(state) {
     turn.params = normalizeTurnParamsCompatibility(turn.params, {
       cwd: readString(turn.params?.cwd) || readString(state.cwd),
     });
-    turn.items = Array.isArray(turn.items) ? turn.items : [];
+    turn.items = Array.isArray(turn.items) ? turn.items.map(normalizeDesktopItemCompatibility) : [];
     turn.hookRuns = Array.isArray(turn.hookRuns) ? turn.hookRuns : [];
     const key = `turn:${turnId}`;
     entries.push({ key, value: key });
@@ -148,7 +149,7 @@ function normalizeTurnParamsCompatibility(params, { cwd = "" } = {}) {
   const normalized = params && typeof params === "object" && !Array.isArray(params)
     ? params
     : {};
-  normalized.input = Array.isArray(normalized.input) ? normalized.input : [];
+  normalized.input = normalizeDesktopInputEntries(normalized.input);
   normalized.attachments = Array.isArray(normalized.attachments) ? normalized.attachments : [];
   normalized.cwd = readString(normalized.cwd) || readString(cwd) || null;
   normalized.summary ??= "none";
