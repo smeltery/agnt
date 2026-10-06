@@ -74,9 +74,9 @@ test("turn/start posts a message body and emits turn/started immediately", async
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(httpCalls[0].method, "POST");
-  assert.equal(httpCalls[0].pathName, "/session/ses_x/message");
-  assert.equal(httpCalls[0].body.providerID, "anthropic");
-  assert.equal(httpCalls[0].body.modelID, "claude-haiku-4-5");
+  assert.equal(httpCalls[0].pathName, "/session/ses_x/prompt_async");
+  assert.equal(httpCalls[0].body.model.providerID, "anthropic");
+  assert.equal(httpCalls[0].body.model.modelID, "claude-haiku-4-5");
   assert.deepEqual(httpCalls[0].body.parts, [{ type: "text", text: "hi" }]);
 
   const events = parseInjected(injected);
@@ -105,7 +105,7 @@ test("turn/start accepts `params.model` as a fallback for `modelID` (Android wir
   }));
   await new Promise((resolve) => setImmediate(resolve));
 
-  assert.equal(httpCalls[0].body.modelID, "claude-haiku-4-5");
+  assert.equal(httpCalls[0].body.model.modelID, "claude-haiku-4-5");
 });
 
 test("message.updated assistant + message.part.updated text emit item/started + agent delta", () => {
@@ -241,7 +241,7 @@ test("session.status idle finalizes the active turn with agent_message + item/co
   assert.ok(turnDone);
 });
 
-test("session.status retry emits turn/failed but does not finalize the turn", () => {
+test("session.status retry preserves the active turn without reporting failure", () => {
   const { translator, injected } = setupTranslator();
   translator.outbound(JSON.stringify({
     id: "tu", method: "turn/start",
@@ -257,7 +257,7 @@ test("session.status retry emits turn/failed but does not finalize the turn", ()
   const events = parseInjected(injected).filter((e) => e.method);
   const failed = events.find((e) => e.method === "turn/failed");
   const completed = events.find((e) => e.method === "turn/completed");
-  assert.equal(failed.params.error.message, "rate limited");
+  assert.equal(failed, undefined);
   // turn/completed should fire later via the eventual idle status, not here.
   assert.equal(completed, undefined);
 });

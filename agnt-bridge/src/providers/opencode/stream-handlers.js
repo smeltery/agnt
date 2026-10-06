@@ -1,6 +1,8 @@
 const { generateItemId, numberOr, readString } = require("../_shared/translator-utils");
 
 function createOpencodeStreamHandlers({ emitNotification, state, toolCallById, turnLifecycle }) {
+const parts = new Map();
+const messageRoles = new Map();
 function handleSessionStatus(props) {
   const status = props?.status;
   const kind = readString(status?.type);
@@ -21,7 +23,7 @@ function handleSessionStatus(props) {
     // limited — surface that as thread/status/changed so the iOS app can
     // render a banner while the request waits to resume.
     const next = numberOr(status?.next, 0);
-    if (next > 0 && state.activeThreadId) {
+    if (state.activeThreadId) {
       emitNotification("thread/status/changed", {
         threadId: state.activeThreadId,
         thread_id: state.activeThreadId,
@@ -36,7 +38,7 @@ function handleSessionStatus(props) {
         },
       });
     }
-    if (state.activeTurnId && state.activeThreadId) {
+    if (kind === "error" && state.activeTurnId && state.activeThreadId) {
       turnLifecycle.emitTurnFailed(state.activeThreadId, state.activeTurnId, message);
       // Don't fire turn/completed here — opencode may auto-recover; an
       // explicit `idle` status will follow once the retry resolves.
@@ -49,6 +51,7 @@ function handleMessageUpdated(props) {
   if (!info || typeof info !== "object") return;
   const role = readString(info.role);
   const messageId = readString(info.id);
+  if (messageId && role) messageRoles.set(messageId, role);
   if (role !== "assistant" || !messageId || !state.activeTurnId || !state.activeThreadId) return;
 
   if (info.tokens && typeof info.tokens === "object") {
@@ -78,41 +81,23 @@ function handleMessagePartUpdated(props) {
   const partType = readString(part.type);
   const messageId = readString(part.messageID) || state.activeAssistantMessageId;
 
-  if (partType === "text") {
-    const text = readString(part.text);
-    if (!text) return;
-    const itemId = messageId || mapPartItemId(partId, "assistant");
-    const previous = state.partItemIds.get(partId);
-    const delta = previous === undefined
-      ? text
-      : text.length > previous.length && text.startsWith(previous)
-        ? text.slice(previous.length)
-        : text;
+  if (messageRoles.get(messageId) === "user") return;
+  if (partId) parts.set(partId, { ...part, messageID: messageId });
+  if (partType === "text" || partType === "reasoning") {
+    const text = typeof part.text === "string" ? part.text : readString(part.reasoning);
+    const previous = state.partItemIds.get(partId) || "";
+    if (text === previous) return;
+    const itemId = partType === "text" ? messageId || partId : partId || mapPartItemId(partId, "thinking");
     state.partItemIds.set(partId, text);
-    emitNotification("item/agentMessage/delta", {
-      threadId: state.activeThreadId,
-      turnId: state.activeTurnId,
-      itemId,
-      delta,
-    });
-    return;
-  }
-
-  if (partType === "reasoning") {
-    const reasoning = readString(part.text) || readString(part.reasoning);
-    if (!reasoning) return;
-    const itemId = mapPartItemId(partId, "thinking");
-    const previous = state.partItemIds.get(partId);
-    const delta = typeof previous === "string" && reasoning.length > previous.length && reasoning.startsWith(previous)
-      ? reasoning.slice(previous.length)
-      : reasoning;
-    state.partItemIds.set(partId, reasoning);
-    emitNotification("item/reasoning/textDelta", {
-      threadId: state.activeThreadId,
-      turnId: state.activeTurnId,
-      itemId,
-      delta,
-    });
+    if (text.startsWith(previous)) {
+      emitNotification(partType === "text" ? "item/agentMessage/delta" : "item/reasoning/textDelta", {
+        threadId: state.activeThreadId, turnId: state.activeTurnId, itemId, delta: text.slice(previous.length),
+      });
+    } else {
+      // A corrected full snapshot replaces the item instead of duplicating its prefix.
+      emitNotification("item/completed", { threadId: state.activeThreadId, turnId: state.activeTurnId, itemId,
+        item: { id: itemId, type: partType === "text" ? "assistant_message" : "reasoning", text } });
+    }
     return;
   }
 
@@ -164,9 +149,9 @@ function handlePatchPartUpdate(part, partId) {
 
 function handleToolPartUpdate(part, partId) {
   const toolName = (readString(part.tool) || readString(part.name) || "tool").toLowerCase();
-  const state = part.state && typeof part.state === "object" ? part.state : null;
-  const status = readString(state?.status);
-  const input = state?.input && typeof state.input === "object" ? state.input : {};
+  const toolState = part.state && typeof part.state === "object" ? part.state : null;
+  const status = readString(toolState?.status);
+  const input = toolState?.input && typeof toolState.input === "object" ? toolState.input : {};
   const errored = status === "error";
   const isTerminal = status === "completed" || status === "error";
 
@@ -182,7 +167,7 @@ function handleToolPartUpdate(part, partId) {
     });
   }
   const record = toolCallById.get(partId);
-  const output = readString(state?.output) || readString(state?.stdout) || "";
+  const output = readString(toolState?.output) || readString(toolState?.stdout) || "";
 
   if (record.kind === "bash") {
     if (!record.wroteBegin) {
@@ -348,7 +333,8 @@ function handleSessionDiff(props) {
 }
 
 function handleSessionError(props) {
-  const message = readString(props?.error?.message)
+  const message = readString(props?.error?.data?.message)
+    || readString(props?.error?.message)
     || readString(props?.message)
     || "opencode session reported an error";
   if (state.activeTurnId && state.activeThreadId) {
@@ -402,18 +388,26 @@ function finalizeActiveTurn() {
   resetTurnState();
 }
 
+function handleMessagePartDelta(props) {
+  const part = parts.get(readString(props.partID));
+  if (!part || props.field !== "text" || typeof props.delta !== "string") return;
+  handleMessagePartUpdated({ part: { ...part, text: (part.text || "") + props.delta } });
+}
+
 function collectAssistantText() {
-  let combined = "";
-  for (const [, snapshot] of state.partItemIds) {
-    if (typeof snapshot === "string") combined += snapshot;
-  }
-  return combined;
+  return [...parts.values()].filter((part) => part.type === "text"
+    && part.messageID === state.activeAssistantMessageId).map((part) => part.text || "").join("");
 }
 
 function resetTurnState() {
   state.activeTurnId = "";
+  state.activeTurnAccepted = false;
+  state.activeUserMessageId = "";
   state.activeAssistantMessageId = "";
   state.partItemIds.clear();
+  parts.clear();
+  messageRoles.clear();
+  state.lastTokenSnapshot = null;
   toolCallById.clear();
   state.didEmitTurnCompletedForActive = false;
 }
@@ -430,6 +424,7 @@ function mapPartItemId(partId, kind) {
   return {
     handleSessionStatus,
     handleMessageUpdated,
+    handleMessagePartDelta,
     handleMessagePartUpdated,
     handleSessionUpdated,
     handleSessionDiff,
