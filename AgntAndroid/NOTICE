@@ -23,8 +23,10 @@ Modifications relative to upstream:
 Original Remodex copyright and Apache-2.0 license notice
 --------------------------------------------------------
 
-Remodex is Copyright (c) the Remodex authors, used under the Apache License,
-Version 2.0. A copy of the Apache-2.0 license is available at:
+Original Remodex notice: Copyright 2025-2026 Emanuele Di Pietro.
+Credit also belongs to the other Remodex contributors whose work is included.
+A complete copy of the Apache-2.0 license and original copyright notice is
+included at ../legal/LICENSE-APACHE-2.0. The license is also available at:
 
     http://www.apache.org/licenses/LICENSE-2.0
 
@@ -35,13 +37,13 @@ Derivative-work license
 
 The Apache-2.0 license permits modification and redistribution of the upstream
 sources under different terms, subject to attribution (this NOTICE file) and
-preservation of the Apache-2.0 license text for the unmodified portions.
+preservation of the upstream notices and Apache-2.0 license text.
 
 The modifications under this directory, and the AgntAndroid module as a whole
 as integrated into the agnt repository, are licensed under PolyForm Shield
 1.0.0 alongside the rest of this repository. See `/LICENSE` at the repository
 root for the full terms.
 
-Files imported verbatim from upstream remain available under Apache-2.0; the
-license headers and copyright notices in those files have been preserved where
-present.
+Inherited upstream code retains its Apache-2.0 grant, including upstream
+portions of modified files. The PolyForm Shield terms do not replace that
+grant. Preserve the applicable upstream license headers and copyright notices.

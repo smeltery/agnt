@@ -15,7 +15,7 @@ You may use, copy, modify, and distribute agnt under the terms of PolyForm Shiel
 
 The license includes the standard "AS IS" disclaimer of warranties and liability, which applies in full.
 
-agnt was forked from a project originally released under Apache-2.0. Code that originated upstream remains available under that grant for anyone who pulled it (the `NOTICE` files record the attribution); new agnt contributions are released under PolyForm Shield 1.0.0.
+agnt is derived from [Remodex](https://github.com/Emanuele-web04/remodex), created by Emanuele Di Pietro, whose original notice is "Copyright 2025-2026 Emanuele Di Pietro". Inherited upstream code retains its Apache-2.0 grant, including upstream portions of modified files. The [original license](LICENSE-APACHE-2.0) and [project attribution](../NOTICE) are included in this repository. New agnt contributions are released under PolyForm Shield 1.0.0; those terms do not replace the upstream grant.
 
 ## 2. No operator-run service
 
@@ -42,4 +42,4 @@ PolyForm Shield 1.0.0 does not grant trademark rights. The "agnt" and "smeltery"
 
 ## 6. Source
 
-[github.com/smeltery/agnt](https://github.com/smeltery/agnt). Upstream attribution is recorded in the project [README](../README.md).
+[github.com/smeltery/agnt](https://github.com/smeltery/agnt). Upstream attribution is recorded in [NOTICE](../NOTICE) and summarized in the project [README](../README.md).

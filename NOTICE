@@ -1,0 +1,40 @@
+agnt — upstream attribution
+===========================
+
+This project is derived from Remodex, created by Emanuele Di Pietro.
+Upstream: https://github.com/Emanuele-web04/remodex
+
+Original copyright notice:
+Copyright 2025-2026 Emanuele Di Pietro
+
+Remodex is licensed under the Apache License, Version 2.0. A complete copy
+of the original license and copyright notice is included in
+legal/LICENSE-APACHE-2.0, restored verbatim from the initial agnt source import
+(commit a1de40d2d1d2de4cbb70b51e98cacf787a958b56, file LICENSE).
+
+The original project supplied the iOS client, local bridge, relay, and
+associated code on which agnt is based. Credit also belongs to the other
+Remodex contributors whose work is included here.
+
+agnt modifications and additions
+-------------------------------
+
+Copyright (c) 2026 smeltery and agnt contributors, for their respective work.
+
+agnt is a modified derivative of Remodex, not an official Remodex release.
+Changes include agnt branding, a multi-provider bridge, Linux runtime support,
+client integrations, and changes to pairing, session recovery, and the UI.
+The Git history records individual changes and their authors.
+
+Additional provenance
+---------------------
+
+The Android client and desktop host incorporate work from Stivy-01/remodex,
+a fork of Emanuele-web04/remodex. Their provenance, modifications, and
+applicable upstream licenses are described in AgntAndroid/NOTICE and
+agnt-host/NOTICE. Marketing-site logo attribution is in
+agnt-site/assets/brands/NOTICE.
+
+This notice records attribution; it does not change any license terms or
+imply endorsement by the upstream authors. See LICENSE for agnt's license
+scope and the preserved upstream license grants.

@@ -1,3 +1,26 @@
+Licensing and upstream attribution
+=================================
+
+agnt is derived from Remodex, created by Emanuele Di Pietro:
+https://github.com/Emanuele-web04/remodex
+
+Original Remodex copyright notice:
+Copyright 2025-2026 Emanuele Di Pietro
+
+The inherited Remodex code is licensed under the Apache License, Version 2.0.
+The original license text, including its copyright notice, is preserved in
+legal/LICENSE-APACHE-2.0. These upstream rights are not replaced by the
+PolyForm Shield terms below, including for upstream portions of modified files.
+
+The PolyForm Shield terms below apply to agnt-specific contributions made
+under those terms and to agnt as a derivative work as a whole, subject to the
+preserved upstream licenses. They do not relicense third-party code.
+
+See NOTICE for project provenance and modification attribution, and the
+component-level notices for additional third-party licenses and credits.
+
+------------------------------------------------------------------------
+
 PolyForm Shield License 1.0.0
 
 Copyright (c) 2026 smeltery

@@ -65,6 +65,8 @@ Start with the [documentation index](docs/README.md).
 
 The [marketing site](agnt-site/README.md) runs locally with no build step.
 
-## License
+## License and attribution
+
+agnt is derived from [Remodex](https://github.com/Emanuele-web04/remodex), created by **Emanuele Di Pietro**. The original [Apache-2.0 license and copyright notice](legal/LICENSE-APACHE-2.0) are preserved; see [NOTICE](NOTICE) for attribution.
 
 [PolyForm Shield 1.0.0](LICENSE): source-available with a non-compete restriction. Inherited Apache-2.0 code retains its original grant. See [terms of use](legal/TERMS_OF_USE.md) for details.
