@@ -11,22 +11,27 @@ enum StreamingInlineMarkupAutoCloser {
         guard !text.isEmpty else { return text }
 
         var scanner = ScannerState()
+        var fence = StreamingMarkdownFence()
         var lineStart = text.startIndex
         while lineStart < text.endIndex {
             let lineEnd = text[lineStart...].firstIndex(of: "\n") ?? text.endIndex
             let line = text[lineStart..<lineEnd]
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                scanner.insideFence.toggle()
-            } else if !scanner.insideFence {
+            if fence.consume(String(line)) || trimmed.isEmpty {
+                // Inline spans cannot cross paragraph or fenced-code boundaries.
+                scanner.codeOpen = false
+                scanner.boldOpen = false
+                scanner.codeHasContent = false
+                scanner.boldHasContent = false
+            } else {
                 scanner.scan(line, isFinalLine: lineEnd == text.endIndex)
             }
 
             lineStart = lineEnd < text.endIndex ? text.index(after: lineEnd) : text.endIndex
         }
 
-        guard !scanner.insideFence else { return text }
+        guard !fence.isOpen else { return text }
 
         if scanner.codeOpen, !scanner.codeHasContent {
             var held = String(text[..<scanner.codeStart])
@@ -54,7 +59,6 @@ enum StreamingInlineMarkupAutoCloser {
     }
 
     private struct ScannerState {
-        var insideFence = false
         var codeOpen = false
         var codeStart: String.Index!
         var codeHasContent = false

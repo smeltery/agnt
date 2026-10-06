@@ -8,6 +8,24 @@ import XCTest
 @testable import AgntMobile
 
 final class StreamingInlineMarkupAutoCloserTests: XCTestCase {
+    func testUnclosedInlineSpanDoesNotLeakAcrossParagraphs() {
+        let text = "- An unmatched **marker\n\n- A different item"
+        XCTAssertEqual(StreamingInlineMarkupAutoCloser.autoClosed(text), text)
+        XCTAssertEqual(
+            StreamingInlineMarkupAutoCloser.autoClosed(text + " with `code"),
+            text + " with `code`"
+        )
+    }
+
+    func testShorterFenceAndDifferentMarkerKeepInlineMarkersLiteral() {
+        let text = "````markdown\n```\n~~~\n\n**literal `marker\n````"
+        XCTAssertEqual(StreamingInlineMarkupAutoCloser.autoClosed(text), text)
+        XCTAssertEqual(
+            StreamingInlineMarkupAutoCloser.autoClosed(text + "\n\nthen `inline"),
+            text + "\n\nthen `inline`"
+        )
+    }
+
     func testPlainAndBalancedTextPassThrough() {
         XCTAssertEqual(StreamingInlineMarkupAutoCloser.autoClosed("plain text"), "plain text")
         XCTAssertEqual(

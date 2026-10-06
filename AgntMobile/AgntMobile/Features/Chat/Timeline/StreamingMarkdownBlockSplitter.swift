@@ -14,32 +14,26 @@ enum StreamingMarkdownBlockSplitter {
         guard !text.isEmpty else { return ("", "") }
 
         let lines = text.components(separatedBy: "\n")
-        var insideFence = false
+        var fence = StreamingMarkdownFence()
         var pendingBoundary = false
         var sawContent = false
         var lastBlockStartLine = 0
 
         for (index, line) in lines.enumerated() {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let isFenceMarker = trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~")
-
-            if isFenceMarker {
+            if fence.consume(line) {
                 if pendingBoundary {
                     lastBlockStartLine = index
                     pendingBoundary = false
                 }
                 sawContent = true
-                insideFence.toggle()
                 continue
             }
 
-            if insideFence {
-                if pendingBoundary {
-                    lastBlockStartLine = index
-                    pendingBoundary = false
-                }
-                sawContent = true
-                continue
+            // Keep document-dependent blocks together across blank lines.
+            if requiresDocumentContext(line, trimmed: trimmed) {
+                if pendingBoundary { lastBlockStartLine = index }
+                break
             }
 
             if trimmed.isEmpty {
@@ -60,6 +54,16 @@ enum StreamingMarkdownBlockSplitter {
         let settled = lines[0..<lastBlockStartLine].joined(separator: "\n")
         let active = lines[lastBlockStartLine...].joined(separator: "\n")
         return (settled, active)
+    }
+
+    private static func requiresDocumentContext(_ line: String, trimmed: String) -> Bool {
+        guard !trimmed.isEmpty else { return false }
+        return classify(trimmed) == .list
+            || trimmed.hasPrefix(">")
+            || trimmed.hasPrefix("<")
+            || trimmed.contains("[")
+            || line.hasPrefix("    ")
+            || line.hasPrefix("\t")
     }
 
     static func topSpacingMultiplier(forBlockStarting active: String) -> CGFloat {

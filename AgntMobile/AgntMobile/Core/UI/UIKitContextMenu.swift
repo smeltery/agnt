@@ -113,6 +113,8 @@ private struct UIKitContextMenuHost<Content: View>: UIViewControllerRepresentabl
 final class ContextMenuHostController<Content: View>: UIHostingController<Content> {
     override init(rootView: Content) {
         super.init(rootView: rootView)
+        // Allow streamed descendants to propagate their growing height.
+        sizingOptions = [.intrinsicContentSize]
         view.backgroundColor = .clear
         view.isOpaque = false
     }
