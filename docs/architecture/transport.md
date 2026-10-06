@@ -101,3 +101,14 @@ If you're inspecting traffic on a self-hosted relay, you'll see:
 - No plaintext prompts, responses, model names, file paths, or command output.
 
 If you do want to debug *inside* the secure session, you have to do it on the bridge side — that's where plaintext exists.
+
+## Observed thread activity
+
+Clients can opt into compact activity metadata with `agnt/activity/subscribe`
+and `{ "schemaVersion": 1 }`. The response contains an epoch, revision, and entries
+for observed threads; it is not a complete thread catalog. Subsequent
+`agnt/activity/updated` notifications carry coalesced revision updates. Subscribe
+again after reconnect or a revision gap, and use `agnt/activity/unsubscribe` when
+updates are no longer needed. The feed preserves runtime ownership and marks a
+lost Desktop connection stale without inventing a terminal outcome. It uses the
+same encrypted transport as other application messages.

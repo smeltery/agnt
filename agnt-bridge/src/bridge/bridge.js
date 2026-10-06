@@ -1,3 +1,4 @@
+const { createThreadActivityCoordinator } = require("./activity/coordinator");
 // FILE: bridge.js
 // Purpose: Runs Codex locally, bridges relay traffic, and coordinates desktop refreshes for Codex.app.
 // Layer: CLI service
@@ -141,6 +142,10 @@ function startBridge({
       includeTurns: true,
     }),
   });
+  const activity = createThreadActivityCoordinator({
+    sendApplicationResponse,
+    isLocallyOwnedThread: (threadId) => Boolean(desktopIpcLiveOwner?.isThreadOwned(threadId)),
+  });
   const readBridgePackageVersionStatus = createBridgePackageVersionStatusReader();
 
   // Keep the local Codex runtime alive across transient relay disconnects.
@@ -234,6 +239,7 @@ function startBridge({
     normalizeCodexTurnStartParams,
     normalizeProviderMessage,
     readDesktopConversationState,
+    onActivityObservation: activity.observeDesktop,
     rememberThreadFromMessage,
     sendApplicationResponse,
   });
@@ -306,6 +312,7 @@ function startBridge({
   // owned by that module.
   function prepareBridgeShutdown() {
     isShuttingDown = true;
+    activity.dispose();
     bridgeWakeAssertion.stop();
     bridgeStatus.clearReconnectTimer();
     bridgeStatus.clearRelayWatchdog();
@@ -319,6 +326,7 @@ function startBridge({
 
   let handleApplicationMessage;
   const socketLoop = createBridgeRelaySocketLoop({
+    activity,
     WebSocketCtor: WebSocket,
     bridgeStatus,
     bridgeWakeAssertion,
@@ -365,6 +373,7 @@ function startBridge({
   }));
 
   codex.onClose(() => {
+    activity.markRuntimeStale();
     bridgeStatus.logConnectionStatus("disconnected");
     bridgeStatus.publishBridgeStatus({
       state: "stopped",
@@ -399,6 +408,7 @@ function startBridge({
     handshakeHandler,
     handleFallbackMessage: forwardApplicationMessageToProvider,
     handleRuntimeSettings,
+    handleActivity: activity.handleRequest,
     notificationsHandler,
     rememberThreadFromMessage,
     rolloutLiveMirror,
@@ -438,6 +448,7 @@ function startBridge({
 
   function forwardApplicationMessage(payload) {
     if (payload == null) return;
+    activity.observe(payload);
     pushNotificationTracker.handleOutbound(payload);
     secureTransport.queueOutboundApplicationMessage(payload, sendRelayWireMessage);
   }

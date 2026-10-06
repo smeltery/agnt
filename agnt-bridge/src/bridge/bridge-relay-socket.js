@@ -5,6 +5,7 @@ const { shutdown } = require("./lifecycle");
 const RELAY_TERMINAL_CLOSE_CODES = new Set([4000, 4001]);
 
 function createBridgeRelaySocketLoop({
+  activity,
   WebSocketCtor,
   bridgeStatus,
   bridgeWakeAssertion,
@@ -39,6 +40,7 @@ function createBridgeRelaySocketLoop({
     onShutdown: () => {
       shutdown(codex, () => socketLoop.getSocket(), () => {
         markShuttingDown();
+        activity?.dispose();
         bridgeWakeAssertion.stop();
         bridgeStatus.clearReconnectTimer();
         bridgeStatus.clearRelayWatchdog();
@@ -54,6 +56,7 @@ function createBridgeRelaySocketLoop({
       sendRelayRegistrationUpdate(getDeviceState());
     },
     onTeardown: () => {
+      activity?.resetSubscriber();
       contextUsageWatcher.stop();
       rolloutLiveMirror?.stopAll();
       desktopIpcLiveOwner?.stopAll();

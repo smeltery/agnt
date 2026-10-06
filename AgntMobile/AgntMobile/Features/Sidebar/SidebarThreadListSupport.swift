@@ -51,18 +51,19 @@ extension SidebarThreadListView {
         isPinnedRow: Bool = false,
         childSubagentCount: Int = 0,
         isSubagentExpanded: Bool = false,
-        onToggleSubagents: (() -> Void)? = nil
+        onToggleSubagents: (() -> Void)? = nil,
+        activityDiffTotals: GitDiffTotals? = nil
     ) -> some View {
         let isSelected = selectedThread?.id == thread.id
 
         return SidebarThreadRowView(
             thread: thread,
             isSelected: isSelected,
-            runBadgeState: runBadgeStateByThreadID[thread.id],
+            runBadgeState: showsActivity ? codex.threadRunBadgeState(for: thread.id) : runBadgeStateByThreadID[thread.id],
             timingLabel: timingLabelProvider(thread),
             diffTotals: diffTotalsByThreadID[thread.id],
             isPinned: codex.isThreadPinned(thread.id),
-            pinnedProjectLabel: isPinnedRow ? thread.projectDisplayName : nil,
+            pinnedProjectLabel: (isPinnedRow || showsActivity) ? thread.projectDisplayName : nil,
             childSubagentCount: childSubagentCount,
             isSubagentExpanded: isSubagentExpanded,
             onToggleSubagents: onToggleSubagents,
@@ -76,7 +77,9 @@ extension SidebarThreadListView {
             onRename: onRenameThread.map { handler in { newName in handler(thread, newName) } },
             onPinToggle: onPinToggleThread.map { handler in { handler(thread) } },
             onArchiveToggle: onArchiveToggleThread.map { handler in { handler(thread) } },
-            onDelete: onDeleteThread.map { handler in { handler(thread) } }
+            onDelete: onDeleteThread.map { handler in { handler(thread) } },
+            activityDiffTotals: activityDiffTotals,
+            showsActivity: showsActivity
         )
     }
 

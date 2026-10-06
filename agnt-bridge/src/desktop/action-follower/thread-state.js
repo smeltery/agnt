@@ -1,4 +1,5 @@
 function createThreadStateManager({
+  onActivityObservation,
   activeThreads,
   backgroundOnlyThreadIds,
   baselineRecoveryStateByThreadId,
@@ -47,6 +48,7 @@ function createThreadStateManager({
   }
 
   function clearDesktopThreadCaches(threadId) {
+    onActivityObservation?.({ type: "removed", threadId });
     unfollowDesktopThread(threadId);
     settleAnnouncedBackgroundTurn(threadId, "interrupted");
     if (backgroundOnlyThreadIds.delete(threadId)) {

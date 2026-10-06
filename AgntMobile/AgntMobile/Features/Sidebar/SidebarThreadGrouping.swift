@@ -18,6 +18,7 @@ enum SidebarThreadGroupKind: Equatable {
 // This is a presentation scope, not a repo filter: each scope still surfaces
 // every thread of that kind the device knows about, just bucketed differently.
 enum SidebarContentScope: String, CaseIterable, Hashable, Identifiable {
+    case activity
     case projects
     case chats
 
@@ -25,6 +26,8 @@ enum SidebarContentScope: String, CaseIterable, Hashable, Identifiable {
 
     var title: String {
         switch self {
+        case .activity:
+            return "Activity"
         case .projects:
             return "Projects"
         case .chats:
@@ -77,6 +80,10 @@ struct SidebarThreadGroup: Identifiable {
 }
 
 enum SidebarThreadGrouping {
+    static func activityThreads(from threads: [CodexThread], runBadgeStateByThreadID: [String: CodexThreadRunBadgeState]) -> [CodexThread] {
+        sortThreadsByRecentActivity(threads.filter { $0.syncState != .archivedLocal }, runBadgeStateByThreadID: runBadgeStateByThreadID)
+    }
+
     static func makeGroups(
         from threads: [CodexThread],
         pinnedThreadIDs: [String] = [],

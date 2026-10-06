@@ -104,6 +104,14 @@ If the WebSocket drops:
 
 Privacy policy and terms link to `legal/PRIVACY_POLICY.md` and `legal/TERMS_OF_USE.md` on GitHub. Lowercase `legal/` is intentional — GitHub URLs are case-sensitive on the web.
 
+## Activity sidebar
+
+The Activity tab lists conversations across projects, putting running tasks,
+questions, and unread outcomes in a Priority section. Other conversations are
+grouped by date. Visible rows load checkout diff totals; requests are shared per
+checkout and stop when the sidebar is hidden. Projects and Chats remain available
+as separate views of the same local thread catalog.
+
 ## Async questions
 
 Assistant items with `delivery: "async"` keep their questions in the timeline while

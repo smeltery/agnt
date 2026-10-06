@@ -55,6 +55,8 @@ struct SidebarView: View {
 
     var groupingScope: SidebarThreadGroupingScope {
         switch contentScope {
+        case .activity:
+            return .all
         case .projects:
             return .projects
         case .chats:
@@ -158,6 +160,9 @@ struct SidebarView: View {
     @ViewBuilder
     private var threadListView: some View {
         SidebarThreadListView(
+            showsActivity: contentScope == .activity,
+            isVisible: isVisible,
+            activityRefreshGeneration: codex.threads.count,
             isFiltering: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             isConnected: codex.isConnected,
             isCreatingThread: isCreatingThread,

@@ -31,6 +31,7 @@ function createBridgeApplicationHandler({
   handshakeHandler,
   handleFallbackMessage,
   handleRuntimeSettings = () => false,
+  handleActivity = () => false,
   notificationsHandler,
   rememberThreadFromMessage,
   rolloutLiveMirror,
@@ -89,6 +90,7 @@ function createBridgeApplicationHandler({
   const route = createApplicationMessageRouter({
     stages: [
       (msg) => handshakeHandler.handlePhoneMessage(msg),
+      (msg) => handleActivity(msg),
       (msg) => accountHandler.handleBridgeManagedAccountRequest(msg, sendApplicationResponse),
       (msg) => accountHandler.handleNonCodexVoiceRequest(msg, sendApplicationResponse),
       (msg) => voiceHandler.handleVoiceRequest(msg, sendApplicationResponse),
