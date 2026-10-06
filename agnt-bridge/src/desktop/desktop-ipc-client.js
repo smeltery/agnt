@@ -94,7 +94,7 @@ function createDesktopIpcClient({
     connectNextSocket();
   }
 
-  function sendRequest(method, params) {
+  function sendRequest(method, params, { targetClientId, returnEnvelope = false, timeoutMs = requestTimeoutMs } = {}) {
     ensureConnected();
     if (!socket || socket.destroyed) {
       return Promise.reject(markDeliveryFailureError(new Error("Desktop IPC is not connected.")));
@@ -109,14 +109,17 @@ function createDesktopIpcClient({
       initializing: method === "initialize",
     });
 
+    if (targetClientId) envelope.targetClientId = targetClientId;
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pendingRequests.delete(requestId);
         reject(new Error(`Desktop IPC request timed out: ${method}`));
-      }, requestTimeoutMs);
+      }, timeoutMs);
       timeout.unref?.();
 
       pendingRequests.set(requestId, {
+        returnEnvelope,
         method,
         resolve,
         reject,
@@ -239,7 +242,7 @@ function createDesktopIpcClient({
         return;
       }
 
-      waiter.resolve(envelope.result ?? null);
+      waiter.resolve(waiter.returnEnvelope ? envelope : envelope.result ?? null);
       return;
     }
 

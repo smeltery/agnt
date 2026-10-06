@@ -1,5 +1,6 @@
 const { desktopLiveStateForProjection } = require("./action-follower/state");
 const net = require("net");
+const { createOwnerNegotiation } = require("./action-follower/owner-negotiation");
 
 const { createDesktopConversationProjector, projectDesktopConversationStateToThread } = require("./desktop-ipc-conversation-projector");
 const {
@@ -79,6 +80,8 @@ const DESKTOP_OWNER_UNSUPPORTED_MUTATION_ERRORS = new Map([
 function createDesktopIpcActionFollower({
   sendApplicationResponse,
   readConversationState = null,
+  readThreadMetadata = null,
+  resumeThreadLocally = null,
   forwardToLocalCodex = null,
   isLocallyOwnedThread = () => false,
   normalizeTurnStartParams = (params) => params,
@@ -199,9 +202,18 @@ function createDesktopIpcActionFollower({
       return requestRouter.submitDesktopFollowerRequest(...args);
     },
   });
+  const ownerNegotiation = createOwnerNegotiation({
+    ipc, readThreadMetadata, resumeThreadLocally, isLocallyOwnedThread,
+    hasDesktopState: (id) => rawStatesByThreadId.has(id),
+    releaseDesktopThreadState, sendApplicationResponse,
+    dispatch: (raw, message) => {
+      if (!observeInbound(raw, message)) forwardToLocalCodex?.(raw);
+    }, timeoutMs: ownershipProbeTimeoutMs,
+  });
   requestRouter = createDesktopRequestRouter({
+    targetClientId: ownerNegotiation.targetClientId,
     runtimeSettingsStore,
-    isKnownDesktopOwner: (threadId) => rawStatesByThreadId.has(threadId),
+    isKnownDesktopOwner: (threadId) => rawStatesByThreadId.has(threadId) || ownerNegotiation.hasOwner(threadId),
     forwardToLocalCodex,
     ipc,
     isDeliveryFailureError,
@@ -347,6 +359,11 @@ function createDesktopIpcActionFollower({
     }
 
     const method = readString(message?.method);
+    if (method === "thread/resume") {
+      const threadId = readThreadId(message.params);
+      if (threadId) { activeThreads.remember(threadId); ipc.ensureConnected(); followDesktopThread(threadId); }
+    }
+    if (ownerNegotiation.handle(message, rawMessage, DESKTOP_FOLLOWER_REQUEST_METHODS.has(method))) return true;
     if (DESKTOP_BACKGROUND_DISCOVERY_METHODS.has(method)) {
       ipc.ensureConnected();
     }
@@ -358,7 +375,7 @@ function createDesktopIpcActionFollower({
     }
     if (DESKTOP_FOLLOWER_REQUEST_METHODS.has(method)) {
       const route = buildDesktopFollowerRoute(message);
-      if (route && heldFollowerRequests.isDesktopRoutable(route.threadId)) {
+      if (route && (heldFollowerRequests.isDesktopRoutable(route.threadId) || ownerNegotiation.hasOwner(route.threadId))) {
         requestRouter.submitDesktopFollowerRequest(route, message);
         return true;
       }
@@ -420,6 +437,7 @@ function createDesktopIpcActionFollower({
   }
 
   function stopAll() {
+    ownerNegotiation.reset();
     onActivityObservation?.({ type: "disconnected", sourceGeneration: activityGeneration });
     for (const threadId of desktopFollowThreadIds) {
       unfollowDesktopThread(threadId);
@@ -573,6 +591,7 @@ function createDesktopIpcActionFollower({
   }
 
   function onDisconnect() {
+    ownerNegotiation.reset();
     onActivityObservation?.({ type: "disconnected", sourceGeneration: activityGeneration });
     threadStateManager.onDisconnect();
   }
