@@ -84,7 +84,7 @@ struct ComposerRuntimeMenuControl: View, Equatable {
                 }
             }
 
-            if runtimeState.supportsFastMode {
+            if !runtimeState.serviceTiers.isEmpty {
                 Section("Speed") {
                     Button {
                         HapticFeedback.shared.triggerImpactFeedback(style: .light)
@@ -97,7 +97,7 @@ struct ComposerRuntimeMenuControl: View, Equatable {
                         }
                     }
 
-                    ForEach(CodexServiceTier.allCases, id: \.rawValue) { tier in
+                    ForEach(runtimeState.serviceTiers, id: \.rawValue) { tier in
                         Button {
                             HapticFeedback.shared.triggerImpactFeedback(style: .light)
                             runtimeActions.selectServiceTier(tier)

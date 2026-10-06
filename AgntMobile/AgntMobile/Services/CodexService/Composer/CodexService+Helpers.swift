@@ -93,6 +93,9 @@ extension CodexService {
         with existing: CodexThread?,
         treatAsServerState: Bool = false
     ) -> CodexThread {
+        if let settings = incoming.runtimeSettings {
+            applyConfirmedRuntimeSettings(settings, threadId: incoming.id)
+        }
         guard let existing else {
             return applyingAuthoritativeProjectPath(
                 to: incoming,

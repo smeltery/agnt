@@ -118,13 +118,13 @@ struct SettingsView: View {
                 .disabled(runtimeReasoningOptions.isEmpty)
             }
 
-            if codex.selectedModelSupportsServiceTier(.fast) {
+            if codex.selectedModelOption()?.serviceTiers.isEmpty == false {
                 HStack {
                     Text("Speed")
                     Spacer()
                     Picker("Speed", selection: runtimeServiceTierSelection) {
                         Text("Normal").tag(runtimeNormalValue)
-                        ForEach(CodexServiceTier.allCases, id: \.rawValue) { tier in
+                        ForEach(codex.selectedModelOption()?.serviceTiers ?? [], id: \.rawValue) { tier in
                             Text(tier.displayName).tag(tier.rawValue)
                         }
                     }

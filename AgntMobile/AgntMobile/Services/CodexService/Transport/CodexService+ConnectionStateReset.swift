@@ -7,6 +7,7 @@ import Network
 
 extension CodexService {
     func resetThreadRuntimeStateForServerSwitch() {
+        resetRuntimeSettingsSyncState()
         activeThreadId = nil
         activeTurnId = nil
         activeTurnIdByThread.removeAll()

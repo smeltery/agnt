@@ -51,3 +51,25 @@ test("mutations serialize by task, continue after failure, and do not block othe
   await Promise.all([rejection, second]);
   assert.deepEqual(order, ["settings", "other", "turn"]);
 });
+
+const { normalizePhoneRuntimeRequest } = require("../../src/desktop/runtime/phone-request");
+
+test("legacy speed defaults are adapted once while modern omission inherits", () => {
+  const request = { id: 1, method: "turn/start", params: { threadId: "task", input: [] } };
+  assert.equal(JSON.parse(normalizePhoneRuntimeRequest(JSON.stringify(request))).params.serviceTier, "default");
+  request.params.agntRuntimeSettingsVersion = 2;
+  assert.deepEqual(JSON.parse(normalizePhoneRuntimeRequest(JSON.stringify(request))).params, { threadId: "task", input: [] });
+  request.params.serviceTier = "fast";
+  assert.equal(JSON.parse(normalizePhoneRuntimeRequest(JSON.stringify(request))).params.serviceTier, "priority");
+  request.method = "thread/settings/update";
+  request.params.serviceTier = null;
+  assert.equal(JSON.parse(normalizePhoneRuntimeRequest(JSON.stringify(request))).params.serviceTier, null);
+});
+
+test("top-level model and nested reasoning remain consistent without inventing overrides", () => {
+  const request = { method: "turn/start", params: { model: "new-model", effort: null,
+    collaborationMode: { mode: "plan", settings: { model: "old-model", reasoning_effort: "high" } } } };
+  const result = JSON.parse(normalizePhoneRuntimeRequest(JSON.stringify(request)));
+  assert.equal(result.params.collaborationMode.settings.model, "new-model");
+  assert.equal(result.params.collaborationMode.settings.reasoning_effort, "high");
+});

@@ -99,7 +99,7 @@ test("warm initialize publishes providerId so the phone can gate Codex-only RPCs
     assert.equal(out.length, 1);
     assert.deepEqual(JSON.parse(out[0]), {
       id: "req-px",
-      result: { bridgeManaged: true, providerId },
+      result: { bridgeManaged: true, providerId, ...(providerId === "codex" ? { agntRuntimeSettingsVersion: 2 } : {}) },
     });
   }
 });

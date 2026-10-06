@@ -10,8 +10,8 @@ extension CodexService {
             return nil
         }
 
-        let resolvedModel = runtimeModelIdentifierForTurn()
-            ?? selectedModelOption()?.model
+        let resolvedModel = runtimeModelIdentifierForTurn(threadId: threadId)
+            ?? selectedModelOption(threadId: threadId)?.model
             ?? availableModels.first?.model
             ?? selectedModelId
         guard let resolvedModel,

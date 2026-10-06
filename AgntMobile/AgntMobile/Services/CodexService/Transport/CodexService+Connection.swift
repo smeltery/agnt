@@ -142,6 +142,7 @@ extension CodexService {
 
         isConnected = false
         isInitialized = false
+        cancelRuntimeSettingsUpdates()
         isLoadingThreads = false
         isLoadingModels = false
         pendingRuntimeOptionRefresh = false
@@ -365,6 +366,7 @@ extension CodexService {
 
         do {
             let initializeResponse = try await sendRequest(method: "initialize", params: modernParams)
+            learnRuntimeSettingsSupport(initializeResponse)
             learnTurnPaginationSupportFromInitializeResponse(initializeResponse)
             // A successful modern initialize means the runtime accepted the experimental
             // capability negotiation. Keep plan-mode sends enabled unless the runtime
@@ -386,6 +388,7 @@ extension CodexService {
             ])
             do {
                 let initializeResponse = try await sendRequest(method: "initialize", params: legacyParams)
+                learnRuntimeSettingsSupport(initializeResponse)
                 learnTurnPaginationSupportFromInitializeResponse(initializeResponse)
             } catch {
                 if let incompatibleAppVersionError = incompatibleBridgeAppVersionError(from: error) {
@@ -399,6 +402,7 @@ extension CodexService {
 
         try await sendNotification(method: "initialized", params: nil)
         isInitialized = true
+        resumePendingRuntimeSettingsUpdates()
         flushPendingReplayDiscontinuityHistoryRefresh()
         if shouldProbePlanCollaborationMode {
             schedulePlanCollaborationModeProbe()

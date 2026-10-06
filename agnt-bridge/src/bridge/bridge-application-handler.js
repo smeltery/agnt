@@ -1,3 +1,4 @@
+const { normalizePhoneRuntimeRequest } = require("../desktop/runtime/phone-request");
 const { handleDesktopRequest } = require("../handlers/desktop-handler");
 const { handleGitRequest } = require("../git/git-handler");
 const { handleThreadContextRequest } = require("../handlers/thread-context-handler");
@@ -85,7 +86,7 @@ function createBridgeApplicationHandler({
     return true;
   }
 
-  return createApplicationMessageRouter({
+  const route = createApplicationMessageRouter({
     stages: [
       (msg) => handshakeHandler.handlePhoneMessage(msg),
       (msg) => accountHandler.handleBridgeManagedAccountRequest(msg, sendApplicationResponse),
@@ -123,6 +124,7 @@ function createBridgeApplicationHandler({
     ],
     fallback: (msg) => handleFallbackMessage(msg, codex),
   });
+  return (message) => route(activeProvider.id === "codex" ? normalizePhoneRuntimeRequest(message) : message);
 }
 
 module.exports = {

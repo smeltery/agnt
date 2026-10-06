@@ -84,6 +84,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
     var agentNickname: String?
     var agentRole: String?
     var model: String?
+    var runtimeSettings: CodexRuntimeSettings? = nil
     var modelProvider: String?
     var ephemeral: Bool
     var syncState: CodexThreadSyncState
@@ -164,6 +165,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
         case agentRole
         case agentRoleSnake = "agent_role"
         case model
+        case runtimeSettings
         case modelProvider
         case modelProviderSnake = "model_provider"
         case ephemeral
@@ -225,6 +227,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
             keys: [.agentRole, .agentRoleSnake],
             metadataKeys: ["agentRole", "agent_role", "agentType", "agent_type"]
         )
+        runtimeSettings = try container.decodeIfPresent(CodexRuntimeSettings.self, forKey: .runtimeSettings)
         model = Self.decodeThreadIdentity(
             from: container,
             metadata: metadata,
@@ -245,6 +248,7 @@ struct CodexThread: Identifiable, Codable, Hashable, Sendable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(runtimeSettings, forKey: .runtimeSettings)
 
         try container.encode(id, forKey: .id)
         try container.encodeIfPresent(title, forKey: .title)

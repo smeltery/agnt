@@ -33,7 +33,7 @@ final class CodexServiceTierTests: XCTestCase {
 
         XCTAssertEqual(
             capturedTurnStartParams.first?.objectValue?["serviceTier"]?.stringValue,
-            "fast"
+            "priority"
         )
     }
 
@@ -45,7 +45,7 @@ final class CodexServiceTierTests: XCTestCase {
         XCTAssertEqual(service.selectedServiceTier, .fast)
         XCTAssertEqual(
             service.defaults.string(forKey: CodexService.selectedServiceTierDefaultsKey),
-            "fast"
+            "priority"
         )
     }
 
@@ -185,7 +185,7 @@ final class CodexServiceTierTests: XCTestCase {
         try await service.sendTurnStart("Second send", to: "thread-fast-2")
 
         XCTAssertEqual(capturedTurnStartParams.count, 3)
-        XCTAssertEqual(capturedTurnStartParams[0].objectValue?["serviceTier"]?.stringValue, "fast")
+        XCTAssertEqual(capturedTurnStartParams[0].objectValue?["serviceTier"]?.stringValue, "priority")
         XCTAssertNil(capturedTurnStartParams[1].objectValue?["serviceTier"]?.stringValue)
         XCTAssertNil(capturedTurnStartParams[2].objectValue?["serviceTier"]?.stringValue)
         XCTAssertFalse(service.supportsServiceTier)

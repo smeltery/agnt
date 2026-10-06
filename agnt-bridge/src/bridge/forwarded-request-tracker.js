@@ -64,6 +64,7 @@ function createForwardedRequestTracker({
     "account/logout",
   ]),
   sanitizedMethods = new Set([
+    "initialize",
     "thread/read",
     "thread/resume",
     "thread/turns/list",

@@ -232,7 +232,7 @@ extension CodexService {
         ]
         // Keep the legacy top-level fields populated so plan-mode turns still honor
         // the user's selected model on runtimes that do not read collaboration settings.
-        if let modelIdentifier = runtimeModelIdentifierForTurn() {
+        if let modelIdentifier = runtimeModelIdentifierForTurn(threadId: threadId) {
             params["model"] = .string(modelIdentifier)
         }
         if let effort = selectedReasoningEffortForSelectedModel(threadId: threadId) {
@@ -247,6 +247,9 @@ extension CodexService {
             threadId: threadId
         ) {
             params["collaborationMode"] = collaborationModePayload
+        }
+        if supportsRuntimeSettingsSync {
+            params["agntRuntimeSettingsVersion"] = .integer(2)
         }
         return params
     }

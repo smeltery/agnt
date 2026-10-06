@@ -48,7 +48,7 @@ extension CodexService {
         let requestedSignature = CodexThreadResumeRequestSignature(
             projectPath: CodexThreadStartProjectBinding.normalizedProjectPath(preferredProjectPath)
                 ?? thread(for: threadId)?.gitWorkingDirectory,
-            modelIdentifier: modelIdentifierOverride ?? runtimeModelIdentifierForTurn()
+            modelIdentifier: modelIdentifierOverride ?? runtimeModelIdentifierForTurn(threadId: threadId)
         )
         let refreshGeneration = currentPerThreadRefreshGeneration(for: threadId)
         if let existingTask = threadResumeTaskByThreadID[threadId] {
