@@ -231,17 +231,6 @@
     min-height: 32px;
     padding: 6px 10px;
   }
-  /* Chat header is a horizontal toolbar of model/effort/permission
-     pills — let it scroll horizontally instead of wrapping into a
-     three-row stack that eats the chat column. */
-  .agnt-chat-header {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .agnt-chat-header::-webkit-scrollbar { display: none; }
-  .agnt-chat-header > * { flex-shrink: 0; width: auto; }
   /* Composer: composing on a phone is painful when the textarea is
      squished by the row of attachment / send buttons. Stack vertically
      so the textarea gets full-width and the actions land below it. */

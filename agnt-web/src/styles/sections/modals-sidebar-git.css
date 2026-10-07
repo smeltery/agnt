@@ -434,6 +434,9 @@
 [data-theme="light"] .token.doctype,
 [data-theme="light"] .token.cdata { color: #6a737d; }
 [data-theme="light"] .token.punctuation { color: #1b1d22; }
+[data-theme="light"] .token.property { color: #895000; }
+[data-theme="light"] .token.selector,
+[data-theme="light"] .token.atrule { color: #7b3d9a; }
 [data-theme="light"] .token.keyword,
 [data-theme="light"] .token.tag { color: #b1284c; }
 [data-theme="light"] .token.string,
@@ -453,6 +456,10 @@
   :root:not([data-theme]) .token.prolog,
   :root:not([data-theme]) .token.doctype,
   :root:not([data-theme]) .token.cdata { color: #6a737d; }
+  :root:not([data-theme]) .token.property { color: #895000; }
+  :root:not([data-theme]) .token.selector,
+  :root:not([data-theme]) .token.atrule { color: #7b3d9a; }
+  :root:not([data-theme]) .token.punctuation { color: #5b6271; }
   :root:not([data-theme]) .token.keyword,
   :root:not([data-theme]) .token.tag { color: #b1284c; }
   :root:not([data-theme]) .token.string,

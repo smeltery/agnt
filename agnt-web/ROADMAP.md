@@ -4,6 +4,15 @@ The web client is being built across a series of focused sessions. Each session
 delivers an end-to-end-usable slice; the foundation never gets restructured by a
 later session because the protocol and storage layers are already complete.
 
+## Browser workspace refinement ✅ DONE
+
+- Crisp desktop and mobile layouts with a centered conversation, project context,
+  readable message hierarchy, and a compact composer.
+- Workspace, message, and composer tools remain available in keyboard-accessible,
+  viewport-aware popovers; model and run settings share a compact control.
+- Light and dark themes, narrow mobile layouts, and CSS syntax highlighting.
+- Marketing captures use the actual browser UI with example conversation data.
+
 ## Session 46 — Streaming inline markdown polish ✅ DONE
 
 - ✅ **Streaming inline marker auto-close.** Assistant rows now render a

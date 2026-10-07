@@ -3,7 +3,9 @@ import type { MentionContext } from "../../lib/mention-detector";
 import type { ImageAttachment } from "../../models";
 import type { ProjectDirectoryEntry } from "../../protocol/project";
 import type { SlashCommand } from "../../state/slash-commands";
-import { Eye, EyeSlash, Paperclip } from "../shared/Icon";
+import { Eye, EyeSlash, Paperclip, Ellipsis, ArrowUp } from "../shared/Icon";
+import { ActionPopover } from "../shared/ActionPopover";
+import { TurnFlagBar } from "./TurnFlagBar";
 import { ComposerDevicePicker } from "./ComposerDevicePicker";
 import { ComposerFindReplace } from "./ComposerFindReplace";
 import { ComposerMentionMenu, ComposerSlashMenu, DraftStatsFooter, PromptHistoryDropdown } from "./ComposerPickers";
@@ -114,6 +116,7 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
         }}
       />
       <DraftStatsFooter draft={props.draft} />
+      <ComposerDevicePicker />
       <ComposerActions {...props} />
       {expandedOpen && <ComposerExpandedEditor {...props} />}
     </form>
@@ -202,8 +205,10 @@ function ComposerEditor({
         onKeyUp={onCaretMove}
         onClick={onCaretMove}
         onPaste={onPaste}
-        placeholder="Send a turn... (Cmd/Ctrl+Enter; / for commands; @ to reference a file; paste or drop images and text files)"
-        rows={3}
+        aria-label="Message your agent"
+        placeholder="Message your agent…"
+        title="Cmd/Ctrl+Enter to send · / commands · @ files"
+        rows={2}
         spellCheck={false}
       />
       {previewOpen && (
@@ -222,7 +227,7 @@ function ComposerEditor({
 function ComposerActions(props: ComposerSurfaceProps) {
   return (
     <div className="agnt-composer-actions">
-      <ComposerDevicePicker />
+      <TurnFlagBar />
       <button
         type="button"
         className="agnt-button-ghost"
@@ -233,39 +238,42 @@ function ComposerActions(props: ComposerSurfaceProps) {
         <Paperclip />
       </button>
       <VoiceButton />
-      <ThreadGoalControl threadId={props.activeThreadId} />
-      <PromptHistoryDropdown
-        open={props.historyOpen}
-        history={props.history}
-        onOpenChange={props.onHistoryOpenChange}
-        onPick={props.onHistoryPick}
-      />
-      <button
-        type="button"
-        className={"agnt-button-ghost" + (props.previewOpen ? " agnt-button-ghost-active" : "")}
-        onClick={() => props.onPreviewOpenChange(!props.previewOpen)}
-        title={props.previewOpen ? "Hide markdown preview" : "Show markdown preview"}
-        aria-pressed={props.previewOpen}
-        aria-label={props.previewOpen ? "Hide preview" : "Show preview"}
-      >
-        {props.previewOpen ? <EyeSlash /> : <Eye />}
-      </button>
-      <button
-        type="button"
-        className="agnt-button-ghost"
-        onClick={() => props.onExpandedOpenChange(true)}
-        title="Expand to a viewport-tall editor (Esc to close)"
-        aria-label="Expand composer"
-      >
-        ⤢
-      </button>
+      <ActionPopover label="More composer tools" placement="top" trigger={<Ellipsis size={18} />} className="agnt-composer-tools">
+        <ThreadGoalControl threadId={props.activeThreadId} />
+        <PromptHistoryDropdown
+          open={props.historyOpen}
+          history={props.history}
+          onOpenChange={props.onHistoryOpenChange}
+          onPick={props.onHistoryPick}
+        />
+        <button data-close-popover
+          type="button"
+          className={"agnt-button-ghost" + (props.previewOpen ? " agnt-button-ghost-active" : "")}
+          onClick={() => props.onPreviewOpenChange(!props.previewOpen)}
+          title={props.previewOpen ? "Hide markdown preview" : "Show markdown preview"}
+          aria-pressed={props.previewOpen}
+          aria-label={props.previewOpen ? "Hide preview" : "Show preview"}
+        >
+          {props.previewOpen ? <EyeSlash /> : <Eye />}
+          {props.previewOpen ? "Hide preview" : "Preview Markdown"}
+        </button>
+        <button data-close-popover
+          type="button"
+          className="agnt-button-ghost"
+          onClick={() => props.onExpandedOpenChange(true)}
+          title="Expand to a viewport-tall editor (Esc to close)"
+          aria-label="Expand composer"
+        >
+          ⤢ <span>Expand editor</span>
+        </button>
+      </ActionPopover>
       {props.running ? (
         <button type="button" className="agnt-button-danger" onClick={props.onStop}>
           Stop
         </button>
       ) : (
-        <button type="submit" className="agnt-button-primary" disabled={!props.draft.trim() && props.attachments.length === 0}>
-          Send
+        <button type="submit" className="agnt-button-primary" aria-label="Send message" title="Send message" disabled={!props.draft.trim() && props.attachments.length === 0}>
+          <ArrowUp size={19} />
         </button>
       )}
     </div>

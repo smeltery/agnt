@@ -82,8 +82,10 @@ export function ChatHeader({ rpc }: ChatHeaderProps) {
         {color && (
           <span className="agnt-chat-header-color-dot" aria-label={`${color} tag`} title={`${color} tag`} />
         )}
-        <h1 className="agnt-chat-header-title">{title}</h1>
-        {thread.cwd && <code className="agnt-chat-header-cwd">{thread.cwd}</code>}
+        <div className="agnt-chat-title-copy">
+          {thread.cwd && <span className="agnt-chat-project" title={thread.cwd}>{thread.cwd.split(/[\\/]/).filter(Boolean).at(-1)}</span>}
+          <h1 className="agnt-chat-header-title">{title}</h1>
+        </div>
         {thread.modelProvider && (
           <span
             className={"agnt-row-tag agnt-chat-header-provider agnt-provider-" + providerSlug(thread.modelProvider)}

@@ -17,7 +17,6 @@ import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
 import { MessageRow } from "./rows";
 import { ThreadSearchBar } from "./ThreadSearchBar";
-import { TurnFlagBar } from "./TurnFlagBar";
 
 const CONTEXT_WARN_FRACTION = 0.8;
 
@@ -247,7 +246,6 @@ export function ChatView() {
           ↓ Latest
         </button>
       )}
-      <TurnFlagBar />
       <Composer
         running={running}
         onSend={(text, attachments) => {

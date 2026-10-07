@@ -4,6 +4,7 @@
 // click.
 
 import { useEffect, useState } from "react";
+import { Mic } from "../shared/Icon";
 import { useVoiceStore } from "../../state/voice-store";
 
 export function VoiceButton() {
@@ -56,7 +57,7 @@ export function VoiceButton() {
       >
         {state.kind === "recording" ? <span className="agnt-voice-dot" aria-hidden /> : null}
         {state.kind === "transcribing" ? <span className="agnt-voice-spinner" aria-hidden /> : null}
-        <span className="agnt-voice-glyph" aria-hidden>{state.kind === "recording" ? "■" : "●"}</span>
+        <span className="agnt-voice-glyph" aria-hidden>{state.kind === "recording" ? "■" : <Mic size={18} />}</span>
         <span className="agnt-voice-label">{label}</span>
       </button>
       {state.kind === "recording" && (

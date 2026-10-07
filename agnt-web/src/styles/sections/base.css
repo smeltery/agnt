@@ -17,7 +17,7 @@
 
 :root {
   /* Dark palette (iOS dark mode UIKit colors). */
-  --agnt-bg: #000000;
+  --agnt-bg: #141416;
   --agnt-bg-elev: #1c1c1e;
   --agnt-bg-elev-2: rgba(118, 118, 128, 0.24);
   --agnt-border: rgba(84, 84, 88, 0.65);
@@ -48,12 +48,12 @@
 
 [data-theme="light"] {
   --agnt-bg: #ffffff;
-  --agnt-bg-elev: #f2f2f7;
+  --agnt-bg-elev: #f7f7f9;
   --agnt-bg-elev-2: rgba(118, 118, 128, 0.12);
-  --agnt-border: rgba(60, 60, 67, 0.29);
-  --agnt-fg: #000000;
-  --agnt-fg-dim: rgba(60, 60, 67, 0.60);
-  --agnt-fg-tertiary: rgba(60, 60, 67, 0.30);
+  --agnt-border: #e5e5ea;
+  --agnt-fg: #202127;
+  --agnt-fg-dim: #6d707a;
+  --agnt-fg-tertiary: #777a84;
   --agnt-accent: #007aff;
   --agnt-danger: #ff3b30;
   --agnt-warn: #ff9500;
@@ -64,12 +64,12 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     --agnt-bg: #ffffff;
-    --agnt-bg-elev: #f2f2f7;
+    --agnt-bg-elev: #f7f7f9;
     --agnt-bg-elev-2: rgba(118, 118, 128, 0.12);
-    --agnt-border: rgba(60, 60, 67, 0.29);
-    --agnt-fg: #000000;
-    --agnt-fg-dim: rgba(60, 60, 67, 0.60);
-    --agnt-fg-tertiary: rgba(60, 60, 67, 0.30);
+    --agnt-border: #e5e5ea;
+    --agnt-fg: #202127;
+    --agnt-fg-dim: #6d707a;
+    --agnt-fg-tertiary: #777a84;
     --agnt-accent: #007aff;
     --agnt-danger: #ff3b30;
     --agnt-warn: #ff9500;
