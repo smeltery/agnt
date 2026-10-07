@@ -70,179 +70,17 @@
         font-size: 12px;
       }
       .desktop {
-        position: absolute;
-        top: 168px;
-        left: 635px;
-        width: 490px;
-        height: 325px;
-        background: white;
-        border: 1px solid #dfe1d8;
-        border-radius: 15px;
-        box-shadow: 0 24px 50px -20px #373d3326;
-        overflow: hidden;
-      }
-      .toolbar {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        height: 41px;
-        padding: 0 16px;
-        border-bottom: 1px solid #ebede5;
-        font-size: 10px;
-      }
-      .dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #d6d9cf;
-      }
-      .toolbar b {
-        font-weight: 500;
-        margin-left: 16px;
-      }
-      .content {
-        display: grid;
-        grid-template-columns: 113px 1fr;
-        height: 284px;
-      }
-      aside {
-        background: #f0f1ed;
-        padding: 20px 8px;
-        font-size: 9px;
-        color: #767d6c;
-      }
-      aside small {
-        font-size: 6px;
-        letter-spacing: 0.5px;
-        display: block;
-        padding: 0 6px 9px;
-      }
-      aside span {
-        display: block;
-        padding: 9px 6px;
-      }
-      aside .selected {
-        background: #e1e6d8;
-        color: #47543b;
-        border-radius: 5px;
-      }
-      .chat {
-        padding: 19px 17px;
-      }
-      .chat h3 {
-        font-size: 11px;
-      }
-      .bubble {
-        background: #efefec;
-        border-radius: 8px 8px 2px 8px;
-        padding: 10px;
-        font-size: 9px;
-        margin: 18px 0;
-      }
-      .assistant {
-        font-size: 10px;
-        display: flex;
-        gap: 7px;
-        align-items: center;
-      }
-      .assistant i {
-        color: #a1775e;
-        font-style: normal;
-        font-size: 18px;
-      }
-      .chat p {
-        font-size: 9px;
-        color: #727968;
-        margin-top: 9px;
-      }
-      .file {
-        background: #f7f9f3;
-        border: 1px solid #e3e7db;
-        padding: 10px;
-        border-radius: 6px;
-        font-size: 8px;
-        color: #527346;
-        margin-top: 13px;
-      }
-      .composer {
-        border: 1px solid #e2e5db;
-        border-radius: 8px;
-        font-size: 9px;
-        color: #89917e;
-        padding: 10px;
-        margin-top: 22px;
+        position: absolute; top: 152px; left: 525px; width: 635px;
+        border: 1px solid #d9dcd5; border-radius: 12px; overflow: hidden;
+        box-shadow: 0 20px 40px -20px #373d3340;
       }
       .phone {
-        position: absolute;
-        left: 948px;
-        top: 225px;
-        width: 184px;
-        height: 340px;
-        border: 5px solid #3a3e33;
-        border-radius: 29px;
-        background: white;
-        transform: rotate(5deg);
-        padding: 13px 12px;
-        box-shadow: 0 18px 35px #30362720;
+        position: absolute; top: 198px; right: 25px; width: 177px;
+        border: 5px solid #34382f; border-radius: 19px; overflow: hidden;
+        box-shadow: 0 14px 32px -12px #373d3340;
       }
-      .island {
-        width: 55px;
-        height: 13px;
-        border-radius: 99px;
-        background: #2d3127;
-        margin: -5px auto 18px;
-      }
-      .phone-brand {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        font-size: 18px;
-        font-weight: 600;
-        letter-spacing: -1px;
-      }
-      .phone-brand img {
-        width: 27px;
-        height: 27px;
-      }
-      .phone h3 {
-        margin-top: 18px;
-        font-size: 14px;
-        letter-spacing: -0.5px;
-      }
-      .phone .bubble {
-        font-size: 9px;
-        margin: 14px 0;
-      }
-      .phone p {
-        font-size: 9px;
-        color: #656d5b;
-        line-height: 1.6;
-        margin-top: 7px;
-      }
-      .phone .file {
-        font-size: 8px;
-        padding: 8px;
-        margin-top: 12px;
-      }
-      .home {
-        width: 57px;
-        height: 3px;
-        border-radius: 3px;
-        background: #404537;
-        position: absolute;
-        bottom: 9px;
-        left: 60px;
-      }
-      .note {
-        position: absolute;
-        top: 516px;
-        left: 678px;
-        color: #7a826d;
-        font-size: 12px;
-      }
-      .note em {
-        font-size: 17px;
-      }
+      .desktop img, .phone img { display: block; width: 100%; height: auto; }
+      .note { position: absolute; top: 603px; right: 38px; font-size: 11px; color: var(--muted); }
     </style>
   </head>
   <body>
@@ -255,55 +93,8 @@
       Coding agents on your machine.<br />The conversation in your pocket.
     </p>
     <div class="pill">Local-first &nbsp;·&nbsp; End-to-end encrypted</div>
-    <div class="desktop">
-      <div class="toolbar">
-        <i class="dot"></i><i class="dot"></i><i class="dot"></i
-        ><b>agnt / workspace</b>
-      </div>
-      <div class="content">
-        <aside>
-          <small>YOUR PROJECTS</small
-          ><span class="selected">▱ &nbsp; fieldnotes</span
-          ><span>▱ &nbsp; personal-site</span><span>▱ &nbsp; tiny-tools</span>
-        </aside>
-        <div class="chat">
-          <h3>Make room for dark mode</h3>
-          <div class="bubble">
-            Add a dark theme that follows my system settings.
-          </div>
-          <div class="assistant">
-            <img
-              src="../assets/brands/claude.svg"
-              width="16"
-              height="16"
-              alt=""
-            />Claude Code
-          </div>
-          <p>I’ll use the existing color tokens and your system preference.</p>
-          <div class="file">✓ &nbsp; theme.css &nbsp; +24 −6</div>
-          <div class="composer">Ask a follow-up…</div>
-        </div>
-      </div>
-    </div>
-    <div class="note">same machine.<br /><em>new point of view.</em></div>
-    <div class="phone">
-      <div class="island"></div>
-      <div class="phone-brand">
-        <img src="../assets/app-icon.png" alt="" />agnt
-      </div>
-      <h3>Make room for<br />dark mode</h3>
-      <div class="bubble">Nice. Add a manual toggle, too.</div>
-      <div class="assistant">
-        <img
-          src="../assets/brands/claude.svg"
-          width="16"
-          height="16"
-          alt=""
-        />Claude Code
-      </div>
-      <p>Added a theme toggle. Your choice persists between visits.</p>
-      <div class="file">✓ &nbsp; Ready for your next idea</div>
-      <div class="home"></div>
-    </div>
+    <div class="desktop"><img src="../assets/screenshots/browser-desktop.png" alt="Actual agnt desktop browser interface" /></div>
+    <div class="phone"><img src="../assets/screenshots/browser-mobile.png" alt="Actual agnt mobile browser interface" /></div>
+    <div class="note">Browser UI · Example conversation data</div>
   </body>
 </html>
