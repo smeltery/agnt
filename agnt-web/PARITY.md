@@ -10,6 +10,14 @@ status. Update it as part of every session that touches `agnt-web/`.
 | 🔲 stub | typed but no real behavior; UI shows placeholder |
 | ⛔ unported | not yet in agnt-web at all |
 
+## Browser presentation
+
+The workspace uses a native-inspired desktop and mobile layout with a centered
+conversation and compact composer. Workspace actions, message actions, and run
+settings use keyboard-accessible popovers that stay within the viewport. Mobile
+keeps the conversation drawer and all composer tools available without horizontal
+overflow. This is browser UI, not a pixel-identical native iOS view.
+
 ## Wire protocol
 
 | Surface | Status | Notes |

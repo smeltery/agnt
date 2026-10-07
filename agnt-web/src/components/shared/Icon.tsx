@@ -326,3 +326,7 @@ export const ALL_ICONS = {
   Trash,
   Xmark,
 } as const;
+
+export function ArrowUp(props: IconProps) {
+  return <svg {...svgProps(props)}><path {...BASE_STROKE_PROPS} d="M8 13V3M3.5 7.5L8 3l4.5 4.5" /></svg>;
+}

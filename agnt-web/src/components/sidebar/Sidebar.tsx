@@ -1,3 +1,5 @@
+import { ActionPopover } from "../shared/ActionPopover";
+import { Ellipsis } from "../shared/Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodexThread } from "../../models";
 import { useTranslator } from "../../lib/i18n";
@@ -260,8 +262,9 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
   return (
     <aside className={"agnt-sidebar agnt-sidebar-density-" + density}>
       <div className="agnt-sidebar-header">
-        <span className="agnt-sidebar-title">Threads</span>
+        <span className="agnt-sidebar-title">Conversations</span>
         {loading && <span className="agnt-sidebar-loading">syncing…</span>}
+        <ActionPopover className="agnt-sidebar-tools" label="Conversation list options" trigger={<Ellipsis size={18} />}>
         {!selectMode && (
           <button
             type="button"
@@ -271,6 +274,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
             aria-label={density === "compact" ? "Comfortable density" : "Compact density"}
           >
             {density === "compact" ? <Line3HorizontalDecrease /> : <Line3Horizontal />}
+            {density === "compact" ? "Comfortable spacing" : "Compact spacing"}
           </button>
         )}
         {!selectMode && (
@@ -298,6 +302,7 @@ export function Sidebar({ onNewChat, onAfterSelect }: SidebarProps) {
             {groupBy === "project" ? "By project" : "By date"}
           </button>
         )}
+        </ActionPopover>
         <button type="button" className="agnt-sidebar-new" onClick={onNewChat} title="New chat" aria-label="New chat">
           <Plus /> {t("sidebar.newChat")}
         </button>

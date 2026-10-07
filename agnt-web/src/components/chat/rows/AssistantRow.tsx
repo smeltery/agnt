@@ -15,7 +15,8 @@ import { useThreadsStore } from "../../../state/threads-store";
 import { formatTurnDuration, useTurnTimingStore } from "../../../state/turn-timing-store";
 import { useTurnTokenUsageStore } from "../../../state/turn-token-usage-store";
 import { revertPatchApply, revertPatchPreview } from "../../../protocol/workspace-checkpoints";
-import { ArrowshapeTurnUpLeft, ArrowUturnLeft, Clock } from "../../shared/Icon";
+import { ArrowshapeTurnUpLeft, ArrowUturnLeft, Clock, Ellipsis } from "../../shared/Icon";
+import { ActionPopover } from "../../shared/ActionPopover";
 import { BookmarkButton } from "./BookmarkButton";
 import { RowLinkButton } from "./RowLinkButton";
 import { MarkdownContent } from "../MarkdownContent";
@@ -163,11 +164,13 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
       className={"agnt-row agnt-row-assistant" + (message.isStreaming ? " agnt-row-streaming" : "")}
       title={formatRelativeWithAbsolute(message.createdAt)}
     >
+      <div className="agnt-assistant-identity"><img src="/icon-192.png" width="22" height="22" alt="" /><span>Assistant</span></div>
       <div className="agnt-row-bubble">
         <MarkdownContent text={renderedText} cwd={thread?.cwd} />
         {message.isStreaming && <span className="agnt-cursor-blink" aria-hidden />}
       </div>
       {!message.isStreaming && message.text && (
+        <ActionPopover label="Message actions" trigger={<Ellipsis size={17} />} className="agnt-message-tools">
         <div className="agnt-row-actions">
           {durationLabel && (
             <span
@@ -269,6 +272,7 @@ export function AssistantRow({ message }: { message: CodexMessage }) {
             {justCopied ? "Copied" : "Copy"}
           </button>
         </div>
+        </ActionPopover>
       )}
     </div>
   );

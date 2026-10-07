@@ -127,7 +127,7 @@ export function PromptHistoryDropdown({
         aria-label="Prompt history (empty)"
         disabled
       >
-        <ClockArrowCirclepath />
+        <ClockArrowCirclepath /> <span>Prompt history</span>
       </button>
     );
   }
@@ -144,7 +144,7 @@ export function PromptHistoryDropdown({
         aria-haspopup="listbox"
         aria-label="Prompt history"
       >
-        <ClockArrowCirclepath />
+        <ClockArrowCirclepath /> <span>Prompt history</span>
       </button>
       {open && (
         <div className="agnt-prompt-history-popover" role="listbox" aria-label="Prompt history">

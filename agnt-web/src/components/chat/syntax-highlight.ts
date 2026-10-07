@@ -24,6 +24,7 @@ const ALIASES: Record<string, string> = {
 // Each entry is a thunk so Vite emits one chunk per language that we only
 // fetch on first use. Adding a language here is the one-line edit.
 const LANGUAGE_LOADERS: Record<string, () => Promise<unknown>> = {
+  css: () => import("prismjs/components/prism-css"),
   bash: () => import("prismjs/components/prism-bash"),
   diff: () => import("prismjs/components/prism-diff"),
   go: () => import("prismjs/components/prism-go"),

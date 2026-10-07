@@ -18,7 +18,8 @@ import { ChatView } from "../chat/ChatView";
 import { Sidebar } from "../sidebar/Sidebar";
 import { NoticeStack } from "../shared/NoticeStack";
 import { ReconnectBanner } from "../shared/ReconnectBanner";
-import { Line3Horizontal } from "../shared/Icon";
+import { Ellipsis, Line3Horizontal } from "../shared/Icon";
+import { ActionPopover } from "../shared/ActionPopover";
 import { StatusPill } from "../shared/StatusPill";
 import { UndoToast } from "../shared/UndoToast";
 
@@ -253,7 +254,7 @@ export function Workspace() {
         >
           <Line3Horizontal />
         </button>
-        <span className="agnt-brand">agnt</span>
+        <span className="agnt-brand"><img src="/icon-192.png" alt="" width="26" height="26" />agnt</span>
         <StatusPill status={status} />
         <div className="agnt-workspace-actions">
           {status.kind !== "open" && status.kind !== "connecting" && status.kind !== "handshaking" && (
@@ -261,38 +262,40 @@ export function Workspace() {
               Reconnect
             </button>
           )}
-          <button
-            className="agnt-button-ghost"
-            onClick={() => setOverlay("help")}
-            title="Keyboard shortcuts"
-            aria-label="Keyboard shortcuts"
-          >
-            ?
-          </button>
-          <button
-            className={"agnt-button-ghost" + (readingMode ? " agnt-button-ghost-active" : "")}
-            onClick={() => setReadingMode((open) => !open)}
-            title={readingMode ? "Exit reading mode (z)" : "Reading mode — hide sidebar + composer (z)"}
-            aria-pressed={readingMode}
-            aria-label="Toggle reading mode"
-          >
-            Read
-          </button>
-          {terminalAvailable && (
-            <button
+          <ActionPopover className="agnt-workspace-tools" label="Workspace actions" trigger={<Ellipsis size={20} />}>
+            <button data-close-popover
               className="agnt-button-ghost"
-              onClick={() => setOverlay("terminal")}
-              title="Open a shell on the bridge host"
+              onClick={() => setOverlay("help")}
+              title="Keyboard shortcuts"
+              aria-label="Keyboard shortcuts"
             >
-              Terminal
+              Keyboard shortcuts
             </button>
-          )}
-          <button className="agnt-button-ghost" onClick={() => setOverlay("settings")}>
-            Settings
-          </button>
-          <button className="agnt-button-ghost" onClick={() => setOverlay("about")}>
-            About
-          </button>
+            <button data-close-popover
+              className={"agnt-button-ghost" + (readingMode ? " agnt-button-ghost-active" : "")}
+              onClick={() => setReadingMode((open) => !open)}
+              title={readingMode ? "Exit reading mode (z)" : "Reading mode — hide sidebar + composer (z)"}
+              aria-pressed={readingMode}
+              aria-label="Toggle reading mode"
+            >
+              Reading mode
+            </button>
+            {terminalAvailable && (
+              <button data-close-popover
+                className="agnt-button-ghost"
+                onClick={() => setOverlay("terminal")}
+                title="Open a shell on the bridge host"
+              >
+                Terminal
+              </button>
+            )}
+            <button data-close-popover className="agnt-button-ghost" onClick={() => setOverlay("settings")}>
+              Settings
+            </button>
+            <button data-close-popover className="agnt-button-ghost" onClick={() => setOverlay("about")}>
+              About
+            </button>
+          </ActionPopover>
         </div>
       </header>
       <ReconnectBanner />

@@ -15,6 +15,12 @@ describe("syntax highlighter (lazy)", () => {
     expect(knownLanguage("Bash")).toBe("bash");
   });
 
+  it("highlights CSS fences with real grammar tokens", async () => {
+    expect(knownLanguage("CSS")).toBe("css");
+    expect(await ensureLanguage("css")).toBe(true);
+    expect(highlightCode("body { color: red; }", "css")).toContain('class="token property"');
+  });
+
   it("returns null for languages we deliberately don't ship loaders for", () => {
     expect(knownLanguage("brainfuck")).toBeNull();
     expect(knownLanguage(undefined)).toBeNull();
