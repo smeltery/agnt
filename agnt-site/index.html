@@ -23,7 +23,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="agnt — Your agents. A little more freedom. A coding session on a desktop continues on a phone."
+      content="agnt — Your agents. A little more freedom. Actual desktop and mobile browser UI with example conversation data."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta
@@ -88,148 +88,20 @@
         <p class="fine">iPhone, Android & browser · Your Mac or Linux host</p>
       </section>
 
-      <figure
-        class="product-demo shell"
-        aria-label="Illustrative demo of a coding agent running on a computer and continuing on a phone"
-      >
+      <figure class="product-demo shell" aria-label="Actual agnt browser interface at desktop and phone sizes, with example conversation data">
         <div class="scene">
-          <div class="desktop-window">
-            <div class="window-bar">
-              <span class="window-dots" aria-hidden="true"
-                ><i></i><i></i><i></i></span
-              ><span>agnt <span class="muted">/</span> workspace</span
-              ><span class="window-status"
-                ><span class="status-dot"></span>Local host</span
-              >
-            </div>
-            <div class="desktop-body">
-              <aside class="scene-sidebar" aria-hidden="true">
-                <div class="sidebar-title">YOUR PROJECTS <span>+</span></div>
-                <div class="project active">▱ &nbsp; fieldnotes</div>
-                <div class="project">▱ &nbsp; personal-site</div>
-                <div class="project">▱ &nbsp; tiny-tools</div>
-                <div class="sidebar-title conversations">CONVERSATIONS</div>
-                <div class="thread active">Make room for dark mode</div>
-                <div class="thread">Tidy up the navigation</div>
-                <div class="thread">A faster search</div>
-                <div class="sidebar-bottom">
-                  <span class="status-dot"></span> Connected to your machine
-                </div>
-              </aside>
-              <div class="desktop-chat">
-                <div class="chat-heading">
-                  <strong>Make room for dark mode</strong
-                  ><span class="branch">⑂ main</span>
-                </div>
-                <div class="chat-user">
-                  Add a dark theme that follows my system settings.
-                </div>
-                <div class="assistant-name">
-                  <img
-                    class="agent-symbol"
-                    src="./assets/brands/claude.svg"
-                    alt=""
-                    width="18"
-                    height="18"
-                  /><span data-provider-name>Claude Code</span
-                  ><span class="muted">on your machine</span>
-                </div>
-                <p class="chat-copy">
-                  I’ll use the existing color tokens and respect your system
-                  preference.
-                </p>
-                <div class="file-change">
-                  <span>▧ &nbsp; src/styles/theme.css</span
-                  ><span class="addition"
-                    >+24 <span class="deletion">−6</span></span
-                  >
-                </div>
-                <pre
-                  class="code-preview"
-                ><span class="code-muted">@media</span> (prefers-color-scheme: dark) {
-  <span class="code-muted">:root</span> {
-    <span class="addition">--surface: #1c1d1b;</span>
-    <span class="addition">--text: #f5f5f2;</span>
-  }
-}</pre>
-                <div class="test-result">
-                  <span>✓</span> Theme updated. All checks passed.
-                </div>
-                <div class="demo-composer">Ask a follow-up…<span>↑</span></div>
-              </div>
-            </div>
-          </div>
-          <div class="connection-note" aria-hidden="true">
-            <span>same machine.<br /><em>new point of view.</em></span
-            ><svg viewBox="0 0 90 44">
-              <path d="M3 9C30 3 36 39 80 30m-8-8 10 8-11 7" />
-            </svg>
-          </div>
-          <div class="phone">
-            <div class="phone-top">
-              <span>9:41</span><span class="dynamic-island"></span
-              ><span aria-hidden="true">▰</span>
-            </div>
-            <div class="phone-header">
-              <img
-                src="./assets/app-icon.png"
-                width="29"
-                height="29"
-                alt=""
-              /><strong>agnt</strong
-              ><span class="secure-pill">● connected</span>
-            </div>
-            <div class="phone-project">fieldnotes <span>⌄</span></div>
-            <h3>Make room for<br />dark mode</h3>
-            <div class="phone-user" id="demo-prompt">
-              Nice. Add a manual toggle, too.
-            </div>
-            <div class="phone-assistant">
-              <img
-                class="agent-symbol"
-                src="./assets/brands/claude.svg"
-                alt=""
-                width="18"
-                height="18"
-              /><strong data-provider-name>Claude Code</strong>
-            </div>
-            <p id="demo-reply">
-              Added a theme toggle to the header. Your choice persists between
-              visits.
-            </p>
-            <div class="phone-file">
-              <span>▧ &nbsp; Header.tsx</span><span class="addition">+18</span>
-            </div>
-            <div class="phone-done">
-              <span class="status-dot"></span
-              ><span id="demo-state">Ready for your next idea</span>
-            </div>
-            <div class="phone-composer">Message your agent<span>↑</span></div>
-            <div class="home-indicator"></div>
-          </div>
+          <a class="desktop-capture" href="./assets/screenshots/browser-desktop.png" aria-label="View full-size desktop browser screenshot">
+            <img src="./assets/screenshots/browser-desktop.png" width="1440" height="1000" alt="agnt browser client: thread sidebar, conversation, Markdown response, model controls, and composer." fetchpriority="high" />
+          </a>
+          <a class="mobile-capture" href="./assets/screenshots/browser-mobile.png" aria-label="View full-size mobile browser screenshot">
+            <img src="./assets/screenshots/browser-mobile.png" width="430" height="932" alt="The same agnt browser conversation at phone width, with the real header and composer controls." />
+          </a>
         </div>
         <figcaption>
-          <span>At your desk. On the sofa. In the same conversation.</span
-          ><span class="demo-label">Illustrative demo</span>
+          <span>One conversation. Desktop and mobile browser.</span>
+          <span class="capture-note">Actual app UI · Example conversation data</span>
         </figcaption>
-        <div
-          class="demo-controls"
-          role="group"
-          aria-label="Explore an example conversation"
-        >
-          <button
-            type="button"
-            class="selected"
-            data-scene="followup"
-            aria-pressed="true"
-          >
-            01 &nbsp; Follow up</button
-          ><button type="button" data-scene="review" aria-pressed="false">
-            02 &nbsp; Review changes</button
-          ><button type="button" data-scene="next" aria-pressed="false">
-            03 &nbsp; Keep going
-          </button>
-        </div>
+        <p class="capture-platform">Browser client shown; the native iOS and Android apps have their own interfaces. Select an image to see it full-size.</p>
       </figure>
 
       <section

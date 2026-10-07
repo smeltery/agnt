@@ -1,6 +1,6 @@
 # <img src="agnt-site/assets/app-icon.png" alt="" width="40" height="40" align="absmiddle" /> agnt
 
-![agnt — Your agents. A little more freedom.](agnt-site/assets/og.png)
+![agnt — actual desktop and mobile browser UI with example conversation data.](agnt-site/assets/og.png)
 
 [![CI](https://github.com/smeltery/agnt/actions/workflows/ci.yml/badge.svg)](https://github.com/smeltery/agnt/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](LICENSE)

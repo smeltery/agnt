@@ -40,8 +40,8 @@ export function ThreadContextMenu({ thread, pinned = false }: Props) {
   const currentColor = useThreadsStore((state) => state.colorByThread[thread.id]);
   const unread = useThreadsStore((state) => isThreadUnread(thread, state.lastVisitedByThread));
   const exportMessages = useThreadsStore(
-    (state) => state.reducerStates[thread.id]?.messages ?? []
-  );
+    (state) => state.reducerStates[thread.id]?.messages
+  ) ?? [];
 
   function exportThread() {
     const markdown = exportThreadToMarkdown({ thread, messages: exportMessages });
