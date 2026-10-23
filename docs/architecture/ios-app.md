@@ -132,6 +132,24 @@ Worth being explicit, because the boundary matters:
 
 This separation keeps the iOS app inspectable and small, and lets adding a new provider be a Mac-side-only change.
 
+### Local files in managed worktrees
+
+Place a `.worktreeinclude` file in the original repository root to carry local
+files into new or reused managed worktrees. It accepts Git ignore-style patterns,
+for example `config/local.json` or `fixtures/local/`. The bridge copies matching
+untracked regular files, including ignored files, without overwriting existing
+destination files. Symlink entries are skipped and each operation is limited to
+512 files. Tracked files come from the selected worktree base branch.
+
+### Live Activity lifetime
+
+Off-screen completion badges expire after five minutes; failures remain for
+fifteen minutes. Running rows have a four-hour display cap. Opening a chat clears
+its activity, and switching hosts clears all activities. When iOS suspends local
+updates, ActivityKit marks content stale by the next expiry or after thirty
+minutes for running work; actual removal resumes when the app can run again.
+These display limits do not stop the agent's work.
+
 ### Managed checkout cleanup
 
 Use **Manage Worktrees** in a local project's sidebar menu to list its managed
