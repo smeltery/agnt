@@ -26,13 +26,27 @@ function createOpencodeStreamRecovery({ state, transport, streamHandlers }) {
       const activeMessages = latestUser >= 0 && messages[latestUser].info.id === state.activeUserMessageId
         ? messages.slice(latestUser + 1) : [];
       for (const message of activeMessages) {
-        if (message?.info?.role !== "assistant") continue;
+        if (message?.info?.role !== "assistant" || message.info.parentID !== state.activeUserMessageId) continue;
         streamHandlers.handleMessageUpdated({ info: message.info });
         for (const part of message.parts || []) streamHandlers.handleMessagePartUpdated({ part });
       }
       if (!current() || !status.json || Array.isArray(status.json)) return;
-      const type = status.json[threadId]?.type || "idle";
-      streamHandlers.handleSessionStatus({ status: { type } });
+      const sessionStatus = status.json[threadId];
+      const type = sessionStatus?.type;
+      if (type === "busy" || type === "retry") {
+        streamHandlers.handleSessionStatus({ status: sessionStatus });
+        return;
+      }
+      const assistant = activeMessages.findLast((message) => message?.info?.role === "assistant"
+        && message.info.parentID === state.activeUserMessageId)?.info;
+      // An absent status is not an idle event. Only matching terminal history
+      // can repair a lost completion when the status snapshot omits the session.
+      if (type === "idle" || (!type && (assistant?.time?.completed || assistant?.error))) {
+        if (assistant?.error) streamHandlers.handleSessionError({ error: assistant.error });
+        else streamHandlers.handleSessionStatus({ status: { type: "idle" } });
+      } else if (sessionStatus) {
+        streamHandlers.handleSessionStatus({ status: sessionStatus });
+      }
     } catch {
       // An unavailable status snapshot is not evidence that the turn ended.
     }
