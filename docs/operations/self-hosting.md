@@ -96,6 +96,30 @@ You should get:
 {"ok":true}
 ```
 
+## Updating or removing the macOS background bridge
+
+After updating a source checkout or moving its Node installation, refresh an
+installed background service from the repo root:
+
+```sh
+node agnt-bridge/bin/agnt.js restart
+```
+
+Restart regenerates the LaunchAgent with the current Node and CLI paths and
+reloads it without replacing saved relay configuration or pairing state.
+
+Before deleting the checkout used by a macOS background service, remove that
+service while its CLI is still available:
+
+```sh
+node agnt-bridge/bin/agnt.js uninstall-service
+```
+
+This unloads the LaunchAgent and removes its plist. Configuration, logs, and
+trusted-device data under `~/.agnt` remain available for a later reinstall.
+Use `stop` for a temporary shutdown. `uninstall-service` is macOS-only; it does
+not remove a Linux systemd user service.
+
 ## Option 2: Self-Hosted VPS Relay
 
 Use this when you want the bridge on your Mac to connect through a relay you run on a VPS.
