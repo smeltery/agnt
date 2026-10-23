@@ -377,6 +377,7 @@ extension CodexService {
 
     // Clears "ready/failed" badges when the user has opened a thread.
     func markThreadAsViewed(_ threadId: String) {
+        LiveActivityCoordinator.shared.dismissIfViewing(threadId: threadId)
         clearRunningThreadWatch(threadId)
         clearOutcomeBadge(for: threadId)
         if threadCompletionBanner?.threadId == threadId {

@@ -43,6 +43,7 @@ extension CodexService {
 
     // Loads messages, drafts, and assistant change-set metadata for the provided Mac namespace.
     func loadLocalState(for macDeviceId: String?) {
+        LiveActivityCoordinator.shared.endAll()
         let normalizedMacDeviceId = normalizedMacScopedDeviceId(macDeviceId)
         let includeLegacyFallback = shouldLoadLegacyLocalStateFallback(for: normalizedMacDeviceId)
         withApplyingMacScopedState {
@@ -247,6 +248,7 @@ extension CodexService {
 
     // Clears in-memory state that is tied to the active Mac before another Mac is loaded.
     func clearInMemoryMacScopedState() {
+        LiveActivityCoordinator.shared.endAll()
         withApplyingMacScopedState {
             threads = []
             activeThreadId = nil

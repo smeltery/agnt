@@ -21,6 +21,7 @@ final class LiveActivityCoordinator {
 
     private static let maxDisplayedConversations = 3
 
+    private var expirationTask: Task<Void, Never>?
     private var current: Activity<AgntActivityAttributes>?
     private var runningTitlesByThread: [String: String] = [:]
     private var runningStartedAtByThread: [String: Date] = [:]
@@ -76,7 +77,10 @@ final class LiveActivityCoordinator {
     }
 
     func dismissIfViewing(threadId: String?) {
-        guard let threadId else { return }
+        guard let threadId else {
+            applyCurrentSnapshot()
+            return
+        }
         runningTitlesByThread.removeValue(forKey: threadId)
         runningStartedAtByThread.removeValue(forKey: threadId)
         completedOutcomesByThread.removeValue(forKey: threadId)
@@ -85,27 +89,59 @@ final class LiveActivityCoordinator {
     }
 
     func endAll() {
+        expirationTask?.cancel()
+        expirationTask = nil
         runningTitlesByThread.removeAll()
         runningStartedAtByThread.removeAll()
         completedOutcomesByThread.removeAll()
         failedOutcomesByThread.removeAll()
-        endCurrent(dismissalPolicy: .immediate)
+        let activities = Activity<AgntActivityAttributes>.activities
+        current = nil
+        Task {
+            for activity in activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
     }
 
     private func applyCurrentSnapshot() {
+        let now = Date()
+        completedOutcomesByThread = completedOutcomesByThread.filter {
+            $0.value.createdAt.addingTimeInterval(LiveActivityExpiration.completedLifetime) > now
+        }
+        failedOutcomesByThread = failedOutcomesByThread.filter {
+            $0.value.createdAt.addingTimeInterval(LiveActivityExpiration.failedLifetime) > now
+        }
         completedOutcomesByThread = Dictionary(uniqueKeysWithValues: completedOutcomesByThread
             .sorted { $0.value.createdAt > $1.value.createdAt }
             .prefix(Self.maxDisplayedConversations).map { ($0.key, $0.value) })
         failedOutcomesByThread = Dictionary(uniqueKeysWithValues: failedOutcomesByThread
             .sorted { $0.value.createdAt > $1.value.createdAt }
             .prefix(Self.maxDisplayedConversations).map { ($0.key, $0.value) })
-        let state = makeContentState()
+        let expiration = LiveActivityExpiration(
+            runningStartedAt: Array(runningStartedAtByThread.values),
+            completedAt: completedOutcomesByThread.values.map(\.createdAt),
+            failedAt: failedOutcomesByThread.values.map(\.createdAt),
+            now: now
+        )
+        expirationTask?.cancel()
+        expirationTask = nil
+        let state = makeContentState(now: now)
         if state.isEmpty {
             endCurrent(dismissalPolicy: .immediate)
             return
         }
 
-        let content = ActivityContent(state: state, staleDate: nil)
+        if let deadline = expiration.nextRefreshDate {
+            expirationTask = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(max(0, deadline.timeIntervalSinceNow) * 1_000_000_000))
+                } catch { return }
+                guard !Task.isCancelled else { return }
+                self?.applyCurrentSnapshot()
+            }
+        }
+        let content = ActivityContent(state: state, staleDate: expiration.staleDate)
         if let current {
             Task { await current.update(content) }
             return
@@ -121,8 +157,14 @@ final class LiveActivityCoordinator {
         }
     }
 
-    private func makeContentState() -> AgntActivityAttributes.ContentState {
+    private func makeContentState(now: Date) -> AgntActivityAttributes.ContentState {
+        // Retain the original start time until the run ends so repeated active
+        // events cannot revive a row that has reached its display lifetime.
         let running = runningTitlesByThread
+            .filter { threadId, _ in
+                guard let startedAt = runningStartedAtByThread[threadId] else { return false }
+                return startedAt.addingTimeInterval(LiveActivityExpiration.runningLifetime) > now
+            }
             .map { threadId, title in
                 AgntActivityConversation(
                     id: threadId,
@@ -170,7 +212,7 @@ final class LiveActivityCoordinator {
             runningConversations: Array(running),
             completedConversations: completed,
             failedConversations: failed,
-            updatedAt: Date()
+            updatedAt: now
         )
     }
 
